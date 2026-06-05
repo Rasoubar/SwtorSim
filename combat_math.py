@@ -1,10 +1,22 @@
 import random
+#EFFECTS = {
+#    79: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
+#    386: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
+#    220: {"stat_name": "Damage Modifier", "modifier_bucket": "sub_30"},
+#    133: {"stat_name": "Critical Chance", "modifier_bucket": "crit"},
+#    46: {"stat_name": "Damage Modifier", "modifier_bucket": "unknown_percentage"}
+#}
+
+
 EFFECTS = {
     79: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
     386: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
     220: {"stat_name": "Damage Modifier", "modifier_bucket": "sub_30"},
     133: {"stat_name": "Critical Chance", "modifier_bucket": "crit"},
-    46: {"stat_name": "Damage Modifier", "modifier_bucket": "unknown_percentage"}
+    46: {"stat_name": "Damage Modifier", "modifier_bucket": "unknown_percentage"},
+    # for testing for now, will check actual ids later
+    500: {"stat_name": "Mastery Stat"},
+    600: {"stat_name": "Power Stat"}
 }
 def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     attack_type = action_data["attack type"] #1 = melee, 2 = ranged, 3 = force, 4 = tech
@@ -50,12 +62,16 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     shp_max = action_data["shp_max"]
     amp = action_data["amp"] #amount modifier percent
     coeff = action_data["coeff"]
-    main_hand_min = caster.stats["main_hand_min"]
-    main_hand_max = caster.stats["main_hand_max"]
-    off_hand_min = caster.stats["off_hand_min"]
-    off_hand_max = caster.stats["off_hand_max"]
-    damage_bonus = caster.stats["damage_bonus"]
-    standard_health = caster.stats["standard_health"]
+    main_hand_min = caster.stats["Main_hand_min"]
+    main_hand_max = caster.stats["Main_hand_max"]
+    off_hand_min = caster.stats["Off_hand_min"]
+    off_hand_max = caster.stats["Off_hand_max"]
+    standard_health = caster.stats["Standard_health"]
+    if attack_type in (1,2):
+        damage_bonus = caster.stats["M_Bonus_Damage"]
+    else:
+        damage_bonus = caster.stats["F_Bonus_Damage"]
+
 
     ability_damage_min = ((amp + 1) * main_hand_min) + ((amp + 1) * off_hand_min) + (coeff * damage_bonus) + (shp_min * standard_health)
     ability_damage_max = ((amp + 1) * main_hand_max) + ((amp + 1) * off_hand_max) + (coeff * damage_bonus) + (shp_max * standard_health)
@@ -63,14 +79,14 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
 
     if damage_type in (1,2):
         armor = target.stats.get("armor", 17225) * (1.0 - target_armor_debuff)
-        total_armor_pen = caster.stats.get("base_armor_penetration", 0.0) + bonus_armor_pen
+        total_armor_pen = caster.stats.get("Armor Penetration", 0.0) + bonus_armor_pen
         effective_armor = armor * (1.0 - total_armor_pen)
 
         armor_dr = effective_armor / (effective_armor + 32000)
         ability_damage *= (1 - armor_dr)
 
-    crit_chance = caster.stats.get("crit_chance", 0.05) + bonus_crit_chance
-    crit_multiplier = caster.stats.get("crit_multiplier", 1.5) + bonus_crit_modifier
+    crit_chance = caster.stats.get("Critical Chance", 0.05) + bonus_crit_chance
+    crit_multiplier = caster.stats.get("Critical Modifier", 1.5) + bonus_crit_modifier
     is_crit = random.random() < crit_chance
     if is_crit:
         return int(ability_damage * crit_multiplier), True

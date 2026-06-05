@@ -9,7 +9,6 @@ class Simulation:
         heapq.heappush(self.queue, (self.current_time + delay, event))
 
     def schedule_absolute(self, absolute_time, event):
-        """Schedules an event at a fixed, exact clock timestamp (e.g., exactly at 12.50s)."""
         heapq.heappush(self.queue, (absolute_time, event))
 
     def run_timed(self, duration = 300.0): #starting with timed because it will be better for early testing

@@ -64,14 +64,21 @@ class BuffExpire(Event):
         self.instance_ref = instance_ref
 
     def resolve(self, sim):
-        if self.player.effects.get(self.buff_name) is self.instance_ref:
-            del self.player.effects[self.buff_name]
-            effect_id = self.instance_ref.get("id")
-            print(f"[{sim.current_time:.2f}s] Buff expired: {self.buff_name}")
-            if effect_id in EFFECTS:
-                stat_name = EFFECTS[effect_id]["stat_name"]
-                if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Crit Stat"}:
-                    self.player.recalculate_stats()
+        active_buff = self.player.effects.get(self.buff_name)
+        if active_buff is not self.instance_ref:
+            return
+        if sim.current_time < active_buff["expires_at"]:
+            time_remaining = active_buff["expires_at"] - sim.current_time
+            sim.schedule_relative(time_remaining, self)
+            return
+        del self.player.effects[self.buff_name]
+        print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.buff_name}")
+        effect_id = active_buff.get("id")
+        from combat_math import EFFECTS
+        if effect_id in EFFECTS:
+            stat_name = EFFECTS[effect_id]["stat_name"]
+            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Crit Stat"}:
+                self.player.recalculate_stats()
 
 class DebuffExpire(Event):
     def __init__(self, target: "Target", debuff_name: str, instance_ref: dict):
@@ -97,8 +104,13 @@ class DotTick(Event):
     def resolve(self, sim):
         dot_name = self.instance_ref["name"]
 
-        if self.target.dots.get(dot_name) is not self.instance_ref:
-            return  #if it was overwritten we ignore
+        #This was useful before I updated dot aplication logic. It might be useful in an unlikely future.
+        #if self.target.dots.get(dot_name) is not self.instance_ref: #this should never evaluate to True with the updated dot aplication logic. It made sense before and I updated
+        #     active_dot = self.target.dots.get(dot_name)
+        #     if active_dot and active_dot.get("ticks_remaining", 0) <= 0:
+        #        del self.target.dots[dot_name]
+        #        print(f"[{sim.current_time:.2f}s] Cleaned up zombie data for: {dot_name}")
+        #    return
 
         hit = DamageHit(source=self.source, target=self.target, action_data = self.instance_ref["action_data"], ability_name= dot_name)
         hit.resolve(sim)
@@ -107,3 +119,6 @@ class DotTick(Event):
         if self.instance_ref["ticks_remaining"] > 0:
             next_tick_time = sim.current_time + self.instance_ref["interval"]
             sim.schedule_absolute(next_tick_time, self)
+        else:
+            if self.target.dots.get(dot_name) is self.instance_ref:
+                del self.target.dots[dot_name]

@@ -1,9 +1,11 @@
 check dot ticks properly work
-check parse to see if delay on dots 1st hit
+check parse to see if delay on dots 1st hit (it does, change code, abilities.py -> cast)
 probly will need is_dot and is_aoe on stuff too. Maybe tags? omg tags
 debuff refreshing
 implement force, regen and "make cost 0" too
 aoe debuff, same stuff as force attack debuff!? basically grouping debuffs/buffs a lot
 effects must have effect_id and buff value (check damage math to know naming)
 
-    ADD STATS TO ENTITIES
+    ADD STATS TO ENTITIES (ok, did, will need to get actual values for some, in the morning)
+
+I'm not dealing with mastery multipliers rn, i just dont wanna

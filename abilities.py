@@ -36,21 +36,35 @@ class Ability:
                 sim.schedule_relative(delay, hit_event)
             elif action_type == "dot":
                 scaled_interval = caster.scale_time_modifier(action["interval"])
-                dot_instance = {
-                    "name": self.name,
-                    "interval": scaled_interval,
-                    "ticks_remaining": action["total_ticks"],
-                    "action data": action
-                }
-                target.dots[self.name] = dot_instance
-                if action.get("instant_tick", False):
-                    instant_hit = DamageHit(caster, target, action["value"], self.name)
-                    instant_hit.resolve(sim)
-                    dot_instance["ticks_remaining"] -= 1
-                sim.schedule_relative(action["interval"], DotTick(caster, target, dot_instance)) #interval will be affected by alacrity too
+                existing_dot = target.dots.get(self.name)
+                if existing_dot:
+                    existing_dot["ticks_remaining"] = action["total_ticks"]
+                    existing_dot["interval"] = scaled_interval
+                    existing_dot["action_data"] = action
+
+                    if action.get("instant_tick", False):
+                        tick_delay = action.get("instant_tick_delay", 0.0)
+                        instant_hit = DamageHit(caster, target, action, f"{self.name} (Instant Refresh)")
+                        sim.schedule_relative(tick_delay, instant_hit)
+                        existing_dot["ticks_remaining"] -= 1
+                else:
+                    dot_instance = {
+                        "name": self.name,
+                        "interval": scaled_interval,
+                        "ticks_remaining": action["total_ticks"],
+                        "action_data": action
+                    }
+                    target.dots[self.name] = dot_instance
+                    if action.get("instant_tick", False):
+                        tick_delay = action.get("instant_tick_delay", 0.0)
+                        instant_hit = DamageHit(caster, target, action, self.name)
+                        sim.schedule_relative(tick_delay, instant_hit)
+                        dot_instance["ticks_remaining"] -= 1
+                    sim.schedule_relative(scaled_interval, DotTick(caster, target, dot_instance)) #interval will be affected by alacrity too
             elif action_type == "buff":
-                buff_key, buff_instance, duration = caster.apply_buff(action, self.name)
-                sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
+                buff_key, buff_instance, duration, is_fresh = caster.apply_buff(action, self.name, sim.current_time)
+                if is_fresh:
+                    sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
             elif action_type == "debuff":
                 debuff_key, debuff_instance, duration = target.apply_debuff(action, self.name)
                 sim.schedule_relative(duration, DebuffExpire(target, debuff_key, debuff_instance))
