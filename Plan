@@ -5,7 +5,55 @@ debuff refreshing
 implement force, regen and "make cost 0" too
 aoe debuff, same stuff as force attack debuff!? basically grouping debuffs/buffs a lot
 effects must have effect_id and buff value (check damage math to know naming)
+debuffexpire change to be more like buffexpire? samewith applybuff and apply debuff?
 
     ADD STATS TO ENTITIES (ok, did, will need to get actual values for some, in the morning)
 
+ability.cast can return True even if nothing happens
+
 I'm not dealing with mastery multipliers rn, i just dont wanna
+check if ActiveBuff.id is ok
+
+
+
+1. Stacking Buffs (Building Up vs. Consuming Down)
+
+Right now, your consumable_charges property behaves like a countdown timer (ammunition). But many MMO effects work in reverse—they build up stacks, and the strength of the buff scales with the stack count.
+
+    The SWTOR Example: Induction or Voltaic Currents on a Deception Assassin. Executing certain moves builds stacks (up to 2 or 3), and each stack reduces the Force cost or increases the damage of your next high-impact ability.
+
+    The Structural Gap: You need an effect type where value is multiplied by the current stack_count, and instead of hitting 0 and popping, it caps out at a max stack limit.
+
+2. On-Hit / On-Crit Procs (The Event Loop Bridge)
+
+Currently, your actions have a chance modifier evaluated when cast. True MMO procs are triggered by the outcome of the hit inside calculate_hit.
+
+    The SWTOR Example: "Your periodic damage ticks have a 30% chance to reset the cooldown of Crushing Darkness," or "Critical hits have a 100% chance to grant a stack of X."
+
+    The Structural Gap: calculate_hit returns (damage, is_crit). Right now, that information is just printed. To handle procs, that result needs to feed back into an event dispatcher so the engine can say: "Hey, this hit was a Crit! Check if the player has any buffs that care about Crits."
+
+3. Internal Cooldown (ICD) Effects
+
+This is a subset of procs, highly common for endgame gear like Relics (e.g., Focused Retribution or Serendipitous Assault).
+
+    The SWTOR Example: Your attacks have a 30% chance to grant +X Mastery for 6 seconds. This effect cannot occur more than once every 20 seconds.
+
+    The Structural Gap: If you implement procs, you will need a way to place an individual effect on its own internal cooldown clock inside caster.cooldowns so it can't trigger back-to-back.
+
+4. Resource Refunds & Cost Modifiers
+
+Right now, energy_cost is a static number hardcoded directly onto the Ability instance configuration.
+
+    The SWTOR Example: Passive skills that reduce the cost of your main abilities by 25%, or mechanics where a critical hit refunds 5 Force back to your pool.
+
+    The Structural Gap: Before spending resources in Ability.cast(), your engine needs to pass the capability through a modifier check (similar to how you pass damage through calculate_hit) to see if any active player buffs reduce or completely waive the resource cost.
+
+5. Execute Phase / Health Threshold Scaling
+
+You have an explicit "sub_30" bucket mapped out inside your global EFFECTS dictionary, but the math loop isn't checking the target's actual health status yet to validate it.
+
+    The SWTOR Example: Passives that increase your critical strike chance by 15% only if the target is below 30% health.
+
+    The Structural Gap: Your caster.effects loop inside calculate_hit needs access to target.hp and target.max_hp to evaluate if threshold-dependent buckets like sub_30 should be factored into the active multiplier calculations.
+
+Of these options, Stacking Buffs or Health Thresholds would be the easiest next additions since they plug right into your current design, whereas On-Hit Procs require shifting how your modules talk to each other.

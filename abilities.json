@@ -1,0 +1,50 @@
+{
+  "Thrash": {
+    "name": "Thrash",
+    "energy_cost": 20,
+    "actions": [
+      {
+        "action_type": "damage",
+        "delay": 0.2,
+        "attack type": 1,
+        "coeff": 0.72,
+        "amp": -0.5,
+        "shp_min": 0.072,
+        "shp_max": 0.072,
+        "tags": [
+          "direct"
+        ]
+      },
+      {
+        "action_type": "damage",
+        "delay": 0.5,
+        "attack type": 1,
+        "coeff": 0.72,
+        "amp": -0.5,
+        "shp_min": 0.072,
+        "shp_max": 0.072,
+        "tags": [
+          "direct"
+        ]
+      }
+    ]
+  },
+  "Assassinate": {
+    "name": "Assassinate",
+    "energy_cost": 20,
+    "actions": [
+      {
+        "action_type": "damage",
+        "delay": 0.2,
+        "attack type": 1,
+        "coeff": 2.54,
+        "amp": 0.7,
+        "shp_min": 0.254,
+        "shp_max": 0.254,
+        "tags": [
+          "direct"
+        ]
+      }
+    ]
+  }
+}

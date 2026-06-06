@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING #yellow warnings annoy me
 from combat_math import calculate_hit, EFFECTS
 
 if TYPE_CHECKING:
-    from entities import Player, Target
+    from entities import Player, Target, ActiveDot, ActiveBuff
     from abilities import Ability
 
 class Event:
@@ -15,6 +15,7 @@ class Event:
     def __lt__(self,other): #prevent crash if 2 events to happen at same time
         return False
 
+
 class DamageHit(Event):
     def __init__(self, source: "Player", target: "Target", action_data: dict, ability_name: str):
         super().__init__(f"{ability_name} Hit")
@@ -24,6 +25,7 @@ class DamageHit(Event):
         self.ability_name = ability_name
 
     def resolve(self, sim):
+
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
 
         crit_string = " (CRITICAL!)" if is_crit else ""
@@ -57,7 +59,7 @@ class PlayerReady(Event):
             sim.schedule_relative(0.1, self)
 
 class BuffExpire(Event):
-    def __init__(self, player: "Player", buff_name: str, instance_ref: dict):
+    def __init__(self, player: "Player", buff_name: str, instance_ref: "ActiveBuff"):
         super().__init__(f"{buff_name} Expired")
         self.player = player
         self.buff_name = buff_name
@@ -65,44 +67,50 @@ class BuffExpire(Event):
 
     def resolve(self, sim):
         active_buff = self.player.effects.get(self.buff_name)
-        if active_buff is not self.instance_ref:
+        if active_buff is not self.instance_ref: #crash protection
             return
-        if sim.current_time < active_buff["expires_at"]:
-            time_remaining = active_buff["expires_at"] - sim.current_time
+        if sim.current_time < active_buff.expires_at: #refresh
+            time_remaining = active_buff.expires_at - sim.current_time
             sim.schedule_relative(time_remaining, self)
             return
-        del self.player.effects[self.buff_name]
-        print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.buff_name}")
-        effect_id = active_buff.get("id")
+        self.player.effects.pop(self.buff_name, None)
+        print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.buff_name}") #should change the print probly, in case it wasn't there.
+        effect_id = active_buff.id
         from combat_math import EFFECTS
         if effect_id in EFFECTS:
             stat_name = EFFECTS[effect_id]["stat_name"]
             if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Crit Stat"}:
                 self.player.recalculate_stats()
 
+
 class DebuffExpire(Event):
-    def __init__(self, target: "Target", debuff_name: str, instance_ref: dict):
+    def __init__(self, target: "Target", debuff_name: str, instance_ref: "ActiveBuff"):
         super().__init__(f"{debuff_name} Expired")
         self.target = target
         self.debuff_name = debuff_name
         self.instance_ref = instance_ref
 
     def resolve(self, sim):
-        if self.target.debuffs.get(self.debuff_name) is self.instance_ref:
-
-            del self.target.debuffs[self.debuff_name]
-            print(f"[{sim.current_time:.2f}s] Debuff expired: {self.debuff_name} on {self.target.name}")
+        active_debuff = self.target.debuffs.get(self.debuff_name)
+        if active_debuff is not self.instance_ref:
+            return
+        if sim.current_time < active_debuff.get("expires_at", 0.0): #probly not needed but let's play it safe for now
+            time_remaining = active_debuff["expires_at"] - sim.current_time
+            sim.schedule_relative(time_remaining, self)
+            return
+        self.target.debuffs.pop(self.debuff_name, None)
+        print(f"[{sim.current_time:.2f}s] Debuff expired and cleared: {self.debuff_name} on {self.target.name}")
 
 
 class DotTick(Event):
-    def __init__(self, source: "Player", target: "Target", instance_ref: dict):
-        super().__init__(f"DoT Tick: {instance_ref['name']}")
+    def __init__(self, source: "Player", target: "Target", instance_ref: "ActiveDot"):
+        super().__init__(f"DoT Tick: {instance_ref.name}")
         self.source = source
         self.target = target
         self.instance_ref = instance_ref
 
     def resolve(self, sim):
-        dot_name = self.instance_ref["name"]
+        dot_name = self.instance_ref.name
 
         #This was useful before I updated dot aplication logic. It might be useful in an unlikely future.
         #if self.target.dots.get(dot_name) is not self.instance_ref: #this should never evaluate to True with the updated dot aplication logic. It made sense before and I updated
@@ -112,13 +120,37 @@ class DotTick(Event):
         #        print(f"[{sim.current_time:.2f}s] Cleaned up zombie data for: {dot_name}")
         #    return
 
-        hit = DamageHit(source=self.source, target=self.target, action_data = self.instance_ref["action_data"], ability_name= dot_name)
+        hit = DamageHit(source=self.source, target=self.target, action_data = self.instance_ref.action_data, ability_name= dot_name)
         hit.resolve(sim)
 
-        self.instance_ref["ticks_remaining"] -= 1
-        if self.instance_ref["ticks_remaining"] > 0:
-            next_tick_time = sim.current_time + self.instance_ref["interval"]
+        self.instance_ref.ticks_remaining -= 1
+        if self.instance_ref.ticks_remaining > 0:
+            next_tick_time = sim.current_time + self.instance_ref.interval
             sim.schedule_absolute(next_tick_time, self)
         else:
-            if self.target.dots.get(dot_name) is self.instance_ref:
-                del self.target.dots[dot_name]
+            del self.target.dots[dot_name]
+            print(f"[{sim.current_time:.2f}s] DoT fully expired and cleared: {dot_name}")
+
+
+class ResourceTick(Event):
+    def __init__(self, player: "Player", interval: float = 1.0):
+        super().__init__(f"Resource Passive Tick")
+        self.player = player
+        self.interval = interval
+
+    def resolve(self, sim):
+        alacrity_pct = self.player.stats.get("Alacrity", 0.0)
+        alacrity_mod = 1.0 + alacrity_pct
+
+        self.player.resource.tick_passive_regen(self.interval, alacrity_mod)
+
+        sim.schedule_relative(self.interval, self)
+
+class ResourceGainEvent(Event):
+    def __init__(self, player, amount):
+        super().__init__("Resource Gain")
+        self.player = player
+        self.amount = amount
+
+    def resolve(self, sim):
+        self.player.resource.generate(self.amount)

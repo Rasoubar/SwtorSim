@@ -1,142 +1,92 @@
-# main.py
-import events
-import abilities
+import random
 from engine import Simulation
 from entities import Player, Target
 from abilities import Ability
-from rotation import PriorityRotation
-from events import PlayerReady
+from events import CastAttemptEvent
 
-# =====================================================================
-# ENHANCED AUTOMATIC DEBUG INTERCEPTORS (MONKEY PATCHES)
-# =====================================================================
-orig_cast = abilities.Ability.cast
+# Pin the random seed so the damage and crit output is deterministic for testing
+random.seed(42)
 
+# 1. Initialize your actual simulation timeline
+sim = Simulation()
 
-def debug_cast(self, caster, target, sim):
-    res = orig_cast(self, caster, target, sim)
-    if res:
-        crit = caster.get_stat('Critical Chance') * 100
-        mastery = caster.stats.get('Mastery', 0)
-        power = caster.stats.get('Power', 0)
+# 2. Create your actual entities
+player = Player("Sith Assassin")
+dummy = Target("Training Dummy", hp=150000)
 
-        # Pull active tracking names
-        active_buffs = list(caster.effects.keys())
-        active_dots = [f"{name}(Ticks:{data['ticks_remaining']})" for name, data in target.dots.items()]
+# Set baseline stats on your real player object so your math has numbers to calculate
+player.base_stats.update({
+    "Main_hand_min": 500,
+    "Main_hand_max": 600,
+    "F_Bonus_Damage": 1500,
+    "Standard_health": 18000,
+    "Critical Chance": 0.10,
+    "Critical Modifier": 1.5
+})
+player.recalculate_stats()
 
-        print(f"   [SHEET SNAPSHOT] Live Stats -> Mastery: {mastery:.0f} | Power: {power:.0f} | Crit: {crit:.1f}%")
-        print(f"   [ENTITY STATE]  Active Buffs: {active_buffs} | Active DoTs: {active_dots}")
-    return res
+# 3. Create raw dictionary configurations matching your JSON database schema
+recklessness_config = {
+    "name": "Recklessness",
+    "cooldown": 60.0,
+    "triggers_gcd": False,
+    "energy_cost": 0.0,
+    "actions": [{
+        "action_type": "buff",
+        "duration": 12.0,
+        "id": 133,
+        "effect_name": "Recklessness",
+        "stat_name": "Critical Chance",
+        "value": 0.60,
+        "consumable_charges": 2,  # Your code inside entities.py automatically maps this to consumable_charges
+        "affected_by_cdr": False
+    }]
+}
 
+shock_config = {
+    "name": "Shock",
+    "cooldown": 0.0,
+    "triggers_gcd": True,
+    "base_gcd": 1.5,
+    "energy_cost": 20.0,
+    "actions": [{
+        "action_type": "direct_hit",
+        "delay": 0.0,
+        "attack type": 3,   # Force Attack
+        "damage type": 1,   # Kinetic Damage
+        "coeff": 2.5,
+        "amp": 0.1,
+        "shp_min": 0.05,
+        "shp_max": 0.05
+    },{
+        "action_type": "direct_hit",
+        "delay": 0.3,
+        "attack type": 3,   # Force Attack
+        "damage type": 1,   # Kinetic Damage
+        "coeff": 4.5,
+        "amp": 0.1,
+        "shp_min": 0.05,
+        "shp_max": 0.05
+    }]
+}
 
-abilities.Ability.cast = debug_cast
+# Instantiate your real Ability items
+recklessness = Ability(recklessness_config)
+shock = Ability(shock_config)
 
-orig_hit = events.DamageHit.resolve
+# 4. Load events onto your actual Simulation heapq timeline
+sim.schedule_relative(0.0, CastAttemptEvent(player, dummy, recklessness))
+sim.schedule_relative(0.1, CastAttemptEvent(player, dummy, shock))       # Hit 1: Consumes charge 1 (High crit chance)
+sim.schedule_relative(1.6, CastAttemptEvent(player, dummy, shock))       # Hit 2: Consumes charge 2 (High crit chance -> Auto-pops)
+sim.schedule_relative(3.1, CastAttemptEvent(player, dummy, shock))       # Hit 3: Buff is gone (Normal baseline crit chance)
 
+print("=" * 60)
+print("   LAUNCHING TIMELINE RUN USING YOUR NATIVE ARCHITECTURE")
+print("=" * 60)
 
-def debug_hit(self, sim):
-    orig_hit(self, sim)
+# Run the heap engine queue for 10 simulation seconds
+sim.run_timed(10.0)
 
-
-events.DamageHit.resolve = debug_hit
-
-orig_expire = events.BuffExpire.resolve
-
-
-def debug_expire(self, sim):
-    was_active = self.buff_name in self.player.effects
-    orig_expire(self, sim)
-    is_active_now = self.buff_name in self.player.effects
-
-    if was_active and not is_active_now:
-        crit = self.player.get_stat('Critical Chance') * 100
-        mastery = self.player.stats.get('Mastery', 0)
-        power = self.player.stats.get('Power', 0)
-        active_buffs = list(self.player.effects.keys())
-
-        print(f"   [SHEET SNAPSHOT] Post-Expiration -> Mastery: {mastery:.0f} | Power: {power:.0f} | Crit: {crit:.1f}%")
-        print(f"   [ENTITY STATE]  Remaining Active Buffs: {active_buffs}")
-
-
-events.BuffExpire.resolve = debug_expire
-
-
-# =====================================================================
-
-def run_proc_expiration_test():
-    sim = Simulation()
-    player = Player("Mage Tester")
-    boss = Target("Boss Enemy", hp=500000)
-
-    # Initialize pristine baseline gear statistics
-    player.base_stats["Cooldown Reduction"] = 0.15  # 15% Alacrity/CDR
-    player.base_stats["Critical Rating"] = 800.0
-    player.base_stats["Mastery"] = 2500.0
-    player.base_stats["Power"] = 1200.0
-    player.base_stats["Force Power"] = 1000.0
-
-    player.base_stats["Main_hand_min"] = 400.0
-    player.base_stats["Main_hand_max"] = 600.0
-    player.base_stats["Off_hand_min"] = 0.0
-    player.base_stats["Off_hand_max"] = 0.0
-    player.base_stats["Standard_health"] = 15000.0
-
-    player.base_stats["Critical Modifier"] = 1.50
-    player.base_stats["Base_Armor_Penetration"] = 0.0
-
-    player.recalculate_stats()
-
-    supernova_config = {
-        "name": "Supernova",
-        "cooldown": 20.0,  # <-- Change this from 0.0 to 20.0!
-        "base_gcd": 1.5,
-        "effects": [
-            {
-                "type": "direct_hit",
-                "attack type": 3,
-                "damage type": 3,
-                "amp": 0.2, "coeff": 2.5, "shp_min": 0.05, "shp_max": 0.05
-            },
-            {
-                "id": 500,
-                "type": "buff",
-                "effect_name": "Supernova_Mastery_Proc",
-                "stat_name": "Mastery Stat",
-                "value": 1000.0,
-                "duration": 4.0  # Lasts 4 seconds baseline (3.40s with alacrity)
-            }
-        ]
-    }
-
-    # Include Scorch too so we can monitor active DoTs and active Buffs simultaneously
-    scorch_config = {
-        "name": "Scorch",
-        "cooldown": 20.0,  # High cooldown so it only casts once as an opener
-        "base_gcd": 1.5,
-        "effects": [
-            {
-                "type": "dot",
-                "attack type": 4,
-                "damage type": 4,
-                "amp": 0.0, "coeff": 0.6, "shp_min": 0.02, "shp_max": 0.02,
-                "interval": 2.0, "total_ticks": 3,
-                "instant_tick": True, "instant_tick_delay": 0.2
-            }
-        ]
-    }
-
-    # Supernova will get spammed after Scorch applies its DoT
-    player.rotation = PriorityRotation([
-        Ability(scorch_config),
-        Ability(supernova_config)
-    ])
-
-    print("--- Starting Extended Lifecycle State Test ---")
-    sim.schedule_absolute(0.00, PlayerReady(player, boss))
-
-    # EXTENDED RUN: 11 seconds guarantees we see the final 9.00s drop-off
-    sim.run_timed(duration=11.0)
-
-
-if __name__ == "__main__":
-    run_proc_expiration_test()
+print("\n" + "=" * 60)
+print(f"Final Active Player Buff Inventory: {list(player.effects.keys())}")
+print("=" * 60)

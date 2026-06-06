@@ -1,0 +1,66 @@
+This is hoping to be a simulator for simple combat in swtor
+
+To simulate time passage I'm using an Heap Queue. All future occurrences are stored/scheduled there.
+We pop the next thing in the queue, add more if needed, and we move on.
+
+Flow:
+
+engine.py schedules events in the queue with events.py.
+
+events.py has 2 functions rn. Authorizing abilities and processing previously scheduled ones like hits, debuff experiation, dot ticks, etcNo.
+
+abilities.py processes the ability usage. it mutates entities, and schedules events (like damage hits)
+
+damagehits, in events.py, calls for combatmath.py which can tell events(using entities and abilities) what damage to do and can also mutate stuff like buffs/debuffs if they are consumed.
+
+
+file by file:
+
+engine.py:
+    Simulation:
+        Manages time passing.
+        Queue is Heap Queue because it's fast for both inserting and removing events.
+        Allows to schedule events relatively (like dot tick 3seconds from now), absolutely (was nice for testing lmao) and to limit how long it lasts for.
+        !!! I should give it a way to allow for something else to break it. Or just have a break option that can be called somewhere else!!!
+        Having a __lt__ in events is crucial for the queue to not crash because of comparison ability
+
+events.py
+    Event: Basic structure. Adds the tiebreaker to not break the simulation.
+        DamageHit: Processes damage. Uses combat_math.py to calculate said damage then applies it to target.
+        CastAttemptEvent: Entry point for events that we input manually. Has abilities.py try to execute it.
+        PlayerReady: Will keep a priority rotation going by checking if we can act.
+        BuffExpire/Debuff Expire: Clean effects from list if their time is up.
+        DotTick: Manages dot ticks. Calls damage hit, updates how many left, calls for damagehit and ends if it no more ticks.
+        ResourceTick: Manages passive resource gain.
+        ResourceGainEvent: Adds set energy values on demand. For abilities that increase it pretty much.
+
+abilities.py
+    Ability: Stores cooldowns, costs, actions that it causes, etc.
+            can_cast(): checks if the cast of the ability is possible.
+            apply_cooldown_locks(): defines when you can cast again, both gcd and and specific ability cooldown
+            cast(): the big boy. Deducts resources, schedules actions that it fecthes and filters.
+                cast(), while going trough actions, filters by action_type to decide what do to. rn we have direct_hit, dot, buff, debuff and resource_gain. (MORE NEEDED)
+                it leverages is_action_valid, which is specifically for actions that only proc in certain conditions. like leeching strike who has 4 possible hits but only 1 procs, depending on number of dots on target.
+
+entities.py
+    ActiveDot and ActiveBuff: I didn't wanna use dicts for this, so here we are.
+    ResourcePool: Can change depending on type we choose, I only care about force for now tho. Can spend (if enough), generate and passively increase.
+    Player: Stores all we need for a player.
+        Apply_buff: gives us modifiers in effects.
+                   - saves configuration entries (like only apply on x damage type, if ability has x tag, etc)
+                   - refreshes when already active
+                   - recalculates stats when the buff messes with stats instead of modifiers (crit is a modifier, crit rating is a stat
+        get_stat: fecthes a stat, updates it with modifiers active too (that will happen with relics stuff only I hope)
+        scale_time_modifier: well, modifies time with cooldown reduction
+        calculate_gcd: same as previous but rounds
+        calculate_cooldown: guess. probly not needed, might remove and use scale_time_modifier later, atm im tired ok
+        recalculate_stats: whenver it's needed, goes trough all the effects to modify base stats to give at the moment stats
+    Target: Stores all we need for a target
+         apply_debuff: updates target debuffs with data from actions. refreshes stacks or duration if already there.
+         count_active_dots: fuck you leeching strike
+         has_debuff: fuck you thrashing terror. wait, no, this will be has_dot. FUCK ME
+
+combat_math.py
+    calculate_hit: caster provides active buffs and stats. target armor and debuffs. action_data the ability data.
+                   we calculate de diferent modifiers (in buckets), with buffs and debuffs, and multiply them together -> we calculate base damage with stats and formulas ->
+                   -> we multiply damage with modifiers -> we check if armor, if so apply that too -> we check if it's crit -> we return damage and is_crit
