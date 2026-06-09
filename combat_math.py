@@ -17,9 +17,7 @@ EFFECTS = {
     46: {"stat_name": "Damage Modifier", "modifier_bucket": "unknown_percentage"},
     68:{"stat_name": "cost_reduction_flat"},
     166:{"stat_name": "Armor Penetration"},
-    # for testing for now, will check actual ids later
-    500: {"stat_name": "Mastery Stat"},
-    600: {"stat_name": "Power Stat"}
+
 }
 def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     attack_type = action_data["attack_type"] #1 = melee, 2 = ranged, 3 = force, 4 = tech
@@ -91,7 +89,6 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     off_hand_min = caster.stats["Off_hand_min"]
     off_hand_max = caster.stats["Off_hand_max"]
     standard_health = caster.stats["Standard_health"]
-    total_armor_pen = 0
     if attack_type in (1,2):
         damage_bonus = caster.stats["M_Bonus_Damage"]
     else:

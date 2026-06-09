@@ -175,6 +175,7 @@ class Player(Actor):
                 self.recalculate_stats()
 
         return buff_key, buff_instance, duration
+
     def recalculate_stats(self): #because relics hate me
 
         temp_stats = self.base_stats.copy()
@@ -285,11 +286,6 @@ class Target(Actor):
         else:
             current_charges = incoming_charges
 
-        raw_att = action.get("required_att_type")
-        att_set = set(raw_att) if isinstance(raw_att, (list, tuple, set)) else ({raw_att} if raw_att is not None else None)
-
-        raw_dmg = action.get("required_dmg_type")
-        dmg_set = set(raw_dmg) if isinstance(raw_dmg, (list, tuple, set)) else ({raw_dmg} if raw_dmg is not None else None)
 
         raw_tags = action.get("required_tags")
         tags_set = set(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else ({raw_tags} if raw_tags is not None else None)

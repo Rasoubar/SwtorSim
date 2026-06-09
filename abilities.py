@@ -4,7 +4,7 @@ from entities import ActiveDot, Player, Target
 from requirements import validate_all
 
 
-def execute_single_action(sim, caster, target, action: dict, source_name: str):
+def execute_single_action(sim, caster, target, action: dict, source_name: str): #this function is ugly. I'll get to it eventually.
     if not is_action_valid(action, target, caster):
         return
     if "chance" in action and random.random() > action["chance"]:

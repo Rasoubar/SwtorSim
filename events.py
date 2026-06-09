@@ -14,10 +14,10 @@ class Event:
     def resolve(self,sim):
         print(f"[{sim.current_time:.2f}s] Executing: {self.name}")
 
-    def __lt__(self,other): #prevent crash if 2 events to happen at same time
+    def __lt__(self,other): #prevent crash if 2 events to happen at same time, which i expect wil happen
         return False
 
-class ApplyDamageLandEvent:
+class ApplyDamageLandEvent: #bro why did I put this here
     def __init__(self, source, target, final_damage, is_crit, ability_name):
         self.source = source
         self.target = target
@@ -219,12 +219,8 @@ class RotationDecisionLoop(Event):
         self.target = target
 
     def resolve(self, sim):
-        # Fire your priority calculation routine
         did_cast = self.rotation.evaluate(self.player, self.target, sim)
-
         if did_cast:
-            # Wake back up precisely when your real player's next_gcd clears
             sim.schedule_absolute(self.player.next_gcd, self)
         else:
-            # Fallback gate: If resource-starved, poll again shortly
             sim.schedule_relative(0.10, self)
