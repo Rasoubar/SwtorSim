@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 from combat_math import calculate_hit, EFFECTS
+import random
 
 if TYPE_CHECKING:
     from entities import Player, Target, ActiveDot, ActiveBuff
@@ -15,6 +16,18 @@ class Event:
     def __lt__(self,other): #prevent crash if 2 events to happen at same time
         return False
 
+class ApplyDamageLandEvent:
+    def __init__(self, source, target, final_damage, is_crit, ability_name):
+        self.source = source
+        self.target = target
+        self.final_damage = final_damage
+        self.is_crit = is_crit
+        self.ability_name = ability_name
+
+    def resolve(self, sim):
+        crit_string = " (CRITICAL!)" if self.is_crit else ""
+        self.target.hp -= self.final_damage
+        print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
 
 class DamageHit(Event):
     def __init__(self, source: "Player", target: "Target", action_data: dict, ability_name: str):
@@ -25,12 +38,45 @@ class DamageHit(Event):
         self.ability_name = ability_name
 
     def resolve(self, sim):
-
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
 
-        crit_string = " (CRITICAL!)" if is_crit else ""
-        self.target.hp -= final_damage
-        print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {final_damage} {crit_string} damage to {self.target.name} (HP: {self.target.hp})")
+        tags = self.action_data.get("tags", [])
+        impact_delay = self.action_data.get("impact_delay", 0.0)
+        if impact_delay > 0.0:
+            sim.schedule_relative(impact_delay, ApplyDamageLandEvent(
+                self.source, self.target, final_damage, is_crit, self.ability_name
+            ))
+        else:
+            instant_land = ApplyDamageLandEvent(self.source, self.target, final_damage, is_crit, self.ability_name)
+            instant_land.resolve(sim)
+        self.evaluate_on_hit_procs(sim, is_crit, tags)
+
+    def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
+        print(f"Scanning procs for hit: {self.ability_name} with tags {tags}")
+        for proc in self.source.procs.values():
+            if proc.trigger == "crit" and not is_crit:
+                continue
+            if proc.required_tag and proc.required_tag not in tags:
+                continue
+            if sim.current_time < proc.next_possible_proc:
+                continue
+            if random.random() > proc.chance:
+                continue
+            current_icd = proc.icd
+            if proc.affected_by_cdr:
+                current_icd = self.source.scale_time_modifier(proc.icd)
+            proc.next_possible_proc = sim.current_time + current_icd
+            if proc.action.get("action_type") == "damage": #needed because of the queue nature. like this procs can generate procs before the next one happens, like it happens in game.
+                proc_strike = DamageHit(                   #alternatives would be adding microscopic delays to stuff or re-designing the whole thing. fuck that, this is the less clunky option.
+                    source=self.source,
+                    target=self.target,
+                    action_data=proc.action,
+                    ability_name=proc.name
+                )
+                proc_strike.resolve(sim)  # Recursive Kick
+            else:
+                from abilities import execute_single_action
+                execute_single_action(sim, self.source, self.target, proc.action,proc.name)
 
 class CastAttemptEvent(Event):
     def __init__(self, player: "Player", target: "Target", ability: "Ability"):
@@ -94,8 +140,8 @@ class DebuffExpire(Event):
         active_debuff = self.target.debuffs.get(self.debuff_name)
         if active_debuff is not self.instance_ref:
             return
-        if sim.current_time < active_debuff.get("expires_at", 0.0): #probly not needed but let's play it safe for now
-            time_remaining = active_debuff["expires_at"] - sim.current_time
+        if sim.current_time < active_debuff.expires_at:
+            time_remaining = active_debuff.expires_at - sim.current_time
             sim.schedule_relative(time_remaining, self)
             return
         self.target.debuffs.pop(self.debuff_name, None)
@@ -112,13 +158,13 @@ class DotTick(Event):
     def resolve(self, sim):
         dot_name = self.instance_ref.name
 
-        #This was useful before I updated dot aplication logic. It might be useful in an unlikely future.
-        #if self.target.dots.get(dot_name) is not self.instance_ref: #this should never evaluate to True with the updated dot aplication logic. It made sense before and I updated
-        #     active_dot = self.target.dots.get(dot_name)
-        #     if active_dot and active_dot.get("ticks_remaining", 0) <= 0:
-        #        del self.target.dots[dot_name]
-        #        print(f"[{sim.current_time:.2f}s] Cleaned up zombie data for: {dot_name}")
-        #    return
+        #This was useful before I updated dot aplication logic. It might be useful in an unlikely future. Nevermind it's useful
+        if self.target.dots.get(dot_name) is not self.instance_ref: #this should never evaluate to True with the updated dot aplication logic. Nop, still makes sense afterall.
+            active_dot = self.target.dots.get(dot_name)
+            if active_dot and active_dot.ticks_remaining <= 0:
+               del self.target.dots[dot_name]
+               print(f"[{sim.current_time:.2f}s] Cleaned up zombie data for: {dot_name}")
+            return
 
         hit = DamageHit(source=self.source, target=self.target, action_data = self.instance_ref.action_data, ability_name= dot_name)
         hit.resolve(sim)
@@ -154,3 +200,23 @@ class ResourceGainEvent(Event):
 
     def resolve(self, sim):
         self.player.resource.generate(self.amount)
+        print(f'[{sim.current_time:.2f}s] gained {self.amount} {self.player.resource.pool_type}')
+
+
+class RotationDecisionLoop(Event):
+    def __init__(self, rotation, player, target):
+        super().__init__("Rotation Decision Loop")
+        self.rotation = rotation
+        self.player = player
+        self.target = target
+
+    def resolve(self, sim):
+        # Fire your priority calculation routine
+        did_cast = self.rotation.evaluate(self.player, self.target, sim)
+
+        if did_cast:
+            # Wake back up precisely when your real player's next_gcd clears
+            sim.schedule_absolute(self.player.next_gcd, self)
+        else:
+            # Fallback gate: If resource-starved, poll again shortly
+            sim.schedule_relative(0.10, self)

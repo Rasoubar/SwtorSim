@@ -1,17 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="3a478dd1-496a-4a22-b691-72f7a72fb6c2" name="Changes" comment="kinda functioniing, need to save state">
-      <change afterPath="$PROJECT_DIR$/READ ME or wtv" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/abilities.json" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/json_builder.py" afterDir="false" />
+    <list default="true" id="3a478dd1-496a-4a22-b691-72f7a72fb6c2" name="Changes" comment="i did some documentation&#10;i added a ton of stuff earlier too, but I forgot what it was">
+      <change afterPath="$PROJECT_DIR$/config_load.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Plan" beforeDir="false" afterPath="$PROJECT_DIR$/Plan" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/READ ME or wtv" beforeDir="false" afterPath="$PROJECT_DIR$/READ ME or wtv" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/abilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/abilities.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/combat_math.py" beforeDir="false" afterPath="$PROJECT_DIR$/combat_math.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/engine.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/entities.py" beforeDir="false" afterPath="$PROJECT_DIR$/entities.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/events.py" beforeDir="false" afterPath="$PROJECT_DIR$/events.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/json_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/json_builder.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/rotation.py" beforeDir="false" afterPath="$PROJECT_DIR$/rotation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -55,7 +57,9 @@
   <component name="PropertiesComponent">{
   &quot;keyToString&quot;: {
     &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.abilities.executor&quot;: &quot;Run&quot;,
     &quot;Python.combat_math.executor&quot;: &quot;Run&quot;,
+    &quot;Python.events.executor&quot;: &quot;Run&quot;,
     &quot;Python.json_builder.executor&quot;: &quot;Run&quot;,
     &quot;Python.main.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
@@ -91,7 +95,12 @@
       <workItem from="1780576995289" duration="35747000" />
       <workItem from="1780650179731" duration="19402000" />
       <workItem from="1780670507330" duration="10668000" />
-      <workItem from="1780689855779" duration="11052000" />
+      <workItem from="1780689855779" duration="11596000" />
+      <workItem from="1780748022842" duration="15226000" />
+      <workItem from="1780787769983" duration="11532000" />
+      <workItem from="1780832391504" duration="17625000" />
+      <workItem from="1780921493324" duration="28990000" />
+      <workItem from="1780967085013" duration="1603000" />
     </task>
     <task id="LOCAL-00001" summary="day 1">
       <option name="closed" value="true" />
@@ -109,7 +118,15 @@
       <option name="project" value="LOCAL" />
       <updated>1780658590982</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="i did some documentation&#10;i added a ton of stuff earlier too, but I forgot what it was">
+      <option name="closed" value="true" />
+      <created>1780710376312</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1780710376312</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -129,11 +146,14 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="day 1" />
     <MESSAGE value="kinda functioniing, need to save state" />
-    <option name="LAST_COMMIT_MESSAGE" value="kinda functioniing, need to save state" />
+    <MESSAGE value="i did some documentation&#10;i added a ton of stuff earlier too, but I forgot what it was" />
+    <option name="LAST_COMMIT_MESSAGE" value="i did some documentation&#10;i added a ton of stuff earlier too, but I forgot what it was" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/SwtorSim$main.coverage" NAME="main Coverage Results" MODIFIED="1780690062626" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SwtorSim$combat_math.coverage" NAME="combat_math Coverage Results" MODIFIED="1780682078347" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SwtorSim$json_builder.coverage" NAME="json_builder Coverage Results" MODIFIED="1780673418673" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$abilities.coverage" NAME="abilities Coverage Results" MODIFIED="1780946138238" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$main.coverage" NAME="main Coverage Results" MODIFIED="1780967694728" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$events.coverage" NAME="events Coverage Results" MODIFIED="1780963365041" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$combat_math.coverage" NAME="combat_math Coverage Results" MODIFIED="1780748414592" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$json_builder.coverage" NAME="json_builder Coverage Results" MODIFIED="1780966122685" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

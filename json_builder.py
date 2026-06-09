@@ -1,209 +1,210 @@
 import json
 import os
 
-# Locate or create the local abilities database file
-FILE_PATH = "abilities.json"
+
+def get_input(prompt, type_func=str, default=None):
+    """Helper function to handle inputs, defaults, and data types."""
+    default_str = f" [Default: {default}]" if default is not None else " [Required]"
+    user_input = input(f"{prompt}{default_str}: ").strip()
+    if not user_input:
+        if default is not None:
+            return default
+        print("❌ This field is required. Please try again.")
+        return get_input(prompt, type_func, default)
+    try:
+        if type_func == bool:
+            return user_input.lower() in ['true', 't', 'y', 'yes', '1']
+        return type_func(user_input)
+    except ValueError:
+        print(f"❌ Invalid format. Expected {type_func.__name__}. Try again.")
+        return get_input(prompt, type_func, default)
 
 
-def load_database():
-    if os.path.exists(FILE_PATH):
-        try:
-            with open(FILE_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except json.JSONDecodeError:
-            print("⚠️ Warning: abilities.json was corrupted or empty. Starting fresh.")
-            return {}
-    return {}
+def collect_tags_interactively(prompt_label):
+    """Collects tags one by one until the user presses Enter on an empty line."""
+    print(f"\n--- Entering tags for {prompt_label} ---")
+    print("Type a tag and press Enter. Press Enter on an empty line when finished.")
+    tags = []
+    while True:
+        tag_input = input(f"Add tag (Current count: {len(tags)}): ").strip()
+        if not tag_input:
+            break
+        if tag_input not in tags:
+            tags.append(tag_input)
+            print(f"Added tag: '{tag_input}'")
+        else:
+            print("⚠️ Tag already added.")
+    return tags
 
 
-def save_database(db):
-    with open(FILE_PATH, "w", encoding="utf-8") as f:
-        json.dump(db, f, indent=2)
-    print(f"\n✅ Database successfully updated and written to '{FILE_PATH}'!")
+def build_conditions():
+    """Builds the optional conditions block for damage actions."""
+    if not get_input("Add conditions to this action? (y/n)", bool, False):
+        return None
 
-
-def get_float(prompt, default=0.0):
-    val = input(f"{prompt} [{default}]: ").strip()
-    return float(val) if val else default
-
-
-def get_int(prompt, default=0):
-    val = input(f"{prompt} [{default}]: ").strip()
-    return int(val) if val else default
-
-
-def get_bool(prompt):
-    val = input(f"{prompt} (y/n): ").strip().lower()
-    return val == 'y'
-
-
-def collect_ability_restrictions():
-    """Handles hard gating requirements at the top level of the ability."""
-    restrictions = {}
-    if not get_bool("Does this ability itself have casting restrictions/thresholds?"):
-        return restrictions
-
-    print("\n--- Available Ability Restrictions ---")
-    print("1. target_hp_below_pct")
-    print("2. target_has_debuff")
-    print("3. caster_requires_buff")
-
-    choice = input("Select restriction type number (leave blank to skip): ").strip()
-
-    if choice == "1":
-        restrictions["target_hp_below_pct"] = get_float("Enter target HP threshold float (e.g., 0.30)")
-    elif choice == "2":
-        restrictions["target_has_debuff"] = input("Enter required target debuff name string: ").strip()
-    elif choice == "3":
-        restrictions["caster_requires_buff"] = input("Enter required caster buff name string: ").strip()
-
-    return restrictions
-
-
-def collect_conditions():
-    """Handles execution pipeline conditions embedded inside individual actions."""
     conditions = {}
-    if not get_bool("Add validation conditions to this action?"):
-        return conditions
-
-    print("\n--- Available Action Condition Rules ---")
-    print(
-        "1. exact_dot_amount\n2. has_dot\n3. has_debuff\n4. has_buff\n5. target_hp_below_pct\n6. does_not_have_debuff")
-
-    choice = input("Select condition type number: ").strip()
-
-    if choice == "1":
-        conditions["exact_dot_amount"] = True
-        conditions["required_count"] = get_int("Enter required_count")
-    elif choice == "2":
+    if get_input("Does it require a DOT? (y/n)", bool, False):
         conditions["has_dot"] = True
-    elif choice == "3":
-        conditions["has_debuff"] = input("Enter target debuff name string: ").strip()
-    elif choice == "4":
-        conditions["has_buff"] = input("Enter caster buff name string: ").strip()
-    elif choice == "5":
-        conditions["target_hp_below_pct"] = get_float("Enter HP threshold float (e.g. 0.30)")
-    elif choice == "6":
-        conditions["does_not_have_debuff"] = input("Enter target debuff name to avoid: ").strip()
-
+        if get_input("Does it require an exact DOT amount? (y/n)", bool, False):
+            conditions["exact_dot_amount"] = True
+            conditions["required_count"] = get_input("Required count of DOTs", int, 1)
     return conditions
 
 
-def run_wizard():
-    print("==================================================")
-    print("      SWTOR SIMULATOR: DATA ENTRY WIZARD          ")
-    print("==================================================")
+def build_action():
+    """Builds a single action dictionary interactively."""
+    action_type = get_input("Action type ('damage', 'buff', etc.)", str).lower()
+    action = {"action_type": action_type}
 
-    db = load_database()
+    if action_type == "damage":
+        action["attack_type"] = get_input("Attack Type (1=Melee, 2=Ranged, 3=Force/Tech)", int)
+        action["damage_type"] = get_input("Damage Type (1=Weapon, 2=Energy, 3=Kinetic, 4=Internal/Elemental)", int)
+        action["amp"] = get_input("Developer Multiplier Modifier (amp)", float, 0.0)
+        action["coeff"] = get_input("Damage Coefficient multiplier", float)
+        action["shp_min"] = get_input("Standard Health Percent Min (shp_min)", float)
+        action["shp_max"] = get_input("Standard Health Percent Max (shp_max)", float)
+        action["delay"] = get_input("Action execution timing delay", float, 0.0)
+        action["impact_delay"] = get_input("Visual impact travel timing delay", float, 0.0)
 
-    ability_key = input("Ability ID Key (e.g., 'Thrash'): ").strip()
-    if not ability_key:
-        print("❌ Ability Key cannot be blank. Exiting.")
-        return
+        # 🟢 Overhauled tag list compilation pattern
+        action["tags"] = collect_tags_interactively("Damage Action")
 
-    name = input(f"Ability Display Name (e.g., 'Thrash'): ").strip()
-    energy_cost = get_int("Energy / Force Resource Cost", default=0)
-    cooldown = get_float("Ability Cooldown (seconds)", default=0.0)
-
-    # NEW: Top-Level Ability Restrictions Checklist
-    ability_restrictions = collect_ability_restrictions()
-
-    triggers_gcd = get_bool("Does this ability trigger the Global Cooldown?")
-    base_gcd = get_float("Base GCD window", default=1.5) if triggers_gcd else 1.5
-
-    ability_blueprint = {
-        "name": name,
-        "energy_cost": energy_cost,
-        "cooldown": cooldown,
-        "restrictions": ability_restrictions,  # Embedded directly at the outer layer
-        "triggers_gcd": triggers_gcd,
-        "base_gcd": base_gcd,
-        "actions": []
-    }
-
-    adding_actions = True
-    while adding_actions:
-        print(f"\n--- Configuring Action #{len(ability_blueprint['actions']) + 1} ---")
-        action_type = input("Action Type (direct_hit / dot / buff / debuff): ").strip().lower()
-
-        action = {
-            "type": action_type
-        }
-
-        # 1. DIRECT DAMAGE ROUTING WINDOW
-        if action_type in ["damage", "direct_hit"]:
-            action["delay"] = get_float("Action execution delay offset (seconds)")
-            attack_type = get_int("Attack Type (1=Melee, 2=Ranged, 3=Force, 4=Tech)", default=1)
-            action["attack type"] = attack_type
-
-            # Dynamic Gating Constraint Checklist (No damage type for Melee/Ranged)
-            if attack_type in [1, 2]:
-                print("   ℹ️ Melee/Ranged type selected: Automatically skipping damage type field.")
-            else:
-                action["damage type"] = get_int("Damage Type (1=Kinetic, 2=Energy, 3=Elemental, 4=Internal)", default=1)
-
-            action["coeff"] = get_float("Ability Scaling Coefficient (coeff)")
-            action["amp"] = get_float("Amount Modifier Percent (amp)")
-            action["shp_min"] = get_float("Standard Health Percent Minimum (shp_min)")
-            action["shp_max"] = get_float("Standard Health Percent Maximum (shp_max)")
-
-            tags_input = input("Action Tags (comma-separated, e.g., 'direct, melee'): ").strip()
-            action["tags"] = [t.strip() for t in tags_input.split(",")] if tags_input else []
-
-        # 2. PERIODIC DOT ROUTING WINDOW (Bypasses top-level delay prompt)
-        elif action_type == "dot":
-            action["attack type"] = get_int("Attack Type (1=Melee, 2=Ranged, 3=Force, 4=Tech)", default=3)
-            action["damage type"] = get_int("Damage Type (1=Kinetic, 2=Energy, 3=Elemental, 4=Internal)", default=1)
-            action["coeff"] = get_float("Tick Scaling Coefficient (coeff)")
-            action["amp"] = get_float("Tick Amount Modifier Percent (amp)")
-            action["shp_min"] = get_float("Tick Standard Health Percent Min (shp_min)")
-            action["shp_max"] = get_float("Tick Standard Health Percent Max (shp_max)")
-            action["interval"] = get_float("Time between ticks (interval)")
-            action["total_ticks"] = get_int("Total number of periodic iterations")
-
-            # Nested delay check inside instant tick configuration gate
-            action["instant_tick"] = get_bool("Does this DoT tick instantly on application?")
-            if action["instant_tick"]:
-                action["instant_tick_delay"] = get_float("Instant tick compensation delay (instant_tick_delay)")
-
-            tags_input = input("DoT Tags (comma-separated): ").strip()
-            action["tags"] = [t.strip() for t in tags_input.split(",")] if tags_input else []
-
-        # 3. CASTER STAT BUFF WINDOW
-        elif action_type == "buff":
-            action["delay"] = get_float("Action execution delay offset (seconds)")
-            action["id"] = get_int("Effect Tracking ID (id matches your EFFECTS database registry)")
-            action["effect_name"] = input("Unique Effect Name Identifier (effect_name): ").strip()
-            action["stat_name"] = input("Stat to modify (stat_name, e.g., 'Critical Chance'): ").strip()
-            action["value"] = get_float("Modifier Value (value)")
-            action["duration"] = get_float("Buff active lifespan duration")
-            action["affected_by_cdr"] = get_bool("Is this buff duration compressed by Alacrity/CDR?")
-
-        # 4. TARGET DEBUFF WINDOW
-        elif action_type == "debuff":
-            action["delay"] = get_float("Action execution delay offset (seconds)")
-            action["id"] = get_int("Effect Tracking ID (id matches your EFFECTS database registry)")
-            action["effect_name"] = input("Unique Target Debuff Name (effect_name): ").strip()
-            action["stat_name"] = input("Stat to modify (stat_name, e.g., 'Armor Debuff'): ").strip()
-            action["value"] = get_float("Modifier Value (value)")
-            action["duration"] = get_float("Debuff active lifespan duration")
-
-        # 5. CONDITIONS PIPELINE (Includes the new option 6)
-        conds = collect_conditions()
+        conds = build_conditions()
         if conds:
             action["conditions"] = conds
 
-        ability_blueprint["actions"].append(action)
-        adding_actions = get_bool("\nAdd another action block to this ability configuration?")
+    elif action_type == "buff":
+        action["effect_name"] = get_input("Buff target unique effect name", str)
+        action["stat_name"] = get_input("Target modification key identifier string", str)
+        action["value"] = get_input("Modification metric value multiplier", float)
+        action["duration"] = get_input("Buff active lifespan frame duration", float)
+        action["max_stacks"] = get_input("Maximum stack registry cap", int, 1)
 
-    # Save to file
-    db[ability_key] = ability_blueprint
-    save_database(db)
+    return action
+
+
+def build_ability():
+    """Builds a full active ability tree configuration block."""
+    ability_name = get_input("Ability Name (e.g. THRASH)", str).upper()
+
+    ability_data = {
+        "name": get_input("Display name text", str, ability_name.capitalize()),
+        "cooldown": get_input("Ability baseline tracking cooldown", float, 0.0),
+        "triggers_gcd": get_input("Does it respect/trigger the Global Cooldown? (y/n)", bool, True),
+        "base_gcd": get_input("Baseline GCD frame interval", float, 1.5),
+        "energy_cost": get_input("Resource optimization cost reduction metric", float, 0.0),
+        "restrictions": {},
+        "actions": []
+    }
+
+    # Add dynamic execution requirements if necessary
+    if get_input("Add target health conditions? (y/n)", bool, False):
+        ability_data["restrictions"]["target_hp_below_pct"] = get_input(
+            "Target health percentage boundary threshold (0.X format)", float)
+
+    # Loop to collect underlying hits/actions
+    num_actions = get_input("How many actions/strikes does this ability perform?", int, 1)
+    for i in range(num_actions):
+        print(f"\n--- Configuring Action {i + 1} of {num_actions} ---")
+        ability_data["actions"].append(build_action())
+
+    return {ability_name: ability_data}
+
+
+def build_proc():
+    """Builds a passive tracking observer proc condition blueprint."""
+    proc_key = get_input("Proc Key Identifier (e.g. LIGHTNING_CHARGE)", str).upper()
+    proc_name = get_input("Display text description name", str, proc_key.replace("_", " ").title())
+
+    proc_data = {
+        "proc_name": proc_name,
+        "trigger": get_input("Trigger window frame descriptor event ('hit' or 'crit')", str).lower(),
+    }
+
+    req_tag = input("Required tag constraint metric (leave blank if none): ").strip()
+    if req_tag:
+        proc_data["required_tag"] = req_tag
+
+    proc_data["chance"] = get_input("Proc activation probability chance scalar (0.X format)", float, 1.0)
+    proc_data["icd"] = get_input("Internal tracking layout Cooldown (ICD)", float, 0.0)
+    proc_data["affected_by_cdr"] = get_input("Is ICD affected by character CDR math? (y/n)", bool, False)
+
+    print("\nDefine the operational sub-action sequence this proc fires:")
+    proc_data["action"] = build_action()
+
+    return {proc_key: proc_data}
+
+
+def build_permanent_buff():
+    """🟢 NEW: Builds a minimalist permanent baseline passive buff object mapping."""
+    buff_key = get_input("Permanent Buff Key Identifier (e.g. MARK_OF_THE_ASSASSIN)", str).upper()
+
+    print("\n--- Configuring Permanent Baseline Stance / Passive Aura ---")
+    buff_data = {
+        "id": get_input("Jedipedia structural attribute identifier integer mapping (id)", int),
+        "value": get_input("Modification metric property value (Use 0.X format if percent modification)", float)
+    }
+
+    # 🟢 Overhauled tag list compilation pattern for permanent buffs
+    buff_data["required_tags"] = collect_tags_interactively("Permanent Buff")
+
+    effect_name = input("Unique structural display effect name (leave blank to auto-generate from key): ").strip()
+    buff_data["effect_name"] = effect_name if effect_name else None
+
+    if get_input("Does this buff require a target execution HP threshold? (y/n)", bool, False):
+        buff_data["target_hp_threshold"] = get_input("Execute health percentage tracking boundary (0.X format)", float)
+    else:
+        buff_data["target_hp_threshold"] = None
+
+    return {buff_key: buff_data}
+
+
+def main():
+    print("Welcome to the SwtorSim JSON Structure Generator CLI!")
+    print("1. Create an Ability Blueprint Collection")
+    print("2. Create a Combat Observer Passive Proc Rule")
+    print("3. Create a Permanent Background Passive Buff / Stance 🟢")
+    choice = get_input("What system structure layout do you want to compile? (1, 2, or 3)", int, 1)
+
+    if choice == 1:
+        final_json = build_ability()
+    elif choice == 2:
+        final_json = build_proc()
+    elif choice == 3:
+        final_json = build_permanent_buff()
+    else:
+        print("❌ Invalid menu choice index logic.")
+        return
+
+    print("\n================ GENERATED JSON ================")
+    print(json.dumps(final_json, indent=2))
+    print("=================================================")
+
+    # Option to save file locally
+    if get_input("Save this configured payload snippet to disk? (y/n)", bool, True):
+        filename = get_input("Provide clean output path/filename (e.g. data/Buffs.json)", str)
+
+        # Simple appending logic check if file exists to grow dictionaries cleanly
+        existing_data = {}
+        if os.path.exists(filename):
+            try:
+                with open(filename, "r", encoding="utf-8") as f:
+                    existing_data = json.load(f)
+            except Exception:
+                pass
+
+        # Merge new definition mapping node keys
+        existing_data.update(final_json)
+
+        try:
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+        except Exception:
+            pass
+
+        with open(filename, "a", encoding="utf-8") as f:
+            json.dump(existing_data, f, indent=2)
+        print(f"🟢 Successfully recorded and synchronized dataset nodes into: {filename}")
 
 
 if __name__ == "__main__":
-    while True:
-        run_wizard()
-        if not get_bool("\nConfigure another separate ability entry?"):
-            print("Wizard closing. Happy parsing!")
-            break
+    main()

@@ -18,4 +18,3 @@ class Simulation:
                 break
             self.current_time = timestamp
             event.resolve(self)
-

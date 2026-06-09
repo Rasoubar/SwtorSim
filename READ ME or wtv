@@ -64,3 +64,34 @@ combat_math.py
     calculate_hit: caster provides active buffs and stats. target armor and debuffs. action_data the ability data.
                    we calculate de diferent modifiers (in buckets), with buffs and debuffs, and multiply them together -> we calculate base damage with stats and formulas ->
                    -> we multiply damage with modifiers -> we check if armor, if so apply that too -> we check if it's crit -> we return damage and is_crit
+
+
+
+- proc data is special, remember
+global_crit_proc_config = {
+    "name": "Passive: Critical Surge",
+    "cooldown": 0.0,
+    "triggers_gcd": False,
+    "energy_cost": 0.0,
+    "actions": [{
+        "action_type": "buff",
+        "id": 702,
+        "effect_name": "Critical Surge Tracker",
+        "stat_name": "None",
+        "value": 0.0,
+        "duration": inf,  # Permanent passive aura
+        "proc_data": {
+            "trigger": "on_crit",       # Gated strictly to critical hits
+            "chance": 1,             # 50% chance to trigger whenever ANY attack crits
+            "internal_cooldown": 1.0,   # Standard 8-second balancing lockout clock
+            "action": {
+                "action_type": "buff",  # Reuses your standard factory logic node
+                "id": 802,
+                "effect_name": "Critical Power Surge",
+                "stat_name": "Power Stat",
+                "value": 600.0,         # Massive global power spike
+                "duration": 4.0         # Lasts for 4 seconds
+            }
+        }
+    }]
+}

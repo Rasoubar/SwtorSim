@@ -19,13 +19,12 @@ EFFECTS = {
     600: {"stat_name": "Power Stat"}
 }
 def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
-    attack_type = action_data["attack type"] #1 = melee, 2 = ranged, 3 = force, 4 = tech
+    attack_type = action_data["attack_type"] #1 = melee, 2 = ranged, 3 = force, 4 = tech
     action_tags = action_data.get("tags", [])
-    ability_name = action_data.get("name")
     if attack_type in (1,2):
         damage_type = 1
     else:
-        damage_type = action_data["damage type"] #1 = kinetic, 2 = energy, 3 = elemental, 4 = internal
+        damage_type = action_data["damage_type"] #1 = kinetic, 2 = energy, 3 = elemental, 4 = internal
 
 
     buckets = {}
@@ -34,45 +33,42 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     bonus_armor_pen = 0
     target_armor_debuff = 0
 
+    caster_expired_buffs = []
     for effect_id, buff in list(caster.effects.items()):
         if buff.id in EFFECTS:
             meta = EFFECTS[buff.id]
-            if hasattr(buff, 'consumable_charges') and buff.consumable_charges <= 0: #can remove this
-                continue
-            if buff.unique_ability is not None and buff.unique_ability != ability_name:
-                continue
-            if buff.required_att_type is not None and attack_type not in buff.required_att_type:
-                continue
-            if buff.required_dmg_type is not None and damage_type not in buff.required_dmg_type:
+            if buff.consumable_charges is not None and buff.consumable_charges <= 0: #can remove this
                 continue
             if buff.required_tags is not None:
                 if not any(tag in action_tags for tag in buff.required_tags):
                     continue
-            if hasattr(buff, 'consumable_charges'):
-                buff.charges -= 1
+            if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
+                continue
+            multiplier = buff.charges if buff.max_charges is not None else 1
             if meta["stat_name"] == "Damage Modifier":
                 bucket = meta["modifier_bucket"]
-                buckets[bucket] = buckets.get(bucket, 0.0) + buff.value
+                buckets[bucket] = buckets.get(bucket, 0.0) + (buff.value * multiplier)
             elif meta["stat_name"] == "Critical Chance":
-                bonus_crit_chance += buff.value
+                bonus_crit_chance += (buff.value * multiplier)
             elif meta["stat_name"] == "Critical Damage":
-                bonus_crit_modifier += buff.value
+                bonus_crit_modifier += (buff.value * multiplier)
             elif meta["stat_name"] == "Armor Penetration":
-                bonus_armor_pen += buff.value
-            if hasattr(buff, 'consumable_charges'):
+                bonus_armor_pen += (buff.value * multiplier)
+            if buff.consumable_charges is not None:
                 buff.consumable_charges -= 1
                 if buff.consumable_charges <= 0:
-                    del caster.effects[effect_id]
+                    caster_expired_buffs.append(effect_id)
 
     for effect_id, buff in list(target.debuffs.items()):
         if buff.id in EFFECTS:
             meta = EFFECTS[buff.id]
+            multiplier = buff.charges if buff.max_charges is not None else 1
             if meta["stat_name"] == "Damage Modifier":
                 bucket = meta["modifier_bucket"]
-                buckets[bucket] = buckets.get(bucket, 0.0) + buff.value
+                buckets[bucket] = buckets.get(bucket, 0.0) + (buff.value * multiplier)
             elif meta["stat_name"] == "Armor Debuff":
-                target_armor_debuff += buff.value
-            if hasattr(buff, 'consumable_charges'):
+                target_armor_debuff += (buff.value * multiplier)
+            if buff.consumable_charges is not None:
                 buff.consumable_charges -= 1
                 if buff.consumable_charges <= 0:
                     del target.debuffs[effect_id]
@@ -95,7 +91,7 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     else:
         damage_bonus = caster.stats["F_Bonus_Damage"]
 
-
+    print(f'multiplier: {total_multiplier}, active effects: {caster.effects}')
     ability_damage_min = ((amp + 1) * main_hand_min) + ((amp + 1) * off_hand_min) + (coeff * damage_bonus) + (shp_min * standard_health)
     ability_damage_max = ((amp + 1) * main_hand_max) + ((amp + 1) * off_hand_max) + (coeff * damage_bonus) + (shp_max * standard_health)
     ability_damage = random.randint(int(ability_damage_min), int(ability_damage_max)) * total_multiplier
@@ -111,6 +107,7 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     crit_chance = caster.stats.get("Critical Chance", 0.05) + bonus_crit_chance
     crit_multiplier = caster.stats.get("Critical Modifier", 1.5) + bonus_crit_modifier
     is_crit = random.random() < crit_chance
+    caster.cleanup_expired_effects(caster_expired_buffs) #idk any buff where this will matter, but i dont know much
     if is_crit:
         return int(ability_damage * crit_multiplier), True
     return int(ability_damage), False
