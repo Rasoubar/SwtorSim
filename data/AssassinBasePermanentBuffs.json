@@ -1,0 +1,63 @@
+{
+  "THRASHING BLADES": {
+    "id": 79,
+    "value": 0.05,
+    "required_tags": [
+      "thrash",
+      "lacerate",
+      "voltaic_slash",
+      "leeching_strike"
+    ],
+    "effect_name": "Thrashing Blades",
+    "target_hp_threshold": null
+  },
+  "FULGURATION_BUFF": {
+    "id": 79,
+    "value": 0.1,
+    "required_tags": [
+      "creeping_terror",
+      "thrashing_terror"
+    ],
+    "effect_name": null
+  },
+  "CRACKLING_CHARGE_DISCHARGE": {
+    "id": 79,
+    "value": 0.3,
+    "required_tags": [
+      "discharge_effect_lightning"
+    ],
+    "effect_name": "Crackling Charge"
+  },
+  "CRACKLING_CHARGE_LIGHTNING_CHARGE": {
+    "id": 133,
+    "value": 0.5,
+    "required_tags": [
+      "charge_lightning_damage"
+    ],
+    "effect_name": null
+  },
+  "PERVASIVE_DEATH_15": {
+    "id": 79,
+    "value": 0.15,
+    "required_tags": [
+      "death_field"
+    ],
+    "effect_name": null
+  },
+  "FANATICISM": {
+    "id": 68,
+    "value": 20.0,
+    "required_tags": [
+      "death_field"
+    ],
+    "effect_name": "Fanaticism"
+  },
+  "DREADFUL NIGHTMARES": {
+    "id": 79,
+    "value": 0.2,
+    "required_tags": [
+      "eradicate"
+    ],
+    "effect_name": null
+  }
+}

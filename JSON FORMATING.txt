@@ -16,7 +16,7 @@ ABILITIES
   "target_hp_below_pct": 0.30, -> if target is not below this hp, can't cast
   "bypass_if_buff_active": ["Bypass_Proc_Name"], -> this is only for target_hp_below_pct. bypasses that restriction if any of the buff in the list is present on caster.
   "target_has_debuff": ["Target_Debuff_Name"], -> can only cast if any of the buff in the list is present on caster.
-  "caster_had_buff": ["Caster_Buff_Name"] -> can only cast if any of the debuff in the list is present on target.
+  "caster_has_buff": ["Caster_Buff_Name"] -> can only cast if any of the debuff in the list is present on target.
 } NOTE: there are more restrictions, will be added over time by interested parties, if there are interested parties. Contact me to add.
 
 "actions":Actions can be diferent types. Every type will have a diferent format.
@@ -40,8 +40,8 @@ Will now go over the formating for each kind of action.
 	  "has_dot": true, -> the condition needs a dot (any dot) to be resolved?
  	 "exact_dot_amount": true, -> only needed if has_dot is present. Tells if the the condiction needs a certain amount of dots.
  	 "required_count": 2, -> only needed if exact_dot_amount present. Tells the number of dots
-  	"has_debuff": "Target_Debuff_Name", -> If action needs certain debuff on target to resolve.
- 	 "has_buff": "Caster_Buff_Name" -> If action needs certain buff on caster to resolve.
+  	"target_has_debuff": "Target_Debuff_Name", -> If action needs certain debuff on target to resolve.
+ 	 "caster_has_buff": "Caster_Buff_Name" -> If action needs certain buff on caster to resolve.
 	} NOTE: there are more conditions, will be added over time by interested parties, if there are interested parties. Contact me to add.
 
 
@@ -51,7 +51,7 @@ Will now go over the formating for each kind of action.
   "id": 133, -> ID of the stat altered on jedipedia. Required.
   "value": 1.0, -> Value of whatever modification the effect does. If percent use 0.X where X is the percent. Required.
   "duration": 15.0, -> Duration of the effect Required.
-  "required_tags": [], -> Tags that the effect looks for when deciding to apply.
+  "required_tags": [], -> Tags that the effect looks for when deciding to apply. Not required. Do not have empty list if none.
   "effect_name": null, -> Name of the effect. Will be auto generated if no input.
   "charges": int, -> Charges to add if the effect has charges that are not consumed. Not required.
   "max_charges": int, -> Max charges if the effect has charges that are not consumed. Not required.
@@ -65,10 +65,10 @@ Will now go over the formating for each kind of action.
   "id": 133, -> ID of the stat altered on jedipedia. Required.
   "value": 1.0, -> Value of whatever modification the effect does. If percent use 0.X where X is the percent. Required.
   "duration": 15.0, -> Duration of the effect Required.
-  "required_tags": [], -> Tags that the effect looks for when deciding to apply.
+  "required_tags": [], -> Tags that the effect looks for when deciding to apply. Not required. Do not have empty list if none.
   "effect_name": null, -> Name of the effect. Will be auto generated if no input.
   "charges": int, -> Charges to add if the effect has charges that are not consumed. Not required.
-  "max_charges": int, -> Max charges if the effect has charges that are not consumed. Not required.
+  "max_charges": int, -> Max charges if the effect has charges. Not required.
   "consumable_charges":int -> Consumable charges if effect as consumable charges. Not required.
   "target_hp_threshold": -float> If buff only does something after target is bellow certain hp percentage, here. Use 0.X where X is the percent. Not required. 
   "affected_by_cdr": True/False -> Is the cooldown of the effect afected by cdr? Will default to False.
@@ -100,7 +100,8 @@ Procs
   "chance": float, -> if it's got random chance, put it here. use 0.X where X is percentage. Not Required, will default to 1.0
   "icd": float, -> cooldown of the proc. will default to 0. Not required
   "affected_by_cdr": bool, - > if affected by internal cooldown affected by cooldown reduction put TRUE, if not put FALSE, defaults to FALSE. Not required.
-  "action": {} -> what it actualy does. format is the same as action (single) from abilities. 
+  "action": {} -> what it actualy does. format is the same as action (single) from abilities.
+  "conditions" -> Not required. Check similarly named field in actions(action_type = damage)
   }
 } 
  ###########END OF PROCS##############
@@ -111,8 +112,10 @@ Permanent buffs
   "BUFF NAME": {
   "id": 133, -> ID of the stat altered on jedipedia. Required.
   "value": 1.0, -> Value of whatever modification the effect does. If percent use 0.X where X is the percent. Required.
-  "required_tags": [], -> Tags that the effect looks for when deciding to apply.
+  "required_tags": [], -> Tags that the effect looks for when deciding to apply. Not required. Do not have empty list if none.
   "effect_name": null, -> Name of the effect. Will be auto generated if no input..
   "target_hp_threshold": -float> If buff only does something after target is bellow certain hp percentage, here. Use 0.X where X is the percent. Not required. 
   }
 }
+
+NEED TO ADD DOTS, im dumb and forgot about them till I input the 1st one

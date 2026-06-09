@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 from combat_math import calculate_hit, EFFECTS
 import random
+from requirements import validate_all
 
 if TYPE_CHECKING:
     from entities import Player, Target, ActiveDot, ActiveBuff
@@ -54,6 +55,9 @@ class DamageHit(Event):
     def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
         print(f"Scanning procs for hit: {self.ability_name} with tags {tags}")
         for proc in self.source.procs.values():
+            proc_conditions = getattr(proc, "conditions", {})
+            if not validate_all(proc_conditions, self.source, self.target):
+                continue
             if proc.trigger == "crit" and not is_crit:
                 continue
             if proc.required_tag and proc.required_tag not in tags:
@@ -73,7 +77,7 @@ class DamageHit(Event):
                     action_data=proc.action,
                     ability_name=proc.name
                 )
-                proc_strike.resolve(sim)  # Recursive Kick
+                proc_strike.resolve(sim)
             else:
                 from abilities import execute_single_action
                 execute_single_action(sim, self.source, self.target, proc.action,proc.name)
@@ -166,16 +170,20 @@ class DotTick(Event):
                print(f"[{sim.current_time:.2f}s] Cleaned up zombie data for: {dot_name}")
             return
 
-        hit = DamageHit(source=self.source, target=self.target, action_data = self.instance_ref.action_data, ability_name= dot_name)
-        hit.resolve(sim)
-
-        self.instance_ref.ticks_remaining -= 1
+        valid_actions = self.instance_ref.choose_action(self.source, self.target)
+        for action in valid_actions:
+            print(action)
+            hit = DamageHit(source=self.source, target=self.target, action_data = action, ability_name= dot_name)
+            hit.resolve(sim)
+            self.instance_ref.ticks_remaining -= 1
+        print(f" [Budget Tracking] {dot_name} action executed. Ticks remaining on target: {self.instance_ref.ticks_remaining}")
         if self.instance_ref.ticks_remaining > 0:
             next_tick_time = sim.current_time + self.instance_ref.interval
             sim.schedule_absolute(next_tick_time, self)
         else:
             del self.target.dots[dot_name]
             print(f"[{sim.current_time:.2f}s] DoT fully expired and cleared: {dot_name}")
+
 
 
 class ResourceTick(Event):

@@ -13,7 +13,6 @@ def load_abilities_from_json(filepath: str) -> Dict[str, Ability]:
 
     with open(filepath, "r", encoding="utf-8") as f:
         raw_json_data = json.load(f)
-        print("RAW DATA FROM DISK FOR THRASH:", raw_json_data.get("THRASH"))
 
     # Safeguard against double-serialized JSON content
     if isinstance(raw_json_data, str):
@@ -67,7 +66,8 @@ def load_passives_from_json(filepath: str) -> Dict[str, Any]:
                 required_tag=raw_data.get("required_tag"),
                 chance=raw_data.get("chance", 1.0),
                 icd=raw_data.get("icd", 0.0),
-                affected_by_cdr=raw_data.get("affected_by_cdr", False)
+                affected_by_cdr=raw_data.get("affected_by_cdr", False),
+                conditions=raw_data.get("conditions")
             )
         else:
             # Multi-proc database map collection layout
@@ -80,7 +80,8 @@ def load_passives_from_json(filepath: str) -> Dict[str, Any]:
                     required_tag=block.get("required_tag"),
                     chance=block.get("chance", 1.0),
                     icd=block.get("icd", 0.0),
-                    affected_by_cdr=block.get("affected_by_cdr", False)
+                    affected_by_cdr=block.get("affected_by_cdr", False),
+                    conditions=raw_data.get("conditions")
                 )
 
     return proc_registry

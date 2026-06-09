@@ -14,13 +14,8 @@ ability.cast can return True even if nothing happens
 I'm not dealing with mastery multipliers rn, i just dont wanna
 check if ActiveBuff.id is ok
 
+-> change action to a class or dataclass later
+-> on execute_single_action and others of the sort, might do something like I did for requirements with the action types
+!!!Will need a requirement like "caster_has_buff_with_x_stacks" for marauder and for instance!!!
 
-5. Execute Phase / Health Threshold Scaling
 
-You have an explicit "sub_30" bucket mapped out inside your global EFFECTS dictionary, but the math loop isn't checking the target's actual health status yet to validate it.
-
-    The SWTOR Example: Passives that increase your critical strike chance by 15% only if the target is below 30% health.
-
-    The Structural Gap: Your caster.effects loop inside calculate_hit needs access to target.hp and target.max_hp to evaluate if threshold-dependent buckets like sub_30 should be factored into the active multiplier calculations.
-
-Of these options, Stacking Buffs or Health Thresholds would be the easiest next additions since they plug right into your current design, whereas On-Hit Procs require shifting how your modules talk to each other.

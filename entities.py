@@ -1,14 +1,26 @@
 import math
 from combat_math import EFFECTS
+from requirements import validate_all
 
 class ActiveDot:
     __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
 
-    def __init__(self, name, interval, ticks_remaining, action_data):
+    def __init__(self, name, interval, ticks_remaining, action_data: list):
         self.name = name
         self.interval = interval
         self.ticks_remaining = ticks_remaining
         self.action_data = action_data
+
+    def choose_action(self, source, target):
+        valid_actions = []
+        sub_actions = self.action_data.get('actions')
+        for action in sub_actions:
+            conditions = action.get("conditions", {})
+            if validate_all(conditions, source, target):
+                valid_actions.append(action)
+        return valid_actions
+
+
 
 
 class ActiveBuff:
@@ -31,10 +43,11 @@ class ActiveBuff:
         self.target_hp_threshold = target_hp_threshold
 
 class ProcData:
-    __slots__ = ['name','action','chance','icd','next_possible_proc','trigger','required_tag','affected_by_cdr']
+    __slots__ = ['name','action','chance','icd','next_possible_proc','trigger','required_tag','affected_by_cdr',
+                 'conditions']
 
     def __init__(self, name: str, trigger: str, action: dict,
-                 required_tag: str = None, chance: float = 1.0, icd: float = 0.0, affected_by_cdr = False):
+                 required_tag: str = None, chance: float = 1.0, icd: float = 0.0, affected_by_cdr = False, conditions: dict = None):
         self.name = name
         self.trigger = trigger
         self.required_tag = required_tag
@@ -43,6 +56,7 @@ class ProcData:
         self.action = action
         self.next_possible_proc = 0.0
         self.affected_by_cdr = affected_by_cdr
+        self.conditions = conditions if conditions is not None else {} #I went with this to not make conitions mandatory in the JSON file. No idea what it implies for performance
 
 class Actor:
     def __init__(self, name: str):
@@ -115,7 +129,8 @@ class Player(Actor):
         if action.get("affected_by_cdr", False):
             duration = self.scale_time_modifier(duration)
 
-        buff_key = action.get("effect_name", f"{source_name}_{action['stat_name']}")
+
+        buff_key = action.get("effect_name", f"{extracted_stat}")
         expiration_timestamp = current_time + duration
 
         existing_buff = self.effects.get(buff_key)
@@ -205,14 +220,16 @@ class Player(Actor):
         pct_modifiers = 1.0
         flat_reductions = 0.0
         for effect in self.effects.values():
-            if effect.stat_name == "cost_reduction_pct":
-                target_ability = getattr(effect, "unique_ability", None)
-                if target_ability is None or target_ability == ability_name:
-                    pct_modifiers -= effect.value
-            elif effect.stat_name == "cost_reduction_flat":
-                target_ability = getattr(effect, "unique_ability", None)
-                if target_ability is None or target_ability == ability_name:
-                    flat_reductions += effect.value
+            meta = EFFECTS[effect.id]
+            target_ability = ability_name.lower().replace(" ", "_") #don't judge me. can make it better later, now i just want it to work
+            stat_name = meta['stat_name']
+            if stat_name in ("cost_reduction_pct", "cost_reduction_flat"):
+                effect_tags = getattr(effect, "required_tags", [])
+                if not effect_tags or target_ability in effect_tags:
+                    if stat_name == "cost_reduction_pct":
+                        pct_modifiers -= effect.value
+                    elif stat_name == "cost_reduction_flat":
+                        flat_reductions += effect.value
         final_cost = (base_cost * pct_modifiers) - flat_reductions
         return max(0.0, final_cost) #safeguard tbh
 
@@ -254,19 +271,19 @@ class Target(Actor):
             print(f"👉 Action ID {action.get('id')} is completely missing from the EFFECTS database!")
             raise e
         duration = action["duration"]
-        debuff_key = action.get("effect_name", f"{source_name}_{action['stat_name']}")
+        debuff_key = action.get("effect_name", f"{extracted_stat}")
         expiration_timestamp = current_time + duration
 
+        incoming_charges = action.get("charges", 1)
         existing_debuff = self.debuffs.get(debuff_key)
         if existing_debuff:
+            new_charge_total = existing_debuff.charges + incoming_charges
             if existing_debuff.max_charges is not None:
-                current_charges = min(existing_debuff.max_charges, existing_debuff.charges + 1)
-            elif "charges" in action:
-                current_charges = action["charges"]
+                current_charges = min(existing_debuff.max_charges, new_charge_total)
             else:
-                current_charges = existing_debuff.charges
+                current_charges = new_charge_total
         else:
-            current_charges = 1 if "max_charges" in action else action.get("charges")
+            current_charges = incoming_charges
 
         raw_att = action.get("required_att_type")
         att_set = set(raw_att) if isinstance(raw_att, (list, tuple, set)) else ({raw_att} if raw_att is not None else None)
@@ -346,6 +363,6 @@ class ResourcePool:
         else:
             self.current_value = min(self.max_value, self.current_value + amount)
 
-    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0):
+    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0): #only works properly for force rn
         actual_regen_rate = self.base_regen * alacrity_modifier
         self.generate(actual_regen_rate * delta_time)

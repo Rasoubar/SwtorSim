@@ -1,6 +1,7 @@
 import random
 from events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent
 from entities import ActiveDot, Player, Target
+from requirements import validate_all
 
 
 def execute_single_action(sim, caster, target, action: dict, source_name: str):
@@ -23,9 +24,11 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
         target.dots[source_name] = dot_instance
         if action.get("instant_tick", False):
             tick_delay = action.get("instant_tick_delay", 0.0)
-            instant_hit = DamageHit(caster, target, action, source_name)
-            sim.schedule_relative(tick_delay, instant_hit)
-            dot_instance.ticks_remaining -= 1
+            valid_instant_actions=dot_instance.choose_action(caster, target)
+            for sub_action in valid_instant_actions:
+                print(sub_action)
+                instant_hit = DamageHit(caster, target, sub_action, source_name)
+                sim.schedule_relative(tick_delay, instant_hit)
         sim.schedule_relative(scaled_interval, DotTick(caster, target, dot_instance))
     elif action_type == "buff":
         buff_key, buff_instance, duration = caster.apply_buff(action, source_name, sim.current_time)
@@ -36,6 +39,7 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
     elif action_type == "resource_gain":
         regen = action.get("value", 0.0)
         sim.schedule_relative(delay, ResourceGainEvent(caster, regen)) #vent heat exists, this prepares for it. doing the imediate ones a microsend later should not have impact
+        print(f'gained {regen:.2f} force')
     elif action_type == "cooldown_mod":
         target_ability = action.get("ability_name")
         if not target_ability:
@@ -72,26 +76,8 @@ class Ability:
         if not caster.resource.can_afford(modified_cost):
             self._calculated_cost = modified_cost
             return False
-        restrictions = getattr(self, "restrictions", {})
-        if not restrictions:
-            return True
-        if "target_hp_below_pct" in restrictions:
-            if target.hp_ratio > restrictions["target_hp_below_pct"]:
-                bypass_input = restrictions.get("bypass_if_buff_active", [])
-                bypass_list = [bypass_input] if isinstance(bypass_input, str) else bypass_input
-                if not any(caster.has_buff(b) for b in bypass_list):
-                    return False
-        if "target_has_debuff" in restrictions:
-            debuff_input = restrictions["target_has_debuff"]
-            debuff_list = [debuff_input] if isinstance(debuff_input, str) else debuff_input
-            if not any(target.has_debuff(d) for d in debuff_list):
-                return False
-        if "caster_had_buff" in restrictions:
-            buff_input = restrictions["caster_had_buff"]
-            buff_list = [buff_input] if isinstance(buff_input, str) else buff_input
-            if not any(caster.has_buff(b) for b in buff_list):
-                return False
-        return True
+
+        return validate_all(self.restrictions, caster,target)
 
 
     def apply_cooldown_locks(self, caster, sim):
@@ -103,7 +89,6 @@ class Ability:
     def cast(self, caster, target, sim) -> bool:
         if not self.can_cast(caster, target, sim):
             return False
-
         if getattr(self, "_calculated_cost", None) is not None:
             final_spend = self._calculated_cost
         else:
@@ -114,12 +99,11 @@ class Ability:
                 return False
         caster.resource.spend(final_spend)
         self._calculated_cost = None
-
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
         self.apply_cooldown_locks(caster, sim)
         for action in self.actions: #do all the things the ability commands
             execute_single_action(sim, caster, target, action, self.name)
-
+        print(caster.resource.current_value)
         return True
 
 
@@ -127,18 +111,4 @@ def is_action_valid(action_data, target, caster):
     conditions = action_data.get("conditions", {})
     if not conditions:
         return True
-
-    if "exact_dot_amount" in conditions:
-        actual_count = target.count_active_dots
-        required_count = conditions.get("required_count", 0)
-        if actual_count != required_count:
-            return False
-    if "has_dot" in conditions:
-        actual_count = target.count_active_dots
-        if actual_count == 0:
-            return False
-    if "has_debuff" in conditions:
-        return target.has_debuff(conditions["has_debuff"])
-    if "has_buff" in conditions:
-        return caster.has_buff(conditions["has_buff"])
-    return True
+    return validate_all(conditions, caster, target)

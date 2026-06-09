@@ -1,0 +1,95 @@
+{
+  "LIGHTNING_CHARGE": {
+    "proc_name": "Lightning Charge",
+    "trigger": "hit",
+    "required_tag": "melee_ability",
+    "chance": 0.5,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "damage",
+      "attack_type": 3,
+      "damage_type": 2,
+      "amp": 0.0,
+      "coeff": 0.234,
+      "shp_min": 0.0234,
+      "shp_max": 0.0234,
+      "delay": 0.0,
+      "impact_delay": 0.0,
+      "tags": [
+        "charge_lightning",
+        "saber_charged",
+        "force_ability",
+        "charge_lightning_damage"
+      ]
+    }
+  },
+  "FULGURATION_PROC": {
+    "proc_name": "Fulguration",
+    "trigger": "hit",
+    "required_tag": "charge_lightning",
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "resource_gain",
+      "value": 5.0
+    },
+    "conditions": {}
+  },
+  "CRACKLING_CHARGE_DISCHARGE": {
+    "id": 79,
+    "value": 0.3,
+    "required_tags": [
+      "discharge_effect_lightning"
+    ],
+    "effect_name": "Crackling Charge"
+  },
+  "CRACKLING_CHARGE_LIGHTNING_CHARGE": {
+    "id": 133,
+    "value": 0.5,
+    "required_tags": [
+      "charge_lightning_damage"
+    ],
+    "effect_name": null
+  },
+  "PERVASIVE_DEATH_ARMOR_PEN": {
+    "proc_name": "Pervasive Death Armor Pen",
+    "trigger": "hit",
+    "required_tag": "death_field",
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "buff",
+      "id": 166,
+      "value": 0.125,
+      "duration": 10.0,
+      "effect_name": "Pervasive Death Armor Pen",
+      "charges": 1,
+      "max_charges": 8,
+      "affected_by_cdr": false
+    },
+    "conditions": {}
+  },
+  "BEFALL": {
+    "proc_name": "Befall",
+    "trigger": "hit",
+    "required_tag": "eradicate",
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "buff",
+      "id": 133,
+      "value": 0.2,
+      "duration": 4.0,
+      "required_tags": [
+        "periodic_damage"
+      ],
+      "effect_name": "Befall",
+      "affected_by_cdr": false
+    },
+    "conditions": {}
+  }
+}

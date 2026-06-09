@@ -3,6 +3,7 @@ This is hoping to be a simulator for simple combat in swtor
 To simulate time passage I'm using an Heap Queue. All future occurrences are stored/scheduled there.
 We pop the next thing in the queue, add more if needed, and we move on.
 
+I did not update this flow much, sorry. What currently bothers me is at the end of this file.
 Flow:
 
 engine.py schedules events in the queue with events.py.
@@ -67,31 +68,8 @@ combat_math.py
 
 
 
-- proc data is special, remember
-global_crit_proc_config = {
-    "name": "Passive: Critical Surge",
-    "cooldown": 0.0,
-    "triggers_gcd": False,
-    "energy_cost": 0.0,
-    "actions": [{
-        "action_type": "buff",
-        "id": 702,
-        "effect_name": "Critical Surge Tracker",
-        "stat_name": "None",
-        "value": 0.0,
-        "duration": inf,  # Permanent passive aura
-        "proc_data": {
-            "trigger": "on_crit",       # Gated strictly to critical hits
-            "chance": 1,             # 50% chance to trigger whenever ANY attack crits
-            "internal_cooldown": 1.0,   # Standard 8-second balancing lockout clock
-            "action": {
-                "action_type": "buff",  # Reuses your standard factory logic node
-                "id": 802,
-                "effect_name": "Critical Power Surge",
-                "stat_name": "Power Stat",
-                "value": 600.0,         # Massive global power spike
-                "duration": 4.0         # Lasts for 4 seconds
-            }
-        }
-    }]
-}
+ABOUT TAGS:
+I added an extra tag direct_force for abilities that are direct and force. Force Critical Chance maps to 133 like all the crit modifiers I've seen so I'm improvising.
+Abilities should probably have tags. Might incorporate later.
+I might have forgotten to have affected_by_gcd in abilities.
+I think I will add ability tags and remake some of the logic before I get in too deep. Will delay this a bit but better to have it done now than later.
