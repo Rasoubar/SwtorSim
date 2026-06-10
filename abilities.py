@@ -44,10 +44,6 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str): 
         is_reset = action.get("reset", False)
         cooldown_dict = getattr(caster, "cooldowns", None)
         player_db = getattr(caster, "abilities_db", None)
-
-        print(action["target_tags"])
-        print(cooldown_dict)
-        print(player_db)
         if cooldown_dict and player_db and "target_tags" in action:
             reset_tags = set(action["target_tags"])
             for cooldown in list(cooldown_dict.keys()):

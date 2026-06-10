@@ -6,7 +6,7 @@
     "chance": 0.5,
     "icd": 0.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "damage",
       "attack_type": 3,
       "damage_type": 2,
@@ -22,7 +22,7 @@
         "force_ability",
         "charge_lightning_damage"
       ]
-    }
+    }]
   },
   "FULGURATION_PROC": {
     "proc_name": "Fulguration",
@@ -31,27 +31,11 @@
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "resource_gain",
       "value": 5.0
-    },
+    }],
     "conditions": {}
-  },
-  "CRACKLING_CHARGE_DISCHARGE": {
-    "id": 79,
-    "value": 0.3,
-    "required_tags": [
-      "discharge_effect_lightning"
-    ],
-    "effect_name": "Crackling Charge"
-  },
-  "CRACKLING_CHARGE_LIGHTNING_CHARGE": {
-    "id": 133,
-    "value": 0.5,
-    "required_tags": [
-      "charge_lightning_damage"
-    ],
-    "effect_name": null
   },
   "PERVASIVE_DEATH_ARMOR_PEN": {
     "proc_name": "Pervasive Death Armor Pen",
@@ -60,7 +44,7 @@
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "buff",
       "id": 166,
       "value": 0.125,
@@ -69,7 +53,7 @@
       "charges": 1,
       "max_charges": 8,
       "affected_by_cdr": false
-    },
+    }],
     "conditions": {}
   },
   "BEFALL": {
@@ -79,7 +63,7 @@
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "buff",
       "id": 133,
       "value": 0.2,
@@ -89,7 +73,7 @@
       ],
       "effect_name": "Befall",
       "affected_by_cdr": false
-    },
+    }],
     "conditions": {}
   },
   "LANGUISHING LASHES PROC": {
@@ -99,7 +83,7 @@
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "buff",
       "id": 133,
       "value": 0.2,
@@ -109,7 +93,7 @@
       ],
       "effect_name": "Languishing Lashes Proc",
       "affected_by_cdr": false
-    },
+    }],
     "conditions": {}
   },
   "EXPLOITIVE STRIKES": {
@@ -119,7 +103,7 @@
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "buff",
       "id": 116,
       "value": 0.05,
@@ -129,7 +113,7 @@
       ],
       "effect_name": "Exploitive Strikes",
       "affected_by_cdr": false
-    },
+    }],
     "conditions": {}
   },
   "MASTERY SURGE": {
@@ -138,14 +122,14 @@
     "chance": 0.3,
     "icd": 20.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "buff",
       "id": 4140,
       "value": 4220.0,
       "duration": 6.0,
       "effect_name": "Mastery Surge",
       "affected_by_cdr": false
-    },
+    }],
     "conditions": {}
   },
   "POWER SURGE": {
@@ -154,14 +138,14 @@
     "chance": 0.3,
     "icd": 20.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "buff",
       "id": 155,
       "value": 4220.0,
       "duration": 6.0,
       "effect_name": "Power Surge",
       "affected_by_cdr": false
-    },
+    }],
     "conditions": {}
   },
   "CRITICAL SURGE": {
@@ -170,14 +154,14 @@
     "chance": 0.3,
     "icd": 20.0,
     "affected_by_cdr": false,
-    "action": {
+    "actions": [{
       "action_type": "buff",
       "id": 156,
       "value": 4220.0,
       "duration": 6.0,
       "effect_name": "Critical Surge",
       "affected_by_cdr": false
-    },
+    }],
     "conditions": {}
   }
 }

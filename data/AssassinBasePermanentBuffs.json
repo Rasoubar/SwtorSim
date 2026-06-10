@@ -140,5 +140,21 @@
     "id": 117,
     "value": 0.01,
     "effect_name":"legacy crit damage"
+  },
+  "CRACKLING_CHARGE_DISCHARGE": {
+    "id": 79,
+    "value": 0.3,
+    "required_tags": [
+      "discharge_effect_lightning"
+    ],
+    "effect_name": "Crackling Charge"
+  },
+  "CRACKLING_CHARGE_LIGHTNING_CHARGE": {
+    "id": 133,
+    "value": 0.5,
+    "required_tags": [
+      "charge_lightning_damage"
+    ],
+    "effect_name": "Crackling Charge LC"
   }
 }

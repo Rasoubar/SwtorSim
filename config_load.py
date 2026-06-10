@@ -38,10 +38,6 @@ def load_abilities_from_json(filepath: str) -> Dict[str, Ability]:
 
 
 def load_passives_from_json(filepath: str) -> Dict[str, Any]:
-    """
-    Loads raw passive data configurations out of JSON blueprints
-    and instantiates them into formal, slotted ProcData objects.
-    """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Passives configuration not found at: {filepath}")
 
@@ -62,7 +58,7 @@ def load_passives_from_json(filepath: str) -> Dict[str, Any]:
             proc_registry[name] = ProcData(
                 name=name,
                 trigger=raw_data.get("trigger", "hit"),
-                action=raw_data.get("action", {}),
+                actions=raw_data.get("actions", []),
                 required_tag=raw_data.get("required_tag"),
                 chance=raw_data.get("chance", 1.0),
                 icd=raw_data.get("icd", 0.0),
@@ -76,7 +72,7 @@ def load_passives_from_json(filepath: str) -> Dict[str, Any]:
                 proc_registry[name] = ProcData(
                     name=name,
                     trigger=block.get("trigger", "hit"),
-                    action=block.get("action", {}),
+                    actions=block.get("actions", []),
                     required_tag=block.get("required_tag"),
                     chance=block.get("chance", 1.0),
                     icd=block.get("icd", 0.0),

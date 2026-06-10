@@ -99,7 +99,6 @@ def build_conditions():
 
 def build_action():
     """Builds a single action dictionary interactively."""
-    # 🟢 UPDATED: Added 'dot' cleanly as an optional first-class action type choice
     action_type = get_input("Action type ('damage', 'buff', 'debuff', 'resource_gain', 'cooldown_mod', 'dot')",
                             str).lower()
     action = {"action_type": action_type}
@@ -141,7 +140,6 @@ def build_action():
         if get_input("Does effect have consumable charges? (y/n)", bool, False):
             action["consumable_charges"] = get_input("Consumable charges", int)
 
-        # 🟢 ENFORCED: Always have charges if max_charges or consumable_charges are tracking
         if "max_charges" in action or "consumable_charges" in action:
             if "charges" not in action:
                 action["charges"] = get_input("Initial baseline tracking charges (Required for caps)", int, 1)
@@ -162,7 +160,6 @@ def build_action():
         if not action["reset"]:
             action["value"] = get_input("How much time to take off the cooldown", float)
 
-    # 🟢 NEW: Handles configuring nested DoT structural components recursively
     elif action_type == "dot":
         action["interval"] = get_input("Tick loop interval duration (seconds)", float, 3.0)
         action["total_ticks"] = get_input("Total baseline tick count", int, 4)
@@ -209,7 +206,7 @@ def build_ability():
 
 
 def build_proc():
-    """Builds a passive tracking observer proc condition blueprint."""
+    """Builds a passive tracking observer proc condition blueprint with multiple actions support."""
     proc_key = get_input("Proc Key Identifier (e.g. LIGHTNING_CHARGE)", str).upper()
     proc_name = get_input("Display text description name", str, proc_key.replace("_", " ").title())
 
@@ -226,8 +223,12 @@ def build_proc():
     proc_data["icd"] = get_input("Internal tracking Cooldown (ICD)", float, 0.0)
     proc_data["affected_by_cdr"] = get_input("Is ICD affected by character CDR math? (y/n)", bool, False)
 
-    print("\nDefine the operational sub-action sequence this proc fires:")
-    proc_data["action"] = build_action()
+    # 🟢 UPDATED: Changed single action dictionary into an array tracking multiple operational actions
+    proc_data["actions"] = []
+    num_actions = get_input("How many operational sub-actions does this proc fire?", int, 1)
+    for i in range(num_actions):
+        print(f"\n--- Configuring Proc Sub-Action {i + 1} of {num_actions} ---")
+        proc_data["actions"].append(build_action())
 
     print(f"\n--- Configuring Conditions for Proc: {proc_key} ---")
     proc_data["conditions"] = build_conditions()
@@ -261,7 +262,6 @@ def main():
     print("1. Create an Ability")
     print("2. Create a Proc")
     print("3. Create a Permanent Buff")
-    # 🟢 REMOVED option 4 since DoT configurations now live seamlessly inside standard action arrays
     choice = get_input("What would you like to create? (1, 2, or 3)", int, 1)
 
     if choice == 1:

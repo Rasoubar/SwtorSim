@@ -104,11 +104,8 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
     else:
         damage_bonus = caster.stats["F_Bonus_Damage"]
 
-    print(total_multiplier)
-    print(bonus_crit_chance)
-    print(bonus_crit_modifier)
-    ability_damage_min = ((amp ) * main_hand_min) + ((amp) * off_hand_min) + (coeff * damage_bonus) + (shp_min * standard_health)
-    ability_damage_max = ((amp ) * main_hand_max) + ((amp) * off_hand_max) + (coeff * damage_bonus) + (shp_max * standard_health)
+    ability_damage_min = ((amp+1)  * main_hand_min) + ((amp+1) * off_hand_min * 0.3) + (coeff * damage_bonus) + (shp_min * standard_health)
+    ability_damage_max = ((amp+1)  * main_hand_max) + ((amp+1) * off_hand_max * 0.3) + (coeff * damage_bonus) + (shp_max * standard_health)
     ability_damage = random.randint(int(ability_damage_min), int(ability_damage_max)) * total_multiplier
 
 

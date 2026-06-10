@@ -70,17 +70,18 @@ class DamageHit(Event):
             if proc.affected_by_cdr:
                 current_icd = self.source.scale_time_modifier(proc.icd)
             proc.next_possible_proc = sim.current_time + current_icd
-            if proc.action.get("action_type") == "damage": #needed because of the queue nature. like this procs can generate procs before the next one happens, like it happens in game.
-                proc_strike = DamageHit(                   #alternatives would be adding microscopic delays to stuff or re-designing the whole thing. fuck that, this is the less clunky option.
-                    source=self.source,
-                    target=self.target,
-                    action_data=proc.action,
-                    ability_name=proc.name
-                )
-                proc_strike.resolve(sim)
-            else:
-                from abilities import execute_single_action
-                execute_single_action(sim, self.source, self.target, proc.action,proc.name)
+            for action in proc.actions:
+                if action.get("action_type") == "damage": #needed because of the queue nature. like this procs can generate procs before the next one happens, like it happens in game.
+                    proc_strike = DamageHit(                   #alternatives would be adding microscopic delays to stuff or re-designing the whole thing. fuck that, this is the less clunky option.
+                        source=self.source,
+                        target=self.target,
+                        action_data=action,
+                        ability_name=proc.name
+                    )
+                    proc_strike.resolve(sim)
+                else:
+                    from abilities import execute_single_action
+                    execute_single_action(sim, self.source, self.target, action,proc.name)
 
 class CastAttemptEvent(Event):
     def __init__(self, player: "Player", target: "Target", ability: "Ability"):

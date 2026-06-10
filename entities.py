@@ -43,17 +43,17 @@ class ActiveBuff:
         self.target_hp_threshold = target_hp_threshold
 
 class ProcData:
-    __slots__ = ['name','action','chance','icd','next_possible_proc','trigger','required_tag','affected_by_cdr',
+    __slots__ = ['name','actions','chance','icd','next_possible_proc','trigger','required_tag','affected_by_cdr',
                  'conditions']
 
-    def __init__(self, name: str, trigger: str, action: dict,
+    def __init__(self, name: str, trigger: str, actions: list,
                  required_tag: str = None, chance: float = 1.0, icd: float = 0.0, affected_by_cdr = False, conditions: dict = None):
         self.name = name
         self.trigger = trigger
         self.required_tag = required_tag
         self.chance = chance
         self.icd = icd
-        self.action = action
+        self.actions = actions
         self.next_possible_proc = 0.0
         self.affected_by_cdr = affected_by_cdr
         self.conditions = conditions if conditions is not None else {} #I went with this to not make conitions mandatory in the JSON file. No idea what it implies for performance

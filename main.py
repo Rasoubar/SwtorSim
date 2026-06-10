@@ -70,8 +70,8 @@ def run_recklessness_cooldown_test():
     print(player.stats)
     # 3. Schedule the explicit step verification sequence
     recklessness_ability = player.abilities_db['RECKLESSNESS']
-    leeching = player.abilities_db['ASSASSINATE']
-    deathfield = player.abilities_db['DISCHARGE']
+    leeching = player.abilities_db['LEECHING STRIKE']
+    deathfield = player.abilities_db['THRASH']
     # At 1.00s: Force target skills onto cooldown
     sim.schedule_absolute(0.0, CastAttemptEvent(player, target, deathfield))
     sim.schedule_absolute(3.0, CastAttemptEvent(player, target, leeching))
