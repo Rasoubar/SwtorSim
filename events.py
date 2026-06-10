@@ -5,7 +5,8 @@ from requirements import validate_all
 
 if TYPE_CHECKING:
     from entities import Player, Target, ActiveDot, ActiveBuff
-    from abilities import Ability
+    from abilities import Ability, is_action_valid
+
 
 class Event:
     def __init__(self, name="EventName"):
@@ -17,7 +18,7 @@ class Event:
     def __lt__(self,other): #prevent crash if 2 events to happen at same time, which i expect wil happen
         return False
 
-class ApplyDamageLandEvent: #bro why did I put this here
+class ApplyDamageLandEvent(Event): #bro why did I put this here
     def __init__(self, source, target, final_damage, is_crit, ability_name):
         self.source = source
         self.target = target
@@ -71,14 +72,16 @@ class DamageHit(Event):
                 current_icd = self.source.scale_time_modifier(proc.icd)
             proc.next_possible_proc = sim.current_time + current_icd
             for action in proc.actions:
-                if action.get("action_type") == "damage": #needed because of the queue nature. like this procs can generate procs before the next one happens, like it happens in game.
-                    proc_strike = DamageHit(                   #alternatives would be adding microscopic delays to stuff or re-designing the whole thing. fuck that, this is the less clunky option.
-                        source=self.source,
-                        target=self.target,
-                        action_data=action,
-                        ability_name=proc.name
-                    )
-                    proc_strike.resolve(sim)
+                if action.get("action_type") == "damage": #needed beca
+                    from abilities import is_action_valid# use of the queue nature. like this procs can generate procs before the next one happens, like it happens in game.
+                    if is_action_valid(action, self.source, self.target):
+                        proc_strike = DamageHit(                   #alternatives would be adding microscopic delays to stuff or re-designing the whole thing. fuck that, this is the less clunky option.
+                            source=self.source,
+                            target=self.target,
+                            action_data=action,
+                            ability_name=proc.name
+                        )
+                        proc_strike.resolve(sim)
                 else:
                     from abilities import execute_single_action
                     execute_single_action(sim, self.source, self.target, action,proc.name)

@@ -121,7 +121,7 @@ class Ability:
         return True
 
 
-def is_action_valid(action_data, target, caster):
+def is_action_valid(action_data,caster,target):
     conditions = action_data.get("conditions", {})
     if not conditions:
         return True

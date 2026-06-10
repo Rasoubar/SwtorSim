@@ -28,7 +28,8 @@
           "direct_damage",
           "thrash",
 		  "agressive_action",
-		  "con_cloak_proccer"
+		  "con_cloak_proccer",
+		  "tt_proc"
         ]
       },
       {
@@ -45,7 +46,8 @@
           "direct_damage",
           "thrash",
 		  "agressive_action",
-		  "con_cloak_proccer"
+		  "con_cloak_proccer",
+		  "tt_proc"
         ]
       }
     ]
@@ -85,7 +87,8 @@
           "agressive_action",
           "assassinate",
           "melee_ability",
-          "direct_damage"
+          "direct_damage",
+		  "tt_proc"
         ]
       }
     ]
@@ -117,7 +120,8 @@
           "force_focus_ability",
           "leeching_strike",
           "direct_damage",
-          "melee_ability"
+          "melee_ability",
+		  "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 0
@@ -144,7 +148,8 @@
           "force_focus_ability",
           "leeching_strike",
           "direct_damage",
-          "melee_ability"
+          "melee_ability",
+		  "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 1
@@ -171,7 +176,8 @@
           "force_focus_ability",
           "leeching_strike",
           "direct_damage",
-          "melee_ability"
+          "melee_ability",
+		  "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 2
@@ -198,7 +204,8 @@
           "force_focus_ability",
           "leeching_strike",
           "direct_damage",
-          "melee_ability"
+          "melee_ability",
+		  "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 3

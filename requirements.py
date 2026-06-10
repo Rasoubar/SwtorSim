@@ -32,6 +32,10 @@ def check_has_any_dot(conditions: Any, caster: "Player", target: "Target") -> bo
 def inverse_check_target_debuff(conditions: Any, caster: "Player", target: "Target") -> bool:
     return not check_target_debuff(conditions, caster, target)
 
+def has_specific_dot(conditions: Any, caster: "Player", target: "Target") -> bool:
+    debuff_list = [conditions] if isinstance(conditions, str) else conditions
+    return any(target.has_debuff(d) for d in debuff_list)
+
 CONDITION_REGISTRY = {
     "target_hp_below_pct": check_target_hp,
     "target_has_debuff": check_target_debuff,
@@ -39,6 +43,7 @@ CONDITION_REGISTRY = {
     "exact_dot_amount": check_exact_dot_amount,
     "has_dot": check_has_any_dot,
     "target_doesnt_have_debuff": inverse_check_target_debuff,
+    "has_specific_dot": has_specific_dot
 }
 
 def validate_all(requirements_dict: dict[str, Any], caster: "Player", target: "Target") -> bool:

@@ -87,10 +87,20 @@ def build_conditions():
     if get_input("Does it require a certain buff on caster (caster_has_buff)? (y/n)", bool, False):
         conditions["caster_has_buff"] = get_input("Buff name", str)
 
-    # 5 & 6. exact_dot_amount / has_dot
+    # 5, 6 & 7. DOT Conditions
     if get_input("Does it require a DOT condition? (y/n)", bool, False):
-        if get_input("Does it require an exact DOT amount (exact_dot_amount)? (y/n)", bool, False):
+        print("\nSelect DOT condition subtype:")
+        print("1. exact_dot_amount (Requires a specific count of total active DOTs)")
+        print("2. has_specific_dot (Requires a specific named DOT tracking token)")
+        print("3. has_dot (Generic check for any generic active DOT frame)")
+
+        dot_choice = get_input("Choose option (1, 2, or 3)", int, 3)
+        if dot_choice == 1:
             conditions["exact_dot_amount"] = get_input("Required count of DOTs", int, 1)
+        # 🟢 NEW: Handles specific dot name mapping requirements safely
+        elif dot_choice == 2:
+            conditions["has_specific_dot"] = get_input("Specific DOT tracking identifier string name (e.g. AFFLICTION)",
+                                                       str).upper()
         else:
             conditions["has_dot"] = True
 
@@ -206,7 +216,7 @@ def build_ability():
 
 
 def build_proc():
-    """Builds a passive tracking observer proc condition blueprint with multiple actions support."""
+    """Builds a passive tracking observer proc condition blueprint supporting multiple standalone actions."""
     proc_key = get_input("Proc Key Identifier (e.g. LIGHTNING_CHARGE)", str).upper()
     proc_name = get_input("Display text description name", str, proc_key.replace("_", " ").title())
 
@@ -223,14 +233,13 @@ def build_proc():
     proc_data["icd"] = get_input("Internal tracking Cooldown (ICD)", float, 0.0)
     proc_data["affected_by_cdr"] = get_input("Is ICD affected by character CDR math? (y/n)", bool, False)
 
-    # 🟢 UPDATED: Changed single action dictionary into an array tracking multiple operational actions
     proc_data["actions"] = []
     num_actions = get_input("How many operational sub-actions does this proc fire?", int, 1)
     for i in range(num_actions):
         print(f"\n--- Configuring Proc Sub-Action {i + 1} of {num_actions} ---")
         proc_data["actions"].append(build_action())
 
-    print(f"\n--- Configuring Conditions for Proc: {proc_key} ---")
+    print(f"\n--- Configuring Overall Global Conditions for Proc: {proc_key} ---")
     proc_data["conditions"] = build_conditions()
 
     return {proc_key: proc_data}

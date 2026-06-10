@@ -15,4 +15,4 @@ check if ActiveBuff.id is ok (
 !!!Will need a requirement like "caster_has_buff_with_x_stacks" for marauder and for instance!!!
 !!! will need to discern kinds of bonus damage when doing other classes!!!
 !!!some dots on my JSON are poorly implemented. instant_tick needs to go!!!
-
+!!!shit, my list of procs only counted the ones that messed with damage, fuck me life!!!

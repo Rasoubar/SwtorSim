@@ -163,5 +163,107 @@
       "affected_by_cdr": false
     }],
     "conditions": {}
+  },
+  "THRASHING TERROR A": {
+    "proc_name": "Thrashing Terror A",
+    "trigger": "hit",
+    "required_tag": "assassinate",
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.3795,
+        "shp_min": 0.03795,
+        "shp_max": 0.03795,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage"
+        ],
+        "conditions": {
+          "target_has_debuff": "Deathmark"
+        }
+      },
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.33,
+        "shp_min": 0.033,
+        "shp_max": 0.033,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage"
+        ],
+        "conditions": {
+          "target_doesnt_have_debuff": "Deathmark"
+        }
+      }
+    ],
+    "conditions": {
+      "has_specific_dot": "CREEPING TERROR"
+    }
+  },
+  "THRASHING TERROR": {
+    "proc_name": "Thrashing Terror",
+    "trigger": "hit",
+    "required_tag": "tt_proc",
+    "chance": 0.6,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.3795,
+        "shp_min": 0.03795,
+        "shp_max": 0.03795,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage"
+        ],
+        "conditions": {
+          "target_has_debuff": "Deathmark"
+        }
+      },
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.33,
+        "shp_min": 0.033,
+        "shp_max": 0.033,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage"
+        ],
+        "conditions": {
+          "target_doesnt_have_debuff": "Deathmark"
+        }
+      }
+    ],
+    "conditions": {
+      "has_specific_dot": "CREEPING TERROR"
+    }
   }
 }

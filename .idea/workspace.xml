@@ -1,18 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="3a478dd1-496a-4a22-b691-72f7a72fb6c2" name="Changes" comment="Added more abilities. Changed some logic.&#10;Almost shareable.">
+    <list default="true" id="3a478dd1-496a-4a22-b691-72f7a72fb6c2" name="Changes" comment="I'm drunk and I'm gonna adjust procs so im commiting to know where i was when i was sober">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Plan" beforeDir="false" afterPath="$PROJECT_DIR$/Plan" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/abilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/abilities.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/combat_math.py" beforeDir="false" afterPath="$PROJECT_DIR$/combat_math.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config_load.py" beforeDir="false" afterPath="$PROJECT_DIR$/config_load.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/AssassinBasePermanentBuffs.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/AssassinBasePermanentBuffs.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/data/BaseAssassinProcs.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/BaseAssassinProcs.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/entities.py" beforeDir="false" afterPath="$PROJECT_DIR$/entities.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/HatredAssassinAbilities.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/HatredAssassinAbilities.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/events.py" beforeDir="false" afterPath="$PROJECT_DIR$/events.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/json_builder.py" beforeDir="false" afterPath="$PROJECT_DIR$/json_builder.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.py" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -106,7 +104,7 @@
       <workItem from="1780967085013" duration="2341000" />
       <workItem from="1780996881187" duration="53469000" />
       <workItem from="1781059982121" duration="112000" />
-      <workItem from="1781087759748" duration="4390000" />
+      <workItem from="1781087759748" duration="10971000" />
     </task>
     <task id="LOCAL-00001" summary="day 1">
       <option name="closed" value="true" />
@@ -164,7 +162,15 @@
       <option name="project" value="LOCAL" />
       <updated>1781060077874</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="I'm drunk and I'm gonna adjust procs so im commiting to know where i was when i was sober">
+      <option name="closed" value="true" />
+      <created>1781104628100</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1781104628100</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -188,16 +194,17 @@
     <MESSAGE value="functioning skeleton. AI made script to make JSONs. some ai generated code to import them too, I couldn't be bothered with that part." />
     <MESSAGE value="Public." />
     <MESSAGE value="Added more abilities. Changed some logic.&#10;Almost shareable." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added more abilities. Changed some logic.&#10;Almost shareable." />
+    <MESSAGE value="I'm drunk and I'm gonna adjust procs so im commiting to know where i was when i was sober" />
+    <option name="LAST_COMMIT_MESSAGE" value="I'm drunk and I'm gonna adjust procs so im commiting to know where i was when i was sober" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/SwtorSim$abilities.coverage" NAME="abilities Coverage Results" MODIFIED="1781053445853" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$requirements_test.coverage" NAME="requirements_test Coverage Results" MODIFIED="1781001050942" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SwtorSim$main.coverage" NAME="main Coverage Results" MODIFIED="1781090590804" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$main.coverage" NAME="main Coverage Results" MODIFIED="1781110614334" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$events.coverage" NAME="events Coverage Results" MODIFIED="1780963365041" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$combat_math.coverage" NAME="combat_math Coverage Results" MODIFIED="1781089956274" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$entities.coverage" NAME="entities Coverage Results" MODIFIED="1781058397145" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SwtorSim$json_builder.coverage" NAME="json_builder Coverage Results" MODIFIED="1781091176419" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$json_builder.coverage" NAME="json_builder Coverage Results" MODIFIED="1781110323233" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$tests.coverage" NAME="tests Coverage Results" MODIFIED="1781052552166" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
