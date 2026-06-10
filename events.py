@@ -129,7 +129,7 @@ class BuffExpire(Event):
         from combat_math import EFFECTS
         if effect_id in EFFECTS:
             stat_name = EFFECTS[effect_id]["stat_name"]
-            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Crit Stat"}:
+            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat"}:
                 self.player.recalculate_stats()
 
 
@@ -172,7 +172,6 @@ class DotTick(Event):
 
         valid_actions = self.instance_ref.choose_action(self.source, self.target)
         for action in valid_actions:
-            print(action)
             hit = DamageHit(source=self.source, target=self.target, action_data = action, ability_name= dot_name)
             hit.resolve(sim)
             self.instance_ref.ticks_remaining -= 1

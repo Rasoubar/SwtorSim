@@ -59,5 +59,86 @@
       "eradicate"
     ],
     "effect_name": null
+  },
+  "MALICIOUSNESS_TALENT": {
+    "id": 0,
+    "value": 0.0,
+    "effect_name": null
+  },
+  "FORCE DREAD": {
+    "id": 79,
+    "value": 0.15,
+    "required_tags": [
+      "periodic_damage"
+    ],
+    "effect_name": "Force Dread"
+  },
+  "INEVITABLE DEMISE": {
+    "id": 220,
+    "value": 0.25,
+    "required_tags": [
+      "death_field",
+      "periodic_damage",
+      "demolish_dd"
+    ],
+    "effect_name": "Inevitable Demise",
+    "target_hp_threshold": 0.3
+  },
+  "LANGUISHING LASHES BUFF": {
+    "id": 220,
+    "value": 0.2,
+    "required_tags": [
+      "leeching_strike"
+    ],
+    "effect_name": "Languishing Lashes Buff",
+    "target_hp_threshold": 0.3
+  },
+  "CLAWS OF DECAY DMG": {
+    "id": 117,
+    "value": 0.12,
+    "required_tags": [
+      "thrash",
+      "assassinate",
+      "leeching_strike"
+    ],
+    "effect_name": "Claws of decay"
+  },
+  "CLAWS OF DECAY ASSASSINATE_COST": {
+    "id": 68,
+    "value": 3.0,
+    "required_tags": [
+      "assassinate"
+    ],
+    "effect_name": "claws of decay cost reduction"
+  },
+  "UNNATURAL MIGHT": {
+    "id": 26,
+    "value": 0.05,
+    "effect_name": "unnatural might"
+  },
+  "COORDINATION": {
+    "id": 116,
+    "value": 0.05,
+    "effect_name": "coordination"
+  },
+  "MARK OF POWER": {
+    "id": 414,
+    "value": 0.05,
+    "effect_name": "Mark of power"
+  },
+  "FORCE TRAINING": {
+    "id": 26,
+    "value": 0.03,
+    "effect_name": "Force Training"
+  },
+  "LEGACY CRIT CHANCE": {
+    "id": 116,
+    "value": 0.01,
+    "effect_name":"legacy crit chance"
+  },
+  "LEGACY CRIT DAMAGE": {
+    "id": 117,
+    "value": 0.01,
+    "effect_name":"legacy crit damage"
   }
 }

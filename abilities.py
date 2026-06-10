@@ -41,20 +41,37 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str): 
         sim.schedule_relative(delay, ResourceGainEvent(caster, regen)) #vent heat exists, this prepares for it. doing the imediate ones a microsend later should not have impact
         print(f'gained {regen:.2f} force')
     elif action_type == "cooldown_mod":
-        target_ability = action.get("ability_name")
-        if not target_ability:
-            return
-        current_cd_timestamp = caster.cooldowns.get(target_ability, 0.0)
-        if current_cd_timestamp > sim.current_time:
-            if action.get("reset", False):
-                caster.cooldowns[target_ability] = 0.0
-                print(f"   >> [COOLDOWN] {target_ability} cooldown has been completely RESET!")
-            else:
-                reduction = action.get("value", 0.0)
-                new_cd = max(sim.current_time, current_cd_timestamp - reduction)
-                caster.cooldowns[target_ability] = new_cd
-                remaining = new_cd - sim.current_time
-                print(f"   >> [COOLDOWN] {target_ability} cooldown reduced by {reduction}s. (Remaining: {remaining:.2f}s)")
+        is_reset = action.get("reset", False)
+        cooldown_dict = getattr(caster, "cooldowns", None)
+        player_db = getattr(caster, "abilities_db", None)
+
+        print(action["target_tags"])
+        print(cooldown_dict)
+        print(player_db)
+        if cooldown_dict and player_db and "target_tags" in action:
+            reset_tags = set(action["target_tags"])
+            for cooldown in list(cooldown_dict.keys()):
+                if cooldown_dict[cooldown] <= sim.current_time:
+                    del cooldown_dict[cooldown]
+                    continue
+                target_ability = cooldown_dict.get(cooldown)
+                if target_ability:
+                    ability_tags = getattr(player_db[cooldown.upper()], 'tags', []) #this is all a bit over the knee. it's late
+                    if reset_tags & set(ability_tags):
+                        current_cd_timestamp = cooldown_dict[cooldown]
+                        if current_cd_timestamp > sim.current_time:
+                            if is_reset:
+                                del cooldown_dict[cooldown]
+                                print(f"   >> [COOLDOWN] {cooldown} cooldown has been completely RESET via tags!")
+                            else:
+                                reduction = action.get("value", 0.0)
+                                new_cd = max(sim.current_time, current_cd_timestamp - reduction)
+                                cooldown_dict[cooldown] = new_cd
+                                remaining = new_cd - sim.current_time
+                                print(
+                                    f"   >> [COOLDOWN] {cooldown} cooldown reduced by {reduction}s. (Remaining: {remaining:.2f}s)")
+                                if cooldown_dict[cooldown] <= sim.current_time:
+                                    del cooldown_dict[cooldown]
 
 class Ability:
     def __init__(self, config: dict):
@@ -65,6 +82,7 @@ class Ability:
         self.actions = config.get ("actions", [])
         self.energy_cost = config.get("energy_cost", 0.0)
         self._calculated_cost = None
+        self.tags=config.get("tags",[])
         self.restrictions = config.get("restrictions", {})
 
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:

@@ -177,20 +177,20 @@ class Player(Actor):
         return buff_key, buff_instance, duration
 
     def recalculate_stats(self): #because relics hate me
-
         temp_stats = self.base_stats.copy()
         bonus_mastery = 0
         bonus_power = 0
         bonus_critical_rating = 0
         bonus_alacrity_rating = 0
         damage_bonus_multiplier = 1
+        mastery_multiplier = 1
         for buff in self.effects.values():
             effect_id = buff.id
             if effect_id in EFFECTS:
                 multiplier = buff.charges if buff.max_charges is not None else 1
                 stat_name = EFFECTS[effect_id]["stat_name"]
                 if stat_name == "Mastery Stat":
-                    bonus_mastery += buff.value * 1.05
+                    bonus_mastery += buff.value
                 elif stat_name == "Power Stat":
                     bonus_power += buff.value
                 elif stat_name == "Critical Stat":
@@ -199,8 +199,11 @@ class Player(Actor):
                     bonus_alacrity_rating += buff.value
                 elif stat_name == "Bonus Damage":
                     damage_bonus_multiplier += (buff.value * multiplier)
+                elif stat_name == "Mastery PCT":
+                    mastery_multiplier += (buff.value * multiplier)
 
-        temp_stats["Mastery"]  = temp_stats["Mastery"] + bonus_mastery
+
+        temp_stats["Mastery"]  = (temp_stats["Mastery"] + bonus_mastery) * mastery_multiplier
         temp_stats["Power"] = temp_stats["Power"] + bonus_power
         temp_stats["Critical Rating"] = temp_stats["Critical Rating"] + bonus_critical_rating
         temp_stats["Alacrity Rating"] = temp_stats["Alacrity Rating"] + bonus_alacrity_rating

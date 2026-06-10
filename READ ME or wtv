@@ -75,7 +75,8 @@ I might have forgotten to have affected_by_gcd in abilities.
 I think I will add ability tags and remake some of the logic before I get in too deep. Will delay this a bit but better to have it done now than later.
 
 main I'm using for tests.
-json_builder it's AI generated scrip to make the json. it's shit but I hate doing shit like that
+json_builder it's AI generated scrip to make the json. it's shit but I hate doing stuff like that
 config_load pretty much same
 
-rest is mine. I did use gemini and google when I was struggling with "is this the best way to do it?" but all the code besides those 3 files is
+rest is mine. I did use gemini and google when I was struggling with "is this the best way to do it?"
+

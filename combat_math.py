@@ -13,10 +13,17 @@ EFFECTS = {
     79: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
     386: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
     220: {"stat_name": "Damage Modifier", "modifier_bucket": "sub_30"},
+    116: {"stat_name": "Critical Chance"},
+    117:{"stat_name": "Critical Damage"},
     133: {"stat_name": "Critical Chance"},
     46: {"stat_name": "Damage Modifier", "modifier_bucket": "unknown_percentage"},
     68:{"stat_name": "cost_reduction_flat"},
     166:{"stat_name": "Armor Penetration"},
+    26:{"stat_name": "Bonus Damage"},
+    414:{"stat_name": "Mastery PCT"},
+    4140:{"stat_name": "Mastery Stat"},
+    155:{"stat_name": "Power Stat"},
+    156:{"stat_name": "Critical Stat"}
 
 }
 def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
@@ -64,6 +71,9 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
         if buff.id in EFFECTS:
             meta = EFFECTS[buff.id]
             multiplier = buff.charges if buff.max_charges is not None else 1
+            if buff.required_tags is not None:
+                if not any(tag in action_tags for tag in buff.required_tags):
+                    continue
             if meta["stat_name"] == "Damage Modifier":
                 bucket = meta["modifier_bucket"]
                 buckets[bucket] = buckets.get(bucket, 0.0) + (buff.value * multiplier)
@@ -96,6 +106,7 @@ def calculate_hit(caster, target, action_data) -> tuple[int, bool]:
 
     print(total_multiplier)
     print(bonus_crit_chance)
+    print(bonus_crit_modifier)
     ability_damage_min = ((amp ) * main_hand_min) + ((amp) * off_hand_min) + (coeff * damage_bonus) + (shp_min * standard_health)
     ability_damage_max = ((amp ) * main_hand_max) + ((amp) * off_hand_max) + (coeff * damage_bonus) + (shp_max * standard_health)
     ability_damage = random.randint(int(ability_damage_min), int(ability_damage_max)) * total_multiplier

@@ -194,6 +194,7 @@ def build_ability():
         "base_gcd": get_input("Baseline GCD", float, 1.5),
         "energy_cost": get_input("Energy cost", float, 0.0),
         "restrictions": {},
+        "tags": [],
         "actions": []
     }
 

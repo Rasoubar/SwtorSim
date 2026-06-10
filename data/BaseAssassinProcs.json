@@ -91,5 +91,93 @@
       "affected_by_cdr": false
     },
     "conditions": {}
+  },
+  "LANGUISHING LASHES PROC": {
+    "proc_name": "Languishing Lashes Proc",
+    "trigger": "hit",
+    "required_tag": "melee_ability",
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "buff",
+      "id": 133,
+      "value": 0.2,
+      "duration": 10.0,
+      "required_tags": [
+        "damage_over_time"
+      ],
+      "effect_name": "Languishing Lashes Proc",
+      "affected_by_cdr": false
+    },
+    "conditions": {}
+  },
+  "EXPLOITIVE STRIKES": {
+    "proc_name": "Exploitive Strikes",
+    "trigger": "crit",
+    "required_tag": "force_ability",
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "buff",
+      "id": 116,
+      "value": 0.05,
+      "duration": 10.0,
+      "required_tags": [
+        "melee_ability"
+      ],
+      "effect_name": "Exploitive Strikes",
+      "affected_by_cdr": false
+    },
+    "conditions": {}
+  },
+  "MASTERY SURGE": {
+    "proc_name": "Mastery Surge",
+    "trigger": "hit",
+    "chance": 0.3,
+    "icd": 20.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "buff",
+      "id": 4140,
+      "value": 4220.0,
+      "duration": 6.0,
+      "effect_name": "Mastery Surge",
+      "affected_by_cdr": false
+    },
+    "conditions": {}
+  },
+  "POWER SURGE": {
+    "proc_name": "Power Surge",
+    "trigger": "hit",
+    "chance": 0.3,
+    "icd": 20.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "buff",
+      "id": 155,
+      "value": 4220.0,
+      "duration": 6.0,
+      "effect_name": "Power Surge",
+      "affected_by_cdr": false
+    },
+    "conditions": {}
+  },
+  "CRITICAL SURGE": {
+    "proc_name": "Critical Surge",
+    "trigger": "hit",
+    "chance": 0.3,
+    "icd": 20.0,
+    "affected_by_cdr": false,
+    "action": {
+      "action_type": "buff",
+      "id": 156,
+      "value": 4220.0,
+      "duration": 6.0,
+      "effect_name": "Critical Surge",
+      "affected_by_cdr": false
+    },
+    "conditions": {}
   }
 }

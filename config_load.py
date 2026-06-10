@@ -119,7 +119,7 @@ def load_permanent_buffs_from_json(filepath: str) -> Dict[str, ActiveBuff]:
             value=block.get("value"),
             expires_at=expires_at,  # Set to math infinity
             source_ability=buff_key,  # Uses the top-level string key as source descriptive context
-            required_tags=block.get("required_tags", []),
+            required_tags=block.get("required_tags", None),
             charges=1,  # Default baseline parameters for status indicators
             consumable_charges=None,
             max_charges=1,
