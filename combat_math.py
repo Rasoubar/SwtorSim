@@ -76,7 +76,7 @@ def get_modifiers(caster, target, action_tags):
 
     for bucket_value in buckets.values():
         modifiers['total_multiplier'] *= (1 + bucket_value)
-
+    print(modifiers['total_multiplier'])
     return modifiers
 
 
@@ -117,7 +117,7 @@ def calculate_hit(caster, target, action_data):
         total_armor_pen = caster.stats.get("Armor Penetration", 0.0) + modifiers['bonus_armor_pen']
         effective_armor = armor * (1.0 - total_armor_pen)
         armor_dr = effective_armor / (effective_armor + 32000)
-        modifiers['total_multiplier'] *= (1.0 - armor_dr)
+        ability_damage *= (1.0 - armor_dr)
     ability_damage *= modifiers['total_multiplier']
     crit_chance = caster.stats.get("Critical Chance", 0.05) + modifiers['bonus_crit_chance']
     crit_multiplier = caster.stats.get("Critical Modifier", 1.5) + modifiers['bonus_crit_modifier']

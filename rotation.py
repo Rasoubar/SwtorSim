@@ -9,7 +9,7 @@ class PriorityRotation:
         return False
 
     
-class FixedSequenceRotation:
+class FixedRotation:
     def __init__(self, sequence: list, loop: bool = True):
         self.sequence = sequence
         self.loop = loop

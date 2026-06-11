@@ -265,5 +265,60 @@
     "conditions": {
       "has_specific_dot": "Creeping Terror"
     }
+  },
+  "RAZE": {
+    "proc_name": "Raze",
+    "trigger": "hit",
+    "required_tag": "melee_ability",
+    "chance": 1.0,
+    "icd": 9.0,
+    "affected_by_cdr": true,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 68,
+        "value": 30.0,
+        "duration": 15.0,
+        "required_tags": [
+          "eradicate"
+        ],
+        "effect_name": "Raze",
+        "consumable_charges": 1,
+        "charges": 1,
+        "affected_by_cdr": false
+      },
+      {
+        "action_type": "cooldown_mod",
+        "target_tags": ["eradicate"],
+        "reset": true
+      }
+    ],
+    "conditions": {
+      "has_specific_dot": "Discharge"
+    }
+  },
+    "BLOODLETTING": {
+    "proc_name": "Bloodletting",
+    "trigger": "hit",
+    "required_tag": "periodic_damage",
+    "chance": 0.3,
+    "icd": 15.0,
+    "affected_by_cdr": true,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 0,
+        "value": 0.0,
+        "duration": 15.0,
+        "required_tags": [
+          "assassinate"
+        ],
+        "effect_name": "Bloodletting",
+        "consumable_charges": 1,
+        "charges": 1,
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
   }
 }

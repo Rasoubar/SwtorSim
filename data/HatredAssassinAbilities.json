@@ -5,13 +5,13 @@
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 20.0,
-	"tags":[
-	"agressive_action",
-	"con_cloak_proccer",
-	"chart_auto_proc",
-	"thrash",
-	"melee_ability"
-	],
+    "tags": [
+      "agressive_action",
+      "con_cloak_proccer",
+      "chart_auto_proc",
+      "thrash",
+      "melee_ability"
+    ],
     "actions": [
       {
         "action_type": "damage",
@@ -26,9 +26,9 @@
           "melee_ability",
           "direct_damage",
           "thrash",
-		  "agressive_action",
-		  "con_cloak_proccer",
-		  "tt_proc"
+          "agressive_action",
+          "con_cloak_proccer",
+          "tt_proc"
         ]
       },
       {
@@ -44,9 +44,9 @@
           "melee_ability",
           "direct_damage",
           "thrash",
-		  "agressive_action",
-		  "con_cloak_proccer",
-		  "tt_proc"
+          "agressive_action",
+          "con_cloak_proccer",
+          "tt_proc"
         ]
       }
     ]
@@ -66,12 +66,12 @@
         ]
       }
     },
-	"tags":[
-	"agressive_action",
-	"assassinate",
-	"con_cloak_proccer",
-	"melee_ability"
-	],
+    "tags": [
+      "agressive_action",
+      "assassinate",
+      "con_cloak_proccer",
+      "melee_ability"
+    ],
     "actions": [
       {
         "action_type": "damage",
@@ -87,7 +87,7 @@
           "assassinate",
           "melee_ability",
           "direct_damage",
-		  "tt_proc"
+          "tt_proc"
         ]
       }
     ]
@@ -98,11 +98,11 @@
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 25.0,
-	"tags":[
-	"agressive_action",
-	"melee_ability",
-	"leeching_strike"
-	],
+    "tags": [
+      "agressive_action",
+      "melee_ability",
+      "leeching_strike"
+    ],
     "actions": [
       {
         "action_type": "damage",
@@ -119,7 +119,7 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-		  "tt_proc"
+          "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 0
@@ -147,7 +147,7 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-		  "tt_proc"
+          "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 1
@@ -175,7 +175,7 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-		  "tt_proc"
+          "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 2
@@ -203,7 +203,7 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-		  "tt_proc"
+          "tt_proc"
         ],
         "conditions": {
           "exact_dot_amount": 3
@@ -219,10 +219,10 @@
     "energy_cost": 50.0,
     "tags": [
       "death_field",
-	  "aoe_ability",
-	  "agressive_action",
-	  "force_ability",
-	  "force_attack"
+      "aoe_ability",
+      "agressive_action",
+      "force_ability",
+      "force_attack"
     ],
     "actions": [
       {
@@ -258,6 +258,17 @@
         "consumable_charges": 15,
         "max_charges": 15,
         "affected_by_cdr": false
+      },
+      {
+        "action_type": "debuff",
+        "id": 46,
+        "value": 0.1,
+        "duration": 45.0,
+        "required_tags": [
+          "aoe_ability"
+        ],
+        "effect_name": "Overwhelmed",
+        "affected_by_cdr": false
       }
     ]
   },
@@ -267,12 +278,12 @@
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 20.0,
-	"tags":[
-	"creeping_terror",
-	"agressive_action",
-	"force_ability",
-	"force_attack"
-	],
+    "tags": [
+      "creeping_terror",
+      "agressive_action",
+      "force_ability",
+      "force_attack"
+    ],
     "actions": [
       {
         "action_type": "dot",
@@ -300,7 +311,7 @@
               "periodic_damage",
               "force_attack",
               "purge_only",
-			  "creeping_terror"
+              "creeping_terror"
             ],
             "conditions": {
               "target_doesnt_have_debuff": "Deathmark"
@@ -325,7 +336,7 @@
               "periodic_damage",
               "force_attack",
               "purge_only",
-			  "creeping_terror"
+              "creeping_terror"
             ],
             "conditions": {
               "target_has_debuff": "Deathmark"
@@ -341,13 +352,13 @@
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 20.0,
-	"tags":[
-	"discharge",
-	"lightning_ability",
-	"agressive_action",
-	"force_ability",
-	"force_attack"
-	],
+    "tags": [
+      "discharge",
+      "lightning_ability",
+      "agressive_action",
+      "force_ability",
+      "force_attack"
+    ],
     "actions": [
       {
         "action_type": "dot",
@@ -375,7 +386,7 @@
               "periodic_damage",
               "force_attack",
               "purge_only",
-			  "discharge_effect_lightning"
+              "discharge_effect_lightning"
             ],
             "conditions": {
               "target_doesnt_have_debuff": "Deathmark"
@@ -400,7 +411,7 @@
               "periodic_damage",
               "force_attack",
               "purge_only",
-			  "discharge_effect_lightning"
+              "discharge_effect_lightning"
             ],
             "conditions": {
               "target_has_debuff": "Deathmark"
@@ -416,16 +427,16 @@
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 30.0,
-	"tags":[
-	"eradicate",
-	"cast_time_attack",
-	"agressive_action",
-	"force_ability",
-	"demolish",
-	"force_attack",
-	"wrath_consumer",
-	"triggers_speed_surge"
-	],
+    "tags": [
+      "eradicate",
+      "cast_time_attack",
+      "agressive_action",
+      "force_ability",
+      "demolish",
+      "force_attack",
+      "wrath_consumer",
+      "triggers_speed_surge"
+    ],
     "actions": [
       {
         "action_type": "damage",
@@ -492,8 +503,7 @@
             "attack_type": 3,
             "damage_type": 1,
             "amp": 0.0,
-            "amp": 0.0,
-            "coeff": 0.0565,
+            "coeff": 0.3565,
             "shp_min": 0.03565,
             "shp_max": 0.03565,
             "delay": 0.0,
@@ -534,59 +544,85 @@
       }
     ]
   },
-"RECKLESSNESS": {
-  "name": "Recklessness",
-  "cooldown": 90.0,
-  "triggers_gcd": false,
-  "base_gcd": 0.0,
-  "energy_cost": 0.0,
-  "tags":[
-  "force_ability"
-  ],
-  "actions": [
-    {
-      "action_type": "buff",
-      "id": 79,
-      "value": 0.1,
-      "duration": 20.0,
-      "required_tags": [
-        "eradicate",
-        "melee_ability"
-      ],
-      "effect_name": "Maliciousness",
-      "charges": 1,
-      "max_charges": 2,
-      "affected_by_cdr": false,
-	  "conditions": {
+  "RECKLESSNESS": {
+    "name": "Recklessness",
+    "cooldown": 90.0,
+    "triggers_gcd": false,
+    "base_gcd": 0.0,
+    "energy_cost": 0.0,
+    "tags": [
+      "force_ability"
+    ],
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 79,
+        "value": 0.1,
+        "duration": 20.0,
+        "required_tags": [
+          "eradicate",
+          "melee_ability"
+        ],
+        "effect_name": "Maliciousness",
+        "charges": 1,
+        "max_charges": 2,
+        "affected_by_cdr": false,
+        "conditions": {
           "caster_has_buff": "MALICIOUSNESS_TALENT"
         }
-    },
-    {
-      "action_type": "cooldown_mod",
-      "target_tags": ["eradicate",
-	  "leeching_strike",
-	  "maul",
-	  "assassinate",
-	  "severing_slash"
-	  ], 
-      "reset": true,
-	  "conditions": {
+      },
+      {
+        "action_type": "cooldown_mod",
+        "target_tags": [
+          "eradicate",
+          "leeching_strike",
+          "maul",
+          "assassinate",
+          "severing_slash"
+        ],
+        "reset": true,
+        "conditions": {
           "caster_has_buff": "MALICIOUSNESS_TALENT"
         }
-    },
-    {
-      "action_type": "buff",
-      "id": 133,
-      "value": 0.6,
-      "duration": 20.0,
-      "required_tags": [
-        "direct_force"
-      ],
-      "effect_name": "Recklessness",
-      "consumable_charges": 2,
-      "charges": 2,
-      "affected_by_cdr": false
-    }
-  ]
-}
+      },
+      {
+        "action_type": "buff",
+        "id": 133,
+        "value": 0.6,
+        "duration": 20.0,
+        "required_tags": [
+          "direct_force"
+        ],
+        "effect_name": "Recklessness",
+        "consumable_charges": 2,
+        "charges": 2,
+        "affected_by_cdr": false
+      }
+    ]
+  },
+  "PHANTOM STRIDE": {
+    "name": "Phantom stride",
+    "cooldown": 30.0,
+    "triggers_gcd": true,
+    "base_gcd": 0.29,
+    "energy_cost": 0.0,
+    "restrictions": {},
+    "tags": [],
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 0,
+        "value": 0.0,
+        "duration": 10.0,
+        "required_tags": [
+          "assassinate"
+        ],
+        "effect_name": "Reapers Rush",
+        "consumable_charges": 1,
+        "charges": 1,
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  }
 }

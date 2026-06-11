@@ -106,7 +106,6 @@ class PlayerReady(Event):
 
     def resolve(self, sim):
         acted = self.player.rotation.evaluate(self.player, self.target, sim)
-
         if acted:
             sim.schedule_absolute(self.player.next_gcd, self)
         else:
