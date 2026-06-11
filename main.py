@@ -8,7 +8,7 @@ def run_test():
 
     sim = Simulation()
     player = Player("Assassin")
-    target = Target("Target Dummy", hp=1000000)
+    target = Target("Target Dummy", hp=3000000)
 
     p_stats = player.base_stats
     p_stats["Mastery"] = 16834
@@ -47,7 +47,6 @@ def run_test():
 
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     sim.schedule_absolute(1.0, ResourceTick(player))
-
     sim.run_timed(duration=90.0)
 
 

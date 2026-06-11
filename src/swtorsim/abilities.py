@@ -26,7 +26,6 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
         _handle_cooldown_modification(sim, caster, action)
 
 
-# --- Isolated Handler Sub-functions ---
 
 def _handle_damage_action(sim, caster, target, action, source_name, delay):
     hit_event = DamageHit(caster, target, action, source_name)

@@ -18,7 +18,7 @@ class Event:
     def __lt__(self,other): #prevent crash if 2 events to happen at same time, which i expect wil happen
         return False
 
-class ApplyDamageLandEvent(Event): #bro why did I put this here
+class ApplyDamageLand(Event): #bro why did I put this here
     def __init__(self, source, target, final_damage, is_crit, ability_name):
         super().__init__()
         self.source = source
@@ -45,11 +45,11 @@ class DamageHit(Event):
         tags = self.action_data.get("tags", [])
         impact_delay = self.action_data.get("impact_delay", 0.0)
         if impact_delay > 0.0:
-            sim.schedule_relative(impact_delay, ApplyDamageLandEvent(
+            sim.schedule_relative(impact_delay, ApplyDamageLand(
                 self.source, self.target, final_damage, is_crit, self.ability_name
             ))
         else:
-            instant_land = ApplyDamageLandEvent(self.source, self.target, final_damage, is_crit, self.ability_name)
+            instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
             instant_land.resolve(sim)
         self.evaluate_on_hit_procs(sim, is_crit, tags)
 
@@ -86,7 +86,7 @@ class DamageHit(Event):
                 from src.swtorsim.abilities import execute_single_action
                 execute_single_action(sim, self.source, self.target, action, proc.name)
 
-class CastAttemptEvent(Event):
+class CastAttempt(Event):
     def __init__(self, player: "Player", target: "Target", ability: "Ability"):
         super().__init__(f"Cast Attempt: {ability.name}")
         self.player = player

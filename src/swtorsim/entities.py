@@ -341,6 +341,8 @@ class ResourcePool:
         self.base_regen = base_regen
 
     def can_afford(self, amount: float) -> bool:
+        # heat was dumb to put already, I only really play assassin, pt tank and merc heal so I thought "oh, I can't
+        # account only for force" but forgot about warriors.
         if self.pool_type == "Heat":
             return self.current_value + amount <= self.max_value
         else:
