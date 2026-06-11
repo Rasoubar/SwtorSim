@@ -1,14 +1,9 @@
 import os
-import json
 from engine import Simulation
 from entities import Player, Target
 from events import Event, CastAttemptEvent, ResourceTick
 from config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
 
-# 🟢 ENGINE SAFETY BRIDGE: Monkeypatch 'abilities' to process and trace cooldown_mod live
-import abilities
-
-# 🟢 CUSTOM TEST EVENT: Forces targeted skills onto a simulated cooldown timeline state
 class ForceMockCooldownsEvent(Event):
     def __init__(self, player: "Player"):
         super().__init__("Test Framework: Simulate Skill Use Cooldowns")
