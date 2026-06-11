@@ -129,7 +129,10 @@ def calculate_hit(caster, target, action_data):
         ability_damage *= (1.0 - armor_dr)
     ability_damage *= modifiers['total_multiplier']
     crit_chance = caster.stats.get("Critical Chance", 0.05) + modifiers['bonus_crit_chance']
-    crit_multiplier = caster.stats.get("Critical Modifier", 1.5) + modifiers['bonus_crit_modifier']
+    extra_crit_multiplier = 0
+    if crit_chance > 1:
+        extra_crit_multiplier = crit_chance - 1
+    crit_multiplier = caster.stats.get("Critical Modifier", 1.5) + modifiers['bonus_crit_modifier'] + extra_crit_multiplier
     is_crit = random.random() < crit_chance
     if is_crit:
         ability_damage *= crit_multiplier
