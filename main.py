@@ -42,7 +42,7 @@ def run_test():
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     sim.schedule_absolute(1.0, ResourceTick(player))
 
-    sim.run_timed(duration=60.0)
+    sim.run_timed(duration=30.0)
 
 
 if __name__ == "__main__":

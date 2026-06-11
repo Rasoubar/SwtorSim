@@ -1,15 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="3a478dd1-496a-4a22-b691-72f7a72fb6c2" name="Changes" comment="Ready to use.&#10;Not all passives implemented yet.&#10;No interface yet.&#10;I think i dont know how to do commit comments.">
+    <list default="true" id="3a478dd1-496a-4a22-b691-72f7a72fb6c2" name="Changes" comment="Fixed charges being consumed on buffs that were not used.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Plan" beforeDir="false" afterPath="$PROJECT_DIR$/Plan" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/combat_math.py" beforeDir="false" afterPath="$PROJECT_DIR$/combat_math.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/BaseAssassinProcs.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/BaseAssassinProcs.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/HatredAssassinAbilities.json" beforeDir="false" afterPath="$PROJECT_DIR$/data/HatredAssassinAbilities.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/events.py" beforeDir="false" afterPath="$PROJECT_DIR$/events.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/abilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/abilities.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/entities.py" beforeDir="false" afterPath="$PROJECT_DIR$/entities.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/rotation.py" beforeDir="false" afterPath="$PROJECT_DIR$/rotation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -107,7 +103,7 @@
       <workItem from="1781059982121" duration="112000" />
       <workItem from="1781087759748" duration="11004000" />
       <workItem from="1781117733801" duration="30946000" />
-      <workItem from="1781176858687" duration="2029000" />
+      <workItem from="1781176858687" duration="6116000" />
     </task>
     <task id="LOCAL-00001" summary="day 1">
       <option name="closed" value="true" />
@@ -205,7 +201,31 @@
       <option name="project" value="LOCAL" />
       <updated>1781139326314</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="Ready to use.&#10;Not all passives implemented yet.&#10;No interface yet.&#10;I think i dont know how to do commit comments.">
+      <option name="closed" value="true" />
+      <created>1781179079528</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1781179079528</updated>
+    </task>
+    <task id="LOCAL-00014" summary="Fixed charges being consumed on buffs that were not used.">
+      <option name="closed" value="true" />
+      <created>1781181616262</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1781181616262</updated>
+    </task>
+    <task id="LOCAL-00015" summary="Fixed charges being consumed on buffs that were not used.">
+      <option name="closed" value="true" />
+      <created>1781181649984</created>
+      <option name="number" value="00015" />
+      <option name="presentableId" value="LOCAL-00015" />
+      <option name="project" value="LOCAL" />
+      <updated>1781181649984</updated>
+    </task>
+    <option name="localTasksCounter" value="16" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -232,12 +252,14 @@
     <MESSAGE value="I'm drunk and I'm gonna adjust procs so im commiting to know where i was when i was sober" />
     <MESSAGE value="didn't break it while drunk" />
     <MESSAGE value="Ready to use.&#10;Not all passives implemented yet.&#10;No interface yet.&#10;I think i dont know how to do commit comments." />
-    <option name="LAST_COMMIT_MESSAGE" value="Ready to use.&#10;Not all passives implemented yet.&#10;No interface yet.&#10;I think i dont know how to do commit comments." />
+    <MESSAGE value="Fixed charges being consumed on buffs that were not used in combat_math" />
+    <MESSAGE value="Fixed charges being consumed on buffs that were not used." />
+    <option name="LAST_COMMIT_MESSAGE" value="Fixed charges being consumed on buffs that were not used." />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/SwtorSim$abilities.coverage" NAME="abilities Coverage Results" MODIFIED="1781146811562" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$requirements_test.coverage" NAME="requirements_test Coverage Results" MODIFIED="1781001050942" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SwtorSim$main.coverage" NAME="main Coverage Results" MODIFIED="1781179042290" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SwtorSim$main.coverage" NAME="main Coverage Results" MODIFIED="1781182971997" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$events.coverage" NAME="events Coverage Results" MODIFIED="1781126411618" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$combat_math.coverage" NAME="combat_math Coverage Results" MODIFIED="1781144272959" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/SwtorSim$engine.coverage" NAME="engine Coverage Results" MODIFIED="1781143023084" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

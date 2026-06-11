@@ -54,6 +54,7 @@ def _handle_dot_action(sim, caster, target, action, source_name):
 
 def _handle_buff_action(sim, caster, action, source_name, current_time):
     buff_key, buff_instance, duration = caster.apply_buff(action, source_name, current_time)
+
     sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
 
 
@@ -106,11 +107,10 @@ class Ability:
             return False
         if sim.current_time < caster.cooldowns.get(self.name, 0.0):
             return False
-        modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost)
+        modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply = False)
         if not caster.resource.can_afford(modified_cost): #considered caching this. didn't do it to keep code cleaner
             return False
         return validate_all(self.conditions, caster, target) #validates conditions
-
 
     def apply_cooldown_locks(self, caster, sim):
         if self.triggers_gcd:
@@ -121,7 +121,7 @@ class Ability:
     def cast(self, caster, target, sim) -> bool:
         if not self.can_cast(caster, target, sim):
             return False
-        final_spend = caster.calculate_resource_cost(self.name, self.energy_cost)
+        final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply = True)
         caster.resource.spend(final_spend)
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
         self.apply_cooldown_locks(caster, sim)

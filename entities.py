@@ -122,8 +122,8 @@ class Player(Actor):
             action_id = action.get("id")
             extracted_stat = EFFECTS[action_id]["stat_name"]
         except (KeyError, TypeError) as e:
-            print(f"🚨 CONFIGURATION CRASH in apply_buff via [{source_name}]")
-            print(f"👉 Action ID {action.get('id')} is completely missing from the EFFECTS database!")
+            print(f" CONFIGURATION CRASH in apply_buff via [{source_name}]")
+            print(f" Action ID {action.get('id')} is completely missing from the EFFECTS database!")
             raise e
         duration = action["duration"]
         if action.get("affected_by_cdr", False):
@@ -218,11 +218,12 @@ class Player(Actor):
         temp_stats["Alacrity"] = 0.3 * (1 - (1 - (0.01 / 0.3)) ** ((1 / 3.2) * (temp_stats["Alacrity Rating"] / 80)))
         self.stats = temp_stats
 
-    def calculate_resource_cost(self, ability_name: str, base_cost: float) -> float:
+    def calculate_resource_cost(self, ability_name: str, base_cost: float, apply = False) -> float:
         if base_cost <= 0.0:
             return 0.0
         pct_modifiers = 1.0
         flat_reductions = 0.0
+        buffs_to_clear = []
         for effect in self.effects.values():
             meta = EFFECTS[effect.id]
             target_ability = ability_name.lower().replace(" ", "_") #don't judge me. can make it better later, now i just want it to work
@@ -234,6 +235,14 @@ class Player(Actor):
                         pct_modifiers -= effect.value
                     elif stat_name == "cost_reduction_flat":
                         flat_reductions += effect.value
+                    if effect.consumable_charges is not None and apply is True:
+                        effect.consumable_charges -= 1
+                        if effect.consumable_charges <= 0:
+                            buffs_to_clear.append(effect.effect_name)
+        self.cleanup_expired_effects(buffs_to_clear)
+        print(apply)
+        if "Raze" in self.effects:
+            print("Raze LIVES")
         final_cost = (base_cost * pct_modifiers) - flat_reductions
         return max(0.0, final_cost) #safeguard tbh
 
@@ -243,14 +252,14 @@ class Player(Actor):
     def cleanup_expired_effects(self, expired_keys: list):
         if not expired_keys:
             return
-
         needs_stat_recalc = False
         for r_id in expired_keys:
+            print(r_id)
             popped_buff = self.effects.pop(r_id, None)
+            print(f'{popped_buff} is gone')
             if popped_buff and popped_buff.id in EFFECTS:
                 if EFFECTS[popped_buff.id]["stat_name"] in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat"}:
                     needs_stat_recalc = True
-
         if needs_stat_recalc:
             self.recalculate_stats()
 class Target(Actor):
