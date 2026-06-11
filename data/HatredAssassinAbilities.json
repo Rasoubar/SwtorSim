@@ -242,7 +242,8 @@
           "death_field",
           "is_aoe",
           "force_attack",
-          "direct_damage"
+          "direct_damage",
+          "direct_force"
         ]
       },
       {
@@ -458,7 +459,8 @@
           "direct_damage",
           "wrath_consumer",
           "speed_surge",
-          "eradicate"
+          "eradicate",
+          "direct_force"
         ]
       },
       {
@@ -551,7 +553,8 @@
     "base_gcd": 0.0,
     "energy_cost": 0.0,
     "tags": [
-      "force_ability"
+      "force_ability",
+      "recklessness"
     ],
     "actions": [
       {
@@ -621,6 +624,66 @@
         "consumable_charges": 1,
         "charges": 1,
         "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "SABER STRIKE": {
+    "name": "Saber strike",
+    "cooldown": 0.0,
+    "triggers_gcd": true,
+    "base_gcd": 1.5,
+    "energy_cost": 0.0,
+    "restrictions": {},
+    "tags": [],
+    "actions": [
+      {
+        "action_type": "damage",
+        "attack_type": 1,
+        "amp": -0.66,
+        "coeff": 0.33,
+        "shp_min": 0.0,
+        "shp_max": 0.0,
+        "delay": 0.0,
+        "impact_delay": 0.2,
+        "tags": [
+          "saber_strike",
+          "is_basic_attack",
+          "melee_ability",
+          "direct_damage"
+        ]
+      },
+      {
+        "action_type": "damage",
+        "attack_type": 1,
+        "amp": -0.66,
+        "coeff": 0.33,
+        "shp_min": 0.0,
+        "shp_max": 0.0,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "saber_strike",
+          "is_basic_attack",
+          "melee_ability",
+          "direct_damage"
+        ]
+      },
+      {
+        "action_type": "damage",
+        "attack_type": 1,
+        "amp": -0.66,
+        "coeff": 0.33,
+        "shp_min": 0.0,
+        "shp_max": 0.0,
+        "delay": 0.0,
+        "impact_delay": 0.9,
+        "tags": [
+          "saber_strike",
+          "is_basic_attack",
+          "melee_ability",
+          "direct_damage"
+        ]
       }
     ],
     "conditions": {}

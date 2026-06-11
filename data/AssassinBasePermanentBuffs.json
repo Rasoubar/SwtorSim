@@ -34,7 +34,7 @@
     "required_tags": [
       "charge_lightning_damage"
     ],
-    "effect_name": null
+    "effect_name": "Crackling Charge LC"
   },
   "PERVASIVE_DEATH_15": {
     "id": 79,
@@ -134,27 +134,19 @@
   "LEGACY CRIT CHANCE": {
     "id": 116,
     "value": 0.01,
-    "effect_name":"legacy crit chance"
+    "effect_name": "legacy crit chance"
   },
   "LEGACY CRIT DAMAGE": {
     "id": 117,
     "value": 0.01,
-    "effect_name":"legacy crit damage"
+    "effect_name": "legacy crit damage"
   },
-  "CRACKLING_CHARGE_DISCHARGE": {
-    "id": 79,
-    "value": 0.3,
+  "DYNAMIC FORCE": {
+    "id": 64,
+    "value": 15.0,
     "required_tags": [
-      "discharge_effect_lightning"
+      "recklessness"
     ],
-    "effect_name": "Crackling Charge"
-  },
-  "CRACKLING_CHARGE_LIGHTNING_CHARGE": {
-    "id": 133,
-    "value": 0.5,
-    "required_tags": [
-      "charge_lightning_damage"
-    ],
-    "effect_name": "Crackling Charge LC"
+    "effect_name": "Dynamic Force"
   }
 }

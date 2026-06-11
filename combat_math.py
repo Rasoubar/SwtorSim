@@ -15,7 +15,8 @@ EFFECTS = {
     414: {"stat_name": "Mastery PCT"},
     4140: {"stat_name": "Mastery Stat"},  # i blame the devs, I made up my own id for this one
     155: {"stat_name": "Power Stat"},
-    156: {"stat_name": "Critical Stat"}
+    156: {"stat_name": "Critical Stat"},
+    64:{ "stat_name": "Base Cooldown Modifier"}
 }
 
 
@@ -57,8 +58,10 @@ def get_modifiers(caster, target, action_tags):
                 buff_used = True
             if buff.consumable_charges is not None and buff_used:
                 buff.consumable_charges -= 1
+                print(buff.effect_name)
                 if buff.consumable_charges <= 0:
                     caster_expired_buffs.append(effect_id)
+
     caster.cleanup_expired_effects(caster_expired_buffs)
 
     for effect_id, buff in list(target.debuffs.items()):

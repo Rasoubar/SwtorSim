@@ -34,15 +34,26 @@ def run_test():
         key.lower().replace(" ", "_"): val
         for key, val in player.abilities_db.items()
     }
+    for effect_id, effect in player.effects.items(): #make better later
+        print(effect)
+        if effect.id == 64:
+            if effect.required_tags is not None:
+                for ability in abilities.values():
+                    if not any(tag in ability.tags for tag in effect.required_tags):
+                        continue
+                    ability.cooldown -= effect.value
+    for name,ability in abilities.items():
+        print(name)
+        print(ability.cooldown)
 
     rotation = [abilities['eradicate'],abilities['creeping_terror'],abilities['discharge'],abilities['leeching_strike'],abilities['eradicate'],abilities['recklessness'],abilities['death_field'],
-            abilities['leeching_strike'],abilities['eradicate'],abilities['thrash'],abilities['thrash'],abilities['thrash']]
+            abilities['leeching_strike'],abilities['assassinate'],abilities['eradicate'],abilities['thrash'],abilities['thrash'],abilities['saber_strike']]
     player.rotation = FixedRotation(rotation)
 
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     sim.schedule_absolute(1.0, ResourceTick(player))
 
-    sim.run_timed(duration=30.0)
+    sim.run_timed(duration=90.0)
 
 
 if __name__ == "__main__":

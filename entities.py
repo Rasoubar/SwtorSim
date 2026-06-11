@@ -240,9 +240,6 @@ class Player(Actor):
                         if effect.consumable_charges <= 0:
                             buffs_to_clear.append(effect.effect_name)
         self.cleanup_expired_effects(buffs_to_clear)
-        print(apply)
-        if "Raze" in self.effects:
-            print("Raze LIVES")
         final_cost = (base_cost * pct_modifiers) - flat_reductions
         return max(0.0, final_cost) #safeguard tbh
 
@@ -254,9 +251,7 @@ class Player(Actor):
             return
         needs_stat_recalc = False
         for r_id in expired_keys:
-            print(r_id)
             popped_buff = self.effects.pop(r_id, None)
-            print(f'{popped_buff} is gone')
             if popped_buff and popped_buff.id in EFFECTS:
                 if EFFECTS[popped_buff.id]["stat_name"] in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat"}:
                     needs_stat_recalc = True
@@ -280,8 +275,8 @@ class Target(Actor):
             action_id = action.get("id")
             extracted_stat = EFFECTS[action_id]["stat_name"]
         except (KeyError, TypeError) as e:
-            print(f"🚨 CONFIGURATION CRASH in apply_debuff via [{source_name}]")
-            print(f"👉 Action ID {action.get('id')} is completely missing from the EFFECTS database!")
+            print(f" CONFIGURATION CRASH in apply_debuff via [{source_name}]")
+            print(f" Action ID {action.get('id')} is completely missing from the EFFECTS database!")
             raise e
         duration = action["duration"]
         debuff_key = action.get("effect_name", f"{extracted_stat}")
