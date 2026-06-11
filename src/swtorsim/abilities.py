@@ -13,26 +13,26 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
     delay = action.get("delay", 0.0)
 
     if action_type == "damage":
-        _handle_damage_action(sim, caster, target, action, source_name, delay)
+        handle_damage_action(sim, caster, target, action, source_name, delay)
     elif action_type == "dot":
-        _handle_dot_action(sim, caster, target, action, source_name)
+        handle_dot_action(sim, caster, target, action, source_name)
     elif action_type == "buff":
-        _handle_buff_action(sim, caster, action, source_name, sim.current_time)
+        handle_buff_action(sim, caster, action, source_name, sim.current_time)
     elif action_type == "debuff":
-        _handle_debuff_action(sim, target, action, source_name, sim.current_time)
+        handle_debuff_action(sim, target, action, source_name, sim.current_time)
     elif action_type == "resource_gain":
-        _handle_resource_gain_action(sim, caster, action, delay)
+        handle_resource_gain_action(sim, caster, action, delay)
     elif action_type == "cooldown_mod":
-        _handle_cooldown_modification(sim, caster, action)
+        handle_cooldown_modification(sim, caster, action)
 
 
 
-def _handle_damage_action(sim, caster, target, action, source_name, delay):
+def handle_damage_action(sim, caster, target, action, source_name, delay):
     hit_event = DamageHit(caster, target, action, source_name)
     sim.schedule_relative(delay, hit_event)
 
 
-def _handle_dot_action(sim, caster, target, action, source_name):
+def handle_dot_action(sim, caster, target, action, source_name):
     scaled_interval = caster.scale_time_modifier(action["interval"])
     dot_instance = ActiveDot(
         name=source_name,
@@ -51,23 +51,23 @@ def _handle_dot_action(sim, caster, target, action, source_name):
     sim.schedule_relative(scaled_interval, DotTick(caster, target, dot_instance))
 
 
-def _handle_buff_action(sim, caster, action, source_name, current_time):
+def handle_buff_action(sim, caster, action, source_name, current_time):
     buff_key, buff_instance, duration = caster.apply_buff(action, source_name, current_time)
 
     sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
 
 
-def _handle_debuff_action(sim, target, action, source_name, current_time):
+def handle_debuff_action(sim, target, action, source_name, current_time):
     debuff_key, debuff_instance, duration = target.apply_debuff(action, source_name, current_time)
     sim.schedule_relative(duration, DebuffExpire(target, debuff_key, debuff_instance))
 
 
-def _handle_resource_gain_action(sim, caster, action, delay):
+def handle_resource_gain_action(sim, caster, action, delay):
     regen = action.get("value", 0.0)
     sim.schedule_relative(delay, ResourceGainEvent(caster, regen))
 
 
-def _handle_cooldown_modification(sim, caster, action):
+def handle_cooldown_modification(sim, caster, action):
     cooldown_dict = getattr(caster, "cooldowns", {})
     player_db = getattr(caster, "abilities_db", {})
     if not (cooldown_dict and player_db and "target_tags" in action):
@@ -102,12 +102,12 @@ class Ability:
         self.conditions = config.get("conditions", {})
 
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
-        if self.triggers_gcd and sim.current_time < caster.next_gcd:
+        if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
             return False
         if sim.current_time < caster.cooldowns.get(self.name, 0.0):
             return False
         modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply = False)
-        if not caster.resource.can_afford(modified_cost): #considered caching this. didn't do it to keep code cleaner
+        if not caster.resource.can_afford(modified_cost): #I had a more eficient aproach to this. Like this rn, will change
             return False
         return validate_all(self.conditions, caster, target) #validates conditions
 
