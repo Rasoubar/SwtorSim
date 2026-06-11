@@ -1,6 +1,6 @@
 import math
-from combat_math import EFFECTS
-from requirements import validate_all
+from src.swtorsim.combat_math import EFFECTS
+from src.swtorsim.requirements import validate_all
 
 class ActiveDot:
     __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
@@ -117,7 +117,6 @@ class Player(Actor):
 
     def apply_buff(self, action: dict, source_name: str, current_time): #can be improved on the refresh
 
-        from combat_math import EFFECTS
         try:
             action_id = action.get("id")
             extracted_stat = EFFECTS[action_id]["stat_name"]
@@ -270,7 +269,6 @@ class Target(Actor):
 
     def apply_debuff(self, action: dict, source_name: str, current_time: float) -> tuple[str, "ActiveBuff", float]:
 
-        from combat_math import EFFECTS
         try:
             action_id = action.get("id")
             extracted_stat = EFFECTS[action_id]["stat_name"]

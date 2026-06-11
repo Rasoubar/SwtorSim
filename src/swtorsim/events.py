@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
-from combat_math import calculate_hit, EFFECTS
+from src.swtorsim.combat_math import calculate_hit, EFFECTS
 import random
-from requirements import validate_all
+from src.swtorsim.requirements import validate_all
 
 if TYPE_CHECKING:
-    from entities import Player, Target, ActiveDot, ActiveBuff
+    from src.swtorsim.entities import Player, Target, ActiveDot, ActiveBuff
     from abilities import Ability
 
 
@@ -83,7 +83,7 @@ class DamageHit(Event):
                 instant_hit = DamageHit(self.source, self.target, action, proc.name)
                 instant_hit.resolve(sim)
             else:
-                from abilities import execute_single_action
+                from src.swtorsim.abilities import execute_single_action
                 execute_single_action(sim, self.source, self.target, action, proc.name)
 
 class CastAttemptEvent(Event):
@@ -129,7 +129,6 @@ class BuffExpire(Event):
         self.player.effects.pop(self.buff_name, None)
         print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.buff_name}") #should change the print probly, in case it wasn't there.
         effect_id = active_buff.id
-        from combat_math import EFFECTS
         if effect_id in EFFECTS:
             stat_name = EFFECTS[effect_id]["stat_name"]
             if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat"}:

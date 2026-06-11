@@ -1,9 +1,8 @@
-import os
-from engine import Simulation
-from entities import Player, Target
-from events import Event, CastAttemptEvent, ResourceTick, PlayerReady
-from config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
-from rotation import FixedRotation
+from src.swtorsim.engine import Simulation
+from src.swtorsim.entities import Player, Target
+from src.swtorsim.events import ResourceTick, PlayerReady
+from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
+from src.swtorsim.rotation import FixedRotation
 
 def run_test():
 
@@ -22,12 +21,9 @@ def run_test():
     p_stats["Standard_health"] = 19335
     player.recalculate_stats()
 
-    json_path_abilities = os.path.join("data", "HatredAssassinAbilities.json")
-    player.abilities_db = load_abilities_from_json(json_path_abilities)
-    json_path_procs = os.path.join("data", "BaseAssassinProcs.json")
-    player.procs = load_passives_from_json(json_path_procs)
-    perm_buffs_path = os.path.join("data", "AssassinBasePermanentBuffs.json")
-    player.effects = load_permanent_buffs_from_json(perm_buffs_path)
+    player.abilities_db = load_abilities_from_json("data/Abilities/HatredAssassinAbilities.json")
+    player.procs = load_passives_from_json("data/Procs/BaseAssassinProcs.json")
+    player.effects = load_permanent_buffs_from_json("data/Buffs/AssassinBasePermanentBuffs.json")
 
     player.recalculate_stats()
     abilities = {
@@ -35,7 +31,6 @@ def run_test():
         for key, val in player.abilities_db.items()
     }
     for effect_id, effect in player.effects.items(): #make better later
-        print(effect)
         if effect.id == 64:
             if effect.required_tags is not None:
                 for ability in abilities.values():

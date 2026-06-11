@@ -1,7 +1,7 @@
 import random
-from events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent
-from entities import ActiveDot, Player, Target
-from requirements import validate_all
+from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent
+from src.swtorsim.entities import ActiveDot, Player, Target
+from src.swtorsim.requirements import validate_all
 
 
 def execute_single_action(sim, caster, target, action: dict, source_name: str):
