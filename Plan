@@ -12,7 +12,7 @@ check if ActiveBuff.id is ok (
 -> change action to a class or dataclass later?
 -> on execute_single_action and others of the sort, might do something like I did for requirements with the action types
 
-!!!Will need a requirement like "caster_has_buff_with_x_stacks" for marauder and for instance!!!
+!!!Will need a requirement like "caster_has_buff_with_x_stacks" for marauder and merc for instance!!!
 !!! will need to discern kinds of bonus damage when doing other classes!!!
 !!!some dots on my JSON are poorly implemented. instant_tick needs to go!!!
 !!!shit, my list of procs only counted the ones that messed with damage, fuck me life!!!

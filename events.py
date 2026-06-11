@@ -5,7 +5,7 @@ from requirements import validate_all
 
 if TYPE_CHECKING:
     from entities import Player, Target, ActiveDot, ActiveBuff
-    from abilities import Ability, is_action_valid
+    from abilities import Ability
 
 
 class Event:
@@ -20,6 +20,7 @@ class Event:
 
 class ApplyDamageLandEvent(Event): #bro why did I put this here
     def __init__(self, source, target, final_damage, is_crit, ability_name):
+        super().__init__()
         self.source = source
         self.target = target
         self.final_damage = final_damage
@@ -41,7 +42,6 @@ class DamageHit(Event):
 
     def resolve(self, sim):
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
-
         tags = self.action_data.get("tags", [])
         impact_delay = self.action_data.get("impact_delay", 0.0)
         if impact_delay > 0.0:
@@ -54,37 +54,37 @@ class DamageHit(Event):
         self.evaluate_on_hit_procs(sim, is_crit, tags)
 
     def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
-        print(f"Scanning procs for hit: {self.ability_name} with tags {tags}")
         for proc in self.source.procs.values():
-            proc_conditions = getattr(proc, "conditions", {})
-            if not validate_all(proc_conditions, self.source, self.target):
+            if not self._proc_can_trigger(proc, sim, is_crit, tags):
                 continue
-            if proc.trigger == "crit" and not is_crit:
+            self._trigger_proc_effects(proc, sim)
+
+    def _proc_can_trigger(self, proc, sim, is_crit: bool, tags) -> bool:
+        if sim.current_time < proc.next_possible_proc:
+            return False
+        if proc.trigger == "crit" and not is_crit:
+            return False
+        if proc.required_tag and proc.required_tag not in tags:
+            return False
+        if not validate_all(proc.conditions, self.source, self.target):
+            return False
+        if random.random() > proc.chance:
+            return False
+        return True
+
+    def _trigger_proc_effects(self, proc, sim):
+        current_icd = self.source.scale_time_modifier(proc.icd) if proc.affected_by_cdr else proc.icd
+        proc.next_possible_proc = sim.current_time + current_icd
+        for action in proc.actions:
+            action_conditions = action.get("conditions", {})
+            if not validate_all(action_conditions, self.source, self.target):
                 continue
-            if proc.required_tag and proc.required_tag not in tags:
-                continue
-            if sim.current_time < proc.next_possible_proc:
-                continue
-            if random.random() > proc.chance:
-                continue
-            current_icd = proc.icd
-            if proc.affected_by_cdr:
-                current_icd = self.source.scale_time_modifier(proc.icd)
-            proc.next_possible_proc = sim.current_time + current_icd
-            for action in proc.actions:
-                if action.get("action_type") == "damage": #needed beca
-                    from abilities import is_action_valid# use of the queue nature. like this procs can generate procs before the next one happens, like it happens in game.
-                    if is_action_valid(action, self.source, self.target):
-                        proc_strike = DamageHit(                   #alternatives would be adding microscopic delays to stuff or re-designing the whole thing. fuck that, this is the less clunky option.
-                            source=self.source,
-                            target=self.target,
-                            action_data=action,
-                            ability_name=proc.name
-                        )
-                        proc_strike.resolve(sim)
-                else:
-                    from abilities import execute_single_action
-                    execute_single_action(sim, self.source, self.target, action,proc.name)
+            if action.get("action_type") == "damage" and action.get("delay", 0.0) == 0.0:
+                instant_hit = DamageHit(self.source, self.target, action, proc.name)
+                instant_hit.resolve(sim)
+            else:
+                from abilities import execute_single_action
+                execute_single_action(sim, self.source, self.target, action, proc.name)
 
 class CastAttemptEvent(Event):
     def __init__(self, player: "Player", target: "Target", ability: "Ability"):
@@ -179,18 +179,18 @@ class DotTick(Event):
             hit = DamageHit(source=self.source, target=self.target, action_data = action, ability_name= dot_name)
             hit.resolve(sim)
             self.instance_ref.ticks_remaining -= 1
-        print(f" [Budget Tracking] {dot_name} action executed. Ticks remaining on target: {self.instance_ref.ticks_remaining}")
+        print(f" [Dot Tracking] {dot_name} action executed. Ticks remaining: {self.instance_ref.ticks_remaining}")
         if self.instance_ref.ticks_remaining > 0:
             next_tick_time = sim.current_time + self.instance_ref.interval
             sim.schedule_absolute(next_tick_time, self)
         else:
             del self.target.dots[dot_name]
-            print(f"[{sim.current_time:.2f}s] DoT fully expired and cleared: {dot_name}")
+            print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
 
 
 
 class ResourceTick(Event):
-    def __init__(self, player: "Player", interval: float = 1.0):
+    def __init__(self, player: "Player", interval: float = 1.0): #keeping interval because i dont know how shit is, dont wanna assume it's every second
         super().__init__(f"Resource Passive Tick")
         self.player = player
         self.interval = interval
@@ -198,10 +198,9 @@ class ResourceTick(Event):
     def resolve(self, sim):
         alacrity_pct = self.player.stats.get("Alacrity", 0.0)
         alacrity_mod = 1.0 + alacrity_pct
-
-        self.player.resource.tick_passive_regen(self.interval, alacrity_mod)
-
-        sim.schedule_relative(self.interval, self)
+        print(f'[{sim.current_time:.2f}s] Passive force regen, now at: {self.player.resource.current_value} force.')
+        self.player.resource.tick_passive_regen(self.interval, alacrity_mod) #generate
+        sim.schedule_relative(self.interval, self) #schedule next
 
 class ResourceGainEvent(Event):
     def __init__(self, player, amount):

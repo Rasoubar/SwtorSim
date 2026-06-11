@@ -205,7 +205,7 @@ def build_ability():
         "actions": []
     }
 
-    ability_data["restrictions"] = build_restrictions()
+    ability_data["conditions"] = build_conditions()
 
     num_actions = get_input("How many actions/strikes does this ability perform?", int, 1)
     for i in range(num_actions):

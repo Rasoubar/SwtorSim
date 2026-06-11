@@ -5,11 +5,10 @@ from requirements import validate_all
 
 
 def execute_single_action(sim, caster, target, action: dict, source_name: str):
-    if not validate_all(action.get("restrictions", {}), caster, target):
+    if not validate_all(action.get("conditions", {}), caster, target):
         return
     if "chance" in action and random.random() > action["chance"]:
         return
-
     action_type = action.get("action_type")
     delay = action.get("delay", 0.0)
 
@@ -100,7 +99,7 @@ class Ability:
         self.actions = config.get ("actions", [])
         self.energy_cost = config.get("energy_cost", 0.0)
         self.tags=config.get("tags",[])
-        self.restrictions = config.get("restrictions", {})
+        self.conditions = config.get("conditions", {})
 
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
         if self.triggers_gcd and sim.current_time < caster.next_gcd:
@@ -110,7 +109,7 @@ class Ability:
         modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost)
         if not caster.resource.can_afford(modified_cost): #considered caching this. didn't do it to keep code cleaner
             return False
-        return validate_all(self.restrictions, caster, target) #validates conditions
+        return validate_all(self.conditions, caster, target) #validates conditions
 
 
     def apply_cooldown_locks(self, caster, sim):

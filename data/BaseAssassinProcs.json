@@ -212,7 +212,7 @@
       }
     ],
     "conditions": {
-      "has_specific_dot": "CREEPING TERROR"
+      "has_specific_dot": "Creeping Terror"
     }
   },
   "THRASHING TERROR": {
@@ -263,7 +263,7 @@
       }
     ],
     "conditions": {
-      "has_specific_dot": "CREEPING TERROR"
+      "has_specific_dot": "Creeping Terror"
     }
   }
 }

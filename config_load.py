@@ -77,7 +77,7 @@ def load_passives_from_json(filepath: str) -> Dict[str, Any]:
                     chance=block.get("chance", 1.0),
                     icd=block.get("icd", 0.0),
                     affected_by_cdr=block.get("affected_by_cdr", False),
-                    conditions=raw_data.get("conditions")
+                    conditions=block.get("conditions")
                 )
 
     return proc_registry

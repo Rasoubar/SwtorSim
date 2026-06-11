@@ -18,7 +18,7 @@
       "creeping_terror",
       "thrashing_terror"
     ],
-    "effect_name": null
+    "effect_name": "fulguration"
   },
   "CRACKLING_CHARGE_DISCHARGE": {
     "id": 79,

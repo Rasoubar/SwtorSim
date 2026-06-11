@@ -2,7 +2,7 @@ import os
 import json
 from engine import Simulation
 from entities import Player, Target
-from events import Event, CastAttemptEvent
+from events import Event, CastAttemptEvent, ResourceTick
 from config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
 
 # 🟢 ENGINE SAFETY BRIDGE: Monkeypatch 'abilities' to process and trace cooldown_mod live
@@ -35,53 +35,53 @@ class ForceMockCooldownsEvent(Event):
         print(f"   ↳ Current status: Assassinate (12s), Leeching Strike (15s), Eradicate (10s)\n")
 
 
-def run_recklessness_cooldown_test():
-    print("=== Starting Isolated Recklessness Cooldown Reset Logic Test ===")
+def run_test():
 
-    # 1. Initialize simulation context and standard player attributes
     sim = Simulation()
     player = Player("Assassin")
-    target = Target("Target Dummy", hp=10000)
+    target = Target("Target Dummy", hp=1000000)
 
-    # Configure baseline combat statistics
     p_stats = player.base_stats
-    p_stats["Mastery"] = 12400
-    p_stats["Power"] = 6200
-    p_stats["Force Power"] = 4900
-    p_stats["Critical Rating"] = 3258
-    p_stats["Alacrity Rating"] = 2684
-    p_stats["Main_hand_min"] = 1840
-    p_stats["Main_hand_max"] = 2460
-    p_stats["Standard_health"] = 2325
+    p_stats["Mastery"] = 16834
+    p_stats["Power"] = 14503
+    p_stats["Force Power"] = 9332
+    p_stats["Critical Rating"] = 3758
+    p_stats["Alacrity Rating"] = 2218
+    p_stats["Main_hand_min"] = 2513
+    p_stats["Main_hand_max"] = 3769
+    p_stats["Standard_health"] = 19335
     player.recalculate_stats()
-    print(player.stats)
-    # 2. Load JSON Database nodes
+
     json_path_abilities = os.path.join("data", "HatredAssassinAbilities.json")
     player.abilities_db = load_abilities_from_json(json_path_abilities)
-
     json_path_procs = os.path.join("data", "BaseAssassinProcs.json")
     player.procs = load_passives_from_json(json_path_procs)
-
     perm_buffs_path = os.path.join("data", "AssassinBasePermanentBuffs.json")
     player.effects = load_permanent_buffs_from_json(perm_buffs_path)
 
     player.recalculate_stats()
-    print(player.effects)
-    print(player.stats)
-    # 3. Schedule the explicit step verification sequence
-    recklessness_ability = player.abilities_db['CREEPING TERROR']
-    leeching = player.abilities_db['ASSASSINATE']
-    deathfield = player.abilities_db['DEATH FIELD']
-    # At 1.00s: Force target skills onto cooldown
-    sim.schedule_absolute(6.0, CastAttemptEvent(player, target, deathfield))
-    sim.schedule_absolute(3.0, CastAttemptEvent(player, target, leeching))
-    # At 3.00s: Activate Recklessness to trigger structural changes
-    sim.schedule_absolute(0.0, CastAttemptEvent(player, target, recklessness_ability))
-    sim.schedule_absolute(  10, CastAttemptEvent(player, target, leeching))
 
-    # 4. Spin up the timeline loop
-    sim.run_timed(duration=60.0)
+    abilities = {
+        key.lower().replace(" ", "_"): val
+        for key, val in player.abilities_db.items()
+    }
+    sim.schedule_absolute(0.0, CastAttemptEvent(player, target, abilities['creeping_terror']))
+    sim.schedule_absolute(1.4, CastAttemptEvent(player, target, abilities['discharge']))
+    sim.schedule_absolute(2.8, CastAttemptEvent(player, target, abilities['leeching_strike']))
+    sim.schedule_absolute(  4.2, CastAttemptEvent(player, target, abilities['eradicate']))
+    sim.schedule_absolute(5.6, CastAttemptEvent(player, target, abilities['recklessness']))
+    sim.schedule_absolute(5.6, CastAttemptEvent(player, target, abilities['death_field']))
+    sim.schedule_absolute(7.0, CastAttemptEvent(player, target, abilities['leeching_strike']))
+    sim.schedule_absolute(8.4, CastAttemptEvent(player, target, abilities['assassinate']))
+    sim.schedule_absolute(9.8, CastAttemptEvent(player, target, abilities['eradicate']))
+    sim.schedule_absolute(11.2, CastAttemptEvent(player, target, abilities['thrash']))
+    sim.schedule_absolute(12.6, CastAttemptEvent(player, target, abilities['thrash']))
+    sim.schedule_absolute(14.0, CastAttemptEvent(player, target, abilities['thrash']))
+
+    sim.schedule_absolute(1.0, ResourceTick(player))
+
+    sim.run_timed(duration=30.0)
 
 
 if __name__ == "__main__":
-    run_recklessness_cooldown_test()
+    run_test()
