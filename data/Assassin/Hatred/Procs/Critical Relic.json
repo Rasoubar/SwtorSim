@@ -1,0 +1,17 @@
+  "CRITICAL SURGE": {
+    "proc_name": "Critical Surge",
+    "trigger": "hit",
+    "chance": 0.3,
+    "icd": 20.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 156,
+        "value": 4220.0,
+        "duration": 6.0,
+        "effect_name": "Critical Surge",
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}

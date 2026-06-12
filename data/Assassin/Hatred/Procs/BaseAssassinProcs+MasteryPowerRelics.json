@@ -1,0 +1,362 @@
+{
+  "LIGHTNING_CHARGE": {
+    "proc_name": "Lightning Charge",
+    "trigger": "hit",
+    "required_tags": ["melee_ability"],
+    "chance": 0.5,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 2,
+        "amp": 0.0,
+        "coeff": 0.234,
+        "shp_min": 0.0234,
+        "shp_max": 0.0234,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "charge_lightning",
+          "saber_charged",
+          "force_ability",
+          "charge_lightning_damage"
+        ]
+      }
+    ]
+  },
+  "FULGURATION_PROC": {
+    "proc_name": "Fulguration",
+    "trigger": "hit",
+    "required_tags": ["charge_lightning"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "resource_gain",
+        "value": 5.0
+      }
+    ],
+    "conditions": {}
+  },
+  "PERVASIVE_DEATH_ARMOR_PEN": {
+    "proc_name": "Pervasive Death Armor Pen",
+    "trigger": "hit",
+    "required_tags": ["death_field"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 166,
+        "value": 0.125,
+        "duration": 10.0,
+        "effect_name": "Pervasive Death Armor Pen",
+        "charges": 1,
+        "max_charges": 8,
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "BEFALL": {
+    "proc_name": "Befall",
+    "trigger": "hit",
+    "required_tags": ["eradicate"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 133,
+        "value": 0.2,
+        "duration": 4.0,
+        "required_tags": [
+          "periodic_damage"
+        ],
+        "effect_name": "Befall",
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "LANGUISHING LASHES PROC": {
+    "proc_name": "Languishing Lashes Proc",
+    "trigger": "hit",
+    "required_tags": ["melee_ability"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 133,
+        "value": 0.2,
+        "duration": 10.0,
+        "required_tags": [
+          "damage_over_time"
+        ],
+        "effect_name": "Languishing Lashes Proc",
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "EXPLOITIVE STRIKES": {
+    "proc_name": "Exploitive Strikes",
+    "trigger": "crit",
+    "required_tags": ["force_ability"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 116,
+        "value": 0.05,
+        "duration": 10.0,
+        "required_tags": [
+          "melee_ability"
+        ],
+        "effect_name": "Exploitive Strikes",
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "MASTERY SURGE": {
+    "proc_name": "Mastery Surge",
+    "trigger": "hit",
+    "chance": 0.3,
+    "icd": 20.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 4140,
+        "value": 4220.0,
+        "duration": 6.0,
+        "effect_name": "Mastery Surge",
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "POWER SURGE": {
+    "proc_name": "Power Surge",
+    "trigger": "hit",
+    "chance": 0.3,
+    "icd": 20.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 155,
+        "value": 4220.0,
+        "duration": 6.0,
+        "effect_name": "Power Surge",
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "THRASHING TERROR A": {
+    "proc_name": "Thrashing Terror A",
+    "trigger": "hit",
+    "required_tags": ["assassinate"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.3795,
+        "shp_min": 0.03795,
+        "shp_max": 0.03795,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage",
+		  "thrashing_terror"
+        ],
+        "conditions": {
+          "target_has_debuff": "Deathmark"
+        }
+      },
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.33,
+        "shp_min": 0.033,
+        "shp_max": 0.033,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage",
+		  "thrashing_terror"
+        ],
+        "conditions": {
+          "target_doesnt_have_debuff": "Deathmark"
+        }
+      }
+    ],
+    "conditions": {
+      "has_specific_dot": "Creeping Terror"
+    }
+  },
+  "THRASHING TERROR": {
+    "proc_name": "Thrashing Terror",
+    "trigger": "hit",
+    "required_tags": ["tt_proc"],
+    "chance": 0.6,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.3795,
+        "shp_min": 0.03795,
+        "shp_max": 0.03795,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage"
+        ],
+        "conditions": {
+          "target_has_debuff": "Deathmark"
+        }
+      },
+      {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+        "amp": 0.0,
+        "coeff": 0.33,
+        "shp_min": 0.033,
+        "shp_max": 0.033,
+        "delay": 0.0,
+        "impact_delay": 0.0,
+        "tags": [
+          "sinister_succor_dot",
+          "damage_over_time",
+          "periodic_damage"
+        ],
+        "conditions": {
+          "target_doesnt_have_debuff": "Deathmark"
+        }
+      }
+    ],
+    "conditions": {
+      "has_specific_dot": "Creeping Terror"
+    }
+  },
+  "RAZE": {
+    "proc_name": "Raze",
+    "trigger": "hit",
+    "required_tags": ["melee_ability"],
+    "chance": 1.0,
+    "icd": 9.0,
+    "affected_by_cdr": true,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 68,
+        "value": 30.0,
+        "duration": 15.0,
+        "required_tags": [
+          "eradicate"
+        ],
+        "effect_name": "Raze",
+        "consumable_charges": 1,
+        "charges": 1,
+        "affected_by_cdr": false
+      },
+      {
+        "action_type": "cooldown_mod",
+        "target_tags": [
+          "eradicate"
+        ],
+        "reset": true
+      }
+    ],
+    "conditions": {
+      "has_specific_dot": "Discharge"
+    }
+  },
+  "BLOODLETTING": {
+    "proc_name": "Bloodletting",
+    "trigger": "hit",
+    "required_tags": ["periodic_damage"],
+    "chance": 0.3,
+    "icd": 15.0,
+    "affected_by_cdr": true,
+    "actions": [
+      {
+        "action_type": "buff",
+        "id": 0,
+        "value": 0.0,
+        "duration": 15.0,
+        "required_tags": [
+          "assassinate"
+        ],
+        "effect_name": "Bloodletting",
+        "consumable_charges": 1,
+        "charges": 1,
+        "affected_by_cdr": false
+      }
+    ],
+    "conditions": {}
+  },
+  "RECKLESSNESS_CD": {
+    "proc_name": "Recklessness Cd",
+    "trigger": "crit",
+    "required_tags": ["periodic_damage"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "cooldown_mod",
+        "target_tags": [
+          "recklessness"
+        ],
+        "reset": false,
+        "value": 2.0
+      }
+    ],
+    "conditions": {}
+  },
+  "ASSASSINS TRAINING": {
+    "proc_name": "Assassins Training",
+    "trigger": "hit",
+    "required_tags": ["saber_strike"],
+    "chance": 1.0,
+    "icd": 0.0,
+    "affected_by_cdr": false,
+    "actions": [
+      {
+        "action_type": "resource_gain",
+        "value": 1.0
+      }
+    ],
+    "conditions": {}
+  }
+}
