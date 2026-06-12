@@ -1,18 +1,7 @@
-check dot ticks properly work
-check parse to see if delay on dots 1st hit (it does, change code, abilities.py -> cast)
-debuff refreshingaoe debuff, same stuff as force attack debuff!? basically grouping debuffs/buffs a lot
-effects must have effect_id and buff value (check damage math to know naming)
-
-
-
-ability.cast can return True even if nothing happens
-
-check if ActiveBuff.id is ok (
 
 -> change action to a class or dataclass later?
--> on execute_single_action and others of the sort, might do something like I did for requirements with the action types
+-> need to go from tag to tags in procs? probly good to make it last with little changes into the future
 
 !!!Will need a requirement like "caster_has_buff_with_x_stacks" for marauder and merc for instance!!!
 !!! will need to discern kinds of bonus damage when doing other classes!!!
 !!!some dots on my JSON are poorly implemented. instant_tick needs to go!!!
-!!!stop using floats for time probly!!!
