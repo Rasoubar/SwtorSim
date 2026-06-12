@@ -26,8 +26,8 @@ def check_target_debuff(conditions: Any, caster: "Player", target: "Target") -> 
 def check_exact_dot_amount(conditions: int, caster: "Player", target: "Target") -> bool:
     return target.count_active_dots == conditions
 
-def check_has_any_dot(conditions: Any, caster: "Player", target: "Target") -> bool:
-    return target.count_active_dots > 0
+def check_has_any_dot(conditions: bool, caster: "Player", target: "Target") -> bool:
+    return (target.count_active_dots > 0) is conditions
 
 def inverse_check_target_debuff(conditions: Any, caster: "Player", target: "Target") -> bool:
     return not check_target_debuff(conditions, caster, target)
@@ -61,3 +61,4 @@ def validate_all(requirements: dict[str, Any], caster: "Player", target: "Target
                 f"Implemented requirements are: {list(CONDITION_REGISTRY.keys())}\n"
                 f"Contact me if you think yours should be here too")
     return True
+

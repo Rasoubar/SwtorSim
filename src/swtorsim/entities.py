@@ -213,7 +213,7 @@ class Player(Actor):
         critical_cc = 0.3 * (1 - (1 - (0.01 / 0.3)) ** ((1 / 2.41) * temp_stats["Critical Rating"] / 80))
         mastery_cc = 0.2 * (1 - (1 - (0.01 / 0.2)) ** ((1 / 12.93) * (temp_stats["Mastery"] / 80)))
         temp_stats["Critical Chance"] = 0.05 + critical_cc + mastery_cc
-        temp_stats["Critical Modifier"] = 1.5 + critical_cc
+        temp_stats["Critical Modifier"] = 0.5 + critical_cc
         temp_stats["Alacrity"] = 0.3 * (1 - (1 - (0.01 / 0.3)) ** ((1 / 3.2) * (temp_stats["Alacrity Rating"] / 80)))
         self.stats = temp_stats
 
@@ -327,6 +327,8 @@ class Target(Actor):
 
     @property
     def count_active_dots(self): #fuck you leeching strike
+        if self.dots is None:
+            return 0
         return len(self.dots.keys())
 
     @property

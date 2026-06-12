@@ -3,6 +3,7 @@ from src.swtorsim.entities import Player, Target
 from src.swtorsim.events import ResourceTick, PlayerReady
 from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
 from src.swtorsim.rotation import FixedRotation
+from src.swtorsim.requirements import validate_all
 
 def run_test():
 
@@ -26,6 +27,7 @@ def run_test():
     player.effects = load_permanent_buffs_from_json("data/Buffs/AssassinBasePermanentBuffs.json")
 
     player.recalculate_stats()
+    print(player.stats)
     abilities = {
         key.lower().replace(" ", "_"): val
         for key, val in player.abilities_db.items()
