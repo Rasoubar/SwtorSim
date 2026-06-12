@@ -58,7 +58,6 @@ def get_modifiers(caster, target, action_tags):
                 buff_used = True
             if buff.consumable_charges is not None and buff_used:
                 buff.consumable_charges -= 1
-                print(buff.effect_name)
                 if buff.consumable_charges <= 0:
                     caster_expired_buffs.append(effect_id)
 
@@ -85,7 +84,6 @@ def get_modifiers(caster, target, action_tags):
 
     for bucket_value in buckets.values():
         modifiers['total_multiplier'] *= (1 + bucket_value)
-    print(modifiers['total_multiplier'])
     return modifiers
 
 
@@ -129,7 +127,7 @@ def calculate_hit(caster, target, action_data):
         ability_damage *= (1.0 - armor_dr)
     ability_damage *= modifiers['total_multiplier']
     crit_chance = caster.stats.get("Critical Chance", 0.05) + modifiers['bonus_crit_chance']
-    extra_crit_multiplier = 0
+    extra_crit_multiplier = 1
     if crit_chance > 1:
         extra_crit_multiplier = crit_chance - 1
     crit_multiplier = 1 + (caster.stats.get("Critical Modifier", 0.5) + modifiers['bonus_crit_modifier']) * extra_crit_multiplier
