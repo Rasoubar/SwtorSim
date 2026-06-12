@@ -64,7 +64,7 @@ class DamageHit(Event):
             return False
         if proc.trigger == "crit" and not is_crit:
             return False
-        if proc.required_tag and proc.required_tag not in tags:
+        if proc.required_tags and not any(tag in tags for tag in proc.required_tags):
             return False
         if not validate_all(proc.conditions, self.source, self.target):
             return False

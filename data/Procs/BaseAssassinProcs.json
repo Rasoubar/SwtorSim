@@ -2,7 +2,7 @@
   "LIGHTNING_CHARGE": {
     "proc_name": "Lightning Charge",
     "trigger": "hit",
-    "required_tag": "melee_ability",
+    "required_tags": ["melee_ability"],
     "chance": 0.5,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -29,7 +29,7 @@
   "FULGURATION_PROC": {
     "proc_name": "Fulguration",
     "trigger": "hit",
-    "required_tag": "charge_lightning",
+    "required_tags": ["charge_lightning"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -44,7 +44,7 @@
   "PERVASIVE_DEATH_ARMOR_PEN": {
     "proc_name": "Pervasive Death Armor Pen",
     "trigger": "hit",
-    "required_tag": "death_field",
+    "required_tags": ["death_field"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -65,7 +65,7 @@
   "BEFALL": {
     "proc_name": "Befall",
     "trigger": "hit",
-    "required_tag": "eradicate",
+    "required_tags": ["eradicate"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -87,7 +87,7 @@
   "LANGUISHING LASHES PROC": {
     "proc_name": "Languishing Lashes Proc",
     "trigger": "hit",
-    "required_tag": "melee_ability",
+    "required_tags": ["melee_ability"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -109,7 +109,7 @@
   "EXPLOITIVE STRIKES": {
     "proc_name": "Exploitive Strikes",
     "trigger": "crit",
-    "required_tag": "force_ability",
+    "required_tags": ["force_ability"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -185,7 +185,7 @@
   "THRASHING TERROR A": {
     "proc_name": "Thrashing Terror A",
     "trigger": "hit",
-    "required_tag": "assassinate",
+    "required_tags": ["assassinate"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -203,7 +203,8 @@
         "tags": [
           "sinister_succor_dot",
           "damage_over_time",
-          "periodic_damage"
+          "periodic_damage",
+		  "thrashing_terror"
         ],
         "conditions": {
           "target_has_debuff": "Deathmark"
@@ -222,7 +223,8 @@
         "tags": [
           "sinister_succor_dot",
           "damage_over_time",
-          "periodic_damage"
+          "periodic_damage",
+		  "thrashing_terror"
         ],
         "conditions": {
           "target_doesnt_have_debuff": "Deathmark"
@@ -236,7 +238,7 @@
   "THRASHING TERROR": {
     "proc_name": "Thrashing Terror",
     "trigger": "hit",
-    "required_tag": "tt_proc",
+    "required_tags": ["tt_proc"],
     "chance": 0.6,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -287,7 +289,7 @@
   "RAZE": {
     "proc_name": "Raze",
     "trigger": "hit",
-    "required_tag": "melee_ability",
+    "required_tags": ["melee_ability"],
     "chance": 1.0,
     "icd": 9.0,
     "affected_by_cdr": true,
@@ -320,7 +322,7 @@
   "BLOODLETTING": {
     "proc_name": "Bloodletting",
     "trigger": "hit",
-    "required_tag": "periodic_damage",
+    "required_tags": ["periodic_damage"],
     "chance": 0.3,
     "icd": 15.0,
     "affected_by_cdr": true,
@@ -344,7 +346,7 @@
   "RECKLESSNESS_CD": {
     "proc_name": "Recklessness Cd",
     "trigger": "crit",
-    "required_tag": "periodic_damage",
+    "required_tags": ["periodic_damage"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
@@ -363,7 +365,7 @@
   "ASSASSINS TRAINING": {
     "proc_name": "Assassins Training",
     "trigger": "hit",
-    "required_tag": "saber_strike",
+    "required_tags": ["saber_strike"],
     "chance": 1.0,
     "icd": 0.0,
     "affected_by_cdr": false,
