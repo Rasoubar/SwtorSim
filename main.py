@@ -9,7 +9,7 @@ def run_test():
 
     sim = Simulation()
     player = Player("Assassin")
-    target = Target("Target Dummy", hp=3000000)
+    target = Target("Target Dummy", hp=2000000)
 
     p_stats = player.base_stats
     p_stats["Mastery"] = 16834
@@ -22,12 +22,11 @@ def run_test():
     p_stats["Standard_health"] = 19335
     player.recalculate_stats()
 
-    player.abilities_db = load_abilities_from_json("data/Abilities/HatredAssassinAbilities.json")
-    player.procs = load_passives_from_json("data/Procs/BaseAssassinProcs.json")
-    player.effects = load_permanent_buffs_from_json("data/Buffs/AssassinBasePermanentBuffs.json")
+    player.abilities_db = load_abilities_from_json("data/Assassin/Hatred/Abilities/Abilities.json")
+    player.procs = load_passives_from_json("data/Assassin/Hatred/Procs/BaseAssassinProcs+MasteryPowerRelics.json")
+    player.effects = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
 
     player.recalculate_stats()
-    print(player.stats)
     abilities = {
         key.lower().replace(" ", "_"): val
         for key, val in player.abilities_db.items()
@@ -39,12 +38,10 @@ def run_test():
                     if not any(tag in ability.tags for tag in effect.required_tags):
                         continue
                     ability.cooldown -= effect.value
-    for name,ability in abilities.items():
-        print(name)
-        print(ability.cooldown)
 
     rotation = [abilities['eradicate'],abilities['creeping_terror'],abilities['discharge'],abilities['leeching_strike'],abilities['eradicate'],abilities['recklessness'],abilities['death_field'],
-            abilities['leeching_strike'],abilities['assassinate'],abilities['eradicate'],abilities['thrash'],abilities['thrash'],abilities['saber_strike']]
+            abilities['leeching_strike'],abilities['assassinate'],abilities['eradicate'],abilities['thrash'],abilities['thrash'],abilities['saber_strike'],abilities['eradicate'],abilities['creeping_terror'],abilities['discharge'],abilities['leeching_strike'],abilities['eradicate'],abilities['recklessness'],abilities['death_field'],
+            abilities['leeching_strike'],abilities['assassinate'],abilities['eradicate'],abilities['thrash'],abilities['saber_strike'],abilities['saber_strike']]
     player.rotation = FixedRotation(rotation)
 
     sim.schedule_absolute(0.0, PlayerReady(player, target))

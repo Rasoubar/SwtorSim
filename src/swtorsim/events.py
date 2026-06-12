@@ -177,7 +177,6 @@ class DotTick(Event):
             hit = DamageHit(source=self.source, target=self.target, action_data = action, ability_name= dot_name)
             hit.resolve(sim)
             self.instance_ref.ticks_remaining -= 1
-        print(f" [Dot Tracking] {dot_name} action executed. Ticks remaining: {self.instance_ref.ticks_remaining}")
         if self.instance_ref.ticks_remaining > 0:
             next_tick_time = sim.current_time + self.instance_ref.interval
             sim.schedule_absolute(next_tick_time, self)
@@ -196,7 +195,6 @@ class ResourceTick(Event):
     def resolve(self, sim):
         alacrity_pct = self.player.stats.get("Alacrity", 0.0)
         alacrity_mod = 1.0 + alacrity_pct
-        print(f'[{sim.current_time:.2f}s] Passive force regen, now at: {self.player.resource.current_value} force.')
         self.player.resource.tick_passive_regen(self.interval, alacrity_mod) #generate
         sim.schedule_relative(self.interval, self) #schedule next
 
@@ -208,7 +206,6 @@ class ResourceGainEvent(Event):
 
     def resolve(self, sim):
         self.player.resource.generate(self.amount)
-        print(f'[{sim.current_time:.2f}s] gained {self.amount} {self.player.resource.pool_type}')
 
 
 class RotationDecisionLoop(Event):

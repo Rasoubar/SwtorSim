@@ -76,8 +76,6 @@ def get_modifiers(caster, target, action_tags):
             elif meta["stat_name"] == "Armor Debuff":
                 modifiers['target_armor_debuff'] += (buff.value * multiplier)
             if buff.consumable_charges is not None:
-                print(f" [Stack Trigger] '{buff.effect_name}' triggered. "
-                      f"Consumable Stacks: {buff.consumable_charges} -> {buff.consumable_charges - 1}")
                 buff.consumable_charges -= 1
                 if buff.consumable_charges <= 0:
                     del target.debuffs[effect_id]
