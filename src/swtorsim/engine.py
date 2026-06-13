@@ -18,10 +18,13 @@ class Simulation:
     def schedule_absolute(self, absolute_time, event):
         heapq.heappush(self.queue, (absolute_time, event))
 
-    def run_timed(self, duration = 300.0): #starting with timed because it will be better for early testing.
+    def run_timed(self, duration=300.0, target=None):
         while self.queue:
             timestamp, event = heapq.heappop(self.queue)
             if timestamp > duration:
+                break
+            if target and target.hp <= 0:
+                print(f"\n[{timestamp:.2f}s] Rip dummy.")
                 break
             self.current_time = timestamp
             event.resolve(self)

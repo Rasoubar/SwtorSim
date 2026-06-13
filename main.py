@@ -122,7 +122,7 @@ def run_test():
     # 7. Run the timeline loop
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     sim.schedule_absolute(1.0, ResourceTick(player))
-    sim.run_timed(duration=90.0)
+    sim.run_timed(duration=90.0, target=target)
 
 if __name__ == "__main__":
     run_test()
