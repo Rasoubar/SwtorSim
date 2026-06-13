@@ -127,7 +127,7 @@ class BuffExpire(Event):
             sim.schedule_relative(time_remaining, self)
             return
         self.player.effects.pop(self.buff_name, None)
-        print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.buff_name}") #should change the print probly, in case it wasn't there.
+        #print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.buff_name}") #should change the print probly, in case it wasn't there.
         effect_id = active_buff.id
         if effect_id in EFFECTS:
             stat_name = EFFECTS[effect_id]["stat_name"]
@@ -151,7 +151,7 @@ class DebuffExpire(Event):
             sim.schedule_relative(time_remaining, self)
             return
         self.target.debuffs.pop(self.debuff_name, None)
-        print(f"[{sim.current_time:.2f}s] Debuff expired and cleared: {self.debuff_name} on {self.target.name}")
+        #print(f"[{sim.current_time:.2f}s] Debuff expired and cleared: {self.debuff_name} on {self.target.name}")
 
 
 class DotTick(Event):
@@ -182,7 +182,7 @@ class DotTick(Event):
             sim.schedule_absolute(next_tick_time, self)
         else:
             del self.target.dots[dot_name]
-            print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
+            #print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
 
 
 

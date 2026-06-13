@@ -69,8 +69,8 @@ def handle_resource_gain_action(sim, caster, action, delay):
 
 def handle_cooldown_modification(sim, caster, action):
     cooldown_dict = getattr(caster, "cooldowns", {})
-    player_db = getattr(caster, "abilities_db", {})
-    if not (cooldown_dict and player_db and "target_tags" in action):
+    ability_db = sim.ability_db
+    if not (cooldown_dict and ability_db and "target_tags" in action):
         return
     reset_tags = set(action["target_tags"])
     is_reset = action.get("reset", False)
@@ -78,12 +78,11 @@ def handle_cooldown_modification(sim, caster, action):
         if cooldown_dict[cd_key] <= sim.current_time: #clean the ones gone
             del cooldown_dict[cd_key]
             continue
-        ability_data = player_db.get(cd_key.upper()) #I'll change JSON a bit to get rid of this upper(), eventually
+        ability_data = ability_db.get(cd_key.lower().replace(" ", "_")) #I'll change JSON a bit to get rid of this string manipulation. eventually
         ability_tags = getattr(ability_data, 'tags', []) if ability_data else []
         if reset_tags & set(ability_tags):
             if is_reset:
                 del cooldown_dict[cd_key]
-                print(f"   >> [COOLDOWN] {cd_key} has been completely RESET!")
             else:
                 reduction = action.get("value", 0.0)
                 new_cd = max(sim.current_time, cooldown_dict[cd_key] - reduction)

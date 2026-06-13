@@ -2,15 +2,21 @@ from src.swtorsim.engine import Simulation
 from src.swtorsim.entities import Player, Target
 from src.swtorsim.events import ResourceTick, PlayerReady
 from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
-from src.swtorsim.rotation import FixedRotation
+from src.swtorsim.rotation import Rotation
+from src.swtorsim.requirements import validate_all
+
+from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
+from src.swtorsim.rotation import Rotation
 from src.swtorsim.requirements import validate_all
 
 def run_test():
-
-    sim = Simulation()
+    # 1. Load data and initialize simulation
+    abilities_db = load_abilities_from_json("data/Assassin/Hatred/Abilities/Abilities.json")
+    sim = Simulation(abilities_db)
     player = Player("Assassin")
     target = Target("Target Dummy", hp=2000000)
 
+    # 2. Assign base player stats
     p_stats = player.base_stats
     p_stats["Mastery"] = 16834
     p_stats["Power"] = 14503
@@ -22,32 +28,101 @@ def run_test():
     p_stats["Standard_health"] = 19335
     player.recalculate_stats()
 
-    player.abilities_db = load_abilities_from_json("data/Assassin/Hatred/Abilities/Abilities.json")
+    # 3. Load passives and permanent buffs
     player.procs = load_passives_from_json("data/Assassin/Hatred/Procs/BaseAssassinProcs+MasteryPowerRelics.json")
     player.effects = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
-
     player.recalculate_stats()
-    abilities = {
-        key.lower().replace(" ", "_"): val
-        for key, val in player.abilities_db.items()
-    }
-    for effect_id, effect in player.effects.items(): #make better later
-        if effect.id == 64:
-            if effect.required_tags is not None:
-                for ability in abilities.values():
-                    if not any(tag in ability.tags for tag in effect.required_tags):
-                        continue
+
+    # 4. Process baseline permanent cooldown modifications
+    for effect_id, effect in player.effects.items():
+        if effect.id == 64 and effect.required_tags is not None:
+            for ability in sim.ability_db.values():
+                if any(tag in ability.tags for tag in effect.required_tags):
                     ability.cooldown -= effect.value
 
-    rotation = [abilities['eradicate'],abilities['creeping_terror'],abilities['discharge'],abilities['leeching_strike'],abilities['eradicate'],abilities['recklessness'],abilities['death_field'],
-            abilities['leeching_strike'],abilities['assassinate'],abilities['eradicate'],abilities['thrash'],abilities['thrash'],abilities['saber_strike'],abilities['eradicate'],abilities['creeping_terror'],abilities['discharge'],abilities['leeching_strike'],abilities['eradicate'],abilities['recklessness'],abilities['death_field'],
-            abilities['leeching_strike'],abilities['assassinate'],abilities['eradicate'],abilities['thrash'],abilities['saber_strike'],abilities['saber_strike']]
-    player.rotation = FixedRotation(rotation)
+    # 5. Define your complete repeating hybrid rotation configuration
+    hybrid_rotation_config = [
+        {"type": "fixed", "ability_id": "eradicate"},
+        {"type": "fixed", "ability_id": "creeping_terror"},
+        {"type": "fixed", "ability_id": "discharge"},
+        {"type": "fixed", "ability_id": "leeching_strike"},
+        {"type": "fixed", "ability_id": "eradicate"},
+        {"type": "fixed", "ability_id": "recklessness"},
+        {"type": "fixed", "ability_id": "death_field"},
 
+        # --- MPRIO 1 ---
+        {
+            "type": "priority_block",
+            "name": "MPRIO 1 Window",
+            "pool": [
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
+                {"ability_id": "assassinate", "rules": []},
+                {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "thrash", "rules": []},
+                {"ability_id": "saber_strike", "rules": []}
+            ]
+        },
+
+        # --- MPRIO 2 ---
+        {
+            "type": "priority_block",
+            "name": "MPRIO 2 Window",
+            "pool": [
+                {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "assassinate", "rules": []},
+                {"ability_id": "thrash", "rules": []},
+                {"ability_id": "saber_strike", "rules": []},
+            ]
+        },
+
+        # --- Return to Fixed Transition ---
+        {"type": "fixed", "ability_id": "eradicate"},
+
+        # --- MPRIO 1 (Back-to-Back Windows) ---
+        {
+            "type": "priority_block",
+            "name": "MPRIO 1 Window A",
+            "pool": [
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
+                {"ability_id": "assassinate", "rules": []},
+                {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "thrash", "rules": []},
+                {"ability_id": "saber_strike", "rules": []}
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "MPRIO 1 Window B",
+            "pool": [
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
+                {"ability_id": "assassinate", "rules": []},
+                {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "thrash", "rules": []},
+                {"ability_id": "saber_strike", "rules": []}
+            ]
+        },
+
+        # --- MPRIO 3 ---
+        {
+            "type": "priority_block",
+            "name": "MPRIO 3 Window",
+            "pool": [
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 60}]},
+                {"ability_id": "assassinate", "rules": []},
+                {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "thrash", "rules": []},
+                {"ability_id": "saber_strike", "rules": []}
+            ]
+        }
+    ]
+
+    # 6. Instantiate the manager WITH loop=True so it repeats for the full duration
+    player.rotation = Rotation(name="Hatred Meta Loop", steps_config=hybrid_rotation_config, loop=True)
+
+    # 7. Run the timeline loop
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     sim.schedule_absolute(1.0, ResourceTick(player))
     sim.run_timed(duration=90.0)
-
 
 if __name__ == "__main__":
     run_test()
