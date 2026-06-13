@@ -230,9 +230,9 @@
         "attack_type": 3,
         "damage_type": 4,
         "amp": 0.0,
-        "coeff": 2.12,
-        "shp_min": 0.192,
-        "shp_max": 0.232,
+        "coeff": 1.69,
+        "shp_min": 0.149,
+        "shp_max": 0.189,
         "delay": 0.0,
         "impact_delay": 0.0,
         "tags": [
@@ -539,7 +539,8 @@
         "value": 0.05,
         "duration": 45.0,
         "required_tags": [
-          "force_attack"
+          "force_attack",
+		  "force_ability"
         ],
         "effect_name": "Vulnerable",
         "affected_by_cdr": false
