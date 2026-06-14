@@ -14,7 +14,7 @@ def run_test():
     abilities_db = load_abilities_from_json("data/Assassin/Hatred/Abilities/Abilities.json")
     sim = Simulation(abilities_db)
     player = Player("Assassin")
-    target = Target("Target Dummy", hp=2000000)
+    target = Target("Target Dummy", hp=10000000)
 
     # 2. Assign base player stats
     p_stats = player.base_stats
@@ -163,7 +163,8 @@ def run_test():
     # 7. Run the timeline loop
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     sim.schedule_absolute(1.0, ResourceTick(player))
-    sim.run_timed(duration=90.0, target=target)
+    sim.run_timed(duration=1000.0, target=target)
+    sim.tracker.print_metrics(sim.current_time)
 
 if __name__ == "__main__":
     run_test()

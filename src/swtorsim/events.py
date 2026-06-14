@@ -51,6 +51,7 @@ class DamageHit(Event):
         else:
             instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
             instant_land.resolve(sim)
+        sim.tracker.log_damage(self.ability_name, final_damage, is_crit)
         self.evaluate_on_hit_procs(sim, is_crit, tags)
 
     def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
