@@ -38,7 +38,7 @@ class FixedAbilityStep:
 class PriorityBlockStep:
     def __init__(self, name, pool):
         self.name = name
-        self.pool = pool    #all abilities + rules, in order of prio
+        self.pool = pool    #all abilities + rules, in order of prioww
 
     def evaluate(self, player, target, sim) -> bool:
         for item in self.pool:

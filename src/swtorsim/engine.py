@@ -5,6 +5,7 @@ class Simulation:
         self.queue = []
         self.current_time = 0.0
         self.ability_db = self.build_ability_db(abilities)
+        self.event_counter = 0
 
     def build_ability_db(self, abilities):
         ability_db = {
@@ -13,14 +14,16 @@ class Simulation:
         }
         return ability_db
     def schedule_relative(self, delay, event):
-        heapq.heappush(self.queue, (self.current_time + delay, event))
+        self.event_counter += 1
+        heapq.heappush(self.queue, (self.current_time + delay, self.event_counter, event))
 
     def schedule_absolute(self, absolute_time, event):
-        heapq.heappush(self.queue, (absolute_time, event))
+        self.event_counter += 1
+        heapq.heappush(self.queue, (absolute_time,self.event_counter, event))
 
     def run_timed(self, duration=300.0, target=None):
         while self.queue:
-            timestamp, event = heapq.heappop(self.queue)
+            timestamp, seq, event = heapq.heappop(self.queue)
             if timestamp > duration:
                 break
             if target and target.hp <= 0:

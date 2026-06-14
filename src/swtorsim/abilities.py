@@ -111,8 +111,9 @@ class Ability:
         return validate_all(self.conditions, caster, target) #validates conditions
 
     def apply_cooldown_locks(self, caster, sim):
+        caster.next_gcd = sim.current_time
         if self.triggers_gcd:
-            caster.next_gcd = sim.current_time + caster.calculate_gcd(self.base_gcd)
+            caster.next_gcd += caster.calculate_gcd(self.base_gcd)
         if self.cooldown > 0.0:
             caster.cooldowns[self.name] = sim.current_time + caster.calculate_cooldown(self.cooldown)
 

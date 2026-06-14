@@ -42,19 +42,50 @@ def run_test():
 
     # 5. Define your complete repeating hybrid rotation configuration
     hybrid_rotation_config = [
+        # --- The Fixed Opener Chain ---
         {"type": "fixed", "ability_id": "eradicate"},
         {"type": "fixed", "ability_id": "creeping_terror"},
         {"type": "fixed", "ability_id": "discharge"},
         {"type": "fixed", "ability_id": "leeching_strike"},
         {"type": "fixed", "ability_id": "eradicate"},
-        {"type": "fixed", "ability_id": "recklessness"},
-        {"type": "fixed", "ability_id": "death_field"},
 
-        # --- MPRIO 1 ---
+        # --- Step 6: Master Block Window 1 ---
         {
             "type": "priority_block",
-            "name": "MPRIO 1 Window",
+            "name": "Reck+DF+MPRIO1 Window 1",
             "pool": [
+                {"ability_id": "recklessness", "rules": []},
+                {"ability_id": "death_field", "rules": []},
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
+                {"ability_id": "assassinate", "rules": []},
+                {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "thrash", "rules": []},
+                {"ability_id": "saber_strike", "rules": []}
+            ]
+        },
+
+        # --- Step 7: Master Block Window 2 ---
+        {
+            "type": "priority_block",
+            "name": "Reck+DF+MPRIO1 Window 2",
+            "pool": [
+                {"ability_id": "recklessness", "rules": []},
+                {"ability_id": "death_field", "rules": []},
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
+                {"ability_id": "assassinate", "rules": []},
+                {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "thrash", "rules": []},
+                {"ability_id": "saber_strike", "rules": []}
+            ]
+        },
+
+        # --- Step 8: Master Block Window 3 ---
+        {
+            "type": "priority_block",
+            "name": "Reck+DF+MPRIO1 Window 3",
+            "pool": [
+                {"ability_id": "recklessness", "rules": []},
+                {"ability_id": "death_field", "rules": []},
                 {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
@@ -83,7 +114,7 @@ def run_test():
             "type": "priority_block",
             "name": "MPRIO 1 Window A",
             "pool": [
-                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 30}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
                 {"ability_id": "thrash", "rules": []},
@@ -94,7 +125,7 @@ def run_test():
             "type": "priority_block",
             "name": "MPRIO 1 Window B",
             "pool": [
-                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 30}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
                 {"ability_id": "thrash", "rules": []},
@@ -107,7 +138,7 @@ def run_test():
             "type": "priority_block",
             "name": "MPRIO 3 Window",
             "pool": [
-                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 60}]},
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 50}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
                 {"ability_id": "thrash", "rules": []},
