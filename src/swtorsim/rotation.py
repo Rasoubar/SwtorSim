@@ -67,10 +67,13 @@ class PriorityBlockStep:
             buff = player.buffs.get(rule["name"], 0) #to add when needed
         if rule_type == "energy_level":
             current_energy = player.resource.current_value
+            print(f'current_energy = {current_energy}')
             operator = rule["operator"]
             threshold = rule["value"]
-
             return self.compare(current_energy, operator, threshold)
+        if rule_type == "buff_active":
+            buff_key = rule["name"] #uniformize (is that a word) this for the love of god, I keep forgetting because boring
+            return buff_key in player.effects
 
 
         return False

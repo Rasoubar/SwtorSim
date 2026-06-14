@@ -55,7 +55,10 @@ def run_test():
             "name": "Reck+DF+MPRIO1 Window 1",
             "pool": [
                 {"ability_id": "recklessness", "rules": []},
-                {"ability_id": "death_field", "rules": []},
+                {
+                    "ability_id": "death_field",
+                    "rules": [{"type": "buff_active", "name": "Recklessness"}]
+                },
                 {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
@@ -70,7 +73,10 @@ def run_test():
             "name": "Reck+DF+MPRIO1 Window 2",
             "pool": [
                 {"ability_id": "recklessness", "rules": []},
-                {"ability_id": "death_field", "rules": []},
+                {
+                    "ability_id": "death_field",
+                    "rules": [{"type": "buff_active", "name": "Recklessness"}]
+                },
                 {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
@@ -85,7 +91,10 @@ def run_test():
             "name": "Reck+DF+MPRIO1 Window 3",
             "pool": [
                 {"ability_id": "recklessness", "rules": []},
-                {"ability_id": "death_field", "rules": []},
+                {
+                    "ability_id": "death_field",
+                    "rules": [{"type": "proc_active", "name": "Recklessness"}]  # <-- Added rule
+                },
                 {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
@@ -100,6 +109,7 @@ def run_test():
             "name": "MPRIO 2 Window",
             "pool": [
                 {"ability_id": "leeching_strike", "rules": []},
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 35}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "thrash", "rules": []},
                 {"ability_id": "saber_strike", "rules": []},
@@ -138,7 +148,7 @@ def run_test():
             "type": "priority_block",
             "name": "MPRIO 3 Window",
             "pool": [
-                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 50}]},
+                {"ability_id": "saber_strike", "rules": [{"type": "energy_level", "operator": "<", "value": 60}]},
                 {"ability_id": "assassinate", "rules": []},
                 {"ability_id": "leeching_strike", "rules": []},
                 {"ability_id": "thrash", "rules": []},
