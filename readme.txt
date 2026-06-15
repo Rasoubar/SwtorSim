@@ -10,7 +10,8 @@ requirements -> used to validate both abilities and actions. the way it's setup 
 config_load -> loads the json files. I didn't write this code, I mostly wanted to load them to test out. Will learn and improve it soon.
 entities -> everything that is in the run for more than it's own execution goes here. 
 abilities -> might rename to actions. or make an action file. Anything player actively does is an ability and the actions an ability causes are actions. All it's logic is here.
-
+batch -> handles batch processing
+metrics -> logs damage and source
 
 
 process:
@@ -59,3 +60,5 @@ damage hit calculation:
   - we apply to modifiers.
   - see if it's crit and if so apply modifier
   - return the number and wether or not it was crit
+  
+  
