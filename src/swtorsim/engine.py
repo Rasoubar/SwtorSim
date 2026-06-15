@@ -34,6 +34,3 @@ class Simulation:
             if target.hp <= 0:
                 print(f"\n[{timestamp:.2f}s] Rip dummy.")
                 break
-
-    def run_prio(self, priority, event):
-        heapq.heappush(self.queue, (priority, event))

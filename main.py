@@ -183,4 +183,4 @@ if __name__ == "__main__":
         procs_db=procs_db,
         buffs_db=buffs_db
     )
-    runner.run_monte_carlo(iterations=10000, duration=10000.0, dummy_hp=10000000)
+    runner.run_monte_carlo(iterations=1, duration=10000.0, dummy_hp=2000000)

@@ -87,15 +87,6 @@ class DamageHit(Event):
                 from src.swtorsim.abilities import execute_single_action
                 execute_single_action(sim, self.source, self.target, action, proc.name)
 
-class CastAttempt(Event):
-    def __init__(self, player: "Player", target: "Target", ability: "Ability"):
-        super().__init__(f"Cast Attempt: {ability.name}")
-        self.player = player
-        self.target = target
-        self.ability = ability
-
-    def resolve(self, sim):
-        self.ability.cast(self.player, self.target, sim)
 
 
 class PlayerReady(Event):
@@ -207,18 +198,3 @@ class ResourceGainEvent(Event):
 
     def resolve(self, sim):
         self.player.resource.generate(self.amount)
-
-
-class RotationDecisionLoop(Event):
-    def __init__(self, rotation, player, target):
-        super().__init__("Rotation Decision Loop")
-        self.rotation = rotation
-        self.player = player
-        self.target = target
-
-    def resolve(self, sim):
-        did_cast = self.rotation.evaluate(self.player, self.target, sim)
-        if did_cast:
-            sim.schedule_absolute(self.player.next_gcd, self)
-        else:
-            sim.schedule_relative(0.10, self)

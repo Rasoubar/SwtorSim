@@ -186,7 +186,8 @@
           "sinister_succor_dot",
           "damage_over_time",
           "periodic_damage",
-		  "thrashing_terror"
+		  "thrashing_terror",
+		  "force_ability"
         ],
         "conditions": {
           "target_has_debuff": "Deathmark"
@@ -206,7 +207,8 @@
           "sinister_succor_dot",
           "damage_over_time",
           "periodic_damage",
-		  "thrashing_terror"
+		  "thrashing_terror",
+		  "force_ability"
         ],
         "conditions": {
           "target_doesnt_have_debuff": "Deathmark"
@@ -238,7 +240,9 @@
         "tags": [
           "sinister_succor_dot",
           "damage_over_time",
-          "periodic_damage"
+          "periodic_damage",
+		  "thrashing_terror",
+		  "force_ability"
         ],
         "conditions": {
           "target_has_debuff": "Deathmark"
@@ -257,7 +261,9 @@
         "tags": [
           "sinister_succor_dot",
           "damage_over_time",
-          "periodic_damage"
+          "periodic_damage",
+		  "thrashing_terror",
+		  "force_ability"
         ],
         "conditions": {
           "target_doesnt_have_debuff": "Deathmark"

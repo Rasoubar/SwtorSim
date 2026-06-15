@@ -123,15 +123,3 @@ def load_permanent_buffs_from_json(filepath: str) -> Dict[str, ActiveBuff]:
         )
 
     return buff_registry
-def load_abilities_from_json1(raw_json_data):
-    processed_abilities = {}
-
-    for ability_name, config in raw_json_data.items():
-        for action in config.get("actions", []):
-            if "tags" not in action:
-                action["tags"] = []
-            action["tags"].append(f"ability:{ability_name}")
-
-        processed_abilities[ability_name] = Ability(config)
-
-    return processed_abilities
