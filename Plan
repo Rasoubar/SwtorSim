@@ -5,3 +5,7 @@
 !!!Will need a requirement like "caster_has_buff_with_x_stacks" for marauder and merc for instance!!!
 !!! will need to discern kinds of bonus damage when doing other classes!!!
 !!!some dots on my JSON are poorly implemented. instant_tick needs to go!!!
+
+!!!optimize proc evaluation!!!
+
+!!!SPLIT EFFECTS INTO COMBAT/COOLDOWN/ETC!!! -> then change stack consumption from combat math

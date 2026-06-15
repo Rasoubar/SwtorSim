@@ -243,6 +243,7 @@ class Player(Actor):
         return max(0.0, final_cost) #safeguard tbh
 
     def has_buff(self, buff_name):
+        print(self.effects)
         return buff_name in self.effects
 
     def cleanup_expired_effects(self, expired_keys: list):
@@ -256,6 +257,7 @@ class Player(Actor):
                     needs_stat_recalc = True
         if needs_stat_recalc:
             self.recalculate_stats()
+            print(f'Buffs active:{self.effects}')
 class Target(Actor):
     def __init__(self, name: str, hp: int):
         super().__init__(name)

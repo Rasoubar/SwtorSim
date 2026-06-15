@@ -1,3 +1,5 @@
+from .requirements import validate_all
+
 class Rotation:
     def __init__(self, name, steps_config, loop: bool = True):
         self.name = name
@@ -13,6 +15,8 @@ class Rotation:
                 self.sequence.append(FixedAbilityStep(step_data["ability_id"]))
             elif step_data["type"] == "priority_block":
                 self.sequence.append(PriorityBlockStep(step_data["name"], step_data["pool"]))
+            elif step_data["type"] == "optional":
+                self.sequence.append(OptionalAbilityStep(step_data["ability_id"], step_data.get("rules", {})))
 
     def evaluate(self, player, target, sim) -> bool:
         if self.current_step >= len(self.sequence):
@@ -38,50 +42,28 @@ class FixedAbilityStep:
 class PriorityBlockStep:
     def __init__(self, name, pool):
         self.name = name
-        self.pool = pool    #all abilities + rules, in order of prioww
+        self.pool = pool
 
     def evaluate(self, player, target, sim) -> bool:
-        for item in self.pool:
-            ability_id = item["ability_id"]
-            ability = sim.ability_db.get(ability_id)
-            if ability is None:
-                continue
-            rules_passed = True
-            for rule in item.get("rules", []):
-                if not self.evaluate_rule(rule, player, target, sim):
-                    rules_passed = False
-                    break
-            if not rules_passed:
-                continue
-            if not ability.can_cast(player, target, sim):
-                continue
-            return ability.cast(player, target, sim)
-
+        for option in self.pool:
+            wanna_cast = validate_all(option.get("rules", {}), player, target)
+            if wanna_cast:
+                ability = sim.ability_db.get(option["ability_id"])
+                if ability and ability.cast(player, target, sim):
+                    return True
         return False
 
-    def evaluate_rule(self, rule, player, target, sim) -> bool:
-        rule_type = rule["type"]
-        if rule_type == "dot_absent":
-            return rule["name"] not in target.dots
-        if rule_type == "buff_stacks":
-            buff = player.buffs.get(rule["name"], 0) #to add when needed
-        if rule_type == "energy_level":
-            current_energy = player.resource.current_value
-            print(f'current_energy = {current_energy}')
-            operator = rule["operator"]
-            threshold = rule["value"]
-            return self.compare(current_energy, operator, threshold)
-        if rule_type == "buff_active":
-            buff_key = rule["name"] #uniformize (is that a word) this for the love of god, I keep forgetting because boring
-            return buff_key in player.effects
 
+class OptionalAbilityStep:
+    def __init__(self, ability_id, rules=None):
+        self.ability_id = ability_id
+        self.rules = rules if rules is not None else {}
 
-        return False
-
-    def compare(self, val1, operator, val2) -> bool:
-        if operator == "==": return val1 == val2
-        if operator == ">=": return val1 >= val2
-        if operator == "<=": return val1 <= val2
-        if operator == ">":  return val1 > val2
-        if operator == "<":  return val1 < val2
-        return False
+    def evaluate(self, player, target, sim) -> bool:
+        print(player.effects)
+        wanna_cast = validate_all(self.rules, player, target, sim=sim)
+        print(wanna_cast)
+        if wanna_cast:
+            ability = sim.ability_db.get(self.ability_id)
+            ability.cast(player, target, sim)
+        return True

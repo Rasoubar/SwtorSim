@@ -32,7 +32,6 @@ def execute_single_worker_task(args):
                     if hasattr(ability, "tags") and any(tag in ability.tags for tag in effect.required_tags):
                         ability.cooldown -= effect.value
         player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
-
         sim.schedule_absolute(0.0, PlayerReady(player, target))
         sim.schedule_absolute(1.0, ResourceTick(player))
         sim.run_timed(duration=duration, target=target)

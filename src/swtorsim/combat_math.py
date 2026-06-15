@@ -33,7 +33,6 @@ def get_modifiers(caster, target, action_tags):
 
     for effect_id, buff in list(caster.effects.items()):
         if buff.id in EFFECTS:
-            buff_used = False
             meta = EFFECTS[buff.id]
             if buff.consumable_charges is not None and buff.consumable_charges <= 0:  # can remove this
                 continue
@@ -46,17 +45,13 @@ def get_modifiers(caster, target, action_tags):
             if meta["stat_name"] == "Damage Modifier":
                 bucket = meta["modifier_bucket"]
                 buckets[bucket] = buckets.get(bucket, 0.0) + (buff.value * multiplier)
-                buff_used = True
             elif meta["stat_name"] == "Critical Chance":
                 modifiers['bonus_crit_chance'] += (buff.value * multiplier)
-                buff_used = True
             elif meta["stat_name"] == "Critical Damage":
                 modifiers['bonus_crit_modifier'] += (buff.value * multiplier)
-                buff_used = True
             elif meta["stat_name"] == "Armor Penetration":
                 modifiers['bonus_armor_pen'] += (buff.value * multiplier)
-                buff_used = True
-            if buff.consumable_charges is not None and buff_used:
+            if buff.consumable_charges is not None and buff.id != 68: #temporary
                 buff.consumable_charges -= 1
                 if buff.consumable_charges <= 0:
                     caster_expired_buffs.append(effect_id)
@@ -79,7 +74,6 @@ def get_modifiers(caster, target, action_tags):
                 buff.consumable_charges -= 1
                 if buff.consumable_charges <= 0:
                     del target.debuffs[effect_id]
-
     for bucket_value in buckets.values():
         modifiers['total_multiplier'] *= (1 + bucket_value)
     return modifiers
