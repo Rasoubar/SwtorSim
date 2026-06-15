@@ -96,7 +96,7 @@ class ParallelBatchRunner:
         print(f"Average Performance : {avg_dps:,.1f} DPS")
         print(f"Worst Performance    : {min_dps:,.1f} DPS")
         print(f"Best Performance  : {max_dps:,.1f} DPS")
-        print(f"Statistical Variance : ±{std_dev:,.1f} DPS")
+        print(f"Standard Deviation : ±{std_dev:,.1f} DPS")
         print("=" * 55)
         print(f"{'Ability Name':<25} | {'Avg Run DPS':<12} | {'Share %':<8}")
         print("-" * 55)
