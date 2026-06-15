@@ -1,1 +1,9 @@
-.idea
+# Python extractor intermediate files
+data/extract_work/
+data/extracted/
+data/hashes.bin
+data/hashes_filename.txt
+data/gom.js
+.venv/
+__pycache__/
+*.pyc
