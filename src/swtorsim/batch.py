@@ -13,7 +13,7 @@ from src.swtorsim.rotation import Rotation
 def execute_single_worker_task(args):
     run_id, duration, dummy_hp, rotation_config, stats_config, abilities_db, procs_db, buffs_db = args
     old_stdout = sys.stdout
-    #sys.stdout = open(os.devnull, 'w')
+    sys.stdout = open(os.devnull, 'w')
 
     try:
         abilities_copy = copy.deepcopy(abilities_db)
@@ -46,7 +46,7 @@ def execute_single_worker_task(args):
             "abilities": ability_data_summary
         }
     finally:
-        #sys.stdout.close()
+        sys.stdout.close()
         sys.stdout = old_stdout
 
 

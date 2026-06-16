@@ -24,6 +24,8 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
         handle_resource_gain_action(sim, caster, action, delay)
     elif action_type == "cooldown_mod":
         handle_cooldown_modification(sim, caster, action)
+    elif action_type =="grant_charge":
+        handle_restore_charge(sim, caster, action)
 
 
 
@@ -89,6 +91,16 @@ def handle_cooldown_modification(sim, caster, action):
                 cooldown_dict[cd_key] = new_cd
                 if cooldown_dict[cd_key] <= sim.current_time:
                     del cooldown_dict[cd_key]
+
+
+def handle_restore_charge(sim, caster, action):
+    target_ability_name = action.get("target_ability")
+    amount = action.get("amount", 1)
+    if target_ability_name in caster.abilities_db:
+        ability = caster.abilities_db[target_ability_name]
+        ability.add_charge(amount)
+
+
 class Ability:
     def __init__(self, config: dict):
         self.name = config["name"]
@@ -99,10 +111,34 @@ class Ability:
         self.energy_cost = config.get("energy_cost", 0.0)
         self.tags=config.get("tags",[])
         self.conditions = config.get("conditions", {})
+        self.has_charges = config.get("max_charges", 0) > 0
+        if self.has_charges:
+            self.max_charges = config.get("max_charges",1)
+            self.charges = self.max_charges
+            self.recharge_time = config.get("recharge_time", self.cooldown)
+            self.last_charge_time = 0.0
+
+    def update_charges(self, caster, sim):
+        if  self.recharge_time <= 0:
+            return
+        if self.charges < self.max_charges:
+            time_elapsed = sim.current_time - self.last_charge_time
+            actual_recharge_time = caster.calculate_cooldown(self.recharge_time)
+            charges_gained = int(time_elapsed // actual_recharge_time)
+            if charges_gained > 0:
+                self.charges = min(self.max_charges, self.charges + charges_gained)
+                self.last_charge_time += charges_gained * actual_recharge_time
+
+    def add_charge(self, amount=1):
+        self.charges = min(self.max_charges, self.charges + amount)
 
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
         if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
             return False
+        if self.has_charges:
+            self.update_charges(caster,sim)
+            if self.charges < 1:
+                return False
         if sim.current_time < caster.cooldowns.get(self.name, 0.0):
             return False
         modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply = False)
@@ -114,7 +150,11 @@ class Ability:
         caster.next_gcd = sim.current_time
         if self.triggers_gcd:
             caster.next_gcd += caster.calculate_gcd(self.base_gcd)
-        if self.cooldown > 0.0:
+        if self.has_charges:
+            if self.charges == self.max_charges:
+                self.last_charge_time = sim.current_time
+            self.charges -= 1
+        elif self.cooldown > 0.0:
             caster.cooldowns[self.name] = sim.current_time + caster.calculate_cooldown(self.cooldown)
 
     def cast(self, caster, target, sim) -> bool:

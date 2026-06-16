@@ -213,7 +213,9 @@
   },
   "DEATH FIELD": {
     "name": "Death field",
-    "cooldown": 15.0,
+    "cooldown": 0.0,
+    "max_charges": 1,
+    "recharge_time": 15.0,
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 50.0,
@@ -617,11 +619,11 @@
         "action_type": "buff",
         "id": 0,
         "value": 0.0,
-        "duration": 10.0,
         "required_tags": [
           "assassinate"
         ],
         "effect_name": "Reapers Rush",
+		"duration": 10.0,
         "consumable_charges": 1,
         "charges": 1,
         "affected_by_cdr": false

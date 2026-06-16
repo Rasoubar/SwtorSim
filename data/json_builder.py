@@ -160,6 +160,10 @@ def main():
         entry_data["base_gcd"] = get_input("Base GCD pacing step time (seconds)", float, 1.5)
 
     entry_data["energy_cost"] = get_input("Force cost to cast this ability", float, 0.0)
+    max_charges = get_input("Maximum charges (enter 0 if ability does not use charges)", int, 0)
+    if max_charges > 0:
+        entry_data["max_charges"] = max_charges
+        entry_data["recharge_time"] = get_input("Recharge time per charge (seconds)", float, entry_data["cooldown"])
 
     if global_tags := collect_list_items("Global Ability Context Tags"):
         entry_data["tags"] = global_tags

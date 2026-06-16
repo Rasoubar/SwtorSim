@@ -60,9 +60,7 @@ class OptionalAbilityStep:
         self.rules = rules if rules is not None else {}
 
     def evaluate(self, player, target, sim) -> bool:
-        print(player.effects)
         wanna_cast = validate_all(self.rules, player, target, sim=sim)
-        print(wanna_cast)
         if wanna_cast:
             ability = sim.ability_db.get(self.ability_id)
             ability.cast(player, target, sim)

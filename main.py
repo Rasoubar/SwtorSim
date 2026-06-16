@@ -135,16 +135,6 @@ HYBRID_ROTATION_CONFIG = [
         ]
     },
     {
-        "type": "optional",
-        "ability_id": "phantom_stride",
-        "rules": {
-            "target_hp_above_pct": 0.30,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
-            "caster_energy_above": 60,
-            "caster_does_not_have_buff": "Bloodletting"
-        }
-    },
-    {
         "type": "priority_block",
         "name": "MPRIO 3 Window",
         "pool": [
@@ -183,4 +173,4 @@ if __name__ == "__main__":
         procs_db=procs_db,
         buffs_db=buffs_db
     )
-    runner.run_monte_carlo(iterations=1, duration=10000.0, dummy_hp=2000000)
+    runner.run_monte_carlo(iterations=1000, duration=10000.0, dummy_hp=10000000)
