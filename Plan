@@ -9,3 +9,4 @@
 !!!optimize proc evaluation!!!
 
 !!!SPLIT EFFECTS INTO COMBAT/COOLDOWN/ETC!!! -> then change stack consumption from combat math
+!!!optimize how player ready interacts with channel!!!

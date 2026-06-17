@@ -186,7 +186,10 @@ class Ability:
             caster.active_channel = None
             caster.is_channeling = False
         final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply = True)
+        print(f'final spend: {final_spend}')
+        print(f'caster.resource.current_value: {caster.resource.current_value}')
         caster.resource.spend(final_spend)
+        print(f'caster.resource.current_value: {caster.resource.current_value}')
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
         self.apply_cooldown_locks(caster, sim)
         for action in self.actions:

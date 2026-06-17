@@ -86,7 +86,6 @@ class DamageHit(Event):
             else:
                 from src.swtorsim.abilities import execute_single_action
                 execute_single_action(sim, self.source, self.target, action, proc.name)
-                execute_single_action(sim, self.source, self.target, action, proc.name)
 
 
 
@@ -186,6 +185,7 @@ class ChannelTickEvent(Event):
         self.channel = channel_instance
 
     def resolve(self, sim):
+        print("Channel Tick")
         if self.source.active_channel is not self.channel:
             print("oh shit")
             return
@@ -246,4 +246,5 @@ class ResourceGainEvent(Event):
         self.amount = amount
 
     def resolve(self, sim):
+        print(f'omg i gained {self.amount}')
         self.player.resource.generate(self.amount)

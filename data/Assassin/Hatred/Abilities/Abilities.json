@@ -58,7 +58,7 @@
     "base_gcd": 1.5,
     "energy_cost": 20.0,
     "conditions": {
-      "target_hp_below_pct": {
+      "target_hp_below_pct":{
         "pct": 0.3,
         "bypass_if_buff_active": [
           "Reapers Rush",
@@ -703,7 +703,7 @@
         "action_type": "channel",
         "channel_ticks": 4,
         "tick_interval": 0.75,
-		"tick_cost": 38.0,
+		"tick_cost": 10.0,
         "actions": [
           {
             "action_type": "damage",

@@ -168,7 +168,7 @@ if __name__ == "__main__":
     buffs_db = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
+    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
     # -----------------------------------
 
     if RUN_MODE == "TEST":
@@ -180,7 +180,7 @@ if __name__ == "__main__":
             buffs_db=buffs_db
         )
         # Running for 5 minutes (300 seconds) is usually enough for a rotation check
-        tester.run_test(duration=40.0, dummy_hp=10000000)
+        tester.run_test(duration=1000.0, dummy_hp=10000000)
 
     elif RUN_MODE == "BATCH":
         runner = ParallelBatchRunner(
