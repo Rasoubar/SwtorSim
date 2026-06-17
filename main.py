@@ -1,5 +1,6 @@
 from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
 from src.swtorsim.batch import ParallelBatchRunner
+from src.swtorsim.tester import SingleTester
 
 HYBRID_ROTATION_CONFIG = [
     {"type": "fixed", "ability_id": "eradicate"},
@@ -166,11 +167,27 @@ if __name__ == "__main__":
     procs_db = load_passives_from_json("data/Assassin/Hatred/Procs/BaseAssassinProcs+MasteryPowerRelics.json")
     buffs_db = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
 
-    runner = ParallelBatchRunner(
-        rotation_config=HYBRID_ROTATION_CONFIG,
-        stats_config=MY_CUSTOM_CHARACTER_STATS,
-        abilities_db=abilities_db,
-        procs_db=procs_db,
-        buffs_db=buffs_db
-    )
-    runner.run_monte_carlo(iterations=1000, duration=10000.0, dummy_hp=10000000)
+    # --- TOGGLE THIS TO SWITCH MODES ---
+    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
+    # -----------------------------------
+
+    if RUN_MODE == "TEST":
+        tester = SingleTester(
+            rotation_config=HYBRID_ROTATION_CONFIG,
+            stats_config=MY_CUSTOM_CHARACTER_STATS,
+            abilities_db=abilities_db,
+            procs_db=procs_db,
+            buffs_db=buffs_db
+        )
+        # Running for 5 minutes (300 seconds) is usually enough for a rotation check
+        tester.run_test(duration=300.0, dummy_hp=10000000)
+
+    elif RUN_MODE == "BATCH":
+        runner = ParallelBatchRunner(
+            rotation_config=HYBRID_ROTATION_CONFIG,
+            stats_config=MY_CUSTOM_CHARACTER_STATS,
+            abilities_db=abilities_db,
+            procs_db=procs_db,
+            buffs_db=buffs_db
+        )
+        runner.run_monte_carlo(iterations=1000, duration=10000.0, dummy_hp=10000000)
