@@ -86,6 +86,7 @@ class DamageHit(Event):
             else:
                 from src.swtorsim.abilities import execute_single_action
                 execute_single_action(sim, self.source, self.target, action, proc.name)
+                execute_single_action(sim, self.source, self.target, action, proc.name)
 
 
 
@@ -175,6 +176,54 @@ class DotTick(Event):
         else:
             del self.target.dots[dot_name]
             #print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
+
+
+class ChannelTickEvent(Event):
+    def __init__(self, player, target, channel_instance):
+        super().__init__(f"DoT Tick: {channel_instance.name}")
+        self.source = player
+        self.target = target
+        self.channel = channel_instance
+
+    def resolve(self, sim):
+        if self.source.active_channel is not self.channel:
+            print("oh shit")
+            return
+        print(f"[{sim.current_time:.3f}] {self.channel.name} ticked! ({self.channel.remaining_ticks} left)")
+        acted = False
+        print(self.source.resource.current_value)
+        if self.source.resource.current_value >= self.channel.tick_cost:
+            acted = True
+            actions = self.choose_action(self.source, self.target)
+            for action in actions:
+                if not validate_all(action.get("conditions", {}), self.source, self.target):
+                    continue
+                action_type = action.get("action_type")
+                if action_type == "damage":
+                    hit = DamageHit(source=self.source, target=self.target, action_data = action, ability_name= self.channel.name)
+                    hit.resolve(sim)
+                else:
+                    from src.swtorsim.abilities import execute_single_action
+                    execute_single_action(sim, self.source, self.target, action, self.channel.name)
+            self.source.resource.spend(self.channel.tick_cost)
+        self.channel.remaining_ticks -= 1
+        if self.channel.remaining_ticks > 0 and acted == True:
+            next_tick_time = sim.current_time + self.channel.tick_interval
+            sim.schedule_absolute(next_tick_time, ChannelTickEvent(self.source, self.target, self.channel))
+        else:
+            self.source.active_channel = None
+            self.source.is_channeling = False
+            print(f"[{sim.current_time:.3f}] {self.channel.name} channel over.")
+            sim.schedule_absolute(sim.current_time, PlayerReady(self.source, self.target))
+
+    def choose_action(self, source, target):
+        valid_actions = []
+        sub_actions = self.channel.action_data.get('actions')
+        for action in sub_actions:
+            conditions = action.get("conditions", {})
+            if validate_all(conditions, source, target):
+                valid_actions.append(action)
+        return valid_actions
 
 
 

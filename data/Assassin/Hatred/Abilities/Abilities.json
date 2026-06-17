@@ -690,5 +690,39 @@
       }
     ],
     "conditions": {}
-  }
+  },
+	"depredating_volts": {
+    "id": "depredating_volts",
+    "name": "Depredating Volts",
+    "energy_cost": 0,
+    "base_gcd": 1.5,
+    "cooldown": 9.0,
+	"conditions": {"caster_energy_above":10},
+    "actions": [
+      {
+        "action_type": "channel",
+        "channel_ticks": 4,
+        "tick_interval": 0.75,
+		"tick_cost": 38.0,
+        "actions": [
+          {
+            "action_type": "damage",
+            "attack_type": 3,
+			"damage_type": 2,
+            "amp": 0.0,
+            "coeff": 0.45,
+            "shp_min": 0.0,
+            "shp_max": 0.0,
+            "delay": 0.0,
+            "impact_delay": 0.0,
+            "tags": [
+              "depredating_volts",
+              "force_ability",
+              "direct_damage"
+            ]
+          }
+        ]
+      }
+    ]
+  } 
 }

@@ -41,7 +41,7 @@ def collect_list_items(prompt_label):
 
 
 def build_conditions():
-    """Builds a condition dictionary checking health thresholds, buffs, or debuffs."""
+    """Builds a condition dictionary checking health thresholds, buffs, debuffs, or resources."""
     conditions = {}
     print("\n--- Optional Special Conditions (Skip any by typing 'none') ---")
 
@@ -63,15 +63,20 @@ def build_conditions():
     if exact_dots != "none":
         conditions["exact_dot_amount"] = int(exact_dots)
 
+    energy_above = get_input("Must the player have energy ABOVE a certain amount? (Enter number, or 'none')", str,
+                             "none")
+    if energy_above != "none":
+        conditions["caster_energy_above"] = float(energy_above)
+
     return conditions if conditions else None
 
 
 def build_action():
     """Builds an individual effect dictionary processed by the action router."""
     print("\n--- Adding Effect/Impact ---")
-    action_types = {1: "damage", 2: "dot", 3: "buff", 4: "resource_gain", 5: "cooldown_mod"}
+    action_types = {1: "damage", 2: "dot", 3: "buff", 4: "resource_gain", 5: "cooldown_mod", 6: "channel"}
     print(
-        "Choose the effect type:\n 1: Direct Damage\n 2: Damage over Time (DoT)\n 3: Temporary Buff\n 4: Resource/Force Gain\n 5: Cooldown Modification")
+        "Choose the effect type:\n 1: Direct Damage\n 2: Damage over Time (DoT)\n 3: Temporary Buff\n 4: Resource/Force Gain\n 5: Cooldown Modification\n 6: Channeled Action")
     choice = get_input("Enter your choice number", int, 1)
     action_type = action_types.get(choice, "damage")
 
@@ -128,6 +133,20 @@ def build_action():
         if target_tags := collect_list_items("Target Ability Tags to reduce cooldown on"):
             action["target_tags"] = target_tags
 
+    elif action_type == "channel":
+        action.update({
+            "channel_ticks": get_input("Total number of ticks", int, 4),
+            "tick_interval": get_input("Time between ticks (seconds)", float, 0.75),
+            "tick_cost": get_input("Force cost PER TICK", float, 10.0)
+        })
+        action["actions"] = []
+        print("\n--- Adding Sub-Actions for Channel ---")
+        print("Now you must define what happens each time the channel ticks.")
+        while True:
+            action["actions"].append(build_action())
+            if not get_input("\nAdd another sub-action to this channel?", bool, False):
+                break
+
     if conds := build_conditions():
         action["conditions"] = conds
 
@@ -151,7 +170,8 @@ def main():
 
     print("\n--- Base Ability Configuration ---")
     entry_data = {
-        "name": get_input("Display Name of the ability", str, lookup_key.replace("_", " ").capitalize()),
+        "id": lookup_key.lower(),
+        "name": get_input("Display Name of the ability", str, lookup_key.replace("_", " ").title()),
         "cooldown": get_input("Cooldown time (seconds, use 0 for none)", float, 0.0),
         "triggers_gcd": get_input("Does this trigger the Global Cooldown (GCD)?", bool, True)
     }
@@ -159,7 +179,10 @@ def main():
     if entry_data["triggers_gcd"]:
         entry_data["base_gcd"] = get_input("Base GCD pacing step time (seconds)", float, 1.5)
 
-    entry_data["energy_cost"] = get_input("Force cost to cast this ability", float, 0.0)
+    entry_data["energy_cost"] = get_input(
+        "Force cost to cast this ability (NOTE: If this ability contains a Channel, set this base cost to 0.0!)", float,
+        0.0)
+
     max_charges = get_input("Maximum charges (enter 0 if ability does not use charges)", int, 0)
     if max_charges > 0:
         entry_data["max_charges"] = max_charges
@@ -172,6 +195,7 @@ def main():
         entry_data["conditions"] = global_conds
 
     entry_data["actions"] = []
+    print("\n--- Main Actions Array ---")
     while True:
         entry_data["actions"].append(build_action())
         if not get_input("\nWould you like to add another sub-action effect to this ability?", bool, False):

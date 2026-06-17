@@ -1,6 +1,6 @@
 import random
-from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent
-from src.swtorsim.entities import ActiveDot, Player, Target
+from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent, ChannelTickEvent
+from src.swtorsim.entities import ActiveDot, Player, Target, ActiveChannel
 from src.swtorsim.requirements import validate_all
 
 
@@ -16,6 +16,8 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
         handle_damage_action(sim, caster, target, action, source_name, delay)
     elif action_type == "dot":
         handle_dot_action(sim, caster, target, action, source_name)
+    elif action_type == "channel":
+        handle_channel_action(sim, caster, target, action, source_name)
     elif action_type == "buff":
         handle_buff_action(sim, caster, action, source_name, sim.current_time)
     elif action_type == "debuff":
@@ -51,6 +53,23 @@ def handle_dot_action(sim, caster, target, action, source_name):
             sim.schedule_relative(tick_delay, instant_hit)
 
     sim.schedule_relative(scaled_interval, DotTick(caster, target, dot_instance))
+
+
+def handle_channel_action(sim, caster, target, action_data: dict, source_name: str):
+
+    caster.is_channeling = True
+
+    tick_interval = action_data.get("tick_interval", 3.0)
+    total_ticks = action_data.get("channel_ticks", 4)
+    tick_cost = action_data.get("tick_cost", 0.0)
+
+    new_channel = ActiveChannel(source_name, action_data, total_ticks, tick_interval, tick_cost)
+    caster.active_channel = new_channel
+    print(f"[{sim.current_time:.3f}] {caster.name} started channeling {source_name}.")
+
+    first_tick_time = sim.current_time
+
+    sim.schedule_absolute(first_tick_time, ChannelTickEvent(caster, target, new_channel))
 
 
 def handle_buff_action(sim, caster, action, source_name, current_time):
@@ -135,6 +154,8 @@ class Ability:
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
         if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
             return False
+        if getattr(caster, "active_channel", None) is not None:
+            return False
         if self.has_charges:
             self.update_charges(caster,sim)
             if self.charges < 1:
@@ -160,6 +181,10 @@ class Ability:
     def cast(self, caster, target, sim) -> bool:
         if not self.can_cast(caster, target, sim):
             return False
+        if getattr(caster, "active_channel", None) is not None:
+            print(f"[{sim.current_time:.3f}] {caster.class_name} interrupted channel to cast {self.name}!")
+            caster.active_channel = None
+            caster.is_channeling = False
         final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply = True)
         caster.resource.spend(final_spend)
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")

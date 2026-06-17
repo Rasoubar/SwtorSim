@@ -180,7 +180,7 @@ if __name__ == "__main__":
             buffs_db=buffs_db
         )
         # Running for 5 minutes (300 seconds) is usually enough for a rotation check
-        tester.run_test(duration=300.0, dummy_hp=10000000)
+        tester.run_test(duration=40.0, dummy_hp=10000000)
 
     elif RUN_MODE == "BATCH":
         runner = ParallelBatchRunner(

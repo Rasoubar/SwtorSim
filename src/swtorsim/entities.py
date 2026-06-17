@@ -20,7 +20,13 @@ class ActiveDot:
                 valid_actions.append(action)
         return valid_actions
 
-
+class ActiveChannel:
+    def __init__(self, name, action_data, total_ticks, tick_interval, tick_cost):
+        self.name = name
+        self.action_data = action_data
+        self.remaining_ticks = total_ticks
+        self.tick_interval = tick_interval
+        self.tick_cost = tick_cost
 
 
 class ActiveBuff:
