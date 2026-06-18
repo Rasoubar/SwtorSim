@@ -38,7 +38,14 @@ def execute_single_worker_task(args):
 
         elapsed_time = sim.current_time if sim.current_time > 0 else 1.0
         calculated_dps = sim.tracker.total_damage / elapsed_time
-        ability_data_summary = {name: data["total_damage"] for name, data in sim.tracker.breakdown.items()}
+
+        ability_data_summary = {
+            name: {
+                "total_damage": data["total_damage"],
+                "hit_count": data["hit_count"]
+            }
+            for name, data in sim.tracker.breakdown.items()
+        }
 
         return {
             "dps": calculated_dps,
@@ -82,27 +89,36 @@ class ParallelBatchRunner:
         total_combat_time_accumulated = sum(r["elapsed"] for r in harvested_results)
         macro_ability_breakdown = {}
         for result in harvested_results:
-            for name, damage_value in result["abilities"].items():
-                macro_ability_breakdown[name] = macro_ability_breakdown.get(name, 0.0) + damage_value
+            for name, data in result["abilities"].items():
+                if name not in macro_ability_breakdown:
+                    macro_ability_breakdown[name] = {"total_damage": 0.0, "hit_count": 0}
+
+                macro_ability_breakdown[name]["total_damage"] += data["total_damage"]
+                macro_ability_breakdown[name]["hit_count"] += data["hit_count"]
 
         avg_dps = sum(all_dps) / len(all_dps)
         min_dps = min(all_dps)
         max_dps = max(all_dps)
         std_dev = math.sqrt(sum((x - avg_dps) ** 2 for x in all_dps) / len(all_dps))
 
-        print("\n" + "=" * 55)
+        print("\n" + "=" * 65)
         print(f"  MONTE CARLO REPORT ({iterations} Fights)")
-        print("=" * 55)
+        print("=" * 65)
         print(f"Average Performance : {avg_dps:,.1f} DPS")
-        print(f"Worst Performance    : {min_dps:,.1f} DPS")
-        print(f"Best Performance  : {max_dps:,.1f} DPS")
-        print(f"Standard Deviation : ±{std_dev:,.1f} DPS")
-        print("=" * 55)
-        print(f"{'Ability Name':<25} | {'Avg Run DPS':<12} | {'Share %':<8}")
-        print("-" * 55)
+        print(f"Worst Performance   : {min_dps:,.1f} DPS")
+        print(f"Best Performance    : {max_dps:,.1f} DPS")
+        print(f"Standard Deviation  : ±{std_dev:,.1f} DPS")
+        print("=" * 65)
 
-        for name, global_damage in sorted(macro_ability_breakdown.items(), key=lambda item: item[1], reverse=True):
-            avg_ability_dps = global_damage / total_combat_time_accumulated
+        print(f"{'Ability Name':<25} | {'Avg Run DPS':<12} | {'Share %':<8} | {'Avg Hits':<8}")
+        print("-" * 65)
+
+        for name, global_data in sorted(macro_ability_breakdown.items(), key=lambda item: item[1]["total_damage"],
+                                        reverse=True):
+            avg_ability_dps = global_data["total_damage"] / total_combat_time_accumulated
             share_pct = (avg_ability_dps / avg_dps) * 100 if avg_dps > 0 else 0.0
-            print(f"{name:<25} | {avg_ability_dps:<12,.1f} | {share_pct:>6.1f}%")
-        print("=" * 55 + "\n")
+
+            avg_hits = global_data["hit_count"] / iterations
+
+            print(f"{name:<25} | {avg_ability_dps:<12,.1f} | {share_pct:>6.1f}% | {avg_hits:>8.1f}")
+        print("=" * 65 + "\n")

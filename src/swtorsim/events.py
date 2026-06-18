@@ -61,6 +61,8 @@ class DamageHit(Event):
             self._trigger_proc_effects(proc, sim)
 
     def _proc_can_trigger(self, proc, sim, is_crit: bool, tags) -> bool:
+        if proc.trigger == "on_cast":
+            return False
         if sim.current_time < proc.next_possible_proc:
             return False
         if proc.trigger == "crit" and not is_crit:

@@ -10,3 +10,5 @@
 
 !!!SPLIT EFFECTS INTO COMBAT/COOLDOWN/ETC!!! -> then change stack consumption from combat math
 !!!optimize how player ready interacts with channel!!!
+!!!optimize procs by splitting them into types at setup. on_crit and on_hit should not be split
+because of order. Kinda matters.!!!

@@ -192,6 +192,24 @@ class Ability:
         print(f'caster.resource.current_value: {caster.resource.current_value}')
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
         self.apply_cooldown_locks(caster, sim)
+        self.evaluate_on_cast_procs(caster, target, sim)
         for action in self.actions:
             execute_single_action(sim, caster, target, action, self.name)
         return True
+
+    def evaluate_on_cast_procs(self, caster, target, sim):
+        for proc in caster.procs.values():
+            if proc.trigger != "on_cast":
+                continue
+            if proc.required_tags:
+                if not any(tag in self.tags for tag in proc.required_tags):
+                    continue
+            if sim.current_time < proc.next_possible_proc:
+                continue
+            print("made it 3x")
+            if random.random() < proc.chance:
+                current_icd = caster.scale_time_modifier(proc.icd) if proc.affected_by_cdr else proc.icd
+                proc.next_possible_proc = sim.current_time + current_icd
+                for action in proc.actions:
+                    print(proc.actions)
+                    execute_single_action(sim, caster, target, action, proc.name)
