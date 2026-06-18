@@ -28,6 +28,7 @@ from extractor.node import (
     fields_to_dict,
     parse_node_fields,
 )
+from extractor.stable_ids import TagResolver
 from extractor.strings import LOC_RETRIEVER_FIELD_IDS, StringResolver
 
 
@@ -192,6 +193,7 @@ def _resolve_value(
     store: BucketStore,
     strings: StringResolver,
     gom: GomLookup,
+    tag_resolver: TagResolver | None = None,
     field_id: str = "",
     enum_type_id: str | None = None,
 ) -> Any:
@@ -226,7 +228,13 @@ def _resolve_value(
                 )
             else:
                 resolved_key = _resolve_value(
-                    key, store, strings, gom, field_id, enum_type_id=key_enum_ref
+                    key,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field_id,
+                    enum_type_id=key_enum_ref,
                 )
             if value_type == DOM_ENUM and isinstance(val, dict) and "index" in val:
                 resolved_val: Any = _resolve_enum_value(
@@ -237,7 +245,13 @@ def _resolve_value(
                 )
             else:
                 resolved_val = _resolve_value(
-                    val, store, strings, gom, field_id, enum_type_id=val_enum_ref
+                    val,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field_id,
+                    enum_type_id=val_enum_ref,
                 )
             entries.append({"key": resolved_key, "value": resolved_val})
         return entries
@@ -252,7 +266,15 @@ def _resolve_value(
 
     if isinstance(value, dict):
         return {
-            k: _resolve_value(v, store, strings, gom, field_id, enum_type_id=enum_type_id)
+            k: _resolve_value(
+                v,
+                store,
+                strings,
+                gom,
+                tag_resolver,
+                field_id,
+                enum_type_id=enum_type_id,
+            )
             for k, v in value.items()
         }
 
@@ -267,14 +289,32 @@ def _resolve_value(
                         "name": gom.field_name(child_id),
                         "type": item.get("type"),
                         "type_name": item.get("type_name"),
-                        "value": _resolve_value(item["value"], store, strings, gom, child_id),
+                        "value": _resolve_value(
+                            item["value"],
+                            store,
+                            strings,
+                            gom,
+                            tag_resolver,
+                            child_id,
+                        ),
                     }
                 )
             else:
                 resolved.append(
-                    _resolve_value(item, store, strings, gom, field_id, enum_type_id=enum_type_id)
+                    _resolve_value(
+                        item,
+                        store,
+                        strings,
+                        gom,
+                        tag_resolver,
+                        field_id,
+                        enum_type_id=enum_type_id,
+                    )
                 )
         return resolved
+
+    if tag_resolver is not None:
+        return tag_resolver.resolve(value)
 
     return value
 
@@ -284,6 +324,7 @@ def resolve_fields(
     store: BucketStore,
     strings: StringResolver,
     gom: GomLookup,
+    tag_resolver: TagResolver | None = None,
 ) -> list[dict[str, Any]]:
     resolved = []
     for field in fields:
@@ -293,7 +334,14 @@ def resolve_fields(
                 "name": gom.field_name(field.id),
                 "type": field.dom_type,
                 "type_name": field.dom_type_name,
-                "value": _resolve_value(field.value, store, strings, gom, field.id),
+                "value": _resolve_value(
+                    field.value,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field.id,
+                ),
             }
         )
     return resolved
@@ -316,6 +364,7 @@ def traverse_combat_graph(
     roots: list[str] | None = None,
     additional_roots: list[str] | None = None,
     origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    tag_resolver: TagResolver | None = None,
 ) -> dict[str, NodeRecord]:
     if roots is None:
         roots_fqns = discover_apc_roots(store, origin_stories)
@@ -361,7 +410,13 @@ def traverse_combat_graph(
             continue
 
         raw_fields = fields_to_dict(parsed.fields)
-        resolved = resolve_fields(parsed.fields, store, strings, gom)
+        resolved = resolve_fields(
+            parsed.fields,
+            store,
+            strings,
+            gom,
+            tag_resolver,
+        )
         visited[node_id] = NodeRecord(
             entry=index_entry,
             parsed=parsed,

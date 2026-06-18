@@ -13,8 +13,18 @@ class SwtorVarInt:
     consumed: int
 
     @property
-    def value(self) -> int:
+    def magnitude(self) -> int:
         return ((self.int_hi & 0xFFFFFFFF) << 32) | (self.int_lo & 0xFFFFFFFF)
+
+    @property
+    def value(self) -> int:
+        return self.sign * self.magnitude
+
+    @property
+    def unsigned_delta(self) -> int:
+        if self.sign < 0:
+            return (-self.magnitude) & 0xFFFFFFFFFFFFFFFF
+        return self.magnitude
 
 
 def read_swtor_varint(data: bytes | memoryview, pos: int = 0) -> SwtorVarInt:
@@ -23,87 +33,55 @@ def read_swtor_varint(data: bytes | memoryview, pos: int = 0) -> SwtorVarInt:
         raise IndexError("index out of range")
 
     first = data[pos]
+    if first < 0xC0 or first > 0xCF:
+        return SwtorVarInt(1, first, 0, 1)
 
-    if first == 0xC0:
-        return SwtorVarInt(-1, data[pos + 1], 0, 2)
-    if first == 0xC1:
-        (int_lo,) = struct.unpack_from(">H", data, pos + 1)
-        return SwtorVarInt(-1, int_lo, 0, 3)
-    if first == 0xC2:
-        int_lo = (data[pos + 1] << 8) | data[pos + 2]
-        int_lo = (int_lo << 8) | data[pos + 3]
-        return SwtorVarInt(-1, int_lo, 0, 4)
-    if first == 0xC3:
-        (int_lo,) = struct.unpack_from(">I", data, pos + 1)
-        return SwtorVarInt(-1, int_lo, 0, 5)
-    if first == 0xC4:
-        int_hi = data[pos + 1]
-        (int_lo,) = struct.unpack_from("<I", data, pos + 2)
-        return SwtorVarInt(-1, int_lo, int_hi, 6)
-    if first == 0xC5:
-        (int_hi,) = struct.unpack_from("<H", data, pos + 1)
-        (int_lo,) = struct.unpack_from("<I", data, pos + 3)
-        return SwtorVarInt(-1, int_lo, int_hi, 7)
-    if first == 0xC6:
-        int_hi = (data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3]
-        (int_lo,) = struct.unpack_from("<I", data, pos + 4)
-        return SwtorVarInt(-1, int_lo, int_hi, 8)
-    if first == 0xC7:
-        (int_hi,) = struct.unpack_from("<I", data, pos + 1)
-        (int_lo,) = struct.unpack_from("<I", data, pos + 5)
-        return SwtorVarInt(-1, int_lo, int_hi, 9)
+    if first <= 0xC7:
+        length = first - 0xBF
+        sign = -1
+    else:
+        length = first - 0xC7
+        sign = 1
 
-    if first == 0xC8:
-        return SwtorVarInt(1, data[pos + 1], 0, 2)
-    if first == 0xC9:
-        (int_lo,) = struct.unpack_from(">H", data, pos + 1)
-        return SwtorVarInt(1, int_lo, 0, 3)
-    if first == 0xCA:
-        int_lo = (data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3]
-        return SwtorVarInt(1, int_lo, 0, 4)
-    if first == 0xCB:
-        (int_lo,) = struct.unpack_from(">I", data, pos + 1)
-        return SwtorVarInt(1, int_lo, 0, 5)
-    if first == 0xCC:
-        int_hi = data[pos + 1]
-        (int_lo,) = struct.unpack_from("<I", data, pos + 2)
-        return SwtorVarInt(1, int_lo, int_hi, 6)
-    if first == 0xCD:
-        (int_hi,) = struct.unpack_from("<H", data, pos + 1)
-        (int_lo,) = struct.unpack_from("<I", data, pos + 3)
-        return SwtorVarInt(1, int_lo, int_hi, 7)
-    if first == 0xCE:
-        int_hi = (data[pos + 1] << 16) | (data[pos + 2] << 8) | data[pos + 3]
-        (int_lo,) = struct.unpack_from("<I", data, pos + 4)
-        return SwtorVarInt(1, int_lo, int_hi, 8)
-    if first == 0xCF:
-        (int_hi,) = struct.unpack_from("<I", data, pos + 1)
-        (int_lo,) = struct.unpack_from("<I", data, pos + 5)
-        return SwtorVarInt(1, int_lo, int_hi, 9)
-
-    return SwtorVarInt(1, first, 0, 1)
+    end = pos + 1 + length
+    if end > len(data):
+        raise IndexError("index out of range")
+    magnitude = int.from_bytes(data[pos + 1 : end], "big")
+    return SwtorVarInt(
+        sign=sign,
+        int_lo=magnitude & 0xFFFFFFFF,
+        int_hi=(magnitude >> 32) & 0xFFFFFFFF,
+        consumed=1 + length,
+    )
 
 
 def swtor_varint_uint(data: bytes | memoryview, pos: int = 0) -> tuple[int, int]:
     """Return (wire uint64 value, bytes consumed). Sign is ignored."""
     parsed = read_swtor_varint(data, pos)
-    return parsed.value, parsed.consumed
+    return parsed.magnitude, parsed.consumed
 
 
 def read_varint(data: bytes | memoryview, pos: int = 0) -> tuple[int, int]:
-    """Read a SWTOR varint and return the raw wire integer."""
+    """Read a non-negative SWTOR varint used for counts and list indexes."""
     return swtor_varint_uint(data, pos)
 
 
-def read_u64_varint(data: bytes | memoryview, pos: int = 0) -> tuple[int, int]:
-    """Read a varint and decode wire-encoded 64-bit database keys (prefix >= 0xC4)."""
-    from extractor.ids import canonical_u64, is_wire_u64_varint
-
+def read_signed_varint(data: bytes | memoryview, pos: int = 0) -> tuple[int, int]:
+    """Read a signed-magnitude SWTOR scalar integer."""
     parsed = read_swtor_varint(data, pos)
-    value = parsed.value
-    if is_wire_u64_varint(data[pos]):
-        value = canonical_u64(value)
-    return value, parsed.consumed
+    return parsed.value, parsed.consumed
+
+
+def read_field_id_delta(data: bytes | memoryview, pos: int = 0) -> tuple[int, int]:
+    """Read a field-ID delta, converting negative magnitudes to uint64 deltas."""
+    parsed = read_swtor_varint(data, pos)
+    return parsed.unsigned_delta, parsed.consumed
+
+
+def read_u64_varint(data: bytes | memoryview, pos: int = 0) -> tuple[int, int]:
+    """Read a signed SWTOR ID/reference varint."""
+    parsed = read_swtor_varint(data, pos)
+    return parsed.value, parsed.consumed
 
 
 def read_varint_from_stream(stream: BinaryIO) -> int:
@@ -111,18 +89,13 @@ def read_varint_from_stream(stream: BinaryIO) -> int:
     if not header:
         raise EOFError("Unexpected EOF while reading varint")
     first = header[0]
-    if first <= 0xCF and first != 0xC0:
-        extra = {0xC1: 1, 0xC2: 2, 0xC3: 3, 0xC4: 4, 0xC5: 5, 0xC6: 6, 0xC7: 7,
-                 0xC8: 0, 0xC9: 1, 0xCA: 2, 0xCB: 3, 0xCC: 4, 0xCD: 5, 0xCE: 6, 0xCF: 7}.get(first, 0)
-        if extra:
-            rest = stream.read(extra)
-            if len(rest) != extra:
-                raise EOFError("Unexpected EOF while reading varint")
-            chunk = header + rest
-            if first >= 0xC8:
-                return read_swtor_varint(chunk, 0).value
-            return read_swtor_varint(chunk, 0).value
-    return first
+    if first < 0xC0 or first > 0xCF:
+        return first
+    extra = first - (0xBF if first <= 0xC7 else 0xC7)
+    rest = stream.read(extra)
+    if len(rest) != extra:
+        raise EOFError("Unexpected EOF while reading varint")
+    return read_swtor_varint(header + rest, 0).value
 
 
 def read_cstring(data: bytes | memoryview, pos: int) -> str:
