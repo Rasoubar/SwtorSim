@@ -28,6 +28,12 @@ COMBAT_FQN_PREFIXES = (
     "tal."
 )
 
+# Combat-relevant item ability trees that are not reachable from player APC nodes.
+ITEM_ABILITY_FQN_PREFIXES = (
+    "abl.itm.legendary",
+    "abl.itm.tactical.sow",
+)
+
 # Ability effect ID list on abl nodes.
 ABL_EFFECT_IDS_FIELD = "4611686061870631192"
 

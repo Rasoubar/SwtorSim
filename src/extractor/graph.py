@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,12 @@ from extractor.bkt import (
     list_node_entries,
     parse_bucket_names_from_info,
 )
-from extractor.config import COMBAT_REF_FIELD_IDS, COMBAT_FQN_PREFIXES, ORIGIN_STORIES
+from extractor.config import (
+    COMBAT_REF_FIELD_IDS,
+    COMBAT_FQN_PREFIXES,
+    ITEM_ABILITY_FQN_PREFIXES,
+    ORIGIN_STORIES,
+)
 from extractor.gom.gom import GomLookup
 from extractor.ids import u64_str
 from extractor.node import (
@@ -144,6 +150,26 @@ def discover_player_apc_nodes(
         if len(parts) >= 3 and parts[0] == "apc" and parts[1] in stories:
             nodes.append(fqn)
     return sorted(nodes)
+
+
+def discover_fqn_prefix_nodes(
+    store: BucketStore,
+    prefixes: tuple[str, ...],
+) -> list[str]:
+    """All nodes at or below any dot-delimited FQN prefix."""
+    nodes: list[str] = []
+    for fqn in store.fqn_to_id:
+        if any(fqn == prefix or fqn.startswith(f"{prefix}.") for prefix in prefixes):
+            nodes.append(fqn)
+    return sorted(nodes)
+
+
+def discover_item_ability_nodes(
+    store: BucketStore,
+    prefixes: tuple[str, ...] = ITEM_ABILITY_FQN_PREFIXES,
+) -> list[str]:
+    """Item ability/effect nodes that are not necessarily referenced by player APCs."""
+    return discover_fqn_prefix_nodes(store, prefixes)
 
 
 def _is_combat_fqn(fqn: str) -> bool:
@@ -288,6 +314,7 @@ def traverse_combat_graph(
     gom: GomLookup,
     strings: StringResolver,
     roots: list[str] | None = None,
+    additional_roots: list[str] | None = None,
     origin_stories: tuple[str, ...] = ORIGIN_STORIES,
 ) -> dict[str, NodeRecord]:
     if roots is None:
@@ -295,25 +322,32 @@ def traverse_combat_graph(
     else:
         roots_fqns = roots
 
-    queue: list[str] = []
-    for fqn in discover_player_apc_nodes(store, origin_stories):
+    seed_fqns = discover_player_apc_nodes(store, origin_stories)
+    if additional_roots:
+        seed_fqns.extend(additional_roots)
+
+    queue: deque[str] = deque()
+    for fqn in seed_fqns:
         node_id = store.fqn_to_id.get(fqn)
         if node_id:
             queue.append(node_id)
 
+    root_ids = {
+        store.fqn_to_id[fqn]
+        for fqn in [*roots_fqns, *(additional_roots or [])]
+        if fqn in store.fqn_to_id
+    }
     visited: dict[str, NodeRecord] = {}
     skipped: set[str] = set()
     while queue:
-        node_id = queue.pop(0)
+        node_id = queue.popleft()
         if node_id in visited or node_id in skipped:
             continue
         if node_id not in store.index:
             continue
 
         index_entry = store.index[node_id]
-        if not _is_combat_fqn(index_entry.fqn) and node_id not in {
-            store.fqn_to_id.get(f) for f in roots_fqns
-        }:
+        if not _is_combat_fqn(index_entry.fqn) and node_id not in root_ids:
             continue
 
         try:
