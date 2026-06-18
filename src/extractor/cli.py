@@ -5,12 +5,21 @@ import shutil
 import sys
 from pathlib import Path
 
-from extractor.config import ExtractorConfig, ORIGIN_STORIES
+from extractor.config import (
+    ExtractorConfig,
+    ITEM_ABILITY_FQN_PREFIXES,
+    ORIGIN_STORIES,
+)
 from extractor.dump import write_node_dump
 from extractor.extract import extract_relevant_files
 from extractor.gom.gom import GomLookup, parse_gom_js
 from extractor.gom_cache import ensure_jedipedia_gom_js
-from extractor.graph import BucketStore, discover_apc_roots, traverse_combat_graph
+from extractor.graph import (
+    BucketStore,
+    discover_apc_roots,
+    discover_item_ability_nodes,
+    traverse_combat_graph,
+)
 from extractor.strings import StringResolver
 
 
@@ -73,16 +82,32 @@ def run_extraction(config: ExtractorConfig) -> Path:
         raise RuntimeError(
             "No APC root nodes found. Expected apc.<origin_story>.<class> nodes."
         )
+    item_ability_roots = discover_item_ability_nodes(store)
 
     records = traverse_combat_graph(
         store,
         gom,
         strings,
         roots=roots,
+        additional_roots=item_ability_roots,
         origin_stories=config.origin_stories,
     )
     apc_count = sum(1 for r in records.values() if r.entry.fqn.startswith("apc."))
-    index_path = write_node_dump(records, config.output_dir, roots)
+    item_ability_counts = {
+        prefix: sum(
+            1
+            for record in records.values()
+            if record.entry.fqn == prefix
+            or record.entry.fqn.startswith(f"{prefix}.")
+        )
+        for prefix in ITEM_ABILITY_FQN_PREFIXES
+    }
+    index_path = write_node_dump(
+        records,
+        config.output_dir,
+        roots,
+        included_fqn_prefixes=ITEM_ABILITY_FQN_PREFIXES,
+    )
 
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
@@ -90,6 +115,8 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Wrote {len(records)} nodes to {config.output_dir}")
     print(f"Index: {index_path}")
     print(f"APC nodes extracted: {apc_count}")
+    for prefix, count in item_ability_counts.items():
+        print(f"{prefix} nodes extracted: {count}")
     return index_path
 
 
