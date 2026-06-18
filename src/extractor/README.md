@@ -14,11 +14,13 @@ pip install -r requirements.txt
 python src/extractor/main.py --assets /path/to/SWTOR/Assets
 ```
 
-On first run, Jedipedia hash list and `gom.js` name maps are downloaded into `data/` and refreshed when the remote copies are newer.
+On first run, Jedipedia's hash list, `gom.js` name maps, and `fnv1a64.js`
+stable-ID dictionary are downloaded into `data/` and refreshed when the remote
+copies are newer.
 
 Options:
 
-- `--force-hash-update` — re-download hash list and `gom.js` from Jedipedia
+- `--force-hash-update` — re-download Jedipedia hash/name data
 - `--origin-story sith_inquisitor` — limit to one origin story
 - `--pts` — use PTS archives
 - `--keep-work` — retain intermediate files in `data/extract_work/`
@@ -29,6 +31,7 @@ Options:
 |------|---------|
 | `data/hashes.bin` | Cached Jedipedia file hash list |
 | `data/gom.js` | Cached Jedipedia GOM class/field/enum names |
+| `data/fnv1a64.js` | Cached Jedipedia stable-ID names used for tag resolution |
 | `data/extract_work/` | Ephemeral MYP extraction (deleted after run unless `--keep-work`) |
 | `data/extracted/` | JSON dump of nodes |
 
@@ -43,6 +46,6 @@ reachable from player ability-package references:
 Ability tag values are stable IDs: unsigned 64-bit FNV-1a hashes of uppercase
 names, rather than GOM node references. For example,
 `tag.abl.smuggler.healing_ability` hashes to `711562958929859131`.
-Jedipedia's reader publishes its known stable-ID strings in
-`https://swtor.jedipedia.net/static/js/reader/lib/fnv1a64.js`; that list can be
-cached and inverted to resolve known tag IDs in a later extraction pass.
+The extractor inverts the known `tag.*` strings published in Jedipedia's
+`fnv1a64.js`. Matching hashes are written as tag names; hashes missing from
+Jedipedia's dictionary remain unchanged as decimal IDs.

@@ -5,6 +5,9 @@ from pathlib import Path
 
 JEDIHASH_URL = "http://swtor.jedipedia.net/ajax/getFileNames.php?env=all&format=easymyp"
 GOM_JS_URL = "https://swtor.jedipedia.net/static/js/reader/gom.js"
+FNV1A64_JS_URL = (
+    "https://swtor.jedipedia.net/static/js/reader/lib/fnv1a64.js"
+)
 
 DATA_DIR = Path("data")
 WORK_DIR = Path("data/extract_work")

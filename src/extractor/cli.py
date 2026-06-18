@@ -20,6 +20,10 @@ from extractor.graph import (
     discover_item_ability_nodes,
     traverse_combat_graph,
 )
+from extractor.stable_ids import (
+    TagResolver,
+    ensure_jedipedia_fnv1a64_js,
+)
 from extractor.strings import StringResolver
 
 
@@ -36,7 +40,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--force-hash-update",
         action="store_true",
-        help="Re-download Jedipedia hash list and gom.js even if cached copies exist",
+        help=(
+            "Re-download Jedipedia hash list, gom.js, and fnv1a64.js "
+            "even if cached copies exist"
+        ),
     )
     parser.add_argument(
         "--origin-story",
@@ -63,6 +70,11 @@ def run_extraction(config: ExtractorConfig) -> Path:
         config.data_dir, force_download=config.force_hash_update
     )
     gom_names = parse_gom_js(gom_js_path)
+    fnv1a64_js_path = ensure_jedipedia_fnv1a64_js(
+        config.data_dir,
+        force_download=config.force_hash_update,
+    )
+    tag_resolver = TagResolver.from_jedipedia_js(fnv1a64_js_path)
 
     resources_root = extract_relevant_files(
         config.assets_path,
@@ -91,6 +103,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
         roots=roots,
         additional_roots=item_ability_roots,
         origin_stories=config.origin_stories,
+        tag_resolver=tag_resolver,
     )
     apc_count = sum(1 for r in records.values() if r.entry.fqn.startswith("apc."))
     item_ability_counts = {
@@ -115,6 +128,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Wrote {len(records)} nodes to {config.output_dir}")
     print(f"Index: {index_path}")
     print(f"APC nodes extracted: {apc_count}")
+    print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")
     return index_path
