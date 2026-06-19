@@ -60,11 +60,6 @@
     ],
     "effect_name": null
   },
-  "MALICIOUSNESS_TALENT": {
-    "id": 0,
-    "value": 0.0,
-    "effect_name": null
-  },
   "FORCE DREAD": {
     "id": 79,
     "value": 0.15,

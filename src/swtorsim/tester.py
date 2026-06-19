@@ -1,7 +1,8 @@
 import copy
+import random
 from src.swtorsim.engine import Simulation
 from src.swtorsim.entities import Player, Target
-from src.swtorsim.events import ResourceTick, PlayerReady
+from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.rotation import Rotation
 
 
@@ -32,7 +33,6 @@ class SingleTester:
         player.effects = copy.deepcopy(self.buffs_db)
         player.recalculate_stats()
 
-        # Alacrity / Cooldown Reduction Logic (Replicating your batch run)
         for effect_id, effect in player.effects.items():
             if effect.id == 64 and effect.required_tags is not None:
                 for ability in sim.ability_db.values():
@@ -41,11 +41,18 @@ class SingleTester:
 
         player.rotation = Rotation(name="Custom Profile Loop", steps_config=self.rotation_config, loop=True)
 
-        # Schedule initial events
         sim.schedule_absolute(0.0, PlayerReady(player, target))
-        sim.schedule_absolute(1.0, ResourceTick(player))
+        first_regen_tick = random.uniform(0.0, 1.0)
+        sim.schedule_absolute(first_regen_tick, ResourceTick(player))
 
-        # Execute run (all engine debug prints will output normally here)
+        for proc in player.procs.values():
+            if getattr(proc, 'trigger', None) == "periodic":
+                is_affected = getattr(proc, 'affected_by_cdr', False)
+                interval = player.scale_time_modifier(proc.icd) if is_affected else proc.icd
+                first_tick = random.uniform(0.0,interval)
+                sim.schedule_absolute(first_tick, PeriodicProcTick(player, target, proc))
+
+            # Execute run (all engine debug prints will output normally here)
         sim.run_timed(duration=duration, target=target)
 
         # Calculate and display results

@@ -91,6 +91,20 @@ class DamageHit(Event):
                 execute_single_action(sim, self.source, self.target, action, proc.name)
 
 
+class PeriodicProcTick(Event):
+    def __init__(self, player, target, proc):
+        super().__init__(f"{proc.name} Tick")
+        self.player = player
+        self.target = target
+        self.proc = proc
+
+    def resolve(self, sim):
+        from src.swtorsim.abilities import execute_single_action
+        for action in getattr(self.proc, 'actions', []):
+            execute_single_action(sim, self.player, self.target, action, self.proc.name)
+        is_affected = getattr(self.proc, 'affected_by_cdr', False)
+        interval = self.player.scale_time_modifier(self.proc.icd) if is_affected else self.proc.icd
+        sim.schedule_relative(interval, PeriodicProcTick(self.player, self.target, self.proc))
 
 class PlayerReady(Event):
 

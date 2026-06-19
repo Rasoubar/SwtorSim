@@ -3,10 +3,11 @@ import os
 import math
 import copy
 import time
+import random
 from multiprocessing import Pool, cpu_count
 from src.swtorsim.engine import Simulation
 from src.swtorsim.entities import Player, Target
-from src.swtorsim.events import ResourceTick, PlayerReady
+from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.rotation import Rotation
 
 
@@ -33,7 +34,14 @@ def execute_single_worker_task(args):
                         ability.cooldown -= effect.value
         player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
         sim.schedule_absolute(0.0, PlayerReady(player, target))
-        sim.schedule_absolute(1.0, ResourceTick(player))
+        first_regen_tick = random.uniform(0.0,1.0)
+        sim.schedule_absolute(first_regen_tick, ResourceTick(player))
+        for proc in player.procs.values():
+            if getattr(proc, 'trigger', None) == "periodic":
+                is_affected = getattr(proc, 'affected_by_cdr', False)
+                interval = player.scale_time_modifier(proc.icd) if is_affected else proc.icd
+                first_tick = random.uniform(0.0, interval)
+                sim.schedule_absolute(first_tick, PeriodicProcTick(player, target, proc))
         sim.run_timed(duration=duration, target=target)
 
         elapsed_time = sim.current_time if sim.current_time > 0 else 1.0

@@ -61,15 +61,14 @@ BUFFS
 PROCS 
 	"CAPSLOCKED NAME"{
 		"proc_name": string
-		"trigger": hit or crit
-		"required_tag": string #what tag procs this proc? might need to be a list later?
-		"chance": float #chance of proc proccing (relics are 0.3)
-		"icd": float #internal cooldown
-		"affected_by_cdr": bool #i dont even know
-		"conditions": list #same as all other conditions
-		"actions": list #list of actions it can aply
-
-	
+		"trigger": string # options: "hit", "crit", "cast", or "periodic"
+		"required_tags": list # tags required from the triggering action (leave empty for "periodic")
+		"chance": float # 0.0 to 1.0 probability to trigger
+		"icd": float # internal cooldown in seconds. NOTE: If trigger is "periodic", this acts as the tick interval
+		"affected_by_cdr": bool # Does alacrity reduce the icd / periodic interval?
+		"actions": list # list of Action dictionaries (same format as ability actions)
+		"conditions": dict # standard conditions required for the proc to fire
+	}
 
 
 
