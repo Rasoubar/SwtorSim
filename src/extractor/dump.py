@@ -38,10 +38,12 @@ def write_node_dump(
     records: dict[str, NodeRecord],
     output_dir: Path,
     roots: list[str],
+    included_fqn_prefixes: tuple[str, ...] = (),
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     index: dict[str, Any] = {
         "roots": roots,
+        "included_fqn_prefixes": list(included_fqn_prefixes),
         "nodes": {},
         "edges": _collect_edges(records),
     }

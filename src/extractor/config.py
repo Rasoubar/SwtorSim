@@ -5,6 +5,9 @@ from pathlib import Path
 
 JEDIHASH_URL = "http://swtor.jedipedia.net/ajax/getFileNames.php?env=all&format=easymyp"
 GOM_JS_URL = "https://swtor.jedipedia.net/static/js/reader/gom.js"
+FNV1A64_JS_URL = (
+    "https://swtor.jedipedia.net/static/js/reader/lib/fnv1a64.js"
+)
 
 DATA_DIR = Path("data")
 WORK_DIR = Path("data/extract_work")
@@ -26,6 +29,12 @@ COMBAT_FQN_PREFIXES = (
     "apc.",
     "abl.",
     "tal."
+)
+
+# Combat-relevant item ability trees that are not reachable from player APC nodes.
+ITEM_ABILITY_FQN_PREFIXES = (
+    "abl.itm.legendary",
+    "abl.itm.tactical.sow",
 )
 
 # Ability effect ID list on abl nodes.
