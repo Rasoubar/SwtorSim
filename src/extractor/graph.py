@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,12 @@ from extractor.bkt import (
     list_node_entries,
     parse_bucket_names_from_info,
 )
-from extractor.config import COMBAT_REF_FIELD_IDS, COMBAT_FQN_PREFIXES, ORIGIN_STORIES
+from extractor.config import (
+    COMBAT_REF_FIELD_IDS,
+    COMBAT_FQN_PREFIXES,
+    ITEM_ABILITY_FQN_PREFIXES,
+    ORIGIN_STORIES,
+)
 from extractor.gom.gom import GomLookup
 from extractor.ids import u64_str
 from extractor.node import (
@@ -22,6 +28,7 @@ from extractor.node import (
     fields_to_dict,
     parse_node_fields,
 )
+from extractor.stable_ids import TagResolver
 from extractor.strings import LOC_RETRIEVER_FIELD_IDS, StringResolver
 
 
@@ -146,6 +153,26 @@ def discover_player_apc_nodes(
     return sorted(nodes)
 
 
+def discover_fqn_prefix_nodes(
+    store: BucketStore,
+    prefixes: tuple[str, ...],
+) -> list[str]:
+    """All nodes at or below any dot-delimited FQN prefix."""
+    nodes: list[str] = []
+    for fqn in store.fqn_to_id:
+        if any(fqn == prefix or fqn.startswith(f"{prefix}.") for prefix in prefixes):
+            nodes.append(fqn)
+    return sorted(nodes)
+
+
+def discover_item_ability_nodes(
+    store: BucketStore,
+    prefixes: tuple[str, ...] = ITEM_ABILITY_FQN_PREFIXES,
+) -> list[str]:
+    """Item ability/effect nodes that are not necessarily referenced by player APCs."""
+    return discover_fqn_prefix_nodes(store, prefixes)
+
+
 def _is_combat_fqn(fqn: str) -> bool:
     return any(fqn.startswith(prefix) for prefix in COMBAT_FQN_PREFIXES)
 
@@ -166,6 +193,7 @@ def _resolve_value(
     store: BucketStore,
     strings: StringResolver,
     gom: GomLookup,
+    tag_resolver: TagResolver | None = None,
     field_id: str = "",
     enum_type_id: str | None = None,
 ) -> Any:
@@ -200,7 +228,13 @@ def _resolve_value(
                 )
             else:
                 resolved_key = _resolve_value(
-                    key, store, strings, gom, field_id, enum_type_id=key_enum_ref
+                    key,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field_id,
+                    enum_type_id=key_enum_ref,
                 )
             if value_type == DOM_ENUM and isinstance(val, dict) and "index" in val:
                 resolved_val: Any = _resolve_enum_value(
@@ -211,7 +245,13 @@ def _resolve_value(
                 )
             else:
                 resolved_val = _resolve_value(
-                    val, store, strings, gom, field_id, enum_type_id=val_enum_ref
+                    val,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field_id,
+                    enum_type_id=val_enum_ref,
                 )
             entries.append({"key": resolved_key, "value": resolved_val})
         return entries
@@ -226,7 +266,15 @@ def _resolve_value(
 
     if isinstance(value, dict):
         return {
-            k: _resolve_value(v, store, strings, gom, field_id, enum_type_id=enum_type_id)
+            k: _resolve_value(
+                v,
+                store,
+                strings,
+                gom,
+                tag_resolver,
+                field_id,
+                enum_type_id=enum_type_id,
+            )
             for k, v in value.items()
         }
 
@@ -241,14 +289,32 @@ def _resolve_value(
                         "name": gom.field_name(child_id),
                         "type": item.get("type"),
                         "type_name": item.get("type_name"),
-                        "value": _resolve_value(item["value"], store, strings, gom, child_id),
+                        "value": _resolve_value(
+                            item["value"],
+                            store,
+                            strings,
+                            gom,
+                            tag_resolver,
+                            child_id,
+                        ),
                     }
                 )
             else:
                 resolved.append(
-                    _resolve_value(item, store, strings, gom, field_id, enum_type_id=enum_type_id)
+                    _resolve_value(
+                        item,
+                        store,
+                        strings,
+                        gom,
+                        tag_resolver,
+                        field_id,
+                        enum_type_id=enum_type_id,
+                    )
                 )
         return resolved
+
+    if tag_resolver is not None:
+        return tag_resolver.resolve(value)
 
     return value
 
@@ -258,6 +324,7 @@ def resolve_fields(
     store: BucketStore,
     strings: StringResolver,
     gom: GomLookup,
+    tag_resolver: TagResolver | None = None,
 ) -> list[dict[str, Any]]:
     resolved = []
     for field in fields:
@@ -267,7 +334,14 @@ def resolve_fields(
                 "name": gom.field_name(field.id),
                 "type": field.dom_type,
                 "type_name": field.dom_type_name,
-                "value": _resolve_value(field.value, store, strings, gom, field.id),
+                "value": _resolve_value(
+                    field.value,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field.id,
+                ),
             }
         )
     return resolved
@@ -288,32 +362,41 @@ def traverse_combat_graph(
     gom: GomLookup,
     strings: StringResolver,
     roots: list[str] | None = None,
+    additional_roots: list[str] | None = None,
     origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    tag_resolver: TagResolver | None = None,
 ) -> dict[str, NodeRecord]:
     if roots is None:
         roots_fqns = discover_apc_roots(store, origin_stories)
     else:
         roots_fqns = roots
 
-    queue: list[str] = []
-    for fqn in discover_player_apc_nodes(store, origin_stories):
+    seed_fqns = discover_player_apc_nodes(store, origin_stories)
+    if additional_roots:
+        seed_fqns.extend(additional_roots)
+
+    queue: deque[str] = deque()
+    for fqn in seed_fqns:
         node_id = store.fqn_to_id.get(fqn)
         if node_id:
             queue.append(node_id)
 
+    root_ids = {
+        store.fqn_to_id[fqn]
+        for fqn in [*roots_fqns, *(additional_roots or [])]
+        if fqn in store.fqn_to_id
+    }
     visited: dict[str, NodeRecord] = {}
     skipped: set[str] = set()
     while queue:
-        node_id = queue.pop(0)
+        node_id = queue.popleft()
         if node_id in visited or node_id in skipped:
             continue
         if node_id not in store.index:
             continue
 
         index_entry = store.index[node_id]
-        if not _is_combat_fqn(index_entry.fqn) and node_id not in {
-            store.fqn_to_id.get(f) for f in roots_fqns
-        }:
+        if not _is_combat_fqn(index_entry.fqn) and node_id not in root_ids:
             continue
 
         try:
@@ -327,7 +410,13 @@ def traverse_combat_graph(
             continue
 
         raw_fields = fields_to_dict(parsed.fields)
-        resolved = resolve_fields(parsed.fields, store, strings, gom)
+        resolved = resolve_fields(
+            parsed.fields,
+            store,
+            strings,
+            gom,
+            tag_resolver,
+        )
         visited[node_id] = NodeRecord(
             entry=index_entry,
             parsed=parsed,

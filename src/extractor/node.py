@@ -5,8 +5,10 @@ from typing import Any
 
 from extractor.ids import apply_field_id_delta, u64_str
 from extractor.varint import (
+    read_field_id_delta,
     read_f32_le,
     read_length_prefixed_string,
+    read_signed_varint,
     read_u64_varint,
     read_varint,
 )
@@ -78,7 +80,7 @@ def read_field_value(
         return _id_to_str(value), consumed
 
     if dom_type in (DOM_INTEGER, DOM_TIME_INTERVAL, DOM_DATE):
-        value, consumed = read_varint(data, pos)
+        value, consumed = read_signed_varint(data, pos)
         return _id_to_str(value), consumed
 
     if dom_type == DOM_BOOLEAN:
@@ -155,7 +157,7 @@ def read_field_value(
         children: list[dict[str, Any]] = []
         for _ in range(num_fields):
             first_byte = data[pos]
-            delta, dc = read_varint(data, pos)
+            delta, dc = read_field_id_delta(data, pos)
             pos += dc
             prev_id = apply_field_id_delta(prev_id, delta, first_byte)
             child_type = data[pos]
@@ -193,7 +195,7 @@ def parse_node_fields(
     prev_id = 0
     for _ in range(num_fields):
         first_byte = data[pos]
-        delta, dc = read_varint(data, pos)
+        delta, dc = read_field_id_delta(data, pos)
         pos += dc
         prev_id = apply_field_id_delta(prev_id, delta, first_byte)
         dom_type = data[pos]
