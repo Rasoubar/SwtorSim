@@ -56,13 +56,13 @@ class DamageHit(Event):
 
     def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
         for proc in self.source.procs.values():
-            if not self._proc_can_trigger(proc, sim, is_crit, tags):
+            if not self.hit_proc_can_trigger(proc, sim, is_crit, tags):
                 continue
-            print(f'Proc {proc.name} triggered')
+            print(f'[{sim.current_time}] Proc {proc.name} triggered')
             self._trigger_proc_effects(proc, sim)
 
-    def _proc_can_trigger(self, proc, sim, is_crit: bool, tags) -> bool:
-        if proc.trigger == "on_cast":
+    def hit_proc_can_trigger(self, proc, sim, is_crit: bool, tags) -> bool:
+        if proc.trigger in ("cast", "periodic"):
             return False
         if sim.current_time < proc.next_possible_proc:
             return False
@@ -101,6 +101,7 @@ class PeriodicProcTick(Event):
     def resolve(self, sim):
         from src.swtorsim.abilities import execute_single_action
         for action in getattr(self.proc, 'actions', []):
+            print(f'[{sim.current_time}] Temporary Proc test')
             execute_single_action(sim, self.player, self.target, action, self.proc.name)
         is_affected = getattr(self.proc, 'affected_by_cdr', False)
         interval = self.player.scale_time_modifier(self.proc.icd) if is_affected else self.proc.icd

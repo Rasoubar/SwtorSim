@@ -168,7 +168,7 @@ if __name__ == "__main__":
     buffs_db = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
+    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
     # -----------------------------------
 
     if RUN_MODE == "TEST":
