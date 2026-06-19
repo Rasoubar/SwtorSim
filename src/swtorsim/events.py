@@ -58,6 +58,7 @@ class DamageHit(Event):
         for proc in self.source.procs.values():
             if not self._proc_can_trigger(proc, sim, is_crit, tags):
                 continue
+            print(f'Proc {proc.name} triggered')
             self._trigger_proc_effects(proc, sim)
 
     def _proc_can_trigger(self, proc, sim, is_crit: bool, tags) -> bool:

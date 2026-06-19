@@ -562,37 +562,6 @@
     "actions": [
       {
         "action_type": "buff",
-        "id": 79,
-        "value": 0.1,
-        "duration": 20.0,
-        "required_tags": [
-          "eradicate",
-          "melee_ability"
-        ],
-        "effect_name": "Maliciousness",
-        "charges": 1,
-        "max_charges": 2,
-        "affected_by_cdr": false,
-        "conditions": {
-          "caster_has_buff": "MALICIOUSNESS_TALENT"
-        }
-      },
-      {
-        "action_type": "cooldown_mod",
-        "target_tags": [
-          "eradicate",
-          "leeching_strike",
-          "maul",
-          "assassinate",
-          "severing_slash"
-        ],
-        "reset": true,
-        "conditions": {
-          "caster_has_buff": "MALICIOUSNESS_TALENT"
-        }
-      },
-      {
-        "action_type": "buff",
         "id": 133,
         "value": 0.6,
         "duration": 20.0,
@@ -613,22 +582,8 @@
     "base_gcd": 0.29,
     "energy_cost": 0.0,
     "restrictions": {},
-    "tags": [],
-    "actions": [
-      {
-        "action_type": "buff",
-        "id": 0,
-        "value": 0.0,
-        "required_tags": [
-          "assassinate"
-        ],
-        "effect_name": "Reapers Rush",
-		"duration": 10.0,
-        "consumable_charges": 1,
-        "charges": 1,
-        "affected_by_cdr": false
-      }
-    ],
+    "tags": ["phantom_stride"],
+    "actions": [],
     "conditions": {}
   },
   "SABER STRIKE": {

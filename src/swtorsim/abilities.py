@@ -199,17 +199,16 @@ class Ability:
 
     def evaluate_on_cast_procs(self, caster, target, sim):
         for proc in caster.procs.values():
-            if proc.trigger != "on_cast":
+            if proc.trigger != "cast":
                 continue
             if proc.required_tags:
                 if not any(tag in self.tags for tag in proc.required_tags):
                     continue
             if sim.current_time < proc.next_possible_proc:
                 continue
-            print("made it 3x")
+            print(f'On cast proc {proc.name} triggered.')
             if random.random() < proc.chance:
                 current_icd = caster.scale_time_modifier(proc.icd) if proc.affected_by_cdr else proc.icd
                 proc.next_possible_proc = sim.current_time + current_icd
                 for action in proc.actions:
-                    print(proc.actions)
                     execute_single_action(sim, caster, target, action, proc.name)
