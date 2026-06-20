@@ -51,9 +51,22 @@ Node JSON files are written under subdirectories derived from their FQN (e.g. `d
 
 ## ID resolution
 
-Field values of DOM type `ID` are replaced with the referenced node's FQN when that node exists in the bucket index. This applies to standalone ID fields, ID elements inside lists (e.g. `ablEffectIDs`), and ID keys/values inside lookup lists (e.g. `ablPackageAbilitiesList`). Unresolved IDs remain as their original numeric strings. Integer and other numeric field types are never resolved this way.
+Field values of DOM type `ID` are replaced with the referenced node's FQN when that node exists in the bucket index. This applies to standalone ID fields, ID elements inside lists (e.g. `ablEffectIDs`), and ID keys/values inside lookup lists (e.g. `ablPackageAbilitiesList`). Unresolved IDs remain as their original numeric strings.
 
 `NodeRef` fields are resolved to `{ref_id, fqn, base_class}` objects.
+
+## STB string resolution
+
+Some integer fields store string-table IDs rather than numeric values. These are looked up in a known `.stb` file under `en-us/str/`:
+
+| Field | STB bucket |
+|-------|------------|
+| `disDisciplineTabName` | `gui/abl/player/skill_trees.stb` |
+| `disDisciplinePackageName` | `gui/abl/player/skill_trees.stb` |
+
+For example, `disDisciplineTabName` value `2031339142381639` on `dis.specialist.plasmatech` resolves to `"Vanguard"`. Unresolved string IDs remain as their original numeric strings.
+
+Loc retriever fields on abilities and talents are resolved separately via the English string entry in their embedded lookup list.
 
 ## Tag-name resolution
 

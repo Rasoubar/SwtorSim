@@ -50,6 +50,14 @@ LOC_STR_BUCKET_FIELD = "4611686093000569993"
 # English language key in loc retriever lookup lists.
 LOC_ENGLISH_KEY = "15685385242400905286"
 
+# Integer fields on disDisciplineInfo that store STB string IDs.
+SKILL_TREES_STB_BUCKET = "gui.abl.player.skill_trees"
+
+STB_STRING_FIELD_BUCKETS: dict[str, str] = {
+    "4611686359990757004": SKILL_TREES_STB_BUCKET,  # disDisciplinePackageName
+    "4611686359990757005": SKILL_TREES_STB_BUCKET,  # disDisciplineTabName
+}
+
 
 @dataclass
 class ExtractorConfig:

@@ -16,6 +16,7 @@ from extractor.config import (
     COMBAT_REF_FIELD_IDS,
     COMBAT_FQN_PREFIXES,
     ITEM_ABILITY_FQN_PREFIXES,
+    STB_STRING_FIELD_BUCKETS,
 )
 from extractor.gom.gom import GomLookup
 from extractor.ids import u64_str
@@ -210,6 +211,11 @@ def _resolve_value(
 ) -> Any:
     if dom_type == DOM_ID and isinstance(value, str):
         return _resolve_id_name(value, store)
+
+    if field_id in STB_STRING_FIELD_BUCKETS and isinstance(value, str):
+        text = strings.resolve(STB_STRING_FIELD_BUCKETS[field_id], value)
+        if text is not None:
+            return text
 
     if isinstance(value, dict) and "ref_id" in value:
         ref_id = value["ref_id"]
