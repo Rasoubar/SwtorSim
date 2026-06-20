@@ -22,6 +22,7 @@ from extractor.gom.gom import GomLookup
 from extractor.ids import u64_str
 from extractor.node import (
     DOM_ENUM,
+    DOM_ID,
     ParsedField,
     ParsedNode,
     collect_node_refs,
@@ -188,6 +189,11 @@ def _resolve_enum_value(
     return gom.enum_member(resolved_type, index)
 
 
+def _resolve_id_name(id_str: Any, store: BucketStore) -> Any:
+    entry = store.index.get(str(id_str))
+    return entry.fqn if entry else id_str
+
+
 def _resolve_value(
     value: Any,
     store: BucketStore,
@@ -196,7 +202,11 @@ def _resolve_value(
     tag_resolver: TagResolver | None = None,
     field_id: str = "",
     enum_type_id: str | None = None,
+    dom_type: int | None = None,
 ) -> Any:
+    if dom_type == DOM_ID and isinstance(value, str):
+        return _resolve_id_name(value, store)
+
     if isinstance(value, dict) and "ref_id" in value:
         ref_id = value["ref_id"]
         target = store.index.get(ref_id)
@@ -235,6 +245,7 @@ def _resolve_value(
                     tag_resolver,
                     field_id,
                     enum_type_id=key_enum_ref,
+                    dom_type=key_type,
                 )
             if value_type == DOM_ENUM and isinstance(val, dict) and "index" in val:
                 resolved_val: Any = _resolve_enum_value(
@@ -252,9 +263,35 @@ def _resolve_value(
                     tag_resolver,
                     field_id,
                     enum_type_id=val_enum_ref,
+                    dom_type=value_type,
                 )
             entries.append({"key": resolved_key, "value": resolved_val})
         return entries
+
+    if (
+        isinstance(value, dict)
+        and "element_type" in value
+        and "list" in value
+        and "key_type" not in value
+    ):
+        element_type = value["element_type"]
+        return {
+            "element_type": element_type,
+            "element_type_name": value.get("element_type_name"),
+            "list": [
+                _resolve_value(
+                    item,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field_id,
+                    enum_type_id=enum_type_id,
+                    dom_type=element_type,
+                )
+                for item in value["list"]
+            ],
+        }
 
     if isinstance(value, dict) and "index" in value and len(value) == 1:
         return _resolve_enum_value(
@@ -296,6 +333,7 @@ def _resolve_value(
                             gom,
                             tag_resolver,
                             child_id,
+                            dom_type=item.get("type"),
                         ),
                     }
                 )
@@ -309,6 +347,7 @@ def _resolve_value(
                         tag_resolver,
                         field_id,
                         enum_type_id=enum_type_id,
+                        dom_type=dom_type,
                     )
                 )
         return resolved
@@ -341,6 +380,7 @@ def resolve_fields(
                     gom,
                     tag_resolver,
                     field.id,
+                    dom_type=field.dom_type,
                 ),
             }
         )
