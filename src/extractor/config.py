@@ -40,6 +40,12 @@ ITEM_ABILITY_FQN_PREFIXES = (
     "abl.itm.tactical.sow",
 )
 
+# Item nodes for tactical and legendary implants (name lookup via itm.stb).
+ITEM_FQN_PREFIXES = (
+    "itm.legendary",
+    "itm.tactical.sow",
+)
+
 # Ability effect ID list on abl nodes.
 ABL_EFFECT_IDS_FIELD = "4611686061870631192"
 

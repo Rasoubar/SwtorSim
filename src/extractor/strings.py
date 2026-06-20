@@ -39,6 +39,10 @@ def convert_loc_retriever(value: Any) -> dict[str, tuple[str, str]]:
 
 
 class StringResolver:
+    _STB_BUCKET_ALIASES = {
+        "str.itm": "itm",
+    }
+
     def __init__(self, resources_root: Path):
         self.resources_root = resources_root
         self._tables: dict[str, StringTable] = {}
@@ -47,6 +51,7 @@ class StringResolver:
             self._stb_root = resources_root / "resources" / "en-us" / "str"
 
     def load_bucket(self, bucket_name: str) -> StringTable | None:
+        bucket_name = self._STB_BUCKET_ALIASES.get(bucket_name, bucket_name)
         if bucket_name in self._tables:
             return self._tables[bucket_name]
         stb_path = self._stb_root / f"{bucket_name}.stb"

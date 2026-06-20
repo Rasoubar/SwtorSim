@@ -14,6 +14,7 @@ from extractor.config import (
 from extractor.disciplines import build_disciplines
 from extractor.dump import write_node_dump
 from extractor.extract import extract_relevant_files
+from extractor.gear import build_gear_abilities_talents
 from extractor.gom.gom import GomLookup, parse_gom_js
 from extractor.gom_cache import ensure_jedipedia_gom_js
 from extractor.graph import (
@@ -123,6 +124,9 @@ def run_extraction(config: ExtractorConfig) -> Path:
     disciplines_dir = config.data_dir / "disciplines"
     discipline_count = build_disciplines(records, disciplines_dir)
 
+    gear_path = config.data_dir / "gear_abilities_talents.json"
+    gear_count = build_gear_abilities_talents(store, gom, strings, gear_path)
+
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
 
@@ -131,6 +135,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"dis.* nodes extracted: {dis_count}")
     print(f"Base APC nodes seeded: {len(base_apc_roots)}")
     print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
+    print(f"Wrote {gear_count} gear entries to {gear_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")
