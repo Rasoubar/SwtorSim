@@ -33,6 +33,7 @@ Two additional seed sources are always included:
 - **Item ability trees** — not reliably reachable from player ability-package references:
   - `abl.itm.legendary`
   - `abl.itm.tactical.sow`
+  - `abl.itm.relic.*.scales_with_item_rating` (rating-scaled relics only)
 - **`ablAbilityReplacement`** (node ID `16141053964861013368`) — always extracted and written as a flat file at `data/extracted/ablAbilityReplacement.json`.
 
 ## Data layout
@@ -46,6 +47,8 @@ Two additional seed sources are always included:
 | `data/extracted/` | JSON dump of nodes |
 | `data/extracted/index.json` | Root FQNs, node index, and cross-reference edges |
 | `data/extracted/ablAbilityReplacement.json` | Global ability-replacement table (flat root file) |
+| `data/gear_abilities_talents.json` | Item name → implant ability FQN lookup |
+| `data/relics.json` | Sorted list of root `abl.itm.relic.*.scales_with_item_rating` ability FQNs |
 
 Node JSON files are written under subdirectories derived from their FQN (e.g. `dis/agent/operative/concealment.json`, `abl/agent/recuperate.json`). Each file contains the node FQN, numeric ID, base class, and resolved field values.
 

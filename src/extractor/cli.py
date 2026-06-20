@@ -10,11 +10,14 @@ from extractor.config import (
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
     ORIGIN_STORIES,
+    RELIC_ABILITY_FQN_PREFIX,
+    RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
 )
 from extractor.disciplines import build_disciplines
 from extractor.dump import write_node_dump
 from extractor.extract import extract_relevant_files
 from extractor.gear import build_gear_abilities_talents
+from extractor.relics import build_relics
 from extractor.gom.gom import GomLookup, parse_gom_js
 from extractor.gom_cache import ensure_jedipedia_gom_js
 from extractor.graph import (
@@ -22,6 +25,7 @@ from extractor.graph import (
     discover_apc_base_nodes,
     discover_dis_nodes,
     discover_item_ability_nodes,
+    discover_scaled_relic_ability_nodes,
     traverse_combat_graph,
 )
 from extractor.stable_ids import (
@@ -91,7 +95,10 @@ def run_extraction(config: ExtractorConfig) -> Path:
         raise RuntimeError(
             "No discipline root nodes found. Expected dis.* nodes in bucket index."
         )
-    item_ability_roots = discover_item_ability_nodes(store)
+    item_ability_roots = [
+        *discover_item_ability_nodes(store),
+        *discover_scaled_relic_ability_nodes(store),
+    ]
     base_apc_roots = discover_apc_base_nodes(store, ORIGIN_STORIES)
 
     records = traverse_combat_graph(
@@ -113,6 +120,12 @@ def run_extraction(config: ExtractorConfig) -> Path:
         )
         for prefix in ITEM_ABILITY_FQN_PREFIXES
     }
+    scaled_relic_count = sum(
+        1
+        for record in records.values()
+        if record.entry.fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}.")
+        and f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}" in record.entry.fqn
+    )
     index_path = write_node_dump(
         records,
         config.output_dir,
@@ -127,6 +140,9 @@ def run_extraction(config: ExtractorConfig) -> Path:
     gear_path = config.data_dir / "gear_abilities_talents.json"
     gear_count = build_gear_abilities_talents(store, gom, strings, gear_path)
 
+    relics_path = config.data_dir / "relics.json"
+    relic_count = build_relics(records, relics_path)
+
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
 
@@ -136,9 +152,14 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Base APC nodes seeded: {len(base_apc_roots)}")
     print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
     print(f"Wrote {gear_count} gear entries to {gear_path}")
+    print(f"Wrote {relic_count} relics to {relics_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")
+    print(
+        f"{RELIC_ABILITY_FQN_PREFIX}.*.{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT} "
+        f"nodes extracted: {scaled_relic_count}"
+    )
     return index_path
 
 

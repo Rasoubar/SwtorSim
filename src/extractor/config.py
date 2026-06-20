@@ -40,6 +40,9 @@ ITEM_ABILITY_FQN_PREFIXES = (
     "abl.itm.tactical.sow",
 )
 
+RELIC_ABILITY_FQN_PREFIX = "abl.itm.relic"
+RELIC_SCALES_WITH_ITEM_RATING_SEGMENT = "scales_with_item_rating"
+
 # Item nodes for tactical and legendary implants (name lookup via itm.stb).
 ITEM_FQN_PREFIXES = (
     "itm.legendary",

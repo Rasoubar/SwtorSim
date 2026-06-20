@@ -16,6 +16,8 @@ from extractor.config import (
     COMBAT_REF_FIELD_IDS,
     COMBAT_FQN_PREFIXES,
     ITEM_ABILITY_FQN_PREFIXES,
+    RELIC_ABILITY_FQN_PREFIX,
+    RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
     STB_STRING_FIELD_BUCKETS,
 )
 from extractor.gom.gom import GomLookup
@@ -193,6 +195,28 @@ def discover_item_ability_nodes(
 ) -> list[str]:
     """Item ability/effect nodes that are not necessarily referenced by player APCs."""
     return discover_fqn_prefix_nodes(store, prefixes)
+
+
+def discover_scaled_relic_ability_nodes(store: BucketStore) -> list[str]:
+    """Root relic abilities whose FQN contains scales_with_item_rating."""
+    marker = f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}"
+    nodes: list[str] = []
+    for fqn, node_id in store.fqn_to_id.items():
+        if not fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}."):
+            continue
+        if marker not in fqn or "/" in fqn:
+            continue
+        if store.index[node_id].base_class_name != "ablAbility":
+            continue
+        nodes.append(fqn)
+    return sorted(nodes)
+
+
+def is_allowed_relic_fqn(fqn: str) -> bool:
+    """Only rating-scaled relic ability trees are extracted."""
+    if not fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}."):
+        return True
+    return f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}" in fqn
 
 
 def _is_combat_fqn(fqn: str) -> bool:
@@ -472,6 +496,8 @@ def traverse_combat_graph(
         index_entry = store.index[node_id]
         if not _is_combat_fqn(index_entry.fqn) and node_id not in root_ids:
             continue
+        if not is_allowed_relic_fqn(index_entry.fqn) and node_id not in root_ids:
+            continue
 
         try:
             parsed = store.parse_node(node_id, gom)
@@ -505,7 +531,7 @@ def traverse_combat_graph(
                 and ref_id in store.index
             ):
                 target_fqn = store.index[ref_id].fqn
-                if _is_combat_fqn(target_fqn):
+                if _is_combat_fqn(target_fqn) and is_allowed_relic_fqn(target_fqn):
                     queue.append(ref_id)
 
     return visited
