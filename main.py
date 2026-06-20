@@ -1,6 +1,8 @@
-from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json
+from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json, load_and_draft_from_file
 from src.swtorsim.batch import ParallelBatchRunner
 from src.swtorsim.tester import SingleTester
+import json
+import os
 
 HYBRID_ROTATION_CONFIG = [
     {"type": "fixed", "ability_id": "eradicate"},
@@ -163,12 +165,17 @@ MY_CUSTOM_CHARACTER_STATS = {
 }
 
 if __name__ == "__main__":
+    #base
     abilities_db = load_abilities_from_json("data/Assassin/Hatred/Abilities/Abilities.json")
-    procs_db = load_passives_from_json("data/Assassin/Hatred/Procs/BaseAssassinProcs+MasteryPowerRelics.json")
+    procs_db = load_passives_from_json("data/Assassin/Hatred/Procs/BaseProcs.json")
     buffs_db = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
+    #relics
+    procs_db.update(load_passives_from_json("data/Assassin/Hatred/Procs/Relics.json", subset="Relics"))
+    #treechoices
+
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
+    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
     # -----------------------------------
 
     if RUN_MODE == "TEST":
@@ -190,4 +197,4 @@ if __name__ == "__main__":
             procs_db=procs_db,
             buffs_db=buffs_db
         )
-        runner.run_monte_carlo(iterations=10000, duration=10000.0, dummy_hp=10000000)
+        runner.run_monte_carlo(iterations=1000, duration=10000.0, dummy_hp=10000000)

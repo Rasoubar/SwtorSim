@@ -37,15 +37,18 @@ def load_abilities_from_json(filepath: str) -> Dict[str, Ability]:
     return ability_registry
 
 
-def load_passives_from_json(filepath: str) -> Dict[str, Any]:
+def load_passives_from_json(filepath: str, subset = None) -> Dict[str, Any]:
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Passives configuration not found at: {filepath}")
 
-    with open(filepath, "r", encoding="utf-8") as f:
-        raw_data = json.load(f)
+    if subset == "Relics":
+        raw_data = load_and_draft_from_file(filepath, category_name="Relic",max_picks=2)
+    else:
+        with open(filepath, "r", encoding="utf-8") as f:
+            raw_data = json.load(f)
 
-    if isinstance(raw_data, str):
-        raw_data = json.loads(raw_data)
+        if isinstance(raw_data, str):
+            raw_data = json.loads(raw_data)
 
     proc_registry = {}
 
@@ -83,7 +86,7 @@ def load_passives_from_json(filepath: str) -> Dict[str, Any]:
     return proc_registry
 
 
-def load_permanent_buffs_from_json(filepath: str) -> Dict[str, ActiveBuff]:
+def load_permanent_buffs_from_json(filepath: str, subset = None) -> Dict[str, ActiveBuff]:
     """
     Loads raw permanent buff configurations out of JSON files and maps them
     strictly to the positional slots layout of the ActiveBuff class container.
@@ -123,3 +126,61 @@ def load_permanent_buffs_from_json(filepath: str) -> Dict[str, ActiveBuff]:
         )
 
     return buff_registry
+
+
+def load_and_draft_from_file(filepath: str, category_name: str = "Item", max_picks: int = None) -> dict:
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Could not find file at: {filepath}")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        raw_data = json.load(f)
+
+    if isinstance(raw_data, str):
+        raw_data = json.loads(raw_data)
+
+    filename = os.path.basename(filepath)
+    print(f"\n=== Drafting {category_name}s from {filename} ===")
+
+    if max_picks:
+        print(f"⚠️ RESTRICTION: You may only pick a maximum of {max_picks}.")
+
+    print("Type 'y' to take the item, or 'n' to leave it.")
+
+    filtered_data = {}
+    picked_rows = set()
+
+    for item_name, item_data in raw_data.items():
+        # RESTRICTION 1: Stop asking if max limit is reached
+        if max_picks is not None and len(filtered_data) >= max_picks:
+            print(f"\n🛑 Maximum limit of {max_picks} reached. Auto-skipping remaining options.")
+            break
+
+        # RESTRICTION 2: Always check the "row" key
+        item_row = item_data.get("row")
+        if item_row is not None and item_row in picked_rows:
+            print(f"  ⏭️  Auto-skipped '{item_name}' (Already picked an option for row {item_row})")
+            continue
+
+        # The Interactive Prompt
+        while True:
+            choice = input(f"Equip '{item_name}'? [y/n]: ").strip().lower()
+
+            if choice in ['y', 'yes']:
+                filtered_data[item_name] = item_data
+
+                # Record the "row" value so we block duplicates later
+                if item_row is not None:
+                    picked_rows.add(item_row)
+
+                print(f"  ✅ Added")
+                break
+
+            elif choice in ['n', 'no', '']:
+                print(f"  ❌ Skipped")
+                break
+
+            else:
+                print("  ⚠️ Please type 'y' for yes, or 'n' for no.")
+
+    print(f"\n {len(filtered_data)} {category_name} selected.")
+    return filtered_data

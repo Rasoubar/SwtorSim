@@ -128,42 +128,6 @@
     ],
     "conditions": {}
   },
-  "MASTERY SURGE": {
-    "proc_name": "Mastery Surge",
-    "trigger": "hit",
-    "chance": 0.3,
-    "icd": 20.0,
-    "affected_by_cdr": false,
-    "actions": [
-      {
-        "action_type": "buff",
-        "id": 4140,
-        "value": 4220.0,
-        "duration": 6.0,
-        "effect_name": "Mastery Surge",
-        "affected_by_cdr": false
-      }
-    ],
-    "conditions": {}
-  },
-  "POWER SURGE": {
-    "proc_name": "Power Surge",
-    "trigger": "hit",
-    "chance": 0.3,
-    "icd": 20.0,
-    "affected_by_cdr": false,
-    "actions": [
-      {
-        "action_type": "buff",
-        "id": 155,
-        "value": 4220.0,
-        "duration": 6.0,
-        "effect_name": "Power Surge",
-        "affected_by_cdr": false
-      }
-    ],
-    "conditions": {}
-  },
   "THRASHING TERROR A": {
     "proc_name": "Thrashing Terror A",
     "trigger": "hit",
