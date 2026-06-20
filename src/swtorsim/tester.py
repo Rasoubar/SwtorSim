@@ -23,7 +23,6 @@ class SingleTester:
 
         player = Player(self.stats_config.get("class_name", "Unknown"))
         target = Target("Target Dummy", hp=dummy_hp)
-
         # Load Stats
         p_stats = player.base_stats
         for stat_key, stat_value in self.stats_config.get("stats", {}).items():
@@ -40,6 +39,7 @@ class SingleTester:
                         ability.cooldown -= effect.value
 
         player.rotation = Rotation(name="Custom Profile Loop", steps_config=self.rotation_config, loop=True)
+        print(player.stats)
 
         sim.schedule_absolute(0.0, PlayerReady(player, target))
         first_regen_tick = random.uniform(0.0, 1.0)

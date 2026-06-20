@@ -152,7 +152,8 @@ MY_CUSTOM_CHARACTER_STATS = {
         "Alacrity Rating": 2218,
         "Main_hand_min": 2513,
         "Main_hand_max": 3769,
-        "Standard_health": 19335
+        "Standard_health": 19335,
+        "Accuracy Rating": 2722
     }
 }
 
@@ -166,7 +167,7 @@ if __name__ == "__main__":
 
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
+    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
     # -----------------------------------
 
     if RUN_MODE == "TEST":

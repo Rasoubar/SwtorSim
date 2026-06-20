@@ -136,6 +136,11 @@
     "value": 0.01,
     "effect_name": "legacy crit damage"
   },
+    "LEGACY ACCURACY": {
+    "id": 154,
+    "value": 0.01,
+    "effect_name": "legacy accuracy"
+  },
   "DYNAMIC FORCE": {
     "id": 64,
     "value": 15.0,

@@ -16,7 +16,8 @@ EFFECTS = {
     4140: {"stat_name": "Mastery Stat"},  # i blame the devs, I made up my own id for this one
     155: {"stat_name": "Power Stat"},
     156: {"stat_name": "Critical Stat"},
-    64:{ "stat_name": "Base Cooldown Modifier"}
+    64:{ "stat_name": "Base Cooldown Modifier"},
+    154:{"stat_name": "Accuracy"}
 }
 
 

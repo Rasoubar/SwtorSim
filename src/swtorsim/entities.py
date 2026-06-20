@@ -82,6 +82,9 @@ class Player(Actor):
             "Critical Chance": 0.0,
             "Critical Modifier": 0.0,
             "Critical Rating": 0.0,
+            "Accuracy Rating":0.0,
+            "Main Accuracy":0.0,
+            "Off Accuracy": 0.0,
             "Mastery": 0.0,
             "Power": 0.0,
             "Force Power": 0.0,
@@ -189,6 +192,7 @@ class Player(Actor):
         bonus_alacrity_rating = 0
         damage_bonus_multiplier = 1
         mastery_multiplier = 1
+        bonus_accuracy = 0
         for buff in self.effects.values():
             effect_id = buff.id
             if effect_id in EFFECTS:
@@ -206,12 +210,15 @@ class Player(Actor):
                     damage_bonus_multiplier += (buff.value * multiplier)
                 elif stat_name == "Mastery PCT":
                     mastery_multiplier += (buff.value * multiplier)
+                elif stat_name == "Accuracy":
+                    bonus_accuracy += buff.value
 
-
+    
         temp_stats["Mastery"]  = (temp_stats["Mastery"] + bonus_mastery) * mastery_multiplier
         temp_stats["Power"] = temp_stats["Power"] + bonus_power
         temp_stats["Critical Rating"] = temp_stats["Critical Rating"] + bonus_critical_rating
         temp_stats["Alacrity Rating"] = temp_stats["Alacrity Rating"] + bonus_alacrity_rating
+
 
         temp_stats["M_Bonus_Damage"] = ((temp_stats["Mastery"] * 0.20) + (temp_stats["Power"] * 0.23)) * damage_bonus_multiplier
         temp_stats["F_Bonus_Damage"] = ((temp_stats["Mastery"] * 0.20) + (temp_stats["Power"] * 0.23) + (temp_stats["Force Power"]*0.23)) * damage_bonus_multiplier
@@ -221,6 +228,9 @@ class Player(Actor):
         temp_stats["Critical Chance"] = 0.05 + critical_cc + mastery_cc
         temp_stats["Critical Modifier"] = 0.5 + critical_cc
         temp_stats["Alacrity"] = 0.3 * (1 - (1 - (0.01 / 0.3)) ** ((1 / 3.2) * (temp_stats["Alacrity Rating"] / 80)))
+        acc_base = 0.3 * (1 - (1 - 0.01 / 0.3)**((1 / 3.2) * (temp_stats["Accuracy Rating"] / 80)))
+        temp_stats["Main Accuracy"] = 1 + acc_base + bonus_accuracy
+        temp_stats["Off Accuracy"] = 0.67 + acc_base + bonus_accuracy
         self.stats = temp_stats
 
     def calculate_resource_cost(self, ability_name: str, base_cost: float, apply = False) -> float:
