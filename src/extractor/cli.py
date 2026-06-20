@@ -9,13 +9,16 @@ from extractor.config import (
     ABILITY_REPLACEMENT_NODE_ID,
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
+    ORIGIN_STORIES,
 )
+from extractor.disciplines import build_disciplines
 from extractor.dump import write_node_dump
 from extractor.extract import extract_relevant_files
 from extractor.gom.gom import GomLookup, parse_gom_js
 from extractor.gom_cache import ensure_jedipedia_gom_js
 from extractor.graph import (
     BucketStore,
+    discover_apc_base_nodes,
     discover_dis_nodes,
     discover_item_ability_nodes,
     traverse_combat_graph,
@@ -88,13 +91,14 @@ def run_extraction(config: ExtractorConfig) -> Path:
             "No discipline root nodes found. Expected dis.* nodes in bucket index."
         )
     item_ability_roots = discover_item_ability_nodes(store)
+    base_apc_roots = discover_apc_base_nodes(store, ORIGIN_STORIES)
 
     records = traverse_combat_graph(
         store,
         gom,
         strings,
         roots=dis_roots,
-        additional_roots=item_ability_roots,
+        additional_roots=[*item_ability_roots, *base_apc_roots],
         additional_node_ids=[ABILITY_REPLACEMENT_NODE_ID],
         tag_resolver=tag_resolver,
     )
@@ -116,12 +120,17 @@ def run_extraction(config: ExtractorConfig) -> Path:
         flat_node_ids=frozenset({ABILITY_REPLACEMENT_NODE_ID}),
     )
 
+    disciplines_dir = config.data_dir / "disciplines"
+    discipline_count = build_disciplines(records, disciplines_dir)
+
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
 
     print(f"Wrote {len(records)} nodes to {config.output_dir}")
     print(f"Index: {index_path}")
     print(f"dis.* nodes extracted: {dis_count}")
+    print(f"Base APC nodes seeded: {len(base_apc_roots)}")
+    print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")

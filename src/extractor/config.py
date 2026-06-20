@@ -23,6 +23,17 @@ COMBAT_FQN_PREFIXES = (
 
 ABILITY_REPLACEMENT_NODE_ID = "16141053964861013368"
 
+ORIGIN_STORIES = (
+    "agent",
+    "bounty_hunter",
+    "jedi_consular",
+    "jedi_knight",
+    "sith_inquisitor",
+    "sith_warrior",
+    "smuggler",
+    "trooper",
+)
+
 # Combat-relevant item ability trees that are not reachable from player APC nodes.
 ITEM_ABILITY_FQN_PREFIXES = (
     "abl.itm.legendary",

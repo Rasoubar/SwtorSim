@@ -145,6 +145,22 @@ def discover_apc_roots(
     return sorted(roots)
 
 
+def discover_apc_base_nodes(
+    store: BucketStore,
+    origin_stories: tuple[str, ...],
+) -> list[str]:
+    """Class and combat-style base APCs: apc.<os>.base and apc.<os>.<style>.base."""
+    stories = set(origin_stories)
+    nodes: list[str] = []
+    for fqn in store.fqn_to_id:
+        parts = fqn.split(".")
+        if parts[0] != "apc" or parts[1] not in stories or parts[-1] != "base":
+            continue
+        if len(parts) == 3 or len(parts) == 4:
+            nodes.append(fqn)
+    return sorted(nodes)
+
+
 def discover_player_apc_nodes(
     store: BucketStore,
     origin_stories: tuple[str, ...],
