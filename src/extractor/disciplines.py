@@ -6,6 +6,23 @@ from typing import Any
 
 from extractor.graph import NodeRecord
 
+_APC_SCOPE_LIST_FIELDS = (
+    "ablPackageActiveAbilitiesList",
+    "ablPackageTalentsList",
+)
+
+
+def _entries_from_apc_list_field(value: Any) -> list[str]:
+    if isinstance(value, dict) and "list" in value:
+        return [str(entry) for entry in value["list"]]
+    if isinstance(value, list):
+        entries: list[str] = []
+        for item in value:
+            if isinstance(item, dict) and "key" in item:
+                entries.append(str(item["key"]))
+        return entries
+    return []
+
 
 def _field_value(record: NodeRecord, name: str) -> Any:
     for field in record.resolved_fields:
@@ -23,12 +40,17 @@ def _lookup_list_to_dict(entries: list[dict[str, Any]] | None) -> dict[str, Any]
 def _active_abilities_from_apc(record: NodeRecord | None) -> list[str]:
     if record is None:
         return []
+    seen: set[str] = set()
+    result: list[str] = []
     for field in record.resolved_fields:
-        if field.get("name") == "ablPackageActiveAbilitiesList":
-            value = field["value"]
-            if isinstance(value, dict) and "list" in value:
-                return list(value["list"])
-    return []
+        if field.get("name") not in _APC_SCOPE_LIST_FIELDS:
+            continue
+        value = field["value"]
+        for entry in _entries_from_apc_list_field(value):
+            if entry not in seen:
+                seen.add(entry)
+                result.append(entry)
+    return result
 
 
 def _union_active_abilities(
