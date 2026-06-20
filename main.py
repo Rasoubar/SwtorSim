@@ -11,10 +11,15 @@ HYBRID_ROTATION_CONFIG = [
     {"type": "fixed", "ability_id": "leeching_strike"},
     {"type": "fixed", "ability_id": "eradicate"},
     {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
         "type": "priority_block",
         "name": "Reck+DF+MPRIO1 Window 1",
         "pool": [
-            {"ability_id": "recklessness", "rules": {}},
+            {"ability_id": "death_field", "rules": {"caster_has_buff": "Recklessness"}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
             {"ability_id": "assassinate", "rules": {}},
             {"ability_id": "leeching_strike", "rules": {}},
@@ -23,10 +28,14 @@ HYBRID_ROTATION_CONFIG = [
         ]
     },
     {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
         "type": "priority_block",
         "name": "Reck+DF+MPRIO1 Window 2",
         "pool": [
-            {"ability_id": "recklessness", "rules": {}},
             {"ability_id": "death_field", "rules": {"caster_has_buff": "Recklessness"}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
             {"ability_id": "assassinate", "rules": {}},
@@ -45,26 +54,9 @@ HYBRID_ROTATION_CONFIG = [
         }
     },
     {
-        "type": "priority_block",
-        "name": "Reck+DF+MPRIO1 Window 3",
-        "pool": [
-            {"ability_id": "recklessness", "rules": {}},
-            {"ability_id": "death_field", "rules":{}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
-        ]
-    },
-    {
         "type": "optional",
-        "ability_id": "phantom_stride",
-        "rules": {
-            "target_hp_above_pct": 0.30,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 6.0},
-            "caster_does_not_have_buff": "Bloodletting"
-        }
+        "ability_id": "recklessness",
+        "rules": {}
     },
     {
         "type": "priority_block",
@@ -171,7 +163,6 @@ if __name__ == "__main__":
     buffs_db = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
     #relics
     procs_db.update(load_passives_from_json("data/Assassin/Hatred/Procs/Relics.json", subset="Relics"))
-    #treechoices
 
 
     # --- TOGGLE THIS TO SWITCH MODES ---
@@ -197,4 +188,4 @@ if __name__ == "__main__":
             procs_db=procs_db,
             buffs_db=buffs_db
         )
-        runner.run_monte_carlo(iterations=1000, duration=10000.0, dummy_hp=10000000)
+        runner.run_monte_carlo(iterations=10000, duration=10000.0, dummy_hp=10000000)
