@@ -4,6 +4,7 @@ data/extracted/
 data/hashes.bin
 data/hashes_filename.txt
 data/gom.js
+data/fnv1a64.js
 .venv/
 __pycache__/
 *.pyc

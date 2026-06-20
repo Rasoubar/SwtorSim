@@ -6,9 +6,9 @@ import sys
 from pathlib import Path
 
 from extractor.config import (
+    ABILITY_REPLACEMENT_NODE_ID,
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
-    ORIGIN_STORIES,
 )
 from extractor.dump import write_node_dump
 from extractor.extract import extract_relevant_files
@@ -16,7 +16,7 @@ from extractor.gom.gom import GomLookup, parse_gom_js
 from extractor.gom_cache import ensure_jedipedia_gom_js
 from extractor.graph import (
     BucketStore,
-    discover_apc_roots,
+    discover_dis_nodes,
     discover_item_ability_nodes,
     traverse_combat_graph,
 )
@@ -44,13 +44,6 @@ def build_parser() -> argparse.ArgumentParser:
             "Re-download Jedipedia hash list, gom.js, and fnv1a64.js "
             "even if cached copies exist"
         ),
-    )
-    parser.add_argument(
-        "--origin-story",
-        action="append",
-        dest="origin_stories",
-        choices=list(ORIGIN_STORIES),
-        help="Limit to specific origin story (repeatable)",
     )
     parser.add_argument(
         "--pts",
@@ -89,10 +82,10 @@ def run_extraction(config: ExtractorConfig) -> Path:
     store.build_index(gom)
 
     strings = StringResolver(resources_root)
-    roots = discover_apc_roots(store, config.origin_stories)
-    if not roots:
+    dis_roots = discover_dis_nodes(store)
+    if not dis_roots:
         raise RuntimeError(
-            "No APC root nodes found. Expected apc.<origin_story>.<class> nodes."
+            "No discipline root nodes found. Expected dis.* nodes in bucket index."
         )
     item_ability_roots = discover_item_ability_nodes(store)
 
@@ -100,12 +93,12 @@ def run_extraction(config: ExtractorConfig) -> Path:
         store,
         gom,
         strings,
-        roots=roots,
+        roots=dis_roots,
         additional_roots=item_ability_roots,
-        origin_stories=config.origin_stories,
+        additional_node_ids=[ABILITY_REPLACEMENT_NODE_ID],
         tag_resolver=tag_resolver,
     )
-    apc_count = sum(1 for r in records.values() if r.entry.fqn.startswith("apc."))
+    dis_count = sum(1 for r in records.values() if r.entry.fqn.startswith("dis."))
     item_ability_counts = {
         prefix: sum(
             1
@@ -118,8 +111,9 @@ def run_extraction(config: ExtractorConfig) -> Path:
     index_path = write_node_dump(
         records,
         config.output_dir,
-        roots,
+        dis_roots,
         included_fqn_prefixes=ITEM_ABILITY_FQN_PREFIXES,
+        flat_node_ids=frozenset({ABILITY_REPLACEMENT_NODE_ID}),
     )
 
     if not config.keep_work_files and config.work_dir.exists():
@@ -127,7 +121,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
 
     print(f"Wrote {len(records)} nodes to {config.output_dir}")
     print(f"Index: {index_path}")
-    print(f"APC nodes extracted: {apc_count}")
+    print(f"dis.* nodes extracted: {dis_count}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")
@@ -138,10 +132,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
-    origin_stories = tuple(args.origin_stories) if args.origin_stories else ORIGIN_STORIES
     config = ExtractorConfig(
         assets_path=args.assets,
-        origin_stories=origin_stories,
         force_hash_update=args.force_hash_update,
         pts=args.pts,
         keep_work_files=args.keep_work,

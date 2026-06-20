@@ -16,7 +16,6 @@ from extractor.config import (
     COMBAT_REF_FIELD_IDS,
     COMBAT_FQN_PREFIXES,
     ITEM_ABILITY_FQN_PREFIXES,
-    ORIGIN_STORIES,
 )
 from extractor.gom.gom import GomLookup
 from extractor.ids import u64_str
@@ -121,9 +120,14 @@ class BucketStore:
         return parse_node_fields(payload, index_entry.stream_style, field_lookup)
 
 
+def discover_dis_nodes(store: BucketStore) -> list[str]:
+    """All discipline entry-point nodes: dis.*."""
+    return sorted(fqn for fqn in store.fqn_to_id if fqn.startswith("dis."))
+
+
 def discover_apc_roots(
     store: BucketStore,
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    origin_stories: tuple[str, ...],
 ) -> list[str]:
     """Entry-point APC per origin story: apc.<origin_story>.base."""
     stories = set(origin_stories)
@@ -142,7 +146,7 @@ def discover_apc_roots(
 
 def discover_player_apc_nodes(
     store: BucketStore,
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    origin_stories: tuple[str, ...],
 ) -> list[str]:
     """All player APC nodes under each origin story: apc.<origin_story>.*."""
     stories = set(origin_stories)
@@ -403,15 +407,15 @@ def traverse_combat_graph(
     strings: StringResolver,
     roots: list[str] | None = None,
     additional_roots: list[str] | None = None,
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    additional_node_ids: list[str] | None = None,
     tag_resolver: TagResolver | None = None,
 ) -> dict[str, NodeRecord]:
     if roots is None:
-        roots_fqns = discover_apc_roots(store, origin_stories)
+        roots_fqns = discover_dis_nodes(store)
     else:
         roots_fqns = roots
 
-    seed_fqns = discover_player_apc_nodes(store, origin_stories)
+    seed_fqns = discover_dis_nodes(store)
     if additional_roots:
         seed_fqns.extend(additional_roots)
 
@@ -420,11 +424,19 @@ def traverse_combat_graph(
         node_id = store.fqn_to_id.get(fqn)
         if node_id:
             queue.append(node_id)
+    for node_id in additional_node_ids or []:
+        if node_id in store.index:
+            queue.append(node_id)
 
     root_ids = {
         store.fqn_to_id[fqn]
         for fqn in [*roots_fqns, *(additional_roots or [])]
         if fqn in store.fqn_to_id
+    }
+    root_ids |= {
+        node_id
+        for node_id in (additional_node_ids or [])
+        if node_id in store.index
     }
     visited: dict[str, NodeRecord] = {}
     skipped: set[str] = set()

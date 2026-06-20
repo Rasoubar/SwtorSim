@@ -13,23 +13,15 @@ DATA_DIR = Path("data")
 WORK_DIR = Path("data/extract_work")
 OUTPUT_DIR = Path("data/extracted")
 
-ORIGIN_STORIES = (
-    "agent",
-    "bounty_hunter",
-    "jedi_consular",
-    "jedi_knight",
-    "sith_inquisitor",
-    "sith_warrior",
-    "smuggler",
-    "trooper",
-)
-
 # FQN prefixes whose nodes are followed during combat graph traversal.
 COMBAT_FQN_PREFIXES = (
     "apc.",
     "abl.",
-    "tal."
+    "tal.",
+    "dis.",
 )
+
+ABILITY_REPLACEMENT_NODE_ID = "16141053964861013368"
 
 # Combat-relevant item ability trees that are not reachable from player APC nodes.
 ITEM_ABILITY_FQN_PREFIXES = (
@@ -62,7 +54,6 @@ LOC_ENGLISH_KEY = "15685385242400905286"
 @dataclass
 class ExtractorConfig:
     assets_path: Path
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES
     force_hash_update: bool = False
     pts: bool = False
     keep_work_files: bool = False

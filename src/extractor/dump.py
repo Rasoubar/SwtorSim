@@ -39,6 +39,7 @@ def write_node_dump(
     output_dir: Path,
     roots: list[str],
     included_fqn_prefixes: tuple[str, ...] = (),
+    flat_node_ids: frozenset[str] = frozenset(),
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     index: dict[str, Any] = {
@@ -49,7 +50,10 @@ def write_node_dump(
     }
 
     for node_id, record in records.items():
-        rel_path = fqn_to_relative_path(record.entry.fqn)
+        if node_id in flat_node_ids:
+            rel_path = Path(f"{record.entry.base_class_name}.json")
+        else:
+            rel_path = fqn_to_relative_path(record.entry.fqn)
         dest = output_dir / rel_path
         dest.parent.mkdir(parents=True, exist_ok=True)
         payload = _node_to_json(record)
