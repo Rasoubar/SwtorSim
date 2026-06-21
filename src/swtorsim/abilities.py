@@ -15,9 +15,6 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
     if action_type == "damage":
         handle_damage_action(sim, caster, target, action, source_name, delay)
     elif action_type == "dot":
-        if not check_hit(caster, action.get("hand", "main")):
-            print (f'DOT {source_name} aplication missed')
-            return
         handle_dot_action(sim, caster, target, action, source_name)
     elif action_type == "channel":
         handle_channel_action(sim, caster, target, action, source_name)
@@ -132,6 +129,7 @@ class Ability:
         self.base_gcd = config.get("base_gcd", 1.5)
         self.actions = config.get ("actions", [])
         self.energy_cost = config.get("energy_cost", 0.0)
+        self.hand = config.get("hand", "main")
         self.tags=config.get("tags",[])
         self.conditions = config.get("conditions", {})
         self.has_charges = config.get("max_charges", 0) > 0
@@ -157,6 +155,8 @@ class Ability:
 
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
         if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
+            return False
+        if not check_hit(caster, self.hand):
             return False
         if getattr(caster, "active_channel", None) is not None:
             return False

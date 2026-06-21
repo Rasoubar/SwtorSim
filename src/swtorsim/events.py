@@ -41,7 +41,7 @@ class DamageHit(Event):
         self.ability_name = ability_name
 
     def resolve(self, sim):
-        if not check_hit(self.source, self.action_data.get("hand", "main")):
+        if not check_hit(self.source, self.action_data.get("hand", "god")):
             return
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
         tags = self.action_data.get("tags", [])
@@ -98,6 +98,8 @@ def check_hit(source, hand):
         acc = source.stats.get("Main Accuracy")
     elif hand == "off":
         acc = source.stats.get("Off Accuracy")
+    elif hand == "god":
+        return True
     if random.random() + def_chance > acc:
         print("MISSED")
         return False
