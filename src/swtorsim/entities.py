@@ -179,7 +179,7 @@ class Player(Actor):
         effect_id = buff_instance.id
         if effect_id in EFFECTS:
             stat_name = EFFECTS[effect_id]["stat_name"]
-            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat"}:
+            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}:
                 self.recalculate_stats()
 
         return buff_key, buff_instance, duration
