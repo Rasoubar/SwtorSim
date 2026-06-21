@@ -157,7 +157,6 @@ class BuffExpire(Event):
             if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}:
                 self.player.recalculate_stats()
 
-
 class DebuffExpire(Event):
     def __init__(self, target: "Target", debuff_name: str, instance_ref: "ActiveBuff"):
         super().__init__(f"{debuff_name} Expired")
