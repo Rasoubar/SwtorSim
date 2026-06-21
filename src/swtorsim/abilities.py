@@ -46,13 +46,6 @@ def handle_dot_action(sim, caster, target, action, source_name):
         action_data=action
     )
     target.dots[source_name] = dot_instance
-
-    if action.get("instant_tick", False):
-        tick_delay = action.get("instant_tick_delay", 0.0)
-        for sub_action in dot_instance.choose_action(caster, target):
-            instant_hit = DamageHit(caster, target, sub_action, source_name)
-            sim.schedule_relative(tick_delay, instant_hit)
-
     sim.schedule_relative(scaled_interval, DotTick(caster, target, dot_instance))
 
 

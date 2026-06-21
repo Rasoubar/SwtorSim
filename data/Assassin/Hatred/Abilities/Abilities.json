@@ -99,6 +99,7 @@
     "name": "Leeching Strike",
     "cooldown": 12.0,
     "triggers_gcd": true,
+	"hand": "main",
     "base_gcd": 1.5,
     "energy_cost": 25.0,
     "tags": [
@@ -110,7 +111,7 @@
       {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "main",
+		"hand": "god",
         "amp": 0.24,
         "coeff": 1.86,
         "shp_min": 0.186,
@@ -139,7 +140,7 @@
       {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "main",
+		"hand": "god",
         "amp": 0.252,
         "coeff": 1.953,
         "shp_min": 0.1953,
@@ -168,7 +169,7 @@
       {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "main",
+		"hand": "god",
         "amp": 0.264,
         "coeff": 2.046,
         "shp_min": 0.2046,
@@ -197,7 +198,7 @@
       {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "main",
+		"hand": "god",
         "amp": 0.276,
         "coeff": 2.139,
         "shp_min": 0.2139,
@@ -222,6 +223,7 @@
     "name": "Death field",
     "cooldown": 0.0,
     "max_charges": 1,
+	"hand": "main",
     "recharge_time": 15.0,
     "triggers_gcd": true,
     "base_gcd": 1.5,
@@ -238,7 +240,7 @@
         "action_type": "damage",
         "attack_type": 3,
         "damage_type": 4,
-		"hand": "main",
+		"hand": "god",
         "amp": 0.0,
         "coeff": 1.69,
         "shp_min": 0.149,
@@ -287,6 +289,7 @@
     "name": "Creeping Terror",
     "cooldown": 0.0,
     "triggers_gcd": true,
+	"hand": "main",
     "base_gcd": 1.5,
     "energy_cost": 20.0,
     "tags": [
@@ -295,7 +298,58 @@
       "force_ability",
       "force_attack"
     ],
-    "actions": [
+    "actions": [{
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+		"hand": "god",
+        "amp": 0.0,
+        "coeff": 0.35,
+        "shp_min": 0.03465,
+        "shp_max": 0.03465,
+        "delay": 0.0,
+        "impact_delay": 0.2,
+        "tags": [
+              "agressive_action",
+              "force_ability",
+              "creeping_terror_dot",
+			  "creeping_terror_dd",
+              "damage_over_time",
+              "periodic_damage",
+              "force_attack",
+              "purge_only",
+              "creeping_terror"
+            ],
+            "conditions": {
+              "target_doesnt_have_debuff": "Deathmark"
+            }
+      },
+	  {
+        "action_type": "damage",
+        "attack_type": 3,
+        "damage_type": 4,
+		"hand": "god",
+        "amp": 0.0,
+        "coeff": 0.4,
+        "shp_min": 0.039848,
+        "shp_max": 0.039848,
+        "delay": 0.0,
+        "impact_delay": 0.2,
+        "tags": [
+              "agressive_action",
+              "force_ability",
+              "creeping_terror_dot",
+			  "creeping_terror_dd",
+              "damage_over_time",
+              "periodic_damage",
+              "force_attack",
+              "purge_only",
+              "creeping_terror"
+            ],
+            "conditions": {
+              "target_has_debuff": "Deathmark"
+            }
+      },
       {
         "action_type": "dot",
         "interval": 3.0,
@@ -362,6 +416,7 @@
   "DISCHARGE": {
     "name": "Discharge",
     "cooldown": 0.0,
+	"hand": "main",
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 20.0,
@@ -372,7 +427,58 @@
       "force_ability",
       "force_attack"
     ],
-    "actions": [
+    "actions": [{
+            "action_type": "damage",
+            "attack_type": 3,
+            "damage_type": 2,
+			"hand": "god",
+            "amp": 0.0,
+            "coeff": 0.39,
+            "shp_min": 0.039,
+            "shp_max": 0.039,
+            "delay": 0.0,
+            "impact_delay": 0.0,
+            "tags": [
+              "lightning_ability",
+              "agressive_action",
+              "force_ability",
+              "damage_over_time",
+              "periodic_damage",
+			  "discharge_initial",
+              "force_attack",
+              "purge_only",
+              "discharge_effect_lightning"
+            ],
+            "conditions": {
+              "target_doesnt_have_debuff": "Deathmark"
+            }
+          },
+          {
+            "action_type": "damage",
+            "attack_type": 3,
+            "damage_type": 2,
+			"hand": "god",
+            "amp": 0.0,
+            "coeff": 0.4485,
+            "shp_min": 0.04485,
+            "shp_max": 0.04485,
+            "delay": 0.0,
+            "impact_delay": 0.0,
+            "tags": [
+              "lightning_ability",
+              "agressive_action",
+              "force_ability",
+              "damage_over_time",
+              "periodic_damage",
+			  "discharge_initial",
+              "force_attack",
+              "purge_only",
+              "discharge_effect_lightning"
+            ],
+            "conditions": {
+              "target_has_debuff": "Deathmark"
+            }
+          },
       {
         "action_type": "dot",
         "interval": 3.0,
@@ -440,6 +546,7 @@
     "name": "Eradicate",
     "cooldown": 24.0,
     "triggers_gcd": true,
+	"hand": "main",
     "base_gcd": 1.5,
     "energy_cost": 30.0,
     "tags": [
@@ -457,7 +564,7 @@
         "action_type": "damage",
         "attack_type": 3,
         "damage_type": 1,
-		"hand": "main",
+		"hand": "god",
         "amp": 0.0,
         "coeff": 1.15,
         "shp_min": 0.095,
