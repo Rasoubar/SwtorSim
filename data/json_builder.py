@@ -33,195 +33,199 @@ def collect_list_items(prompt_label):
             break
         if user_input not in items:
             items.append(user_input)
-            print(f"   Saved: '{user_input}'")
+            print(f"Added: '{user_input}'")
         else:
-            print("   ⚠️ This item has already been added to the list.")
-
-    return items if items else None
+            print("⚠️ Already added.")
+    return items
 
 
 def build_conditions():
-    """Builds a condition dictionary checking health thresholds, buffs, debuffs, or resources."""
+    """Builds the conditions dictionary for an action."""
     conditions = {}
-    print("\n--- Optional Special Conditions (Skip any by typing 'none') ---")
-
-    target_hp = get_input("Only trigger if target health is below percentage? (e.g. 0.3 for 30%, or 'none')", str,
-                          "none")
-    if target_hp != "none":
-        conditions["target_hp_below_pct"] = float(target_hp)
-
-    has_debuff = get_input("Must the target have a specific debuff active? (Enter name, or 'none')", str, "none")
-    if has_debuff != "none":
-        conditions["target_has_debuff"] = has_debuff
-
-    caster_buff = get_input("Must the player have a specific buff active? (Enter name, or 'none')", str, "none")
-    if caster_buff != "none":
-        conditions["caster_has_buff"] = caster_buff
-
-    exact_dots = get_input("Require an exact number of active DoTs on the target? (Enter number, or 'none')", str,
-                           "none")
-    if exact_dots != "none":
-        conditions["exact_dot_amount"] = int(exact_dots)
-
-    energy_above = get_input("Must the player have energy ABOVE a certain amount? (Enter number, or 'none')", str,
-                             "none")
-    if energy_above != "none":
-        conditions["caster_energy_above"] = float(energy_above)
-
-    return conditions if conditions else None
-
-
-def build_action():
-    """Builds an individual effect dictionary processed by the action router."""
-    print("\n--- Adding Effect/Impact ---")
-    action_types = {1: "damage", 2: "dot", 3: "buff", 4: "resource_gain", 5: "cooldown_mod", 6: "channel"}
-    print(
-        "Choose the effect type:\n 1: Direct Damage\n 2: Damage over Time (DoT)\n 3: Temporary Buff\n 4: Resource/Force Gain\n 5: Cooldown Modification\n 6: Channeled Action")
-    choice = get_input("Enter your choice number", int, 1)
-    action_type = action_types.get(choice, "damage")
-
-    action = {"action_type": action_type}
-
-    if action_type == "damage":
-        # Extract variables first to determine hand requirements
-        attack_type = get_input("Attack Type (1 = Melee, 3 = Force)", int, 1)
-        damage_type = get_input("Damage Type (1 = Kinetic, 2 = Energy, 3 = Elemental, 4 = Internal)", int, 1)
-
-        # Determine Hand
-        if attack_type in [3, 4]:
-            hand = "main"
-        else:
-            hand = get_input("Weapon Hand ('main' or 'off')", str, "main").lower()
-            while hand not in ["main", "off"]:
-                print("❌ Invalid hand type. Please enter 'main' or 'off'.")
-                hand = get_input("Weapon Hand ('main' or 'off')", str, "main").lower()
-
-        action.update({
-            "attack_type": attack_type,
-            "damage_type": damage_type,
-            "hand": hand,
-            "amp": get_input("Jedipedia Damage Multiplier (Amp)", float, 0.0),
-            "coeff": get_input("Jedipedia Standard Scaling Factor (Coeff)", float, 0.0),
-            "shp_min": get_input("Jedipedia Bonus Damage Min (Standard Health Percent Min)", float, 0.0),
-            "shp_max": get_input("Jedipedia Bonus Damage Max (Standard Health Percent Max)", float, 0.0),
-            "delay": get_input("Delay after cast finishes before calculating damage (seconds)", float, 0.0),
-            "impact_delay": get_input("Animation land delay before damage hits target (seconds)", float, 0.2)
-        })
-        if tags := collect_list_items("Damage Context Tags"):
-            action["tags"] = tags
-
-    elif action_type == "dot":
-        action.update({
-            "id": get_input("Unique numerical ID for this status tracking", int),
-            "effect_name": get_input("Display Name of the DoT debuff", str),
-            "interval": get_input("Time between ticks (seconds)", float, 1.0),
-            "total_ticks": get_input("Total number of times the DoT will tick", int, 6)
-        })
-        if tags := collect_list_items("DoT Context Tags"):
-            action["tags"] = tags
-
-    elif action_type == "buff":
-        action.update({
-            "id": get_input("Unique numerical ID for this status tracking", int),
-            "value": get_input("Stat increase percentage/multiplier value", float, 0.0),
-            "duration": get_input("How long does the buff last? (seconds)", float, 15.0),
-            "effect_name": get_input("Display Name of the Buff", str),
-            "charges": get_input("Starting/gained number of stacks/charges", int, 1),
-            "max_charges": get_input("Maximum stack capacity", int, 1),
-            "affected_by_cdr": get_input("Is this buff duration reduced by your cooldown stats?", bool, False)
-        })
-        if req_tags := collect_list_items("Ability Tags this Buff affects"):
-            action["required_tags"] = req_tags
-
-    elif action_type == "resource_gain":
-        action.update({
-            "value": get_input("Amount of Force/Resource restored", float, 1.0)
-        })
-
-    elif action_type == "cooldown_mod":
-        action.update({
-            "reset": get_input("Does this completely reset the cooldown?", bool, True)
-        })
-        if not action["reset"]:
-            action["value"] = get_input("Amount of time subtracted from cooldown (seconds)", float, 1.5)
-        if target_tags := collect_list_items("Target Ability Tags to reduce cooldown on"):
-            action["target_tags"] = target_tags
-
-    elif action_type == "channel":
-        action.update({
-            "channel_ticks": get_input("Total number of ticks", int, 4),
-            "tick_interval": get_input("Time between ticks (seconds)", float, 0.75),
-            "tick_cost": get_input("Force cost PER TICK", float, 10.0)
-        })
-        action["actions"] = []
-        print("\n--- Adding Sub-Actions for Channel ---")
-        print("Now you must define what happens each time the channel ticks.")
+    if get_input("\nDoes this have specific execution conditions? (y/n)", bool, False):
+        print("Available rules: target_hp_below_pct, target_has_debuff, caster_has_buff, etc.")
         while True:
-            action["actions"].append(build_action())
-            if not get_input("\nAdd another sub-action to this channel?", bool, False):
+            key = get_input("Condition Key (or press Enter to finish)", str, "")
+            if not key:
                 break
 
-    if conds := build_conditions():
-        action["conditions"] = conds
+            # Auto-detect if value should be a float or a string based on common rules
+            if "pct" in key or "amount" in key:
+                val = get_input(f"Value for '{key}'", float)
+            elif "has_dot" in key:
+                val = get_input(f"Value for '{key}' (true/false)", bool)
+            else:
+                val = get_input(f"Value for '{key}'", str)
+
+            conditions[key] = val
+            print(f"Added condition: {key} = {val}")
+    return conditions
+
+
+def build_action(is_nested=False, depth=0):
+    """Builds a single action dictionary interactively, supporting recursive nesting."""
+    prefix = "  " * depth + ("↪ " if is_nested else "")
+    print(f"\n{prefix}--- Building Action ---")
+
+    action_type = get_input(
+        f"{prefix}Action type ('damage', 'buff', 'debuff', 'resource_gain', 'cooldown_mod', 'dot', 'channel')",
+        str).lower()
+    action = {"action_type": action_type}
+
+    action["delay"] = get_input(f"{prefix}Delay (seconds)", float, 0.0)
+
+    if action_type == "damage":
+        action["attack_type"] = get_input(f"{prefix}Attack Type (1=melee, 2=ranged, 3=force, 4=tech)", int, 1)
+        action["damage_type"] = get_input(f"{prefix}Damage Type (1=kinetic, 2=energy, 3=elemental, 4=internal)", int, 1)
+
+        if action["attack_type"] in [3, 4]:
+            action["hand"] = "main"
+        else:
+            action["hand"] = get_input(f"{prefix}Hand ('main' or 'off')", str, "main")
+
+        action["amp"] = get_input(f"{prefix}Amp", float, 0.0)
+        action["coeff"] = get_input(f"{prefix}Coeff", float, 0.0)
+        action["shp_min"] = get_input(f"{prefix}SHP Min", float, 0.0)
+        action["shp_max"] = get_input(f"{prefix}SHP Max", float, 0.0)
+        action["impact_delay"] = get_input(f"{prefix}Impact Delay", float, 0.0)
+
+    elif action_type == "dot":
+        action["tick_interval"] = get_input(f"{prefix}Tick Interval (seconds)", float, 1.0)
+        action["duration"] = get_input(f"{prefix}Duration (seconds)", float, 15.0)
+        action["ticks_remaining"] = get_input(f"{prefix}Ticks Remaining (99 for infinite)", int, 15)
+        action["name"] = get_input(f"{prefix}Name (needed for overwrite)", str)
+        action["effect_name"] = get_input(f"{prefix}Effect Name", str)
+
+        action["tick_actions"] = []
+        print(f"\n{prefix}--- Entering tick actions for DoT '{action['name']}' ---")
+        while True:
+            action["tick_actions"].append(build_action(is_nested=True, depth=depth + 1))
+            if not get_input(f"{prefix}Add another tick action? (y/n)", bool, False):
+                break
+
+    elif action_type == "channel":
+        action["channel_ticks"] = get_input(f"{prefix}Total Channel Ticks", int, 4)
+        action["tick_interval"] = get_input(f"{prefix}Tick Interval (seconds)", float, 1.0)
+
+        action["actions"] = []
+        print(f"\n{prefix}--- Entering actions for Channel ---")
+        while True:
+            action["actions"].append(build_action(is_nested=True, depth=depth + 1))
+            if not get_input(f"{prefix}Add another action to this channel? (y/n)", bool, False):
+                break
+
+    elif action_type == "buff":
+        action["id"] = get_input(f"{prefix}Buff ID", int, 0)
+        action["value"] = get_input(f"{prefix}Buff Value", float, 0.0)
+        action["effect_name"] = get_input(f"{prefix}Effect Name", str)
+        action["target_hp_threshold"] = get_input(f"{prefix}Target HP Threshold (0.0 for none)", float, 0.0)
+        action["duration"] = get_input(f"{prefix}Duration (seconds)", float, 10.0)
+        if req_tags := collect_list_items("Required Tags"):
+            action["required_tags"] = req_tags
+
+    elif action_type == "debuff":
+        action["id"] = get_input(f"{prefix}Debuff ID", int, 0)
+        action["value"] = get_input(f"{prefix}Debuff Value", float, 0.0)
+        action["effect_name"] = get_input(f"{prefix}Effect Name", str)
+        action["duration"] = get_input(f"{prefix}Duration (seconds)", float, 10.0)
+
+    elif action_type == "resource_gain":
+        action["value"] = get_input(f"{prefix}Amount of Resource Given", float, 0.0)
+
+    elif action_type == "cooldown_mod":
+        action["target_tags"] = collect_list_items("Target Tags to alter cooldown")
+        action["reset"] = get_input(f"{prefix}Is the cooldown completely reset? (y/n)", bool, False)
+        if not action["reset"]:
+            action["value"] = get_input(f"{prefix}Cooldown reduction value (seconds)", float, 0.0)
+
+    else:
+        print(f"⚠️ Warning: Unrecognized action type '{action_type}'. Building as a generic empty action.")
+
+    if global_conds := build_conditions():
+        action["conditions"] = global_conds
+
+    if action_tags := collect_list_items("Action Tags"):
+        action["tags"] = action_tags
+
+    # ============================================
+    # 🟢 THE NESTED ACTION GATE (Recursion)
+    # ============================================
+    if get_input(f"\n{prefix}Does this [{action_type}] action have nested 'on_success_actions'? (y/n)", bool, False):
+        action["on_success_actions"] = []
+        print(f"\n{prefix}>>> Entering Nested 'on_success' Actions for [{action_type}] <<<")
+
+        while True:
+            child_action = build_action(is_nested=True, depth=depth + 1)
+            action["on_success_actions"].append(child_action)
+
+            if not get_input(f"{prefix}Add another nested action to this [{action_type}] parent? (y/n)", bool, False):
+                break
+
+        print(f"{prefix}<<< Finished Nested Actions for [{action_type}] >>>\n")
 
     return action
 
 
 def main():
-    print("=== SWTOR Combat Simulator Data Generator ===")
-    file_path = input("Enter path to JSON file (e.g. data/HatredAssassinAbilities.json): ").strip()
+    print("=== SWTOR Simulator JSON Ability Builder ===")
+    file_path = get_input("Target JSON file path (e.g., data/Abilities.json)", str, "data/Abilities.json")
 
+    # Load existing db if it exists so we don't overwrite the whole file
     db = {}
     if os.path.exists(file_path):
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 db = json.load(f)
-            print(f"📖 Loaded {len(db)} existing abilities from file successfully.")
-        except Exception:
-            print("⚠️ Could not parse existing file. Creating a fresh database.")
+            print(f"Loaded existing database with {len(db)} entries.")
+        except json.JSONDecodeError:
+            print("Warning: Could not parse existing JSON. Starting fresh.")
 
-    lookup_key = input("Enter Ability Key (CAPSLOCKED, e.g. 'LEECHING_STRIKE'): ").strip().upper()
-
-    print("\n--- Base Ability Configuration ---")
-    entry_data = {
-        "id": lookup_key.lower(),
-        "name": get_input("Display Name of the ability", str, lookup_key.replace("_", " ").title()),
-        "cooldown": get_input("Cooldown time (seconds, use 0 for none)", float, 0.0),
-        "triggers_gcd": get_input("Does this trigger the Global Cooldown (GCD)?", bool, True)
-    }
-
-    if entry_data["triggers_gcd"]:
-        entry_data["base_gcd"] = get_input("Base GCD pacing step time (seconds)", float, 1.5)
-
-    entry_data["energy_cost"] = get_input(
-        "Force cost to cast this ability (NOTE: If this ability contains a Channel, set this base cost to 0.0!)", float,
-        0.0)
-
-    max_charges = get_input("Maximum charges (enter 0 if ability does not use charges)", int, 0)
-    if max_charges > 0:
-        entry_data["max_charges"] = max_charges
-        entry_data["recharge_time"] = get_input("Recharge time per charge (seconds)", float, entry_data["cooldown"])
-
-    if global_tags := collect_list_items("Global Ability Context Tags"):
-        entry_data["tags"] = global_tags
-
-    if global_conds := build_conditions():
-        entry_data["conditions"] = global_conds
-
-    entry_data["actions"] = []
-    print("\n--- Main Actions Array ---")
     while True:
-        entry_data["actions"].append(build_action())
-        if not get_input("\nWould you like to add another sub-action effect to this ability?", bool, False):
+        lookup_key = get_input("\nEnter EXACT Ability Name string (e.g., 'SABER STRIKE')").upper()
+
+        entry_data = {
+            "name": get_input("Readable Name (e.g., 'Saber Strike')", str, lookup_key.title()),
+            "cooldown": get_input("Cooldown (seconds)", float, 0.0),
+            "triggers_gcd": get_input("Triggers GCD? (y/n)", bool, True)
+        }
+
+        if entry_data["triggers_gcd"]:
+            entry_data["base_gcd"] = get_input("Base GCD pacing step time (seconds)", float, 1.5)
+
+        entry_data["energy_cost"] = get_input(
+            "Resource cost to cast (Note: If this holds a Channel, set base cost to 0.0)", float, 0.0
+        )
+
+        # The new Charge System Logic
+        max_charges = get_input("Maximum charges (enter 0 if ability does not use charges)", int, 0)
+        if max_charges > 0:
+            entry_data["max_charges"] = max_charges
+            entry_data["recharge_time"] = get_input("Recharge time per charge (seconds)", float, entry_data["cooldown"])
+
+        if global_tags := collect_list_items("Global Ability Context Tags"):
+            entry_data["tags"] = global_tags
+
+        if global_conds := build_conditions():
+            entry_data["conditions"] = global_conds
+
+        entry_data["actions"] = []
+        print("\n--- Main Actions Array ---")
+        while True:
+            entry_data["actions"].append(build_action())
+            if not get_input("\nWould you like to add another sub-action effect to this ability? (y/n)", bool, False):
+                break
+
+        db[lookup_key] = entry_data
+
+        # Safely create directory if missing and save
+        os.makedirs(os.path.dirname(file_path) if os.path.dirname(file_path) else ".", exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(db, f, indent=2)
+
+        print(f"✅ {lookup_key} successfully saved to {file_path}")
+
+        if not get_input("\nBuild another ability? (y/n)", bool, True):
             break
-
-    db[lookup_key] = entry_data
-
-    os.makedirs(os.path.dirname(file_path) if os.path.dirname(file_path) else ".", exist_ok=True)
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(db, f, indent=2, ensure_ascii=False)
-
-    print(f"\n✅ Done! The ability has been added/updated under key: '{lookup_key}'")
 
 
 if __name__ == "__main__":
