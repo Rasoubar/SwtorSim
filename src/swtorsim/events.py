@@ -41,7 +41,7 @@ class DamageHit(Event):
         self.ability_name = ability_name
 
     def resolve(self, sim):
-        if not self.check_hit():
+        if not check_hit(self.source, self.action_data.get("hand", "main")):
             return
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
         tags = self.action_data.get("tags", [])
@@ -91,17 +91,17 @@ class DamageHit(Event):
             else:
                 from src.swtorsim.abilities import execute_single_action
                 execute_single_action(sim, self.source, self.target, action, proc.name)
-    def check_hit(self):
-        def_chance = 0.1
-        if self.action_data.get("hand", "main") == "main":
-            acc = self.source.stats.get("Main Accuracy")
-        elif self.action_data.get("hand", "main") == "off":
-            acc = self.source.stats.get("Off Accuracy")
-        if random.random() + def_chance > acc:
-            print("MISSED")
-            return False
-        return True
 
+def check_hit(source, hand):
+    def_chance = 0.1
+    if hand == "main":
+        acc = source.stats.get("Main Accuracy")
+    elif hand == "off":
+        acc = source.stats.get("Off Accuracy")
+    if random.random() + def_chance > acc:
+        print("MISSED")
+        return False
+    return True
 
 
 class PeriodicProcTick(Event):

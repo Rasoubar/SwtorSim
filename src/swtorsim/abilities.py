@@ -1,5 +1,5 @@
 import random
-from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent, ChannelTickEvent
+from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent, ChannelTickEvent, check_hit
 from src.swtorsim.entities import ActiveDot, Player, Target, ActiveChannel
 from src.swtorsim.requirements import validate_all
 
@@ -15,6 +15,9 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
     if action_type == "damage":
         handle_damage_action(sim, caster, target, action, source_name, delay)
     elif action_type == "dot":
+        if not check_hit(caster, action.get("hand", "main")):
+            print (f'DOT {source_name} aplication missed')
+            return
         handle_dot_action(sim, caster, target, action, source_name)
     elif action_type == "channel":
         handle_channel_action(sim, caster, target, action, source_name)
@@ -26,7 +29,7 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
         handle_resource_gain_action(sim, caster, action, delay)
     elif action_type == "cooldown_mod":
         handle_cooldown_modification(sim, caster, action)
-    elif action_type =="grant_charge":
+    elif action_type == "grant_charge":
         handle_restore_charge(sim, caster, action)
 
 
@@ -37,6 +40,7 @@ def handle_damage_action(sim, caster, target, action, source_name, delay):
 
 
 def handle_dot_action(sim, caster, target, action, source_name):
+
     scaled_interval = caster.scale_time_modifier(action["interval"])
     dot_instance = ActiveDot(
         name=source_name,
