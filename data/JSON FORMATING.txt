@@ -2,6 +2,7 @@ Actions
 	"action_type": "damage"
 		"attack_type": int #1=melee,2=ranged,3=force,4=tech
 		"damage_type": int #1=kinetic,2=energy,3=elemental,4=interntal
+		"hand": string #which hand does the hit. If attack force or tech, "main" is assumed (for now anyway)
 		"amp":float #check jedipedia
 		"coeff":float #check jedipedia
 		"shp_min":float #check jedipedia

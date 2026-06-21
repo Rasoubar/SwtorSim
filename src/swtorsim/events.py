@@ -154,7 +154,7 @@ class BuffExpire(Event):
         effect_id = active_buff.id
         if effect_id in EFFECTS:
             stat_name = EFFECTS[effect_id]["stat_name"]
-            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat"}:
+            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}:
                 self.player.recalculate_stats()
 
 

@@ -213,7 +213,7 @@ class Player(Actor):
                 elif stat_name == "Accuracy":
                     bonus_accuracy += buff.value
 
-    
+
         temp_stats["Mastery"]  = (temp_stats["Mastery"] + bonus_mastery) * mastery_multiplier
         temp_stats["Power"] = temp_stats["Power"] + bonus_power
         temp_stats["Critical Rating"] = temp_stats["Critical Rating"] + bonus_critical_rating
@@ -269,7 +269,7 @@ class Player(Actor):
         for r_id in expired_keys:
             popped_buff = self.effects.pop(r_id, None)
             if popped_buff and popped_buff.id in EFFECTS:
-                if EFFECTS[popped_buff.id]["stat_name"] in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat"}:
+                if EFFECTS[popped_buff.id]["stat_name"] in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}:
                     needs_stat_recalc = True
         if needs_stat_recalc:
             self.recalculate_stats()
