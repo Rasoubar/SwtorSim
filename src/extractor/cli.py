@@ -13,6 +13,7 @@ from extractor.config import (
     RELIC_ABILITY_FQN_PREFIX,
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
 )
+from extractor.abilities import build_abilities
 from extractor.disciplines import build_disciplines
 from extractor.talents import build_talents
 from extractor.dump import write_node_dump
@@ -138,8 +139,9 @@ def run_extraction(config: ExtractorConfig) -> Path:
     disciplines_dir = config.data_dir / "disciplines"
     discipline_count = build_disciplines(records, disciplines_dir)
 
-    talents_dir = config.data_dir / "parsed"
-    talent_count = build_talents(records, talents_dir)
+    parsed_dir = config.data_dir / "parsed"
+    talent_count = build_talents(records, parsed_dir)
+    ability_count = build_abilities(records, parsed_dir)
 
     gear_path = config.data_dir / "gear_abilities_talents.json"
     gear_count = build_gear_abilities_talents(store, gom, strings, gear_path)
@@ -155,7 +157,8 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"dis.* nodes extracted: {dis_count}")
     print(f"Base APC nodes seeded: {len(base_apc_roots)}")
     print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
-    print(f"Wrote {talent_count} talent files to {talents_dir / 'tal'}")
+    print(f"Wrote {talent_count} talent files to {parsed_dir / 'tal'}")
+    print(f"Wrote {ability_count} ability files to {parsed_dir / 'abl'}")
     print(f"Wrote {gear_count} gear entries to {gear_path}")
     print(f"Wrote {relic_count} relics to {relics_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
