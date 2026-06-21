@@ -83,9 +83,23 @@ def build_action():
     action = {"action_type": action_type}
 
     if action_type == "damage":
+        # Extract variables first to determine hand requirements
+        attack_type = get_input("Attack Type (1 = Melee, 3 = Force)", int, 1)
+        damage_type = get_input("Damage Type (1 = Kinetic, 2 = Energy, 3 = Elemental, 4 = Internal)", int, 1)
+
+        # Determine Hand
+        if attack_type in [3, 4]:
+            hand = "main"
+        else:
+            hand = get_input("Weapon Hand ('main' or 'off')", str, "main").lower()
+            while hand not in ["main", "off"]:
+                print("❌ Invalid hand type. Please enter 'main' or 'off'.")
+                hand = get_input("Weapon Hand ('main' or 'off')", str, "main").lower()
+
         action.update({
-            "attack_type": get_input("Attack Type (1 = Melee, 3 = Force)", int, 1),
-            "damage_type": get_input("Damage Type (1 = Kinetic, 2 = Energy, 3 = Elemental, 4 = Internal)", int, 1),
+            "attack_type": attack_type,
+            "damage_type": damage_type,
+            "hand": hand,
             "amp": get_input("Jedipedia Damage Multiplier (Amp)", float, 0.0),
             "coeff": get_input("Jedipedia Standard Scaling Factor (Coeff)", float, 0.0),
             "shp_min": get_input("Jedipedia Bonus Damage Min (Standard Health Percent Min)", float, 0.0),
