@@ -41,6 +41,7 @@ def convert_loc_retriever(value: Any) -> dict[str, tuple[str, str]]:
 class StringResolver:
     _STB_BUCKET_ALIASES = {
         "str.itm": "itm",
+        "str.tal": "tal",
     }
 
     def __init__(self, resources_root: Path):
