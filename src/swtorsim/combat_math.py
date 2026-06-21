@@ -100,15 +100,18 @@ def calculate_hit(caster, target, action_data):
         ability_damage_max = (coeff * damage_bonus) + (shp_max * standard_health)
     elif attack_type in (1, 2):
         amp = action_data["amp"]
-        main_hand_min = caster.stats["Main_hand_min"]
-        main_hand_max = caster.stats["Main_hand_max"]
-        off_hand_min = caster.stats["Off_hand_min"]
-        off_hand_max = caster.stats["Off_hand_max"]
         damage_bonus = caster.stats["M_Bonus_Damage"]
-        ability_damage_min = ((amp + 1) * main_hand_min) + ((amp + 1) * off_hand_min * 0.3) + (coeff * damage_bonus) + (
-                    shp_min * standard_health)
-        ability_damage_max = ((amp + 1) * main_hand_max) + ((amp + 1) * off_hand_max * 0.3) + (coeff * damage_bonus) + (
-                    shp_max * standard_health)
+        if action_data["hand"] == "main":
+            main_hand_min = caster.stats["Main_hand_min"]
+            main_hand_max = caster.stats["Main_hand_max"]
+            ability_damage_min = ((amp + 1) * main_hand_min) + (coeff * damage_bonus) + (shp_min * standard_health)
+            ability_damage_max = ((amp + 1) * main_hand_max) + (coeff * damage_bonus) + (shp_max * standard_health)
+        elif action_data["hand"] == "off":
+            off_hand_min = caster.stats["Off_hand_min"]
+            off_hand_max = caster.stats["Off_hand_max"]
+            ability_damage_min =((amp + 1) * off_hand_min * 0.3)
+            ability_damage_max =((amp + 1) * off_hand_max * 0.3)
+
     else:
         raise ValueError(f'Action had no valid attack_type')
     ability_damage = random.randint(int(ability_damage_min), int(ability_damage_max))
