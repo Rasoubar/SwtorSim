@@ -36,14 +36,6 @@
     ],
     "effect_name": "Crackling Charge LC"
   },
-  "PERVASIVE_DEATH_15": {
-    "id": 79,
-    "value": 0.15,
-    "required_tags": [
-      "death_field"
-    ],
-    "effect_name": null
-  },
   "FANATICISM": {
     "id": 68,
     "value": 20.0,

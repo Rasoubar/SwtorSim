@@ -18,8 +18,8 @@ Actions
     				"has_dot": bool #if target has any dot on it
     				"target_doesnt_have_debuff": debuff_name
   				"has_specific_dot": dot_name
-			
 		"tags" : list #list of tags the action carries, useful a lot in procs
+		"on_success_actions": list # actions that need that action to hit.
 	"action_type": "dot"
 		"interval": float #time between ticks (before alac)
 		"total_ticks": int #guess

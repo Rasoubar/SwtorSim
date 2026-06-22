@@ -1,8 +1,6 @@
-from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json, load_and_draft_from_file
+from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json, optional_choices
 from src.swtorsim.batch import ParallelBatchRunner
 from src.swtorsim.tester import SingleTester
-import json
-import os
 
 HYBRID_ROTATION_CONFIG = [
     {"type": "fixed", "ability_id": "eradicate"},
@@ -160,10 +158,17 @@ MY_CUSTOM_CHARACTER_STATS = {
 if __name__ == "__main__":
     #base
     abilities_db = load_abilities_from_json("data/Assassin/Hatred/Abilities/Abilities.json")
-    procs_db = load_passives_from_json("data/Assassin/Hatred/Procs/BaseProcs.json")
     buffs_db = load_permanent_buffs_from_json("data/Assassin/Hatred/Buffs/PermanentBuffs.json")
-    #relics
-    procs_db.update(load_passives_from_json("data/Assassin/Hatred/Procs/Relics.json", subset="Relics"))
+    procs_db = load_passives_from_json("data/Assassin/Hatred/Procs/BaseProcs.json")
+    #options
+    optional = {"relics": "data/Assassin/Hatred/Choices/Relics.json",
+                "tree": "data/Assassin/Hatred/Choices/Tree.json",
+                "tactical": "data/Assassin/Hatred/Choices/Tacticals.json"}
+    choices = optional_choices(optional)
+    print(f'choices are {choices}')
+    abilities_db.update(choices[0])
+    buffs_db.update(choices[1])
+    procs_db.update(choices[2])
 
 
     # --- TOGGLE THIS TO SWITCH MODES ---
