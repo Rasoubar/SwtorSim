@@ -172,7 +172,7 @@ if __name__ == "__main__":
 
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
+    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
     # -----------------------------------
 
     if RUN_MODE == "TEST":

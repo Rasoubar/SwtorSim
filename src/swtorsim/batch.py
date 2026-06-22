@@ -32,6 +32,11 @@ def execute_single_worker_task(args):
                 for ability in sim.ability_db.values():
                     if hasattr(ability, "tags") and any(tag in ability.tags for tag in effect.required_tags):
                         ability.cooldown -= effect.value
+            if effect.id == 422 and effect.required_tags is not None:
+                for ability in sim.ability_db.values():
+                    if hasattr(ability, "tags") and any(tag in ability.tags for tag in effect.required_tags):
+                        ability.max_charges += effect.value
+                        ability.charges += effect.value
         player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
         sim.schedule_absolute(0.0, PlayerReady(player, target))
         first_regen_tick = random.uniform(0.0,1.0)

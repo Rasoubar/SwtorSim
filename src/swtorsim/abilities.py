@@ -122,8 +122,8 @@ def handle_cooldown_modification(sim, caster, action):
 def handle_restore_charge(sim, caster, action):
     target_ability_name = action.get("target_ability")
     amount = action.get("amount", 1)
-    if target_ability_name in caster.abilities_db:
-        ability = caster.abilities_db[target_ability_name]
+    if target_ability_name in sim.ability_db:
+        ability = sim.ability_db[target_ability_name]
         ability.add_charge(amount)
 
 

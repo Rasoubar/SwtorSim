@@ -17,7 +17,8 @@ EFFECTS = {
     155: {"stat_name": "Power Stat"},
     156: {"stat_name": "Critical Stat"},
     64:{ "stat_name": "Base Cooldown Modifier"},
-    154:{"stat_name": "Accuracy"}
+    154:{"stat_name": "Accuracy"},
+    422:{"stat_name": "Ability Base Charges"}
 }
 
 
