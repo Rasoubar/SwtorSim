@@ -5,6 +5,7 @@ class Rotation:
         self.name = name
         self.sequence = []
         self.current_step = 0
+        self.loop_start_index = 0
         self.loop = loop
 
         self.build_steps(steps_config)
@@ -17,6 +18,9 @@ class Rotation:
                 self.sequence.append(PriorityBlockStep(step_data["name"], step_data["pool"]))
             elif step_data["type"] == "optional":
                 self.sequence.append(OptionalAbilityStep(step_data["ability_id"], step_data.get("rules", {})))
+            elif step_data("type") == "loop_anchor":
+                self.loop_start_index = len(self.sequence)
+                continue
 
     def evaluate(self, player, target, sim) -> bool:
         if self.current_step >= len(self.sequence):
@@ -25,7 +29,7 @@ class Rotation:
         if step.evaluate(player, target, sim):
             self.current_step += 1
             if self.loop and self.current_step >= len(self.sequence):
-                self.current_step = 0
+                self.current_step = self.loop_start_index
             return True
 
         return False
