@@ -3,7 +3,7 @@ from src.swtorsim.batch import ParallelBatchRunner
 from src.swtorsim.tester import SingleTester
 
 
-Rotation = load_rotation_from_json("data/Assassin/Hatred/Rotation/BasicMaliPS.json")
+Rotation = load_rotation_from_json("data/Assassin/Hatred/Rotations/HungeringForce2fields.json")
 
 MY_CUSTOM_CHARACTER_STATS = {
     "class_name": "Assassin",
@@ -28,7 +28,8 @@ if __name__ == "__main__":
     #options
     optional = {"relics": "data/Assassin/Hatred/Choices/Relics.json",
                 "tree": "data/Assassin/Hatred/Choices/Tree.json",
-                "tactical": "data/Assassin/Hatred/Choices/Tacticals.json"}
+                "tactical": "data/Assassin/Hatred/Choices/Tacticals.json",
+                "implants": "data/Assassin/Hatred/Choices/Implants.json"}
     choices = optional_choices(optional)
     print(f'choices are {choices}')
     abilities_db.update(choices[0])

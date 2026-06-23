@@ -18,7 +18,7 @@ class Rotation:
                 self.sequence.append(PriorityBlockStep(step_data["name"], step_data["pool"]))
             elif step_data["type"] == "optional":
                 self.sequence.append(OptionalAbilityStep(step_data["ability_id"], step_data.get("rules", {})))
-            elif step_data("type") == "loop_anchor":
+            elif step_data["type"] == "loop_anchor":
                 self.loop_start_index = len(self.sequence)
                 continue
 

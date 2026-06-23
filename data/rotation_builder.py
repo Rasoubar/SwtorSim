@@ -1,5 +1,6 @@
 import json
 import os
+import copy  # 🟢 NEW: Needed to safely clone saved templates
 
 
 def get_input(prompt, type_func=str, default=None):
@@ -88,6 +89,7 @@ def main():
     print("=========================================")
 
     rotation = []
+    saved_templates = {}  # 🟢 NEW: Local clipboard for the session
 
     while True:
         print("\nWhat kind of step do you want to add to the timeline?")
@@ -95,6 +97,7 @@ def main():
         print("  2. Optional Cast (Has rules. Engine skips it if rules fail)")
         print("  3. Priority Block (A pool of abilities evaluated top-to-bottom)")
         print("  4. Loop Anchor (Marks where the rotation restarts after an opener)")
+        print("  5. Insert Saved Template (Paste a previously saved block/cast)")  # 🟢 NEW
         print("  0. Finish & Save Rotation")
 
         choice = get_input("Select an option", int)
@@ -115,12 +118,20 @@ def main():
             print("\n--- Adding OPTIONAL Step ---")
             ability_id = get_input("Ability ID (e.g., recklessness)", str)
             rules = build_rules()
-            rotation.append({
+
+            step_dict = {
                 "type": "optional",
                 "ability_id": ability_id,
                 "rules": rules
-            })
+            }
+            rotation.append(step_dict)
             print(f"✔ Optional step '{ability_id}' added.")
+
+            # 🟢 NEW: Ask to save as template
+            if get_input("  Save this Optional Step as a template for reuse? (y/n)", bool, False):
+                t_name = get_input("  Enter a short template name (e.g., 'reck_opt')", str)
+                saved_templates[t_name] = step_dict
+                print(f"  ✔ Template '{t_name}' saved to clipboard.")
 
         elif choice == 3:
             print("\n--- Adding PRIORITY BLOCK ---")
@@ -141,12 +152,19 @@ def main():
                 })
                 print(f"  ✔ Added '{ab_id}' to pool.")
 
-            rotation.append({
+            step_dict = {
                 "type": "priority_block",
                 "name": block_name,
                 "pool": pool
-            })
+            }
+            rotation.append(step_dict)
             print(f"✔ Priority Block '{block_name}' added.")
+
+            # 🟢 NEW: Ask to save as template
+            if get_input("  Save this Priority Block as a template for reuse? (y/n)", bool, False):
+                t_name = get_input("  Enter a short template name (e.g., 'main_filler')", str)
+                saved_templates[t_name] = step_dict
+                print(f"  ✔ Template '{t_name}' saved to clipboard.")
 
         elif choice == 4:
             print("\n--- Adding LOOP ANCHOR ---")
@@ -155,24 +173,47 @@ def main():
             })
             print("✔ Loop Anchor added. Everything below this will repeat indefinitely.")
 
+        elif choice == 5:
+            # 🟢 NEW: Logic to inject templates
+            print("\n--- INSERT SAVED TEMPLATE ---")
+            if not saved_templates:
+                print("❌ Your clipboard is empty. Create an Optional or Priority step and save it first.")
+                continue
+
+            print("Available templates:")
+            for name in saved_templates.keys():
+                print(f"  - {name}")
+
+            template_name = get_input("Enter template name to insert", str)
+            if template_name in saved_templates:
+                # Use deepcopy so if we change JSON structure later, instances don't share memory
+                rotation.append(copy.deepcopy(saved_templates[template_name]))
+                print(f"✔ Successfully inserted template '{template_name}'.")
+            else:
+                print("❌ Template not found. Skipping.")
+
         else:
-            print("❌ Invalid choice. Select 0, 1, 2, 3, or 4.")
+            print("❌ Invalid choice. Select 0-5.")
 
     if not rotation:
         print("Rotation sequence is empty. Exiting without saving.")
         return
 
     print("\n=========================================")
-    # Create the directory if it doesn't exist to prevent crash
-    os.makedirs("data/Rotations", exist_ok=True)
+    print("             SAVE & EXPORT               ")
+
+    class_name = get_input("Enter Class name (e.g., Assassin)", str, "Assassin")
+    spec_name = get_input("Enter Spec name (e.g., Hatred)", str, "Hatred")
+
+    target_dir = os.path.join("data", class_name, spec_name, "Rotations")
+    os.makedirs(target_dir, exist_ok=True)
 
     save_path = get_input("Enter filename to save (e.g., Hybrid.json)", str, "StandardRotation.json")
 
-    # Automatically ensure the file ends with .json
     if not save_path.endswith(".json"):
         save_path += ".json"
 
-    full_path = os.path.join("data/Rotations", save_path)
+    full_path = os.path.join(target_dir, save_path)
 
     with open(full_path, "w", encoding="utf-8") as f:
         json.dump(rotation, f, indent=4)
