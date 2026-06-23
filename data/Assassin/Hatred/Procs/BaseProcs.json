@@ -222,43 +222,5 @@
       }
     ],
     "conditions": {}
-  },
-  "MALICIOUSNESS": {
-	  "proc_name": "Maliciousness",
-	  "trigger": "cast",
-	  "required_tags" : ["recklessness"],
-	  "chance": 1.0,
-	  "icd":0,
-	  "affected_by_cdr": false,
-	  "actions": [
-      {
-        "action_type": "buff",
-        "id": 79,
-        "value": 0.1,
-        "duration": 20.0,
-        "required_tags": [
-          "eradicate",
-          "melee_ability"
-        ],
-        "effect_name": "Maliciousness",
-        "charges": 1,
-        "max_charges": 2,
-        "affected_by_cdr": false,
-        "conditions": {}
-      },
-      {
-        "action_type": "cooldown_mod",
-        "target_tags": [
-          "eradicate",
-          "leeching_strike",
-          "maul",
-          "assassinate",
-          "severing_slash"
-        ],
-        "reset": true,
-        "conditions": {}
-      }
-	 ],
-	 "conditions" : {}
   }
 }

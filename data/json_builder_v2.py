@@ -111,12 +111,23 @@ def build_action(is_nested=False, depth=0):
             if not get_input(f"{prefix}Add another action to this channel? (y/n)", bool, False):
                 break
 
+
     elif action_type == "buff":
         action["id"] = get_input(f"{prefix}Buff ID", int, 0)
         action["value"] = get_input(f"{prefix}Buff Value", float, 0.0)
         action["effect_name"] = get_input(f"{prefix}Effect Name", str)
-        action["target_hp_threshold"] = get_input(f"{prefix}Target HP Threshold (0.0 for none)", float, 0.0)
         action["duration"] = get_input(f"{prefix}Duration (seconds)", float, 10.0)
+
+        if get_input(f"{prefix}Does this buff utilize or modify charges? (y/n)", bool, False):
+            charges_given = get_input(f"{prefix}Charges this buff gives/restores (0 to skip)", int, 0)
+            if charges_given > 0:
+                action["charges_given"] = charges_given
+            max_charges = get_input(f"{prefix}Max ability charges this buff allows/increases to (0 to skip)", int, 0)
+            if max_charges > 0:
+                action["max_charges"] = max_charges
+            if get_input(f"{prefix}Does this buff have consumable stacks (e.g., Recklessness)? (y/n)", bool, False):
+                action["consumable_charges"] = get_input(f"{prefix}How many consumable stacks?", int, 1)
+
         if req_tags := collect_list_items("Required Tags"):
             action["required_tags"] = req_tags
 
@@ -254,11 +265,10 @@ def build_permanent_buff():
 
     return buff_key, entry_data
 
+
 def main():
-
-
     print("\n=============================================")
-    print(" SwtorSim JSON Structure Generator CLI v2.1  ")
+    print(" SwtorSim JSON Structure Generator CLI v2.2  ")
     print("=============================================")
 
     # --- 1. PATH RESOLUTION MENU ---
@@ -275,6 +285,7 @@ def main():
     folder_path = f"{char_class}/{char_spec}"
     file_name = ""
     is_choice_format = False
+    choice_cat = None  # <-- Added safety variable to track exactly what type of choice this is
 
     if storage_type == "1":
         print("\nSelect Base Category:")
@@ -338,15 +349,20 @@ def main():
                 pass
 
     # --- 4. FORMATTING & APPENDING ---
-    print("\n--- Optional Choice Formatting ---")
-    is_choice_format = get_input("Format this as an Optional Choice (Relics/Tree/Tacticals)? (y/n)", bool, False)
+    # (Removed the redundant is_choice_format question here!)
 
     if is_choice_format:
+        print("\n--- Wrapping & Appending Choice ---")
         outer_key = get_input("Enter the Top-Level Choice Name (e.g., PenetratingDeath)", str, lookup_key)
 
         # Safely setup the To_add array if it doesn't exist
         if outer_key not in db:
             db[outer_key] = {"To_add": []}
+
+            # ---> NEW: If this is specifically a Tree talent, prompt for the level!
+            if choice_cat == "2":
+                db[outer_key]["level"] = get_input(f"What level does '{outer_key}' unlock?", int, 0)
+
         elif "To_add" not in db[outer_key]:
             db[outer_key]["To_add"] = []
 
