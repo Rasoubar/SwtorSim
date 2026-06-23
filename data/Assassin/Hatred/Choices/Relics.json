@@ -1,0 +1,77 @@
+{
+  "CRITICAL SURGE": {
+    "To_add": [
+      {
+        "CRITICAL SURGE": {
+          "item_type": "proc",
+          "proc_name": "Critical Surge",
+          "trigger": "hit",
+          "chance": 0.3,
+          "icd": 20.0,
+          "affected_by_cdr": false,
+          "actions": [
+            {
+              "action_type": "buff",
+              "id": 156,
+              "value": 4220.0,
+              "duration": 6.0,
+              "effect_name": "Critical Surge",
+              "affected_by_cdr": false
+            }
+          ],
+          "conditions": {}
+        }
+      }
+    ]
+  },
+  "MASTERY SURGE": {
+    "To_add": [
+      {
+        "MASTERY SURGE": {
+          "item_type": "proc",
+          "proc_name": "Mastery Surge",
+          "trigger": "hit",
+          "chance": 0.3,
+          "icd": 20.0,
+          "affected_by_cdr": false,
+          "actions": [
+            {
+              "action_type": "buff",
+              "id": 4140,
+              "value": 4220.0,
+              "duration": 6.0,
+              "effect_name": "Mastery Surge",
+              "affected_by_cdr": false
+            }
+          ],
+          "conditions": {}
+        }
+      }
+    ]
+  },
+  "POWER SURGE": {
+    "To_add": [
+      {
+        "POWER SURGE": {
+          "item_type": "proc",
+          "proc_name": "Power Surge",
+          "trigger": "hit",
+          "chance": 0.3,
+          "icd": 20.0,
+          "affected_by_cdr": false,
+          "actions": [
+            {
+              "action_type": "buff",
+              "id": 155,
+              "value": 4220.0,
+              "duration": 6.0,
+              "effect_name": "Power Surge",
+              "affected_by_cdr": false
+            }
+          ],
+          "conditions": {}
+        }
+      }
+    ]
+  }
+}

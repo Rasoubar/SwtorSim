@@ -1,0 +1,41 @@
+{
+  "Dynamic Force": {
+    "To_add": [
+      {
+        "Dynamic Force": {
+          "item_type": "buff",
+          "id": 64,
+		   "value": 15.0,
+		   "required_tags": [
+			"recklessness"
+			],
+		    "effect_name": "Dynamic Force"
+        }
+      }
+    ]
+  },
+  "Force Training": {
+    "To_add": [
+      {
+        "Force training": {
+          "item_type": "buff",
+          "id": 26,
+		  "value": 0.03,
+		  "effect_name": "Force Training"
+        }
+      }
+    ]
+  },
+  "Berserker's Package": {
+    "To_add": [
+      {
+        "Berserke's Package": {
+          "item_type": "buff",
+          "id": 79,
+		  "value": 0.03,
+		  "effect_name": "Berserker's Package"
+        }
+      }
+    ]
+  }
+}
