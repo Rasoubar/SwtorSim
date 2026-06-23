@@ -210,3 +210,7 @@ def optional_choices(choice_dict):
     procs = load_passives_from_dict(raw_procs)
 
     return abilities,buffs,procs
+
+def load_rotation_from_json(filepath):
+    with open(filepath, 'r') as f:
+        return json.load(f)

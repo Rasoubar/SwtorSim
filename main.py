@@ -1,144 +1,9 @@
-from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json, optional_choices
+from src.swtorsim.config_load import load_abilities_from_json, load_passives_from_json, load_permanent_buffs_from_json, optional_choices, load_rotation_from_json
 from src.swtorsim.batch import ParallelBatchRunner
 from src.swtorsim.tester import SingleTester
 
-HYBRID_ROTATION_CONFIG = [
-    {"type": "fixed", "ability_id": "eradicate"},
-    {"type": "fixed", "ability_id": "creeping_terror"},
-    {"type": "fixed", "ability_id": "discharge"},
-    {"type": "fixed", "ability_id": "leeching_strike"},
-    {"type": "fixed", "ability_id": "eradicate"},
-    {
-        "type": "optional",
-        "ability_id": "recklessness",
-        "rules": {}
-    },
-    {
-        "type": "priority_block",
-        "name": "Reck+DF+MPRIO1 Window 1",
-        "pool": [
-            {"ability_id": "death_field", "rules": {"caster_has_buff": "Recklessness"}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
-        ]
-    },
-    {
-        "type": "optional",
-        "ability_id": "recklessness",
-        "rules": {}
-    },
-    {
-        "type": "priority_block",
-        "name": "Reck+DF+MPRIO1 Window 2",
-        "pool": [
-            {"ability_id": "death_field", "rules": {"caster_has_buff": "Recklessness"}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
-        ]
-    },
-    {
-        "type": "optional",
-        "ability_id": "phantom_stride",
-        "rules": {
-            "target_hp_above_pct": 0.30,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 0.5},
-            "caster_does_not_have_buff": "Bloodletting"
-        }
-    },
-    {
-        "type": "optional",
-        "ability_id": "recklessness",
-        "rules": {}
-    },
-    {
-        "type": "priority_block",
-        "name": "MPRIO 2 Window",
-        "pool": [
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}},
-        ]
-    },
-    {
-        "type": "optional",
-        "ability_id": "phantom_stride",
-        "rules": {
-            "target_hp_above_pct": 0.30,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
-            "caster_does_not_have_buff": "Bloodletting"
-        }
-    },
-    {
-        "type": "priority_block",
-        "name": "Eradicate_block",
-        "pool": [
-            {"ability_id": "eradicate", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}},
-        ]
-    },
-    {
-        "type": "optional",
-        "ability_id": "phantom_stride",
-        "rules": {
-            "target_hp_above_pct": 0.30,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 0.3},
-            "caster_does_not_have_buff": "Bloodletting"
-        }
-    },
-    {
-        "type": "priority_block",
-        "name": "MPRIO 1 Window A",
-        "pool": [
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 30}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
-        ]
-    },
-    {
-        "type": "optional",
-        "ability_id": "phantom_stride",
-        "rules": {
-            "target_hp_above_pct": 0.30,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
-            "caster_does_not_have_buff": "Bloodletting"
-        }
-    },
-    {
-        "type": "priority_block",
-        "name": "MPRIO 1 Window B",
-        "pool": [
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 30}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
-        ]
-    },
-    {
-        "type": "priority_block",
-        "name": "MPRIO 3 Window",
-        "pool": [
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 60}},
-            {"ability_id": "assassinate", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
-        ]
-    }
-]
+
+Rotation = load_rotation_from_json("data/Assassin/Hatred/Rotation/BasicMaliPS.json")
 
 MY_CUSTOM_CHARACTER_STATS = {
     "class_name": "Assassin",
@@ -177,7 +42,7 @@ if __name__ == "__main__":
 
     if RUN_MODE == "TEST":
         tester = SingleTester(
-            rotation_config=HYBRID_ROTATION_CONFIG,
+            rotation_config=Rotation,
             stats_config=MY_CUSTOM_CHARACTER_STATS,
             abilities_db=abilities_db,
             procs_db=procs_db,
@@ -188,7 +53,7 @@ if __name__ == "__main__":
 
     elif RUN_MODE == "BATCH":
         runner = ParallelBatchRunner(
-            rotation_config=HYBRID_ROTATION_CONFIG,
+            rotation_config=Rotation,
             stats_config=MY_CUSTOM_CHARACTER_STATS,
             abilities_db=abilities_db,
             procs_db=procs_db,
