@@ -37,7 +37,7 @@ def build_rules(indent="  "):
     while get_input(f"{indent}Add a rule? (y/n)", bool, False):
         key = get_input(f"{indent}Rule Key", str)
 
-        # 🟢 NEW: Ask if the value needs to be a nested dictionary
+        # Ask if the value needs to be a nested dictionary (e.g., {"name": "Bloodletting", "value": 0.5})
         is_nested = get_input(f"{indent}Is the value for '{key}' a nested dictionary? (y/n)", bool, False)
 
         if is_nested:
@@ -94,6 +94,7 @@ def main():
         print("  1. Fixed Cast (No rules. Engine waits until ability is ready)")
         print("  2. Optional Cast (Has rules. Engine skips it if rules fail)")
         print("  3. Priority Block (A pool of abilities evaluated top-to-bottom)")
+        print("  4. Loop Anchor (Marks where the rotation restarts after an opener)")
         print("  0. Finish & Save Rotation")
 
         choice = get_input("Select an option", int)
@@ -147,8 +148,15 @@ def main():
             })
             print(f"✔ Priority Block '{block_name}' added.")
 
+        elif choice == 4:
+            print("\n--- Adding LOOP ANCHOR ---")
+            rotation.append({
+                "type": "loop_anchor"
+            })
+            print("✔ Loop Anchor added. Everything below this will repeat indefinitely.")
+
         else:
-            print("❌ Invalid choice. Select 0, 1, 2, or 3.")
+            print("❌ Invalid choice. Select 0, 1, 2, 3, or 4.")
 
     if not rotation:
         print("Rotation sequence is empty. Exiting without saving.")
