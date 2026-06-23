@@ -201,10 +201,10 @@ def optional_choices(choice_dict):
     relics = draft_choices(choice_dict["relics"], prompt_title="Relics", max_picks=2)
     tactical = draft_choices(choice_dict["tactical"], prompt_title="Tactical", max_picks=1)
     tree = draft_choices(choice_dict["tree"], prompt_title="Tree", check_levels=True)
-    implants = draft_choices(choice_dict["implant"], prompt_title="Implant", max_picks=2)
+    implants = draft_choices(choice_dict["implants"], prompt_title="Implant", max_picks=2)
     raw_abilities = relics[0] | tactical[0] | tree[0] |implants[0]
-    raw_buffs = relics[1] | tactical[1] | tree[1], implants[1]
-    raw_procs = relics[2] | tactical[2] | tree[2], implants[2]
+    raw_buffs = relics[1] | tactical[1] | tree[1] | implants[1]
+    raw_procs = relics[2] | tactical[2] | tree[2] | implants[2]
 
     abilities = load_abilities_from_dict(raw_abilities)
     buffs = load_permanent_buffs_from_dict(raw_buffs)
