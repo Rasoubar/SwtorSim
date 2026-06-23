@@ -50,7 +50,10 @@ class PriorityBlockStep:
 
     def evaluate(self, player, target, sim) -> bool:
         for option in self.pool:
+            print(option)
             wanna_cast = validate_all(option.get("rules", {}), player, target)
+            print(wanna_cast)
+            print(player.cooldowns)
             if wanna_cast:
                 ability = sim.ability_db.get(option["ability_id"])
                 if ability and ability.cast(player, target, sim):

@@ -175,15 +175,16 @@ class Ability:
         return validate_all(self.conditions, caster, target) #validates conditions
 
     def apply_cooldown_locks(self, caster, sim):
-        caster.next_gcd = sim.current_time
+        #fuck floating points but i dont wanna go integer
+        caster.next_gcd = round(sim.current_time, 4)
         if self.triggers_gcd:
-            caster.next_gcd += caster.calculate_gcd(self.base_gcd)
+            caster.next_gcd = round(sim.current_time + caster.calculate_gcd(self.base_gcd), 4)
         if self.has_charges:
             if self.charges == self.max_charges:
-                self.last_charge_time = sim.current_time
+                self.last_charge_time = round(sim.current_time, 4)
             self.charges -= 1
         elif self.cooldown > 0.0:
-            caster.cooldowns[self.name] = sim.current_time + caster.calculate_cooldown(self.cooldown)
+            caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown), 4)
 
     def cast(self, caster, target, sim) -> bool:
         if not self.can_cast(caster, target, sim):

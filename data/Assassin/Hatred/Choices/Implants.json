@@ -37,5 +37,17 @@
         }
       }
     ]
+  },
+  "Stimulated Package": {
+	  "To_add":[
+	  {
+		"Stimulated Package":  {
+			"item_type": "buff",
+			"id": 414,
+			"value": 0.05,
+			"effect_name": "Stimulated Package"
+		}  
+	  }
+	  ]
   }
 }

@@ -22,7 +22,8 @@
           "charge_lightning",
           "saber_charged",
           "force_ability",
-          "charge_lightning_damage"
+          "charge_lightning_damage",
+		  "heal"
         ]
       }
     ]
