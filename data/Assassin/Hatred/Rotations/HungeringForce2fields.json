@@ -168,6 +168,7 @@
         "type": "priority_block",
         "name": "FillerPriority",
         "pool": [
+			{"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
             {
                 "ability_id": "leeching_strike",
                 "rules": {
@@ -224,6 +225,7 @@
         "type": "priority_block",
         "name": "FillerPriority",
         "pool": [
+			{"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
             {
                 "ability_id": "leeching_strike",
                 "rules": {
@@ -280,6 +282,7 @@
         "type": "priority_block",
         "name": "FillerPriority",
         "pool": [
+			{"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
             {
                 "ability_id": "leeching_strike",
                 "rules": {
