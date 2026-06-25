@@ -99,7 +99,6 @@
     "name": "Leeching Strike",
     "cooldown": 12.0,
     "triggers_gcd": true,
-	"hand": "main",
     "base_gcd": 1.5,
     "energy_cost": 25.0,
     "tags": [
@@ -111,7 +110,7 @@
       {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.24,
         "coeff": 1.86,
         "shp_min": 0.186,
@@ -124,23 +123,17 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-          "tt_proc"
+          "tt_proc",
+		  "heal"
         ],
         "conditions": {
           "exact_dot_amount": 0
         }
       },
       {
-        "action_type": "resource_gain",
-        "value": 4.0,
-        "conditions": {
-          "exact_dot_amount": 1
-        }
-      },
-      {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.252,
         "coeff": 1.953,
         "shp_min": 0.1953,
@@ -153,23 +146,21 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-          "tt_proc"
+          "tt_proc",
+		  "heal"
         ],
         "conditions": {
           "exact_dot_amount": 1
-        }
-      },
-      {
+        },
+		"on_success_actions":[ {
         "action_type": "resource_gain",
-        "value": 8.0,
-        "conditions": {
-          "exact_dot_amount": 2
-        }
+        "value": 4.0
+      }]
       },
       {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.264,
         "coeff": 2.046,
         "shp_min": 0.2046,
@@ -182,23 +173,21 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-          "tt_proc"
+          "tt_proc",
+		  "heal"
         ],
         "conditions": {
           "exact_dot_amount": 2
-        }
-      },
-      {
+        },
+		"on_success_actions":[ {
         "action_type": "resource_gain",
-        "value": 12.0,
-        "conditions": {
-          "exact_dot_amount": 3
-        }
+        "value": 8.0
+      }]
       },
       {
         "action_type": "damage",
         "attack_type": 1,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.276,
         "coeff": 2.139,
         "shp_min": 0.2139,
@@ -211,11 +200,16 @@
           "leeching_strike",
           "direct_damage",
           "melee_ability",
-          "tt_proc"
+          "tt_proc",
+		  "heal"
         ],
         "conditions": {
           "exact_dot_amount": 3
-        }
+        },
+		"on_success_actions":[ {
+        "action_type": "resource_gain",
+        "value": 12.0
+      }]
       }
     ]
   },
@@ -223,7 +217,6 @@
     "name": "Death field",
     "cooldown": 0.0,
     "max_charges": 1,
-	"hand": "main",
     "recharge_time": 15.0,
     "triggers_gcd": true,
     "base_gcd": 1.5,
@@ -240,7 +233,7 @@
         "action_type": "damage",
         "attack_type": 3,
         "damage_type": 4,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.0,
         "coeff": 1.69,
         "shp_min": 0.149,
@@ -256,32 +249,32 @@
           "force_attack",
           "direct_damage",
           "direct_force"
-        ]
-      },
-      {
-        "action_type": "debuff",
-        "id": 0,
-        "value": 0.0,
-        "duration": 30.0,
-        "required_tags": [
-          "periodic_damage"
         ],
-        "effect_name": "Deathmark",
-        "charges": 15,
-        "consumable_charges": 15,
-        "max_charges": 15,
-        "affected_by_cdr": false
-      },
-      {
-        "action_type": "debuff",
-        "id": 46,
-        "value": 0.1,
-        "duration": 45.0,
-        "required_tags": [
-          "aoe_ability"
-        ],
-        "effect_name": "Overwhelmed",
-        "affected_by_cdr": false
+		"on_success_actions":[{
+			"action_type": "debuff",
+			"id": 0,
+			"value": 0.0,
+			"duration": 30.0,
+			"required_tags": [
+			  "periodic_damage"
+			],
+			"effect_name": "Deathmark",
+			"charges": 15,
+			"consumable_charges": 15,
+			"max_charges": 15,
+			"affected_by_cdr": false
+		  },
+		  {
+			"action_type": "debuff",
+			"id": 46,
+			"value": 0.1,
+			"duration": 45.0,
+			"required_tags": [
+			  "aoe_ability"
+			],
+			"effect_name": "Overwhelmed",
+			"affected_by_cdr": false
+      }]
       }
     ]
   },
@@ -289,7 +282,6 @@
     "name": "Creeping Terror",
     "cooldown": 0.0,
     "triggers_gcd": true,
-	"hand": "main",
     "base_gcd": 1.5,
     "energy_cost": 20.0,
     "tags": [
@@ -302,7 +294,7 @@
         "action_type": "damage",
         "attack_type": 3,
         "damage_type": 4,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.0,
         "coeff": 0.35,
         "shp_min": 0.03465,
@@ -318,17 +310,81 @@
               "periodic_damage",
               "force_attack",
               "purge_only",
-              "creeping_terror"
+              "creeping_terror",
+			  "heal"
             ],
             "conditions": {
               "target_doesnt_have_debuff": "Deathmark"
-            }
+            },
+			"on_success_actions":[{
+				"action_type": "dot",
+				"interval": 3.0,
+				"total_ticks": 6,
+				"instant_tick": true,
+				"instant_tick_delay": 0.2,
+				"actions": [
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 4,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.35,
+					"shp_min": 0.03465,
+					"shp_max": 0.03465,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "sinister_succor_dot",
+					  "agressive_action",
+					  "force_ability",
+					  "creeping_terror_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "creeping_terror",
+					  "heal"
+					],
+					"conditions": {
+					  "target_doesnt_have_debuff": "Deathmark"
+					}
+				  },
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 4,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.4,
+					"shp_min": 0.039848,
+					"shp_max": 0.039848,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "sinister_succor_dot",
+					  "agressive_action",
+					  "force_ability",
+					  "creeping_terror_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "creeping_terror",
+					  "heal"
+					],
+					"conditions": {
+					  "target_has_debuff": "Deathmark"
+					}
+				  }
+				]
+      }]
       },
 	  {
         "action_type": "damage",
         "attack_type": 3,
         "damage_type": 4,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.0,
         "coeff": 0.4,
         "shp_min": 0.039848,
@@ -344,79 +400,81 @@
               "periodic_damage",
               "force_attack",
               "purge_only",
-              "creeping_terror"
+              "creeping_terror",
+			  "heal"
             ],
             "conditions": {
               "target_has_debuff": "Deathmark"
-            }
-      },
-      {
-        "action_type": "dot",
-        "interval": 3.0,
-        "total_ticks": 6,
-        "instant_tick": true,
-        "instant_tick_delay": 0.2,
-        "actions": [
-          {
-            "action_type": "damage",
-            "attack_type": 3,
-            "damage_type": 4,
-			"hand": "main",
-            "amp": 0.0,
-            "coeff": 0.35,
-            "shp_min": 0.03465,
-            "shp_max": 0.03465,
-            "delay": 0.0,
-            "impact_delay": 0.0,
-            "tags": [
-              "sinister_succor_dot",
-              "agressive_action",
-              "force_ability",
-              "creeping_terror_dot",
-              "damage_over_time",
-              "periodic_damage",
-              "force_attack",
-              "purge_only",
-              "creeping_terror"
-            ],
-            "conditions": {
-              "target_doesnt_have_debuff": "Deathmark"
-            }
-          },
-          {
-            "action_type": "damage",
-            "attack_type": 3,
-            "damage_type": 4,
-			"hand": "main",
-            "amp": 0.0,
-            "coeff": 0.4,
-            "shp_min": 0.039848,
-            "shp_max": 0.039848,
-            "delay": 0.0,
-            "impact_delay": 0.0,
-            "tags": [
-              "sinister_succor_dot",
-              "agressive_action",
-              "force_ability",
-              "creeping_terror_dot",
-              "damage_over_time",
-              "periodic_damage",
-              "force_attack",
-              "purge_only",
-              "creeping_terror"
-            ],
-            "conditions": {
-              "target_has_debuff": "Deathmark"
-            }
-          }
-        ]
+            },
+			"on_success_actions":[{
+				"action_type": "dot",
+				"interval": 3.0,
+				"total_ticks": 6,
+				"instant_tick": true,
+				"instant_tick_delay": 0.2,
+				"actions": [
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 4,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.35,
+					"shp_min": 0.03465,
+					"shp_max": 0.03465,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "sinister_succor_dot",
+					  "agressive_action",
+					  "force_ability",
+					  "creeping_terror_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "creeping_terror",
+					  "heal"
+					],
+					"conditions": {
+					  "target_doesnt_have_debuff": "Deathmark"
+					}
+				  },
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 4,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.4,
+					"shp_min": 0.039848,
+					"shp_max": 0.039848,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "sinister_succor_dot",
+					  "agressive_action",
+					  "force_ability",
+					  "creeping_terror_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "creeping_terror",
+					  "heal"
+					],
+					"conditions": {
+					  "target_has_debuff": "Deathmark"
+					}
+				  }
+				]
+			 }]
       }
     ]
   },
   "DISCHARGE": {
     "name": "Discharge",
     "cooldown": 0.0,
-	"hand": "main",
     "triggers_gcd": true,
     "base_gcd": 1.5,
     "energy_cost": 20.0,
@@ -431,7 +489,7 @@
             "action_type": "damage",
             "attack_type": 3,
             "damage_type": 2,
-			"hand": "god",
+			"hand": "main",
             "amp": 0.0,
             "coeff": 0.39,
             "shp_min": 0.039,
@@ -447,17 +505,82 @@
 			  "discharge_initial",
               "force_attack",
               "purge_only",
-              "discharge_effect_lightning"
+              "discharge_effect_lightning",
+			  "heal"
             ],
             "conditions": {
               "target_doesnt_have_debuff": "Deathmark"
-            }
+            },
+			"on_success_actions": [{
+				"action_type": "dot",
+				"interval": 3.0,
+				"total_ticks": 6,
+				"instant_tick": true,
+				"instant_tick_delay": 0.2,
+				"actions": [
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 2,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.39,
+					"shp_min": 0.039,
+					"shp_max": 0.039,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "lightning_ability",
+					  "agressive_action",
+					  "force_ability",
+					  "sinister_succor_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "discharge_effect_lightning",
+					  "heal"
+					],
+					"conditions": {
+					  "target_doesnt_have_debuff": "Deathmark"
+					}
+				  },
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 2,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.4485,
+					"shp_min": 0.04485,
+					"shp_max": 0.04485,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "lightning_ability",
+					  "agressive_action",
+					  "force_ability",
+					  "sinister_succor_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "discharge_effect_lightning",
+					  "heal"
+					],
+					"conditions": {
+					  "target_has_debuff": "Deathmark"
+					}
+				  }
+				]
+			  }
+	  ]
           },
           {
             "action_type": "damage",
             "attack_type": 3,
             "damage_type": 2,
-			"hand": "god",
+			"hand": "main",
             "amp": 0.0,
             "coeff": 0.4485,
             "shp_min": 0.04485,
@@ -473,80 +596,83 @@
 			  "discharge_initial",
               "force_attack",
               "purge_only",
-              "discharge_effect_lightning"
+              "discharge_effect_lightning",
+			  "heal"
             ],
             "conditions": {
               "target_has_debuff": "Deathmark"
-            }
-          },
-      {
-        "action_type": "dot",
-        "interval": 3.0,
-        "total_ticks": 6,
-        "instant_tick": true,
-        "instant_tick_delay": 0.2,
-        "actions": [
-          {
-            "action_type": "damage",
-            "attack_type": 3,
-            "damage_type": 2,
-			"hand": "main",
-            "amp": 0.0,
-            "coeff": 0.39,
-            "shp_min": 0.039,
-            "shp_max": 0.039,
-            "delay": 0.0,
-            "impact_delay": 0.0,
-            "tags": [
-              "lightning_ability",
-              "agressive_action",
-              "force_ability",
-              "sinister_succor_dot",
-              "damage_over_time",
-              "periodic_damage",
-              "force_attack",
-              "purge_only",
-              "discharge_effect_lightning"
-            ],
-            "conditions": {
-              "target_doesnt_have_debuff": "Deathmark"
-            }
-          },
-          {
-            "action_type": "damage",
-            "attack_type": 3,
-            "damage_type": 2,
-			"hand": "main",
-            "amp": 0.0,
-            "coeff": 0.4485,
-            "shp_min": 0.04485,
-            "shp_max": 0.04485,
-            "delay": 0.0,
-            "impact_delay": 0.0,
-            "tags": [
-              "lightning_ability",
-              "agressive_action",
-              "force_ability",
-              "sinister_succor_dot",
-              "damage_over_time",
-              "periodic_damage",
-              "force_attack",
-              "purge_only",
-              "discharge_effect_lightning"
-            ],
-            "conditions": {
-              "target_has_debuff": "Deathmark"
-            }
-          }
-        ]
-      }
+            },
+			"on_success_actions": [{
+				"action_type": "dot",
+				"interval": 3.0,
+				"total_ticks": 6,
+				"instant_tick": true,
+				"instant_tick_delay": 0.2,
+				"actions": [
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 2,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.39,
+					"shp_min": 0.039,
+					"shp_max": 0.039,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "lightning_ability",
+					  "agressive_action",
+					  "force_ability",
+					  "sinister_succor_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "discharge_effect_lightning",
+					  "heal"
+					],
+					"conditions": {
+					  "target_doesnt_have_debuff": "Deathmark"
+					}
+				  },
+				  {
+					"action_type": "damage",
+					"attack_type": 3,
+					"damage_type": 2,
+					"hand": "main",
+					"amp": 0.0,
+					"coeff": 0.4485,
+					"shp_min": 0.04485,
+					"shp_max": 0.04485,
+					"delay": 0.0,
+					"impact_delay": 0.0,
+					"tags": [
+					  "lightning_ability",
+					  "agressive_action",
+					  "force_ability",
+					  "sinister_succor_dot",
+					  "damage_over_time",
+					  "periodic_damage",
+					  "force_attack",
+					  "purge_only",
+					  "discharge_effect_lightning",
+					  "heal"
+					],
+					"conditions": {
+					  "target_has_debuff": "Deathmark"
+					}
+				  }
+				]
+			  }
+	  ]
+     }
     ]
   },
   "ERADICATE": {
     "name": "Eradicate",
     "cooldown": 24.0,
     "triggers_gcd": true,
-	"hand": "main",
     "base_gcd": 1.5,
     "energy_cost": 30.0,
     "tags": [
@@ -564,7 +690,7 @@
         "action_type": "damage",
         "attack_type": 3,
         "damage_type": 1,
-		"hand": "god",
+		"hand": "main",
         "amp": 0.0,
         "coeff": 1.15,
         "shp_min": 0.095,
@@ -583,92 +709,93 @@
           "speed_surge",
           "eradicate",
           "direct_force"
-        ]
-      },
-      {
-        "action_type": "dot",
-        "interval": 1.0,
-        "total_ticks": 6,
-        "instant_tick": false,
-        "actions": [
-          {
-            "action_type": "damage",
-            "attack_type": 3,
-            "damage_type": 1,
-			"hand": "main",
-            "amp": 0.0,
-            "coeff": 0.31,
-            "shp_min": 0.031,
-            "shp_max": 0.031,
-            "delay": 0.0,
-            "impact_delay": 0.0,
-            "tags": [
-              "cast_time_attack",
-              "sinister_succor_dot",
-              "agressive_action",
-              "force_ability",
-              "demolish_and_crushing_darkness_shared_dot",
-              "demolish",
-              "demolish_dot",
-              "damage_over_time",
-              "periodic_damage",
-              "force_attack",
-              "purge_only",
-              "wrath_consumer",
-              "crush",
-              "triggers_speed_surge",
-              "eradicate"
-            ],
-            "conditions": {
-              "target_doesnt_have_debuff": "Deathmark"
-            }
-          },
-          {
-            "action_type": "damage",
-            "attack_type": 3,
-            "damage_type": 1,
-			"hand": "main",
-            "amp": 0.0,
-            "coeff": 0.3565,
-            "shp_min": 0.03565,
-            "shp_max": 0.03565,
-            "delay": 0.0,
-            "impact_delay": 0.0,
-            "tags": [
-              "cast_time_attack",
-              "sinister_succor_dot",
-              "agressive_action",
-              "force_ability",
-              "demolish_and_crushing_darkness_shared_dot",
-              "demolish",
-              "demolish_dot",
-              "damage_over_time",
-              "periodic_damage",
-              "force_attack",
-              "purge_only",
-              "wrath_consumer",
-              "crush",
-              "triggers_speed_surge",
-              "eradicate"
-            ],
-            "conditions": {
-              "target_has_debuff": "Deathmark"
-            }
-          }
-        ]
-      },
-      {
-        "action_type": "debuff",
-        "id": 386,
-        "value": 0.05,
-        "duration": 45.0,
-        "required_tags": [
-          "force_attack",
-		  "force_ability"
         ],
-        "effect_name": "Vulnerable",
-        "affected_by_cdr": false
-      }
+		"on_success_actions":[{
+			"action_type": "dot",
+			"interval": 1.0,
+			"total_ticks": 6,
+			"instant_tick": false,
+			"actions": [
+			  {
+				"action_type": "damage",
+				"attack_type": 3,
+				"damage_type": 1,
+				"hand": "main",
+				"amp": 0.0,
+				"coeff": 0.31,
+				"shp_min": 0.031,
+				"shp_max": 0.031,
+				"delay": 0.0,
+				"impact_delay": 0.0,
+				"tags": [
+				  "cast_time_attack",
+				  "sinister_succor_dot",
+				  "agressive_action",
+				  "force_ability",
+				  "demolish_and_crushing_darkness_shared_dot",
+				  "demolish",
+				  "demolish_dot",
+				  "damage_over_time",
+				  "periodic_damage",
+				  "force_attack",
+				  "purge_only",
+				  "wrath_consumer",
+				  "crush",
+				  "triggers_speed_surge",
+				  "eradicate"
+				],
+				"conditions": {
+				  "target_doesnt_have_debuff": "Deathmark"
+				}
+			  },
+			  {
+				"action_type": "damage",
+				"attack_type": 3,
+				"damage_type": 1,
+				"hand": "main",
+				"amp": 0.0,
+				"coeff": 0.3565,
+				"shp_min": 0.03565,
+				"shp_max": 0.03565,
+				"delay": 0.0,
+				"impact_delay": 0.0,
+				"tags": [
+				  "cast_time_attack",
+				  "sinister_succor_dot",
+				  "agressive_action",
+				  "force_ability",
+				  "demolish_and_crushing_darkness_shared_dot",
+				  "demolish",
+				  "demolish_dot",
+				  "damage_over_time",
+				  "periodic_damage",
+				  "force_attack",
+				  "purge_only",
+				  "wrath_consumer",
+				  "crush",
+				  "triggers_speed_surge",
+				  "eradicate"
+				],
+				"conditions": {
+				  "target_has_debuff": "Deathmark"
+				}
+			  }
+			]
+		  },
+		  {
+			"action_type": "debuff",
+			"id": 386,
+			"value": 0.05,
+			"duration": 45.0,
+			"required_tags": [
+			  "force_attack",
+			  "force_ability"
+			],
+			"effect_name": "Vulnerable",
+			"affected_by_cdr": false
+		  }
+	   ]
+      }   
     ]
   },
   "RECKLESSNESS": {
@@ -770,40 +897,5 @@
       }
     ],
     "conditions": {}
-  },
-	"depredating_volts": {
-    "id": "depredating_volts",
-    "name": "Depredating Volts",
-    "energy_cost": 0,
-    "base_gcd": 1.5,
-    "cooldown": 9.0,
-	"conditions": {"caster_energy_above":10},
-    "actions": [
-      {
-        "action_type": "channel",
-        "channel_ticks": 4,
-        "tick_interval": 0.75,
-		"tick_cost": 10.0,
-        "actions": [
-          {
-            "action_type": "damage",
-            "attack_type": 3,
-			"damage_type": 2,
-			"hand": "main",
-            "amp": 0.0,
-            "coeff": 0.45,
-            "shp_min": 0.0,
-            "shp_max": 0.0,
-            "delay": 0.0,
-            "impact_delay": 0.0,
-            "tags": [
-              "depredating_volts",
-              "force_ability",
-              "direct_damage"
-            ]
-          }
-        ]
-      }
-    ]
-  } 
+  }
 }

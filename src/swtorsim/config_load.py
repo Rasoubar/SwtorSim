@@ -6,6 +6,17 @@ from typing import Dict, Any
 
 
 # Ensure you keep your existing Ability class configuration unchanged here!
+def load_abilities_from_dict(raw_data):
+    ability_registry: Dict[str, Ability] = {}
+    for ability_name, config in raw_data.items():
+        # Ensure the underlying class blueprint configuration dictionary knows its identifier name
+        if "name" not in config:
+            config["name"] = ability_name
+
+        # Instantiate your custom OOP Ability instance layout
+        ability_registry[ability_name] = Ability(config)
+
+    return ability_registry
 
 def load_abilities_from_json(filepath: str) -> Dict[str, Ability]:
     if not os.path.exists(filepath):
@@ -16,6 +27,7 @@ def load_abilities_from_json(filepath: str) -> Dict[str, Ability]:
 
     # Safeguard against double-serialized JSON content
     if isinstance(raw_json_data, str):
+        print("SAFEGUARD")
         print("⚠️ Warning: JSON parsed as string. Attempting secondary unpacking...")
         raw_json_data = json.loads(raw_json_data)
 
@@ -23,33 +35,10 @@ def load_abilities_from_json(filepath: str) -> Dict[str, Ability]:
     if not isinstance(raw_json_data, dict):
         raise TypeError(f"Expected JSON root to be a Dictionary/Object, got {type(raw_json_data)}")
 
-    ability_registry: Dict[str, Ability] = {}
-
-    # 🟢 FIXED: Actively instantiate the elements and save them to your dict
-    for ability_name, config in raw_json_data.items():
-        # Ensure the underlying class blueprint configuration dictionary knows its identifier name
-        if "name" not in config:
-            config["name"] = ability_name
-
-        # Instantiate your custom OOP Ability instance layout
-        ability_registry[ability_name] = Ability(config)
-
-    return ability_registry
+    return load_abilities_from_dict(raw_json_data)
 
 
-def load_passives_from_json(filepath: str, subset = None) -> Dict[str, Any]:
-    if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Passives configuration not found at: {filepath}")
-
-    if subset == "Relics":
-        raw_data = load_and_draft_from_file(filepath, category_name="Relic",max_picks=2)
-    else:
-        with open(filepath, "r", encoding="utf-8") as f:
-            raw_data = json.load(f)
-
-        if isinstance(raw_data, str):
-            raw_data = json.loads(raw_data)
-
+def load_passives_from_dict(raw_data):
     proc_registry = {}
 
     # Case A: If your JSON file matches a grouped dictionary mapping pattern:
@@ -86,20 +75,18 @@ def load_passives_from_json(filepath: str, subset = None) -> Dict[str, Any]:
     return proc_registry
 
 
-def load_permanent_buffs_from_json(filepath: str, subset = None) -> Dict[str, ActiveBuff]:
-    """
-    Loads raw permanent buff configurations out of JSON files and maps them
-    strictly to the positional slots layout of the ActiveBuff class container.
-    """
+def load_passives_from_json(filepath: str) -> Dict[str, Any]:
     if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Permanent buff blueprint not found at: {filepath}")
-
+        raise FileNotFoundError(f"Passives configuration not found at: {filepath}")
     with open(filepath, "r", encoding="utf-8") as f:
-        raw_data = json.load(f)
-
+       raw_data = json.load(f)
     if isinstance(raw_data, str):
         raw_data = json.loads(raw_data)
 
+    return load_passives_from_dict(raw_data)
+
+
+def load_permanent_buffs_from_dict(raw_data):
     buff_registry: Dict[str, ActiveBuff] = {}
 
     for buff_key, block in raw_data.items():
@@ -127,10 +114,13 @@ def load_permanent_buffs_from_json(filepath: str, subset = None) -> Dict[str, Ac
 
     return buff_registry
 
-
-def load_and_draft_from_file(filepath: str, category_name: str = "Item", max_picks: int = None) -> dict:
+def load_permanent_buffs_from_json(filepath: str) -> Dict[str, ActiveBuff]:
+    """
+    Loads raw permanent buff configurations out of JSON files and maps them
+    strictly to the positional slots layout of the ActiveBuff class container.
+    """
     if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Could not find file at: {filepath}")
+        raise FileNotFoundError(f"Permanent buff blueprint not found at: {filepath}")
 
     with open(filepath, "r", encoding="utf-8") as f:
         raw_data = json.load(f)
@@ -138,49 +128,90 @@ def load_and_draft_from_file(filepath: str, category_name: str = "Item", max_pic
     if isinstance(raw_data, str):
         raw_data = json.loads(raw_data)
 
-    filename = os.path.basename(filepath)
-    print(f"\n=== Drafting {category_name}s from {filename} ===")
+    return load_permanent_buffs_from_dict(raw_data)
 
-    if max_picks:
-        print(f"⚠️ RESTRICTION: You may only pick a maximum of {max_picks}.")
 
-    print("Type 'y' to take the item, or 'n' to leave it.")
+def draft_choices(filepath, prompt_title, max_picks=None, check_levels=False):
+    """Interactively drafts items from a JSON file based on specific rules."""
+    with open(filepath, 'r', encoding='utf-8') as f:
+        raw_data = json.load(f)
 
-    filtered_data = {}
-    picked_rows = set()
+    selected_raw_abilities = {}
+    selected_raw_procs = {}
+    selected_raw_buffs = {}
+    picked_levels = set()
+    picks = 0
+    print(f"\n--- {prompt_title} ---")
 
     for item_name, item_data in raw_data.items():
-        # RESTRICTION 1: Stop asking if max limit is reached
-        if max_picks is not None and len(filtered_data) >= max_picks:
-            print(f"\n🛑 Maximum limit of {max_picks} reached. Auto-skipping remaining options.")
+        # Rule 1: Max Picks (for Relics/Tacticals)
+        if max_picks and picks >= max_picks:
+            print(f"🛑 Max limit of {max_picks} reached. Skipping remaining.")
             break
 
-        # RESTRICTION 2: Always check the "row" key
-        item_row = item_data.get("row")
-        if item_row is not None and item_row in picked_rows:
-            print(f"  ⏭️  Auto-skipped '{item_name}' (Already picked an option for row {item_row})")
+        # Safely grab the "To_add" array
+        to_add_list = item_data.get("To_add", [])
+        if not to_add_list:
             continue
 
-        # The Interactive Prompt
+        # Peek at the FIRST item in the array to get level and type for the prompt
+        first_key = list(to_add_list[0].keys())[0]
+        first_data = to_add_list[0][first_key]
+
+        item_level = item_data.get("level")
+        print(item_level)
+        primary_type = first_data.get("item_type", "unknown").lower()
+
+        # Rule 2: Level/Row restrictions (for Skill Tree)
+        if check_levels and item_level in picked_levels:
+            # Silently skip if they already picked a talent for this level
+            continue
+
+        # The Prompt
         while True:
-            choice = input(f"Equip '{item_name}'? [y/n]: ").strip().lower()
-
+            choice = input(f"Equip '{item_name}' ({primary_type})? [y/n]: ").strip().lower()
             if choice in ['y', 'yes']:
-                filtered_data[item_name] = item_data
+                # Iterate through EVERYTHING inside the To_add array and route it
+                for addition in to_add_list:
+                    for inner_name, inner_config in addition.items():
+                        inner_type = inner_config.get("item_type", "unknown").lower()
+                        inner_config["name"] = inner_name  # Inject name for the builder
 
-                # Record the "row" value so we block duplicates later
-                if item_row is not None:
-                    picked_rows.add(item_row)
+                        if inner_type == "ability":
+                            selected_raw_abilities[inner_name] = inner_config
+                        elif inner_type == "proc":
+                            selected_raw_procs[inner_name] = inner_config
+                        elif inner_type == "buff":
+                            selected_raw_buffs[inner_name] = inner_config
+                        else:
+                            print(f"⚠️ Unknown item type '{inner_type}' in {inner_name}")
 
-                print(f"  ✅ Added")
+                if check_levels and item_level:
+                    picked_levels.add(item_level)
+                picks += 1
+                print("  ✅ Added")
                 break
-
             elif choice in ['n', 'no', '']:
-                print(f"  ❌ Skipped")
                 break
 
-            else:
-                print("  ⚠️ Please type 'y' for yes, or 'n' for no.")
+    return selected_raw_abilities, selected_raw_buffs, selected_raw_procs
 
-    print(f"\n {len(filtered_data)} {category_name} selected.")
-    return filtered_data
+def optional_choices(choice_dict):
+    print("choices")
+    relics = draft_choices(choice_dict["relics"], prompt_title="Relics", max_picks=2)
+    tactical = draft_choices(choice_dict["tactical"], prompt_title="Tactical", max_picks=1)
+    tree = draft_choices(choice_dict["tree"], prompt_title="Tree", check_levels=True)
+    implants = draft_choices(choice_dict["implants"], prompt_title="Implant", max_picks=2)
+    raw_abilities = relics[0] | tactical[0] | tree[0] |implants[0]
+    raw_buffs = relics[1] | tactical[1] | tree[1] | implants[1]
+    raw_procs = relics[2] | tactical[2] | tree[2] | implants[2]
+
+    abilities = load_abilities_from_dict(raw_abilities)
+    buffs = load_permanent_buffs_from_dict(raw_buffs)
+    procs = load_passives_from_dict(raw_procs)
+
+    return abilities,buffs,procs
+
+def load_rotation_from_json(filepath):
+    with open(filepath, 'r') as f:
+        return json.load(f)

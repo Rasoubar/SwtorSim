@@ -41,7 +41,7 @@ class DamageHit(Event):
         self.ability_name = ability_name
 
     def resolve(self, sim):
-        if not check_hit(self.source, self.action_data.get("hand", "god")):
+        if not check_hit(self.source, self.action_data.get("hand", "main")):
             return
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
         tags = self.action_data.get("tags", [])
@@ -53,7 +53,7 @@ class DamageHit(Event):
         else:
             instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
             instant_land.resolve(sim)
-        sim.tracker.log_damage(self.ability_name, final_damage, is_crit)
+        sim.tracker.log_damage(self.ability_name, final_damage, is_crit, self.target, sim.current_time)
         self.evaluate_on_hit_procs(sim, is_crit, tags)
 
     def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
@@ -98,8 +98,6 @@ def check_hit(source, hand):
         acc = source.stats.get("Main Accuracy")
     elif hand == "off":
         acc = source.stats.get("Off Accuracy")
-    elif hand == "god":
-        return True
     if random.random() + def_chance > acc:
         print("MISSED")
         return False

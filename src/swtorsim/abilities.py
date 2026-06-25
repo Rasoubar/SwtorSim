@@ -6,34 +6,47 @@ from src.swtorsim.requirements import validate_all
 
 def execute_single_action(sim, caster, target, action: dict, source_name: str):
     if not validate_all(action.get("conditions", {}), caster, target):
-        return
+        return False
     if "chance" in action and random.random() > action["chance"]:
-        return
+        return False
     action_type = action.get("action_type")
     delay = action.get("delay", 0.0)
-
     if action_type == "damage":
-        handle_damage_action(sim, caster, target, action, source_name, delay)
+        return handle_damage_action(sim, caster, target, action, source_name, delay)
     elif action_type == "dot":
         handle_dot_action(sim, caster, target, action, source_name)
+        return True
     elif action_type == "channel":
         handle_channel_action(sim, caster, target, action, source_name)
+        return True
     elif action_type == "buff":
         handle_buff_action(sim, caster, action, source_name, sim.current_time)
+        return True
     elif action_type == "debuff":
         handle_debuff_action(sim, target, action, source_name, sim.current_time)
+        return True
     elif action_type == "resource_gain":
         handle_resource_gain_action(sim, caster, action, delay)
+        return True
     elif action_type == "cooldown_mod":
         handle_cooldown_modification(sim, caster, action)
+        return True
     elif action_type == "grant_charge":
         handle_restore_charge(sim, caster, action)
-
+        return True
+    else:
+        raise ValueError(
+            f"CRITICAL ENGINE ERROR: Unrecognized action_type '{action_type}' "
+            f"triggered by '{source_name}'. Please check your JSON blueprints."
+        )
 
 
 def handle_damage_action(sim, caster, target, action, source_name, delay):
+    if not check_hit(caster, action.get("hand","main")):
+        return False
     hit_event = DamageHit(caster, target, action, source_name)
     sim.schedule_relative(delay, hit_event)
+    return True
 
 
 def handle_dot_action(sim, caster, target, action, source_name):
@@ -109,8 +122,8 @@ def handle_cooldown_modification(sim, caster, action):
 def handle_restore_charge(sim, caster, action):
     target_ability_name = action.get("target_ability")
     amount = action.get("amount", 1)
-    if target_ability_name in caster.abilities_db:
-        ability = caster.abilities_db[target_ability_name]
+    if target_ability_name in sim.ability_db:
+        ability = sim.ability_db[target_ability_name]
         ability.add_charge(amount)
 
 
@@ -122,7 +135,6 @@ class Ability:
         self.base_gcd = config.get("base_gcd", 1.5)
         self.actions = config.get ("actions", [])
         self.energy_cost = config.get("energy_cost", 0.0)
-        self.hand = config.get("hand", "main")
         self.tags=config.get("tags",[])
         self.conditions = config.get("conditions", {})
         self.has_charges = config.get("max_charges", 0) > 0
@@ -149,8 +161,6 @@ class Ability:
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
         if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
             return False
-        if not check_hit(caster, self.hand):
-            return False
         if getattr(caster, "active_channel", None) is not None:
             return False
         if self.has_charges:
@@ -165,15 +175,16 @@ class Ability:
         return validate_all(self.conditions, caster, target) #validates conditions
 
     def apply_cooldown_locks(self, caster, sim):
-        caster.next_gcd = sim.current_time
+        #fuck floating points but i dont wanna go integer
+        caster.next_gcd = round(sim.current_time, 4)
         if self.triggers_gcd:
-            caster.next_gcd += caster.calculate_gcd(self.base_gcd)
+            caster.next_gcd = round(sim.current_time + caster.calculate_gcd(self.base_gcd), 4)
         if self.has_charges:
             if self.charges == self.max_charges:
-                self.last_charge_time = sim.current_time
+                self.last_charge_time = round(sim.current_time, 4)
             self.charges -= 1
         elif self.cooldown > 0.0:
-            caster.cooldowns[self.name] = sim.current_time + caster.calculate_cooldown(self.cooldown)
+            caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown), 4)
 
     def cast(self, caster, target, sim) -> bool:
         if not self.can_cast(caster, target, sim):
@@ -191,7 +202,10 @@ class Ability:
         self.apply_cooldown_locks(caster, sim)
         self.evaluate_on_cast_procs(caster, target, sim)
         for action in self.actions:
-            execute_single_action(sim, caster, target, action, self.name)
+            success = execute_single_action(sim, caster, target, action, self.name)
+            if success and "on_success_actions" in action:
+                for child_action in action["on_success_actions"]:
+                    execute_single_action(sim, caster, target, child_action, self.name)
         return True
 
     def evaluate_on_cast_procs(self, caster, target, sim):

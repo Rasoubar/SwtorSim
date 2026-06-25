@@ -1,0 +1,200 @@
+{
+  "Pervasive Death": {
+    "level": 23,
+    "To_add": [
+      {
+        "PERVASIVE_DEATH_15": {
+          "item_type": "buff",
+          "id": 79,
+          "effect_name": "Pervasive Death 15",
+          "value": 0.15,
+          "required_tags": [
+            "death_field"
+          ]
+        }
+      },
+      {
+        "PERVASIVE_DEATH_ARMOR_PEN": {
+          "item_type": "proc",
+          "proc_name": "Pervasive Death Armor Pen",
+          "trigger": "hit",
+          "required_tags": [
+            "death_field"
+          ],
+          "chance": 1.0,
+          "icd": 0.0,
+          "affected_by_cdr": false,
+          "actions": [
+            {
+              "action_type": "buff",
+              "id": 166,
+              "value": 0.125,
+              "duration": 10.0,
+              "effect_name": "Pervasive Death Armor Pen",
+              "charges": 1,
+              "max_charges": 8,
+              "affected_by_cdr": false
+            }
+          ],
+          "conditions": {}
+        }
+      }
+    ]
+  },
+  "Deadly Field": {
+    "level": 23,
+    "To_add": [
+      {
+        "Deadly_Field_Max": {
+          "item_type": "buff",
+          "id": 422,
+          "effect_name": "Deadly Field Max",
+          "value": 1,
+          "required_tags": [
+            "death_field"
+          ]
+        }
+      },
+      {
+        "Deadly_Field_Restore": {
+          "item_type": "proc",
+          "proc_name": "Deadly Field Restore",
+          "trigger": "cast",
+          "required_tags": [
+            "recklessness"
+          ],
+          "chance": 1.0,
+          "icd": 0.0,
+          "affected_by_cdr": false,
+          "actions": [
+            {
+              "action_type": "grant_charge",
+              "target_ability": "death_field",
+              "amount": 1
+            }
+          ],
+          "conditions": {}
+        }
+      }
+    ]
+  },
+  "DEATH_FOCUS": {
+    "level": 23,
+    "To_add": [
+      {
+        "Death_focus": {
+          "item_type": "proc",
+          "proc_name": "Death Focus",
+          "trigger": "cast",
+          "required_tags": [
+            "death_field"
+          ],
+          "chance": 1.0,
+          "icd": 0.0,
+          "actions": [
+            {
+              "action_type": "cooldown_mod",
+              "delay": 0.0,
+              "target_tags": [
+                "recklessness"
+              ],
+              "reset": false,
+              "value": 5.0
+            },
+            {
+              "action_type": "resource_gain",
+              "delay": 0.0,
+              "value": 5.0
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "HUNGERING_FORCE": {
+    "To_add": [
+      {
+        "HUNGERING_FORCE_CRIT": {
+          "item_type": "buff",
+          "id": 133,
+          "effect_name": "Hungering Force Crit",
+          "value": 0.1,
+          "required_tags": [
+            "periodic_damage"
+          ]
+        }
+      },
+      {
+        "HUNGERING_FORCE_DMG": {
+          "item_type": "buff",
+          "id": 134,
+          "effect_name": "Hungering Force Dmg",
+          "value": 0.1,
+          "required_tags": [
+            "periodic_damage"
+          ]
+        }
+      },
+	  {
+		"HUNGERING_FORCE_HEAL": {
+			"item_type":"proc",
+			"proc_name":"hungering_heal_force",
+			"trigger": "hit",
+			"required_tags":["heal"],
+			"chance":1.0,
+			"icd":0,
+			"actions":[{
+				"action_type": "resource_gain",
+				"value":2
+			}]
+		}
+	  }
+	  ],
+    "level": 43
+  },
+  "MALICIOUSNESS": {
+    "To_add": [
+      {
+        "MALICIOUSNESS": {
+          "item_type": "proc",
+          "proc_name": "Maliciousness",
+          "trigger": "cast",
+          "required_tags": [
+            "recklessness"
+          ],
+          "chance": 1.0,
+          "icd": 0.0,
+          "actions": [
+            {
+              "action_type": "buff",
+              "delay": 0.0,
+              "id": 79,
+              "value": 0.1,
+              "effect_name": "Maliciousness",
+              "duration": 20.0,
+              "charges_given": 1,
+              "max_charges": 2,
+              "required_tags": [
+                "eradicate",
+                "melee_ability"
+              ]
+            },
+            {
+              "action_type": "cooldown_mod",
+              "delay": 0.0,
+              "target_tags": [
+                "eradicate",
+                "leeching_strike",
+                "maul",
+                "assassinate",
+                "severing_slash"
+              ],
+              "reset": true
+            }
+          ]
+        }
+      }
+    ],
+    "level": 43
+  }
+}

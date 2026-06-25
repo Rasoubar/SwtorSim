@@ -1,0 +1,317 @@
+[
+    {
+        "type": "fixed",
+        "ability_id": "creeping_terror"
+    },
+    {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
+        "type": "priority_block",
+        "name": "FillerPriority",
+        "pool": [
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "exact_dot_amount": 3
+                }
+            },
+            {
+                "ability_id": "assassinate",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "fixed",
+        "ability_id": "eradicate"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "death_field"
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above":{"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    },
+    {
+        "type": "priority_block",
+        "name": "FillerPriority",
+        "pool": [
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "exact_dot_amount": 3
+                }
+            },
+            {
+                "ability_id": "assassinate",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above":{"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    },
+    {
+        "type": "priority_block",
+        "name": "FillerPriority",
+        "pool": [
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "exact_dot_amount": 3
+                }
+            },
+            {
+                "ability_id": "assassinate",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "fixed",
+        "ability_id": "discharge"
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    },
+    {
+        "type": "priority_block",
+        "name": "FillerPriority",
+        "pool": [
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "exact_dot_amount": 3
+                }
+            },
+            {
+                "ability_id": "assassinate",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "loop_anchor"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "eradicate"
+    },
+    {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    },
+    {
+        "type": "priority_block",
+        "name": "FillerPriority",
+        "pool": [
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "exact_dot_amount": 3
+                }
+            },
+            {
+                "ability_id": "assassinate",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    },
+    {
+        "type": "fixed",
+        "ability_id": "death_field"
+    },
+    {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above":{"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    },
+    {
+        "type": "priority_block",
+        "name": "FillerPriority",
+        "pool": [
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "exact_dot_amount": 3
+                }
+            },
+            {
+                "ability_id": "assassinate",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "priority_block",
+        "name": "dots",
+        "pool": [
+            {
+                "ability_id": "creeping_terror",
+                "rules": {
+                    "dot_absent": "Creeping Terror"
+                }
+            },
+            {
+                "ability_id": "discharge",
+                "rules": {
+                    "dot_absent": "Discharge"
+                }
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    },
+    {
+        "type": "priority_block",
+        "name": "FillerPriority",
+        "pool": [
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "exact_dot_amount": 3
+                }
+            },
+            {
+                "ability_id": "assassinate",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {}
+    },
+    {
+        "type": "optional",
+        "ability_id": "phantom_stride",
+        "rules": {
+            "target_hp_above_pct": 0.3,
+            "proc_cooldown_above": {"name": "Bloodletting", "value": 4.0},
+            "caster_does_not_have_buff": "Bloodletting"
+        }
+    }
+]

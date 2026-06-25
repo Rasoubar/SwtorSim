@@ -7,6 +7,7 @@ EFFECTS = {
     220: {"stat_name": "Damage Modifier", "modifier_bucket": "sub_30"},
     116: {"stat_name": "Critical Chance"},
     117: {"stat_name": "Critical Damage"},
+    134: {"stat_name": "Critical Damage"},
     133: {"stat_name": "Critical Chance"},
     46: {"stat_name": "Damage Modifier", "modifier_bucket": "unknown_percentage"},
     68: {"stat_name": "cost_reduction_flat"},
@@ -17,7 +18,8 @@ EFFECTS = {
     155: {"stat_name": "Power Stat"},
     156: {"stat_name": "Critical Stat"},
     64:{ "stat_name": "Base Cooldown Modifier"},
-    154:{"stat_name": "Accuracy"}
+    154:{"stat_name": "Accuracy"},
+    422:{"stat_name": "Ability Base Charges"}
 }
 
 
@@ -81,6 +83,7 @@ def get_modifiers(caster, target, action_tags):
 
 
 def calculate_hit(caster, target, action_data):
+    print(f'TARGET DOTS NAMES: {target.dots}')
     attack_type = action_data["attack_type"]  # 1 = melee, 2 = ranged, 3 = force, 4 = tech
     action_tags = action_data.get("tags", [])
     if attack_type in (1, 2):

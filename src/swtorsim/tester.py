@@ -37,10 +37,16 @@ class SingleTester:
                 for ability in sim.ability_db.values():
                     if hasattr(ability, "tags") and any(tag in ability.tags for tag in effect.required_tags):
                         ability.cooldown -= effect.value
+            if effect.id == 422 and effect.required_tags is not None:
+                for ability in sim.ability_db.values():
+                    if hasattr(ability, "tags") and any(tag in ability.tags for tag in effect.required_tags):
+                        ability.max_charges += effect.value
+                        ability.charges += effect.value
 
         player.rotation = Rotation(name="Custom Profile Loop", steps_config=self.rotation_config, loop=True)
         print(player.stats)
-
+        print(player.effects)
+        print(player.procs)
         sim.schedule_absolute(0.0, PlayerReady(player, target))
         first_regen_tick = random.uniform(0.0, 1.0)
         sim.schedule_absolute(first_regen_tick, ResourceTick(player))
@@ -73,6 +79,29 @@ class SingleTester:
             dmg = data["total_damage"]
             dps = dmg / elapsed_time
             print(f"{name:<25} | {dmg:<12,.0f} | {dps:<8,.1f}")
+
+            # 🟢 NEW: Calculate and print True Phase DPS
+        if getattr(sim.tracker, 'total_execute_damage', 0) > 0 and getattr(sim.tracker, 'execute_start_time',
+                                                                               None) is not None:
+            # Calculate how many seconds the execute phase lasted
+            execute_duration = elapsed_time - sim.tracker.execute_start_time
+            execute_duration = max(execute_duration, 1.0)  # Prevent division by zero
+
+            phase_dps = sim.tracker.total_execute_damage / execute_duration
+
+            print("\n" + "=" * 55)
+            print(f"  EXECUTE PHASE (<30% HP)")
+            print(f"  Phase Duration : {execute_duration:.1f}s")
+            print(f"  Phase DPS      : {phase_dps:,.1f}")
+            print("-" * 55)
+
+            for name, data in sorted(sim.tracker.execute_breakdown.items(),
+                                         key=lambda item: item[1]["total_damage"], reverse=True):
+                dmg = data["total_damage"]
+                dps = dmg / execute_duration  # 🟢 DPS is now relative to the phase duration
+                print(f"{name:<25} | {dmg:<12,.0f} | {dps:<8,.1f}")
+
+        print("=" * 55 + "\n")
         print("=" * 55 + "\n")
 
         return calculated_dps

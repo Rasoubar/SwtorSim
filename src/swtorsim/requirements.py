@@ -4,7 +4,7 @@ if TYPE_CHECKING:
 
 def check_target_hp(conditions, caster: "Player", target: "Target",**kwargs) -> bool:
     if isinstance(conditions, dict):
-        threshold = conditions.get("pct", 1.0)
+        threshold = conditions.get("pct", 0.3)
         bypass_buffs = conditions.get("bypass_if_buff_active", None)
     else:
         threshold = conditions
