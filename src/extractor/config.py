@@ -13,6 +13,16 @@ DATA_DIR = Path("data")
 WORK_DIR = Path("data/extract_work")
 OUTPUT_DIR = Path("data/extracted")
 
+# FQN prefixes whose nodes are followed during combat graph traversal.
+COMBAT_FQN_PREFIXES = (
+    "apc.",
+    "abl.",
+    "tal.",
+    "dis.",
+)
+
+ABILITY_REPLACEMENT_NODE_ID = "16141053964861013368"
+
 ORIGIN_STORIES = (
     "agent",
     "bounty_hunter",
@@ -24,17 +34,19 @@ ORIGIN_STORIES = (
     "trooper",
 )
 
-# FQN prefixes whose nodes are followed during combat graph traversal.
-COMBAT_FQN_PREFIXES = (
-    "apc.",
-    "abl.",
-    "tal."
-)
-
 # Combat-relevant item ability trees that are not reachable from player APC nodes.
 ITEM_ABILITY_FQN_PREFIXES = (
     "abl.itm.legendary",
     "abl.itm.tactical.sow",
+)
+
+RELIC_ABILITY_FQN_PREFIX = "abl.itm.relic"
+RELIC_SCALES_WITH_ITEM_RATING_SEGMENT = "scales_with_item_rating"
+
+# Item nodes for tactical and legendary implants (name lookup via itm.stb).
+ITEM_FQN_PREFIXES = (
+    "itm.legendary",
+    "itm.tactical.sow",
 )
 
 # Ability effect ID list on abl nodes.
@@ -58,11 +70,18 @@ LOC_STR_BUCKET_FIELD = "4611686093000569993"
 # English language key in loc retriever lookup lists.
 LOC_ENGLISH_KEY = "15685385242400905286"
 
+# Integer fields on disDisciplineInfo that store STB string IDs.
+SKILL_TREES_STB_BUCKET = "gui.abl.player.skill_trees"
+
+STB_STRING_FIELD_BUCKETS: dict[str, str] = {
+    "4611686359990757004": SKILL_TREES_STB_BUCKET,  # disDisciplinePackageName
+    "4611686359990757005": SKILL_TREES_STB_BUCKET,  # disDisciplineTabName
+}
+
 
 @dataclass
 class ExtractorConfig:
     assets_path: Path
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES
     force_hash_update: bool = False
     pts: bool = False
     keep_work_files: bool = False

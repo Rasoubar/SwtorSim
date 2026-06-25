@@ -1,9 +1,5 @@
 # Python extractor intermediate files
-data/extract_work/
-data/extracted/
-data/hashes.bin
-data/hashes_filename.txt
-data/gom.js
+data/
 .venv/
 __pycache__/
 *.pyc
