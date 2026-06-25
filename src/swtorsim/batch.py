@@ -4,6 +4,8 @@ import math
 import copy
 import time
 import random
+import statistics
+import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
 from src.swtorsim.engine import Simulation
 from src.swtorsim.entities import Player, Target
@@ -152,11 +154,13 @@ class ParallelBatchRunner:
         min_dps = min(all_dps)
         max_dps = max(all_dps)
         std_dev = math.sqrt(sum((x - avg_dps) ** 2 for x in all_dps) / len(all_dps))
+        median_dps = statistics.median(all_dps)
 
         print("\n" + "=" * 65)
         print(f"  MONTE CARLO REPORT ({iterations} Fights)")
         print("=" * 65)
         print(f"Average Performance : {avg_dps:,.1f} DPS")
+        print(f"Median Performance  : {median_dps:,.1f} DPS")
         print(f"Worst Performance   : {min_dps:,.1f} DPS")
         print(f"Best Performance    : {max_dps:,.1f} DPS")
         print(f"Standard Deviation  : ±{std_dev:,.1f} DPS")
@@ -196,3 +200,50 @@ class ParallelBatchRunner:
 
                 print(f"{name:<25} | {avg_ability_dps:<12,.1f} | {share_pct:>6.1f}% | {avg_hits:>8.1f}")
             print("=" * 65 + "\n")
+            self._plot_dps_histogram(all_dps,avg_dps, std_dev, iterations)
+
+    def _plot_dps_histogram(self, all_dps, avg_dps, std_dev, iterations):
+        """Helper to render and save the Monte Carlo DPS distribution."""
+        plt.figure(figsize=(10, 6))
+
+        # Determine a dynamic number of bins based on iteration scale
+        num_bins = max(10, min(50, iterations // 20))
+
+        # Plot the histogram
+        n, bins, patches = plt.hist(
+            all_dps,
+            bins=num_bins,
+            color='#2ca02c',
+            alpha=0.75,
+            edgecolor='black',
+            linewidth=0.6,
+            label='DPS Distribution'
+        )
+
+        # Add a vertical line indicating the average DPS
+        plt.axvline(avg_dps, color='red', linestyle='dashed', linewidth=1.5,
+                    label=f'Avg DPS: {avg_dps:,.1f}')
+
+        # Add shaded regions representing Standard Deviation bounds
+        plt.axvspan(avg_dps - std_dev, avg_dps + std_dev, color='gray', alpha=0.15,
+                    label=f'±1 Std Dev ({std_dev:,.1f} DPS)')
+
+        # Customizing Titles & Labels
+        plt.title(f'SWTOR Sim: Monte Carlo DPS Distribution ({iterations} Fights)', fontsize=14, fontweight='bold',
+                  pad=15)
+        plt.xlabel('Damage Per Second (DPS)', fontsize=12)
+        plt.ylabel('Frequency (Frequency of Runs)', fontsize=12)
+        plt.grid(axis='y', linestyle='--', alpha=0.5)
+        plt.legend(loc='upper right')
+
+        # Apply a clean layout
+        plt.tight_layout()
+
+        # Options: Save to disk, show interactively, or both
+        output_filename = "dps_distribution_histogram.png"
+        plt.savefig(output_filename, dpi=300)
+        print(f"Histogram successfully generated and saved to: {output_filename}")
+
+        # Uncomment the line below if you are running in a GUI environment and want it to pop up:
+        plt.show()
+        plt.close()

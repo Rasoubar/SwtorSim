@@ -3,20 +3,20 @@ from src.swtorsim.batch import ParallelBatchRunner
 from src.swtorsim.tester import SingleTester
 
 
-Rotation = load_rotation_from_json("data/Assassin/Hatred/Rotations/HungeringForce2fields.json")
+Rotation = load_rotation_from_json("data/Assassin/Hatred/Rotations/BasicMaliPS.json")
 
 MY_CUSTOM_CHARACTER_STATS = {
     "class_name": "Assassin",
     "stats": {
-        "Mastery": 16834,
-        "Power": 14503,
+        "Mastery": 16570,
+        "Power": 14394,
         "Force Power": 9332,
-        "Critical Rating": 3758,
+        "Critical Rating": 4029,
         "Alacrity Rating": 2218,
         "Main_hand_min": 2513,
         "Main_hand_max": 3769,
         "Standard_health": 19335,
-        "Accuracy Rating": 2722
+        "Accuracy Rating": 2824
     }
 }
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
+    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
     # -----------------------------------
 
     if RUN_MODE == "TEST":
@@ -60,4 +60,4 @@ if __name__ == "__main__":
             procs_db=procs_db,
             buffs_db=buffs_db
         )
-        runner.run_monte_carlo(iterations=1000, duration=10000.0, dummy_hp=10000000)
+        runner.run_monte_carlo(iterations=10000, duration=10000.0, dummy_hp=10000000)
