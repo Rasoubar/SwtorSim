@@ -36,6 +36,19 @@ def collect_list_items(prompt_label):
             print("⚠️ Already added.")
     return items
 
+def collect_stack_values(prefix=""):
+    """Collects an array of exact float values for non-linear stack scaling."""
+    stack_vals = []
+    print(f"\n{prefix}--- Non-Linear Stack Values ---")
+    print(f"{prefix}Enter the exact value for each stack level (1st entry = 1 stack, 2nd = 2 stacks, etc.).")
+    stack_num = 1
+    while True:
+        val = get_input(f"{prefix}Value for {stack_num} stack(s)", float)
+        stack_vals.append(val)
+        if not get_input(f"{prefix}Add a value for {stack_num + 1} stacks? (y/n)", bool, False):
+            break
+        stack_num += 1
+    return stack_vals
 
 def build_conditions(prefix=""):
     """Builds a dictionary of conditional rules dynamically."""
@@ -59,6 +72,7 @@ def build_conditions(prefix=""):
         print(f"{prefix}  ✅ Added rule -> {key}: {val}")
 
     return conditions
+
 def build_action(is_nested=False, depth=0):
     """Builds a single action dictionary interactively, supporting recursive nesting."""
     prefix = "  " * depth + ("↪ " if is_nested else "")
@@ -118,6 +132,9 @@ def build_action(is_nested=False, depth=0):
         action["effect_name"] = get_input(f"{prefix}Effect Name", str)
         action["duration"] = get_input(f"{prefix}Duration (seconds)", float, 10.0)
 
+        if get_input(f"{prefix}Does this buff have custom non-linear stack scaling (e.g., Static Charge)? (y/n)", bool, False):
+            action["stack_values"] = collect_stack_values(f"{prefix}  ")
+
         if get_input(f"{prefix}Does this buff utilize or modify charges? (y/n)", bool, False):
             charges_given = get_input(f"{prefix}Charges this buff gives/restores (0 to skip)", int, 0)
             if charges_given > 0:
@@ -136,6 +153,9 @@ def build_action(is_nested=False, depth=0):
         action["value"] = get_input(f"{prefix}Debuff Value", float, 0.0)
         action["effect_name"] = get_input(f"{prefix}Effect Name", str)
         action["duration"] = get_input(f"{prefix}Duration (seconds)", float, 10.0)
+
+        if get_input(f"{prefix}Does this debuff have custom non-linear stack scaling? (y/n)", bool, False):
+            action["stack_values"] = collect_stack_values(f"{prefix}  ")
 
     elif action_type == "resource_gain":
         action["value"] = get_input(f"{prefix}Amount of Resource Given", float, 0.0)
@@ -261,6 +281,9 @@ def build_permanent_buff():
     # What does this buff actually do?
     print("\n[Stat Modification]")
     entry_data["value"] = get_input("Value multiplier (e.g., 1.10 for 10% damage increase)", float, 1.0)
+
+    if get_input("Does this buff have custom non-linear stack scaling? (y/n)", bool, False):
+        entry_data["stack_values"] = collect_stack_values("  ")
 
     # Are there restrictions on what this buff applies to?
     if req_tags := collect_list_items("Required Tags (e.g., 'melee', 'direct_damage' - leave empty if global)"):

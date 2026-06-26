@@ -44,16 +44,21 @@ def get_modifiers(caster, target, action_tags):
                     continue
             if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
                 continue
-            multiplier = buff.charges if buff.max_charges is not None else 1
+            if buff.stack_values:
+                stack_index = min(buff.charges - 1, len(buff.stack_values) - 1)
+                total_buff_value = buff.stack_values[stack_index]
+            else:
+                multiplier = buff.charges if buff.max_charges is not None else 1
+                total_buff_value = buff.value * multiplier
             if meta["stat_name"] == "Damage Modifier":
                 bucket = meta["modifier_bucket"]
-                buckets[bucket] = buckets.get(bucket, 0.0) + (buff.value * multiplier)
+                buckets[bucket] = buckets.get(bucket, 0.0) + total_buff_value
             elif meta["stat_name"] == "Critical Chance":
-                modifiers['bonus_crit_chance'] += (buff.value * multiplier)
+                modifiers['bonus_crit_chance'] += total_buff_value
             elif meta["stat_name"] == "Critical Damage":
-                modifiers['bonus_crit_modifier'] += (buff.value * multiplier)
+                modifiers['bonus_crit_modifier'] += total_buff_value
             elif meta["stat_name"] == "Armor Penetration":
-                modifiers['bonus_armor_pen'] += (buff.value * multiplier)
+                modifiers['bonus_armor_pen'] += total_buff_value
             if buff.consumable_charges is not None and buff.id != 68: #temporary
                 buff.consumable_charges -= 1
                 if buff.consumable_charges <= 0:

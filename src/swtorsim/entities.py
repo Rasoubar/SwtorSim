@@ -32,10 +32,11 @@ class ActiveChannel:
 class ActiveBuff:
     __slots__ = [
         'id', 'effect_name', 'stat_name', 'value', 'expires_at', 'source_ability', 'required_tags', 'charges', 'consumable_charges',
-        'max_charges', 'proc_data', 'last_proc_at','target_hp_threshold']
+        'max_charges', 'proc_data', 'last_proc_at','target_hp_threshold',"stack_values"]
 
     def __init__(self, id_num, effect_name, stat_name, value, expires_at, source_ability,
-                 required_tags=None, charges=None, consumable_charges=None, max_charges = None, target_hp_threshold = None):
+                 required_tags=None, charges=None, consumable_charges=None, max_charges = None, target_hp_threshold = None,
+                 stack_values = None):
         self.id = id_num
         self.effect_name = effect_name
         self.stat_name = stat_name
@@ -47,6 +48,7 @@ class ActiveBuff:
         self.consumable_charges = consumable_charges
         self.max_charges = max_charges
         self.target_hp_threshold = target_hp_threshold
+        self.stack_values = stack_values
 
 class ProcData:
     __slots__ = ['name','actions','chance','icd','next_possible_proc','trigger','required_tags','affected_by_cdr',
@@ -171,7 +173,8 @@ class Player(Actor):
             charges= current_charges,
             consumable_charges=action.get("consumable_charges"),
             max_charges=action.get("max_charges"),
-            target_hp_threshold=action.get("target_hp_threshold")
+            target_hp_threshold=action.get("target_hp_threshold"),
+            stack_values=action.get("stack_values")
         )
 
         self.effects[buff_key] = buff_instance
@@ -324,7 +327,8 @@ class Target(Actor):
             charges=current_charges,
             consumable_charges=action.get("consumable_charges"),
             max_charges=action.get("max_charges"),
-            target_hp_threshold=action.get("target_hp_threshold")
+            target_hp_threshold=action.get("target_hp_threshold"),
+            stack_values=action.get("stack_values")
         )
         self.debuffs[debuff_key] = debuff_instance
 

@@ -26,6 +26,7 @@ Actions
 	"action_type": "buff" or "debuff"
 		"id": int #check jedipedia for buff id. Ive used placeholder and some made up ones. Check EFFECTS in requirements for list rn
 		"value": float #value of the buff's effect
+		"stack_values": list # (Optional) Array of exact values per stack for non-linear scaling (e.g., [0.0, 1.0, 2.0] for 1, 2, and 3 stacks)
 		"duration": float
 		"required_tags": list #tags that the action has to have one of to be affected by this. Leave empty if no tags required
 		"effect_name": string
@@ -58,6 +59,7 @@ BUFFS
 	"CAPSLOCKED NAME" #same as for action buff for everything, just has less parameters
 		"id": int
 		"value":float
+		"stack_values": list # (Optional) Array of exact values per stack
 		"required tags": list
 		"effect_name": string
 		"target_hp_threshold": float #only aplies after target under this percent
