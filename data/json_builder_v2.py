@@ -65,7 +65,7 @@ def build_action(is_nested=False, depth=0):
     print(f"\n{prefix}--- Building Action ---")
 
     action_type = get_input(
-        f"{prefix}Action type ('damage', 'buff', 'debuff', 'resource_gain', 'cooldown_mod', 'dot', 'channel')",
+        f"{prefix}Action type ('damage', 'buff', 'debuff', 'resource_gain', 'cooldown_mod', 'dot', 'channel', 'buff_remove')",
         str).lower()
     action = {"action_type": action_type}
 
@@ -145,6 +145,9 @@ def build_action(is_nested=False, depth=0):
         action["reset"] = get_input(f"{prefix}Is the cooldown completely reset? (y/n)", bool, False)
         if not action["reset"]:
             action["value"] = get_input(f"{prefix}Cooldown reduction value (seconds)", float, 0.0)
+
+    elif action_type == "buff_remove":
+        action["target_effect"] = get_input(f"{prefix}Target Effect Name to remove", str)
 
     else:
         print(f"⚠️ Warning: Unrecognized action type '{action_type}'. Building as a generic empty action.")
@@ -349,8 +352,6 @@ def main():
                 pass
 
     # --- 4. FORMATTING & APPENDING ---
-    # (Removed the redundant is_choice_format question here!)
-
     if is_choice_format:
         print("\n--- Wrapping & Appending Choice ---")
         outer_key = get_input("Enter the Top-Level Choice Name (e.g., PenetratingDeath)", str, lookup_key)

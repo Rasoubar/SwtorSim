@@ -9,8 +9,7 @@ Actions
 		"shp_max":float #check jedipedia
 		"delay": float #how long after the ability is the action executed.
 		"impact_delay": float #how long after the action is executed does the damage land. example is 1st hit of most attacking takes 0.2 seconds. Know it resolves first because of procs
-		"conditions": dict #conditions needed for the action to be excuted. 
-			note: conditions can have a "bypass_if_buff_active" that rn is only for check_target_hp but in retrospect will need to be for all
+		"conditions": dict #conditions needed for the action to be excuted. note: conditions can have a "bypass_if_buff_active" that rn is only for check_target_hp but in retrospect will need to be for all
 			options:"target_hp_below_pct" : float
 				"target_has_debuff": debuff_name
     				"caster_has_buff": buff_name
@@ -34,9 +33,12 @@ Actions
 		"max_charges": int
 		"affect_by_cdr": bool #is this buff affected by cooldown reduction? I haven't seen one yet. standad is False
 		"conditions": dict #conditions for buff to happen. Like for Maliciousness when using recklessness you need the talent choice.
+	"action_type": "buff_remove"
+		"target_effect": string
+		"delay": float
 	"action_type" : "resource_gain"
 		"value": float #amount of resource given
-		"conditions" : dict 
+		"conditions" : dict
 	"action_type" : "cooldown_mod"
 		"target_tags": "list #tags an ability can have to have it's cooldown altered
 		"reset": bool #is the cooldown completely reset?
@@ -48,18 +50,18 @@ Abilities
 		"cooldown": float
 		"tiggers_gcd": bool
 		"base_gcd":float #only needed if triggers_gcd
-		"energy_cost": float 
+		"energy_cost": float
 		"conditions": dict
 		"tags": list
-		
+
 BUFFS
 	"CAPSLOCKED NAME" #same as for action buff for everything, just has less parameters
-		"id": int 
-		"value":float 
+		"id": int
+		"value":float
 		"required tags": list
 		"effect_name": string
 		"target_hp_threshold": float #only aplies after target under this percent
-PROCS 
+PROCS
 	"CAPSLOCKED NAME"{
 		"proc_name": string
 		"trigger": string # options: "hit", "crit", "cast", or "periodic"
@@ -70,6 +72,3 @@ PROCS
 		"actions": list # list of Action dictionaries (same format as ability actions)
 		"conditions": dict # standard conditions required for the proc to fire
 	}
-
-
-
