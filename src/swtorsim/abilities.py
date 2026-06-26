@@ -34,6 +34,9 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
     elif action_type == "grant_charge":
         handle_restore_charge(sim, caster, action)
         return True
+    elif action_type == "buff_remove":
+        handle_buff_remove_action(sim, caster, action)
+        return True
     else:
         raise ValueError(
             f"CRITICAL ENGINE ERROR: Unrecognized action_type '{action_type}' "
@@ -125,6 +128,12 @@ def handle_restore_charge(sim, caster, action):
     if target_ability_name in sim.ability_db:
         ability = sim.ability_db[target_ability_name]
         ability.add_charge(amount)
+
+def handle_buff_remove_action(sim, caster, action):
+    effect_name = action.get("effect_name")
+    if effect_name and caster.has_buff(effect_name):
+        caster.cleanup_expired_effects([effect_name])
+        print(f"[{sim.current_time:.3f}] {caster.name} consumed/removed buff: {effect_name}")
 
 
 class Ability:
