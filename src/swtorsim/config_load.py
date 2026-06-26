@@ -215,3 +215,15 @@ def optional_choices(choice_dict):
 def load_rotation_from_json(filepath):
     with open(filepath, 'r') as f:
         return json.load(f)
+
+
+import json
+import os
+
+
+def load_character_stats_from_json(filepath: str) -> dict:
+    if not os.path.exists(filepath):
+        raise FileNotFoundError(f"Stats configuration file not found at: {filepath}")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        return json.load(f)
