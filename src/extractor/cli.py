@@ -7,6 +7,7 @@ from pathlib import Path
 
 from extractor.config import (
     ABILITY_REPLACEMENT_NODE_ID,
+    DEFAULT_ITEM_RATING,
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
     ORIGIN_STORIES,
@@ -20,6 +21,10 @@ from extractor.dump import write_node_dump
 from extractor.extract import extract_relevant_files
 from extractor.gear import build_gear_abilities_talents
 from extractor.relics import build_relics
+from extractor.standard_rating import (
+    load_standard_rating_table,
+    standard_rating_for_item_rating,
+)
 from extractor.gom.gom import GomLookup, parse_gom_js
 from extractor.gom_cache import ensure_jedipedia_gom_js
 from extractor.graph import (
@@ -64,6 +69,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--keep-work",
         action="store_true",
         help="Keep intermediate extracted files in data/extract_work",
+    )
+    parser.add_argument(
+        "--item-rating",
+        type=int,
+        default=DEFAULT_ITEM_RATING,
+        help=(
+            "Item rating used to resolve relic standard-rating scaled amounts "
+            f"(default: {DEFAULT_ITEM_RATING})"
+        ),
     )
     return parser
 
@@ -141,7 +155,16 @@ def run_extraction(config: ExtractorConfig) -> Path:
 
     parsed_dir = config.data_dir / "parsed"
     talent_count = build_talents(records, parsed_dir)
-    ability_count = build_abilities(records, parsed_dir)
+    standard_rating_table = load_standard_rating_table(store, gom, strings)
+    standard_rating = standard_rating_for_item_rating(
+        standard_rating_table,
+        config.item_rating,
+    )
+    ability_count = build_abilities(
+        records,
+        parsed_dir,
+        standard_rating=standard_rating,
+    )
 
     gear_path = config.data_dir / "gear_abilities_talents.json"
     gear_count = build_gear_abilities_talents(store, gom, strings, gear_path)
@@ -159,6 +182,10 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
     print(f"Wrote {talent_count} talent files to {parsed_dir / 'tal'}")
     print(f"Wrote {ability_count} ability files to {parsed_dir / 'abl'}")
+    print(
+        f"Relic standard rating resolved for item rating {config.item_rating}: "
+        f"{standard_rating}"
+    )
     print(f"Wrote {gear_count} gear entries to {gear_path}")
     print(f"Wrote {relic_count} relics to {relics_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
@@ -180,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
         force_hash_update=args.force_hash_update,
         pts=args.pts,
         keep_work_files=args.keep_work,
+        item_rating=args.item_rating,
     )
 
     try:

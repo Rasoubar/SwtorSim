@@ -22,6 +22,8 @@ COMBAT_FQN_PREFIXES = (
 )
 
 ABILITY_REPLACEMENT_NODE_ID = "16141053964861013368"
+STANDARD_RATING_INFO_NODE_ID = "16140953577088069180"
+DEFAULT_ITEM_RATING = 344
 
 ORIGIN_STORIES = (
     "agent",
@@ -85,6 +87,7 @@ class ExtractorConfig:
     force_hash_update: bool = False
     pts: bool = False
     keep_work_files: bool = False
+    item_rating: int = DEFAULT_ITEM_RATING
 
     @property
     def data_dir(self) -> Path:
