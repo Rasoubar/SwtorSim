@@ -1,5 +1,4 @@
 # Python extractor intermediate files
-data/
 .venv/
 __pycache__/
 *.pyc

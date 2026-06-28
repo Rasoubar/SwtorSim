@@ -1,0 +1,48 @@
+{
+  "DISCHARGE": {
+    "item_type": "ability",
+    "id": "discharge",
+    "name": "Discharge",
+    "energy_cost": 20.0,
+    "base_gcd": 1.5,
+    "cooldown": 0.0,
+    "tags": [
+      "lightning_ability",
+      "agressive_action",
+      "force_ability"
+    ],
+    "conditions": {
+      "caster_has_buff": "Static Charge"
+    },
+    "actions": [
+      {
+        "action_type": "damage",
+        "delay": 0.0,
+        "attack_type": 3,
+        "damage_type": 4,
+        "hand": "main",
+        "amp": 0.0,
+        "coeff": 0.73,
+        "shp_min": 0.053,
+        "shp_max": 0.093,
+        "impact_delay": 0.5,
+        "tags": [
+          "lightning_ability",
+          "agressive_action",
+          "force_ability",
+          "discharge_initial",
+          "discharge_effect_surging",
+          "force_attack",
+          "direct_damage"
+        ],
+        "on_success_actions": [
+          {
+            "action_type": "buff_remove",
+			"target_effect": "Static Charge",
+            "delay": 0.0
+          }
+        ]
+      }
+    ]
+  }
+}
