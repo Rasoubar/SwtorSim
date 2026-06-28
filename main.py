@@ -98,7 +98,7 @@ if __name__ == "__main__":
     Rotation, MY_CUSTOM_CHARACTER_STATS, abilities_db, procs_db, buffs_db = get_dynamic_loadout()
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
+    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
     # -----------------------------------
 
     if RUN_MODE == "TEST":
@@ -119,4 +119,4 @@ if __name__ == "__main__":
             procs_db=procs_db,
             buffs_db=buffs_db
         )
-        runner.run_monte_carlo(iterations=30000, duration=300.0, dummy_hp=10000000)
+        runner.run_monte_carlo(iterations=5000, duration=300.0, dummy_hp=10000000)

@@ -45,7 +45,7 @@ def get_modifiers(caster, target, action_tags):
             if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
                 continue
             if buff.stack_values:
-                stack_index = max(0,min(buff.charges - 1, len(buff.stack_values) - 1)) #no negative indexs. not sure if needed tbh
+                stack_index = max(0,min(buff.charges - 1, len(buff.stack_values) - 1)) #max for no negative indexs. not sure if needed tbh
                 total_buff_value = buff.stack_values[stack_index]
             else:
                 multiplier = buff.charges if buff.max_charges is not None else 1
