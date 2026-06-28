@@ -16,12 +16,15 @@ from extractor.config import (
     COMBAT_REF_FIELD_IDS,
     COMBAT_FQN_PREFIXES,
     ITEM_ABILITY_FQN_PREFIXES,
-    ORIGIN_STORIES,
+    RELIC_ABILITY_FQN_PREFIX,
+    RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
+    STB_STRING_FIELD_BUCKETS,
 )
 from extractor.gom.gom import GomLookup
 from extractor.ids import u64_str
 from extractor.node import (
     DOM_ENUM,
+    DOM_ID,
     ParsedField,
     ParsedNode,
     collect_node_refs,
@@ -120,9 +123,14 @@ class BucketStore:
         return parse_node_fields(payload, index_entry.stream_style, field_lookup)
 
 
+def discover_dis_nodes(store: BucketStore) -> list[str]:
+    """All discipline entry-point nodes: dis.*."""
+    return sorted(fqn for fqn in store.fqn_to_id if fqn.startswith("dis."))
+
+
 def discover_apc_roots(
     store: BucketStore,
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    origin_stories: tuple[str, ...],
 ) -> list[str]:
     """Entry-point APC per origin story: apc.<origin_story>.base."""
     stories = set(origin_stories)
@@ -139,9 +147,25 @@ def discover_apc_roots(
     return sorted(roots)
 
 
+def discover_apc_base_nodes(
+    store: BucketStore,
+    origin_stories: tuple[str, ...],
+) -> list[str]:
+    """Class and combat-style base APCs: apc.<os>.base and apc.<os>.<style>.base."""
+    stories = set(origin_stories)
+    nodes: list[str] = []
+    for fqn in store.fqn_to_id:
+        parts = fqn.split(".")
+        if parts[0] != "apc" or parts[1] not in stories or parts[-1] != "base":
+            continue
+        if len(parts) == 3 or len(parts) == 4:
+            nodes.append(fqn)
+    return sorted(nodes)
+
+
 def discover_player_apc_nodes(
     store: BucketStore,
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    origin_stories: tuple[str, ...],
 ) -> list[str]:
     """All player APC nodes under each origin story: apc.<origin_story>.*."""
     stories = set(origin_stories)
@@ -173,6 +197,28 @@ def discover_item_ability_nodes(
     return discover_fqn_prefix_nodes(store, prefixes)
 
 
+def discover_scaled_relic_ability_nodes(store: BucketStore) -> list[str]:
+    """Root relic abilities whose FQN contains scales_with_item_rating."""
+    marker = f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}"
+    nodes: list[str] = []
+    for fqn, node_id in store.fqn_to_id.items():
+        if not fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}."):
+            continue
+        if marker not in fqn or "/" in fqn:
+            continue
+        if store.index[node_id].base_class_name != "ablAbility":
+            continue
+        nodes.append(fqn)
+    return sorted(nodes)
+
+
+def is_allowed_relic_fqn(fqn: str) -> bool:
+    """Only rating-scaled relic ability trees are extracted."""
+    if not fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}."):
+        return True
+    return f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}" in fqn
+
+
 def _is_combat_fqn(fqn: str) -> bool:
     return any(fqn.startswith(prefix) for prefix in COMBAT_FQN_PREFIXES)
 
@@ -188,6 +234,11 @@ def _resolve_enum_value(
     return gom.enum_member(resolved_type, index)
 
 
+def _resolve_id_name(id_str: Any, store: BucketStore) -> Any:
+    entry = store.index.get(str(id_str))
+    return entry.fqn if entry else id_str
+
+
 def _resolve_value(
     value: Any,
     store: BucketStore,
@@ -196,7 +247,16 @@ def _resolve_value(
     tag_resolver: TagResolver | None = None,
     field_id: str = "",
     enum_type_id: str | None = None,
+    dom_type: int | None = None,
 ) -> Any:
+    if dom_type == DOM_ID and isinstance(value, str):
+        return _resolve_id_name(value, store)
+
+    if field_id in STB_STRING_FIELD_BUCKETS and isinstance(value, str):
+        text = strings.resolve(STB_STRING_FIELD_BUCKETS[field_id], value)
+        if text is not None:
+            return text
+
     if isinstance(value, dict) and "ref_id" in value:
         ref_id = value["ref_id"]
         target = store.index.get(ref_id)
@@ -235,6 +295,7 @@ def _resolve_value(
                     tag_resolver,
                     field_id,
                     enum_type_id=key_enum_ref,
+                    dom_type=key_type,
                 )
             if value_type == DOM_ENUM and isinstance(val, dict) and "index" in val:
                 resolved_val: Any = _resolve_enum_value(
@@ -252,9 +313,35 @@ def _resolve_value(
                     tag_resolver,
                     field_id,
                     enum_type_id=val_enum_ref,
+                    dom_type=value_type,
                 )
             entries.append({"key": resolved_key, "value": resolved_val})
         return entries
+
+    if (
+        isinstance(value, dict)
+        and "element_type" in value
+        and "list" in value
+        and "key_type" not in value
+    ):
+        element_type = value["element_type"]
+        return {
+            "element_type": element_type,
+            "element_type_name": value.get("element_type_name"),
+            "list": [
+                _resolve_value(
+                    item,
+                    store,
+                    strings,
+                    gom,
+                    tag_resolver,
+                    field_id,
+                    enum_type_id=enum_type_id,
+                    dom_type=element_type,
+                )
+                for item in value["list"]
+            ],
+        }
 
     if isinstance(value, dict) and "index" in value and len(value) == 1:
         return _resolve_enum_value(
@@ -296,6 +383,7 @@ def _resolve_value(
                             gom,
                             tag_resolver,
                             child_id,
+                            dom_type=item.get("type"),
                         ),
                     }
                 )
@@ -309,6 +397,7 @@ def _resolve_value(
                         tag_resolver,
                         field_id,
                         enum_type_id=enum_type_id,
+                        dom_type=dom_type,
                     )
                 )
         return resolved
@@ -341,6 +430,7 @@ def resolve_fields(
                     gom,
                     tag_resolver,
                     field.id,
+                    dom_type=field.dom_type,
                 ),
             }
         )
@@ -363,15 +453,15 @@ def traverse_combat_graph(
     strings: StringResolver,
     roots: list[str] | None = None,
     additional_roots: list[str] | None = None,
-    origin_stories: tuple[str, ...] = ORIGIN_STORIES,
+    additional_node_ids: list[str] | None = None,
     tag_resolver: TagResolver | None = None,
 ) -> dict[str, NodeRecord]:
     if roots is None:
-        roots_fqns = discover_apc_roots(store, origin_stories)
+        roots_fqns = discover_dis_nodes(store)
     else:
         roots_fqns = roots
 
-    seed_fqns = discover_player_apc_nodes(store, origin_stories)
+    seed_fqns = discover_dis_nodes(store)
     if additional_roots:
         seed_fqns.extend(additional_roots)
 
@@ -380,11 +470,19 @@ def traverse_combat_graph(
         node_id = store.fqn_to_id.get(fqn)
         if node_id:
             queue.append(node_id)
+    for node_id in additional_node_ids or []:
+        if node_id in store.index:
+            queue.append(node_id)
 
     root_ids = {
         store.fqn_to_id[fqn]
         for fqn in [*roots_fqns, *(additional_roots or [])]
         if fqn in store.fqn_to_id
+    }
+    root_ids |= {
+        node_id
+        for node_id in (additional_node_ids or [])
+        if node_id in store.index
     }
     visited: dict[str, NodeRecord] = {}
     skipped: set[str] = set()
@@ -397,6 +495,8 @@ def traverse_combat_graph(
 
         index_entry = store.index[node_id]
         if not _is_combat_fqn(index_entry.fqn) and node_id not in root_ids:
+            continue
+        if not is_allowed_relic_fqn(index_entry.fqn) and node_id not in root_ids:
             continue
 
         try:
@@ -431,7 +531,7 @@ def traverse_combat_graph(
                 and ref_id in store.index
             ):
                 target_fqn = store.index[ref_id].fqn
-                if _is_combat_fqn(target_fqn):
+                if _is_combat_fqn(target_fqn) and is_allowed_relic_fqn(target_fqn):
                     queue.append(ref_id)
 
     return visited
