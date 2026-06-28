@@ -142,6 +142,33 @@ def _resolve_ability_spec(
     return key
 
 
+def _decode_generic_ints(
+    int_params: dict[str, Any],
+    *,
+    id_to_fqn: dict[str, str] | None = None,
+    exclude_keys: frozenset[str] = frozenset(),
+    skip_zero: bool = False,
+) -> dict[str, Any]:
+    ints: dict[str, Any] = {}
+    for key, value in int_params.items():
+        if key in DROPPED_ACTION_PARAMS or key in exclude_keys:
+            continue
+        if key == "effParam_AbilitySpec":
+            if str(value) == "0":
+                ints["ability_spec"] = 0
+            else:
+                resolved = _resolve_ability_spec(value, id_to_fqn)
+                if resolved is not None:
+                    ints["ability_spec"] = resolved
+            continue
+        if str(value).isdigit():
+            int_value = int(value)
+            if skip_zero and int_value == 0:
+                continue
+            ints[_snake_case(key)] = int_value
+    return ints
+
+
 def _should_drop_condition(condition_name: Any) -> bool:
     return isinstance(condition_name, str) and condition_name in DROPPED_CONDITION_TYPES
 
@@ -784,7 +811,12 @@ def _branch_conditions(
     return is_else, _finalize_conditions({"list": decoded_list, "logic": logic})
 
 
-def _decode_action(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _decode_action(
+    entry: list[dict[str, Any]],
+    *,
+    id_to_fqn: dict[str, str] | None = None,
+    standard_rating: float | None = None,
+) -> dict[str, Any] | None:
     fields = _entry_fields(entry)
     action_name = fields.get("effActionName")
     if not isinstance(action_name, str):
@@ -828,13 +860,26 @@ def _decode_action(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
         }
 
     if action_name == "effAction_ModifyStat":
-        return {
+        decoded = {
             "action_type": "modify_stat",
             "stat": _int_param(int_params, "effParam_Stat"),
             "amount_percent": _float_param(float_params, "effParam_AmountPercent"),
             "amount_min": _float_param(float_params, "effParam_AmountMin"),
             "amount_max": _float_param(float_params, "effParam_AmountMax"),
         }
+        if standard_rating is not None and (
+            "effParam_StandardRatingPercentMin" in float_params
+            or "effParam_StandardRatingPercentMax" in float_params
+        ):
+            decoded["amount_min"] = (
+                _float_param(float_params, "effParam_StandardRatingPercentMin")
+                * standard_rating
+            )
+            decoded["amount_max"] = (
+                _float_param(float_params, "effParam_StandardRatingPercentMax")
+                * standard_rating
+            )
+        return decoded
 
     if action_name in {"effAction_RestoreForce", "effAction_RestoreEnergy"}:
         return {
@@ -868,11 +913,7 @@ def _decode_action(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
     if floats:
         generic["floats"] = floats
 
-    ints = {
-        _snake_case(key): int(value)
-        for key, value in int_params.items()
-        if key not in DROPPED_ACTION_PARAMS and str(value).isdigit()
-    }
+    ints = _decode_generic_ints(int_params, id_to_fqn=id_to_fqn)
     if ints:
         generic["ints"] = ints
 
@@ -895,7 +936,11 @@ def _decode_action(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
     return generic
 
 
-def _decode_trigger(entry: list[dict[str, Any]]) -> dict[str, Any]:
+def _decode_trigger(
+    entry: list[dict[str, Any]],
+    *,
+    id_to_fqn: dict[str, str] | None = None,
+) -> dict[str, Any]:
     fields = _entry_fields(entry)
     trigger_name = fields.get("effTriggerName")
     label, _index = decode_trigger_name(trigger_name, TRIGGER_LABELS)
@@ -925,14 +970,12 @@ def _decode_trigger(entry: list[dict[str, Any]]) -> dict[str, Any]:
     if bools:
         decoded["bools"] = bools
 
-    ints = {
-        _snake_case(key): int(value)
-        for key, value in params["int"].items()
-        if key not in DROPPED_ACTION_PARAMS
-        and key != "effParam_TickNumber"
-        and str(value).isdigit()
-        and int(value) != 0
-    }
+    ints = _decode_generic_ints(
+        params["int"],
+        id_to_fqn=id_to_fqn,
+        exclude_keys=frozenset({"effParam_TickNumber"}),
+        skip_zero=True,
+    )
     if ints:
         decoded["ints"] = ints
 
@@ -1056,7 +1099,12 @@ def _prune_dropped_effect_references(
     return pruned
 
 
-def _branch_actions(branch: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _branch_actions(
+    branch: list[dict[str, Any]],
+    *,
+    id_to_fqn: dict[str, str] | None = None,
+    standard_rating: float | None = None,
+) -> list[dict[str, Any]]:
     actions_raw = _sub_effect_field(branch, "effActions")
     if not isinstance(actions_raw, dict):
         return []
@@ -1068,13 +1116,21 @@ def _branch_actions(branch: list[dict[str, Any]]) -> list[dict[str, Any]]:
     for entry in action_list:
         if not isinstance(entry, list):
             continue
-        decoded = _decode_action(entry)
+        decoded = _decode_action(
+            entry,
+            id_to_fqn=id_to_fqn,
+            standard_rating=standard_rating,
+        )
         if decoded is not None:
             actions.append(decoded)
     return actions
 
 
-def _branch_triggers(branch: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _branch_triggers(
+    branch: list[dict[str, Any]],
+    *,
+    id_to_fqn: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
     triggers_raw = _sub_effect_field(branch, "effTriggers")
     if not isinstance(triggers_raw, dict):
         return []
@@ -1085,7 +1141,7 @@ def _branch_triggers(branch: list[dict[str, Any]]) -> list[dict[str, Any]]:
     triggers: list[dict[str, Any]] = []
     for entry in trigger_list:
         if isinstance(entry, list):
-            triggers.append(_decode_trigger(entry))
+            triggers.append(_decode_trigger(entry, id_to_fqn=id_to_fqn))
     return triggers
 
 
@@ -1214,13 +1270,18 @@ def _decode_branch(
     effect_duration: float | None = None,
     effect_tick_interval: float | None = None,
     id_to_fqn: dict[str, str] | None = None,
+    standard_rating: float | None = None,
 ) -> dict[str, Any] | None:
     if _is_redundant_self_aoe_branch(branch, effect_tags):
         return None
 
     is_else, conditions = _branch_conditions(branch, id_to_fqn=id_to_fqn)
-    actions = _branch_actions(branch)
-    triggers = _branch_triggers(branch)
+    actions = _branch_actions(
+        branch,
+        id_to_fqn=id_to_fqn,
+        standard_rating=standard_rating,
+    )
+    triggers = _branch_triggers(branch, id_to_fqn=id_to_fqn)
     initializers = _branch_initializers(branch)
 
     if not actions and conditions is None:
@@ -1248,6 +1309,7 @@ def _decode_effect(
     effect_record: NodeRecord,
     *,
     id_to_fqn: dict[str, str] | None = None,
+    standard_rating: float | None = None,
 ) -> dict[str, Any] | None:
     number = _effect_number(effect_record.entry.fqn)
     if number is None or number == 0:
@@ -1266,6 +1328,7 @@ def _decode_effect(
             effect_duration=duration,
             effect_tick_interval=tick_interval,
             id_to_fqn=id_to_fqn,
+            standard_rating=standard_rating,
         )
         if decoded_branch is not None:
             branches.append(decoded_branch)
@@ -1301,6 +1364,7 @@ def _build_effects(
     records_by_fqn: dict[str, NodeRecord],
     *,
     id_to_fqn: dict[str, str] | None = None,
+    standard_rating: float | None = None,
 ) -> list[dict[str, Any]]:
     effect_records = _effect_records(record, records_by_fqn)
     dropped_effect_numbers: set[int] = set()
@@ -1316,7 +1380,11 @@ def _build_effects(
         number = _effect_number(effect_record.entry.fqn)
         if number in dropped_effect_numbers:
             continue
-        decoded = _decode_effect(effect_record, id_to_fqn=id_to_fqn)
+        decoded = _decode_effect(
+            effect_record,
+            id_to_fqn=id_to_fqn,
+            standard_rating=standard_rating,
+        )
         if decoded is not None:
             effects.append(decoded)
 
@@ -1329,6 +1397,7 @@ def _build_ability_payload(
     records_by_fqn: dict[str, NodeRecord],
     *,
     id_to_fqn: dict[str, str] | None = None,
+    standard_rating: float | None = None,
 ) -> dict[str, Any]:
     ability_type = _ability_type(record)
     payload: dict[str, Any] = {
@@ -1353,7 +1422,12 @@ def _build_ability_payload(
         payload["tags"] = []
         payload["conditions"] = None
 
-    payload["effects"] = _build_effects(record, records_by_fqn, id_to_fqn=id_to_fqn)
+    payload["effects"] = _build_effects(
+        record,
+        records_by_fqn,
+        id_to_fqn=id_to_fqn,
+        standard_rating=standard_rating,
+    )
 
     return payload
 
@@ -1361,6 +1435,8 @@ def _build_ability_payload(
 def build_abilities(
     records: dict[str, NodeRecord],
     output_dir: Path,
+    *,
+    standard_rating: float | None = None,
 ) -> int:
     """Build trimmed root-ability JSON files from extracted node records."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -1377,6 +1453,7 @@ def build_abilities(
             record,
             records_by_fqn,
             id_to_fqn=id_to_fqn,
+            standard_rating=standard_rating,
         )
         dest = output_dir / fqn_to_relative_path(record.entry.fqn)
         dest.parent.mkdir(parents=True, exist_ok=True)
