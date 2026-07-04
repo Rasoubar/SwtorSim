@@ -218,7 +218,15 @@ def discover_adrenal_ability_nodes(
     fqns: tuple[str, ...] = ADRENAL_ABILITY_FQNS,
 ) -> list[str]:
     """Adrenal item abilities that are not reachable from player APC nodes."""
-    return sorted(fqn for fqn in fqns if fqn in store.fqn_to_id)
+    nodes: list[str] = []
+    for fqn in fqns:
+        node_id = store.fqn_to_id.get(fqn)
+        if not node_id:
+            continue
+        if store.index[node_id].base_class_name != "ablAbility":
+            continue
+        nodes.append(fqn)
+    return sorted(nodes)
 
 
 def is_allowed_relic_fqn(fqn: str) -> bool:

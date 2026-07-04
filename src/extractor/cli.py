@@ -7,7 +7,6 @@ from pathlib import Path
 
 from extractor.config import (
     ABILITY_REPLACEMENT_NODE_ID,
-    ADRENAL_ABILITY_FQNS,
     ALWAYS_EXTRACTED_ABILITY_FQNS,
     DEFAULT_ITEM_RATING,
     ExtractorConfig,
@@ -151,11 +150,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
         if record.entry.fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}.")
         and f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}" in record.entry.fqn
     )
-    adrenal_count = sum(
-        1
-        for record in records.values()
-        if record.entry.fqn in ADRENAL_ABILITY_FQNS
-    )
+    adrenal_count = len(discover_adrenal_ability_nodes(store))
     index_path = write_node_dump(
         records,
         config.output_dir,
@@ -187,7 +182,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     relic_count = build_relics(records, relics_path)
 
     adrenals_path = config.data_dir / "adrenals.json"
-    adrenal_list_count = build_adrenals(records, adrenals_path)
+    adrenal_list_count = build_adrenals(store, adrenals_path)
 
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
