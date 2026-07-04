@@ -2,3 +2,12 @@
 .venv/
 __pycache__/
 *.pyc
+.vscode/
+data/extracted/
+data/parsed/
+data/disciplines/
+data/fnv1a64.js
+data/gear_abilities_talents.json
+data/gom.js
+data/hashes.bin
+data/relics.json
