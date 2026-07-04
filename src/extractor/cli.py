@@ -7,6 +7,7 @@ from pathlib import Path
 
 from extractor.config import (
     ABILITY_REPLACEMENT_NODE_ID,
+    ADRENAL_ABILITY_FQNS,
     ALWAYS_EXTRACTED_ABILITY_FQNS,
     DEFAULT_ITEM_RATING,
     ExtractorConfig,
@@ -16,6 +17,7 @@ from extractor.config import (
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
 )
 from extractor.abilities import build_abilities
+from extractor.adrenals import build_adrenals
 from extractor.disciplines import build_disciplines
 from extractor.talents import build_talents
 from extractor.dump import write_node_dump
@@ -30,6 +32,7 @@ from extractor.gom.gom import GomLookup, parse_gom_js
 from extractor.gom_cache import ensure_jedipedia_gom_js
 from extractor.graph import (
     BucketStore,
+    discover_adrenal_ability_nodes,
     discover_apc_base_nodes,
     discover_dis_nodes,
     discover_item_ability_nodes,
@@ -115,6 +118,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     item_ability_roots = [
         *discover_item_ability_nodes(store),
         *discover_scaled_relic_ability_nodes(store),
+        *discover_adrenal_ability_nodes(store),
     ]
     base_apc_roots = discover_apc_base_nodes(store, ORIGIN_STORIES)
 
@@ -147,6 +151,11 @@ def run_extraction(config: ExtractorConfig) -> Path:
         if record.entry.fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}.")
         and f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}" in record.entry.fqn
     )
+    adrenal_count = sum(
+        1
+        for record in records.values()
+        if record.entry.fqn in ADRENAL_ABILITY_FQNS
+    )
     index_path = write_node_dump(
         records,
         config.output_dir,
@@ -177,6 +186,9 @@ def run_extraction(config: ExtractorConfig) -> Path:
     relics_path = config.data_dir / "relics.json"
     relic_count = build_relics(records, relics_path)
 
+    adrenals_path = config.data_dir / "adrenals.json"
+    adrenal_list_count = build_adrenals(records, adrenals_path)
+
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
 
@@ -193,6 +205,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     )
     print(f"Wrote {gear_count} gear entries to {gear_path}")
     print(f"Wrote {relic_count} relics to {relics_path}")
+    print(f"Wrote {adrenal_list_count} adrenals to {adrenals_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")
@@ -200,6 +213,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
         f"{RELIC_ABILITY_FQN_PREFIX}.*.{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT} "
         f"nodes extracted: {scaled_relic_count}"
     )
+    print(f"Adrenal ability nodes extracted: {adrenal_count}")
     return index_path
 
 

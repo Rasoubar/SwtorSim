@@ -47,6 +47,14 @@ ALWAYS_EXTRACTED_ABILITY_FQNS = (
     "abl.npc.ability.utility.training_dummy_armor_debuff",
 )
 
+# Adrenal item abilities not reachable from player APC nodes.
+ADRENAL_ABILITY_FQNS = (
+    "abl.itm.potion.biochem.adrenal.critical.prototype.grade11",
+    "abl.itm.potion.biochem.adrenal.alacrity.artifact.grade11",
+    "abl.itm.potion.biochem.adrenal.atk.artifact.grade11",
+    "abl.itm.potion.biochem.adrenal.heal.artifact.grade11",
+)
+
 RELIC_ABILITY_FQN_PREFIX = "abl.itm.relic"
 RELIC_SCALES_WITH_ITEM_RATING_SEGMENT = "scales_with_item_rating"
 
