@@ -107,6 +107,13 @@ DROPPED_CONDITION_TYPES: frozenset[str] = frozenset(
     }
 )
 
+ELSE_CONDITION_TYPES: frozenset[str] = frozenset(
+    {
+        "effCondition_Else",
+        "effCondition_IfElseBlock",
+    }
+)
+
 
 def build_id_to_fqn(records: dict[str, NodeRecord]) -> dict[str, str]:
     return {record.entry.node_id: record.entry.fqn for record in records.values()}
@@ -171,6 +178,10 @@ def _decode_generic_ints(
 
 def _should_drop_condition(condition_name: Any) -> bool:
     return isinstance(condition_name, str) and condition_name in DROPPED_CONDITION_TYPES
+
+
+def _is_else_condition(condition_name: Any) -> bool:
+    return isinstance(condition_name, str) and condition_name in ELSE_CONDITION_TYPES
 
 
 def _simplify_condition_logic(logic: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -508,7 +519,10 @@ def _collect_conditions(
                     if not isinstance(value, list):
                         continue
                     fields = _condition_fields(value)
-                    if _should_drop_condition(fields.get("effConditionName")):
+                    condition_name = fields.get("effConditionName")
+                    if _should_drop_condition(condition_name):
+                        continue
+                    if _is_else_condition(condition_name):
                         continue
                     all_conditions[key] = value
 
@@ -760,6 +774,7 @@ def _branch_conditions(
     branch: list[dict[str, Any]],
     *,
     id_to_fqn: dict[str, str] | None = None,
+    is_first_branch: bool = False,
 ) -> tuple[bool, dict[str, Any] | None]:
     conditions_raw = _sub_effect_field(branch, "effConditions")
     logic_raw = _sub_effect_field(branch, "effConditionLogic")
@@ -778,8 +793,9 @@ def _branch_conditions(
             continue
         fields = _condition_fields(value)
         condition_name = fields.get("effConditionName")
-        if condition_name == "effCondition_Else":
-            is_else = True
+        if _is_else_condition(condition_name):
+            if condition_name == "effCondition_Else" or not is_first_branch:
+                is_else = True
             continue
         if _should_drop_condition(condition_name):
             continue
@@ -1271,11 +1287,16 @@ def _decode_branch(
     effect_tick_interval: float | None = None,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
+    is_first_branch: bool = False,
 ) -> dict[str, Any] | None:
     if _is_redundant_self_aoe_branch(branch, effect_tags):
         return None
 
-    is_else, conditions = _branch_conditions(branch, id_to_fqn=id_to_fqn)
+    is_else, conditions = _branch_conditions(
+        branch,
+        id_to_fqn=id_to_fqn,
+        is_first_branch=is_first_branch,
+    )
     actions = _branch_actions(
         branch,
         id_to_fqn=id_to_fqn,
@@ -1321,7 +1342,7 @@ def _decode_effect(
     stack_limit = _effect_stack_limit(effect_record)
 
     branches: list[dict[str, Any]] = []
-    for branch in _sub_effects(effect_record):
+    for branch_index, branch in enumerate(_sub_effects(effect_record)):
         decoded_branch = _decode_branch(
             branch,
             tag_set,
@@ -1329,6 +1350,7 @@ def _decode_effect(
             effect_tick_interval=tick_interval,
             id_to_fqn=id_to_fqn,
             standard_rating=standard_rating,
+            is_first_branch=branch_index == 0,
         )
         if decoded_branch is not None:
             branches.append(decoded_branch)
