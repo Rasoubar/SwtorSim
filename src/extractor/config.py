@@ -42,6 +42,11 @@ ITEM_ABILITY_FQN_PREFIXES = (
     "abl.itm.tactical.sow",
 )
 
+# Individual abilities not reachable from player APC nodes but needed for simulation.
+ALWAYS_EXTRACTED_ABILITY_FQNS = (
+    "abl.npc.ability.utility.training_dummy_armor_debuff",
+)
+
 RELIC_ABILITY_FQN_PREFIX = "abl.itm.relic"
 RELIC_SCALES_WITH_ITEM_RATING_SEGMENT = "scales_with_item_rating"
 

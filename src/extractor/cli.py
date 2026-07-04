@@ -7,6 +7,7 @@ from pathlib import Path
 
 from extractor.config import (
     ABILITY_REPLACEMENT_NODE_ID,
+    ALWAYS_EXTRACTED_ABILITY_FQNS,
     DEFAULT_ITEM_RATING,
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
@@ -122,7 +123,11 @@ def run_extraction(config: ExtractorConfig) -> Path:
         gom,
         strings,
         roots=dis_roots,
-        additional_roots=[*item_ability_roots, *base_apc_roots],
+        additional_roots=[
+            *item_ability_roots,
+            *base_apc_roots,
+            *ALWAYS_EXTRACTED_ABILITY_FQNS,
+        ],
         additional_node_ids=[ABILITY_REPLACEMENT_NODE_ID],
         tag_resolver=tag_resolver,
     )
