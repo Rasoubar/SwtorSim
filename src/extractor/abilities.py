@@ -104,6 +104,7 @@ DROPPED_CONDITION_TYPES: frozenset[str] = frozenset(
         "effCondition_IsEnemy",
         "effCondition_IfWeaponType",
         "effCondition_IsChanneling",
+        "effCondition_InRange",
     }
 )
 
