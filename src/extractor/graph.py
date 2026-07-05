@@ -15,6 +15,7 @@ from extractor.bkt import (
 from extractor.config import (
     COMBAT_REF_FIELD_IDS,
     COMBAT_FQN_PREFIXES,
+    ADRENAL_ABILITY_FQNS,
     ITEM_ABILITY_FQN_PREFIXES,
     RELIC_ABILITY_FQN_PREFIX,
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
@@ -205,6 +206,22 @@ def discover_scaled_relic_ability_nodes(store: BucketStore) -> list[str]:
         if not fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}."):
             continue
         if marker not in fqn or "/" in fqn:
+            continue
+        if store.index[node_id].base_class_name != "ablAbility":
+            continue
+        nodes.append(fqn)
+    return sorted(nodes)
+
+
+def discover_adrenal_ability_nodes(
+    store: BucketStore,
+    fqns: tuple[str, ...] = ADRENAL_ABILITY_FQNS,
+) -> list[str]:
+    """Adrenal item abilities that are not reachable from player APC nodes."""
+    nodes: list[str] = []
+    for fqn in fqns:
+        node_id = store.fqn_to_id.get(fqn)
+        if not node_id:
             continue
         if store.index[node_id].base_class_name != "ablAbility":
             continue
