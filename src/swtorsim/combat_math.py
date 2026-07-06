@@ -85,29 +85,7 @@ def handle_caster_buffs(caster, target, action_tags, buckets, modifiers):
         if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
             continue
 
-        #determines what to alter for current buff
-        meta = EFFECTS[buff.id]
-
-        """get the buff value when different number of stacks on the buff give different values,
-           is needed because it's not implemented so that it is always linear.
-           Works for now but might need changes for other classes, JSONs too."""
-        if buff.stack_values:
-            stack_index = max(0, min(buff.charges - 1, len(buff.stack_values) - 1))
-            total_buff_value = buff.stack_values[stack_index]
-        else:
-            multiplier = buff.charges if buff.max_charges is not None else 1
-            total_buff_value = buff.value * multiplier
-
-        stat_name = meta["stat_name"]
-        if stat_name == "Damage Modifier":
-            bucket = meta["modifier_bucket"]
-            buckets[bucket] = buckets.get(bucket, 0.0) + total_buff_value
-        elif stat_name == "Critical Chance":
-            modifiers['bonus_crit_chance'] += total_buff_value
-        elif stat_name == "Critical Damage":
-            modifiers['bonus_crit_modifier'] += total_buff_value
-        elif stat_name == "Armor Penetration":
-            modifiers['bonus_armor_pen'] += total_buff_value
+        alter_modifier(buff,modifiers,buckets)
 
 def handle_target_debuffs(target, action_tags, buckets, modifiers):
     """ Alters modifiers dict according to debuffs on target."""
@@ -117,15 +95,30 @@ def handle_target_debuffs(target, action_tags, buckets, modifiers):
         if debuff.required_tags is not None and not any(tag in action_tags for tag in debuff.required_tags):
             continue
 
-        meta = EFFECTS[debuff.id]
-        multiplier = debuff.charges if debuff.max_charges is not None else 1
-        stat_name = meta["stat_name"]
+        alter_modifier(debuff,modifiers,buckets)
+def alter_modifier(effect, modifiers, buckets):
+    meta = EFFECTS[effect.id]
 
-        if stat_name == "Damage Modifier":
-            bucket = meta["modifier_bucket"]
-            buckets[bucket] = buckets.get(bucket, 0.0) + (debuff.value * multiplier)
-        elif stat_name == "Armor Debuff":
-            modifiers['target_armor_debuff'] += (debuff.value * multiplier)
+    """get the buff value when different number of stacks on the buff give different values,
+       is needed because it's not implemented so that it is always linear.
+       Works for now but might need changes for other classes, JSONs too."""
+    if effect.stack_values:
+        stack_index = max(0, min(effect.charges - 1, len(effect.stack_values) - 1))
+        total_buff_value = effect.stack_values[stack_index]
+    else:
+        multiplier = effect.charges if effect.max_charges is not None else 1
+        total_buff_value = effect.value * multiplier
+
+    stat_name = meta["stat_name"]
+    if stat_name == "Damage Modifier":
+        bucket = meta["modifier_bucket"]
+        buckets[bucket] = buckets.get(bucket, 0.0) + total_buff_value
+    elif stat_name == "Critical Chance":
+        modifiers['bonus_crit_chance'] += total_buff_value
+    elif stat_name == "Critical Damage":
+        modifiers['bonus_crit_modifier'] += total_buff_value
+    elif stat_name == "Armor Penetration":
+        modifiers['bonus_armor_pen'] += total_buff_value
 
 def consume_charges(caster, target, action_tags):
     """Alters charge value according to use. Will be gone on next version as doesn't follow game logic."""
