@@ -96,7 +96,9 @@ def handle_target_debuffs(target, action_tags, buckets, modifiers):
             continue
 
         alter_modifier(debuff,modifiers,buckets)
+
 def alter_modifier(effect, modifiers, buckets):
+    """Handles the individual modifier modification fors both buffs and debuffs"""
     meta = EFFECTS[effect.id]
 
     """get the buff value when different number of stacks on the buff give different values,
