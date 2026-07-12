@@ -77,6 +77,7 @@ CONDITION_REGISTRY = {
 }
 
 def validate_all(requirements: dict[str, Any], caster: "Player", target: "Target", sim = None) -> bool:
+    """applies the condition_registry so that the correct functions for the requirement is run"""
     if not requirements:
         return True
     for key, value in requirements.items():
