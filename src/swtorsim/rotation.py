@@ -1,4 +1,4 @@
-from .requirements import validate_all
+from src.swtorsim.requirements import validate_all
 
 class Rotation:
     def __init__(self, name, steps_config, loop: bool = True):
@@ -11,6 +11,7 @@ class Rotation:
         self.build_steps(steps_config)
 
     def build_steps(self, steps_config):
+        """On setup builds the rotation according to config"""
         for step_data in steps_config:
             if step_data["type"] == "fixed":
                 self.sequence.append(FixedAbilityStep(step_data["ability_id"]))
@@ -18,11 +19,12 @@ class Rotation:
                 self.sequence.append(PriorityBlockStep(step_data["name"], step_data["pool"]))
             elif step_data["type"] == "optional":
                 self.sequence.append(OptionalAbilityStep(step_data["ability_id"], step_data.get("rules", {})))
-            elif step_data["type"] == "loop_anchor":
+            elif step_data["type"] == "loop_anchor": #discriminates rotation from opener if applicable
                 self.loop_start_index = len(self.sequence)
                 continue
 
     def evaluate(self, player, target, sim) -> bool:
+        """Loops through the rotation"""
         if self.current_step >= len(self.sequence):
             return False
         step = self.sequence[self.current_step]
@@ -31,7 +33,6 @@ class Rotation:
             if self.loop and self.current_step >= len(self.sequence):
                 self.current_step = self.loop_start_index
             return True
-
         return False
 
 
@@ -40,6 +41,7 @@ class FixedAbilityStep:
         self.ability_id = ability_id
 
     def evaluate(self, player, target, sim) -> bool:
+        """Simply tries to cast the ability."""
         ability = sim.ability_db.get(self.ability_id)
         return ability.cast(player, target, sim)
 
@@ -49,9 +51,10 @@ class PriorityBlockStep:
         self.pool = pool
 
     def evaluate(self, player, target, sim) -> bool:
+        """Tries to cast the ability according to priority rules"""
         for option in self.pool:
             print(option)
-            wanna_cast = validate_all(option.get("rules", {}), player, target)
+            wanna_cast = validate_all(option.get("rules", {}), player, target, sim)
             print(wanna_cast)
             print(player.cooldowns)
             if wanna_cast:
@@ -67,6 +70,7 @@ class OptionalAbilityStep:
         self.rules = rules if rules is not None else {}
 
     def evaluate(self, player, target, sim) -> bool:
+        """Tries to cast the ability if chosen conditions are met."""
         wanna_cast = validate_all(self.rules, player, target, sim=sim)
         if wanna_cast:
             ability = sim.ability_db.get(self.ability_id)

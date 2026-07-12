@@ -277,6 +277,7 @@ class Player(Actor):
         if needs_stat_recalc:
             self.recalculate_stats()
             print(f'Buffs active:{self.effects}')
+
 class Target(Actor):
     def __init__(self, name: str, hp: int):
         super().__init__(name)

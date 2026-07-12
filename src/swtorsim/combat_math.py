@@ -201,3 +201,15 @@ def calculate_crit(caster, damage, modifiers):
         crit_multiplier = 1 + (caster.stats.get("Critical Modifier", 0.5) + modifiers['bonus_crit_modifier']) * extra_crit_multiplier
         damage *= crit_multiplier
     return damage, is_crit
+
+def accuracy_roll(source, hand):
+    """Determines if hit/ability meets the accuracy roll."""
+    def_chance = 0.1
+    if hand == "main":
+        acc = source.stats.get("Main Accuracy")
+    elif hand == "off":
+        acc = source.stats.get("Off Accuracy")
+    if random.random() + def_chance > acc:
+        print("MISSED")
+        return False
+    return True

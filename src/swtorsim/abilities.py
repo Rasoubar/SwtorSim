@@ -1,5 +1,6 @@
 import random
-from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent, ChannelTickEvent, check_hit
+from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent, ChannelTickEvent
+from src.swtorsim.combat_math import accuracy_roll
 from src.swtorsim.entities import ActiveDot, Player, Target, ActiveChannel
 from src.swtorsim.requirements import validate_all
 
@@ -45,7 +46,7 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
 
 
 def handle_damage_action(sim, caster, target, action, source_name, delay):
-    if not check_hit(caster, action.get("hand","main")):
+    if not accuracy_roll(caster, action.get("hand", "main")):
         return False
     hit_event = DamageHit(caster, target, action, source_name)
     sim.schedule_relative(delay, hit_event)
@@ -84,7 +85,6 @@ def handle_channel_action(sim, caster, target, action_data: dict, source_name: s
 
 def handle_buff_action(sim, caster, action, source_name, current_time):
     buff_key, buff_instance, duration = caster.apply_buff(action, source_name, current_time)
-
     sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
 
 
@@ -170,17 +170,23 @@ class Ability:
     def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
         if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
             return False
-        if getattr(caster, "active_channel", None) is not None:
+
+        if getattr(caster, "active_channel", None) is not None: #to improve when channel clipping is implemented
             return False
+
         if self.has_charges:
             self.update_charges(caster,sim)
             if self.charges < 1:
                 return False
+
         if sim.current_time < caster.cooldowns.get(self.name, 0.0):
             return False
+
         modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply = False)
+
         if not caster.resource.can_afford(modified_cost): #I had a more eficient aproach to this. Like this rn, will change
             return False
+
         return validate_all(self.conditions, caster, target) #validates conditions
 
     def apply_cooldown_locks(self, caster, sim):
@@ -198,18 +204,18 @@ class Ability:
     def cast(self, caster, target, sim) -> bool:
         if not self.can_cast(caster, target, sim):
             return False
+
         if getattr(caster, "active_channel", None) is not None:
             print(f"[{sim.current_time:.3f}] {caster.class_name} interrupted channel to cast {self.name}!")
             caster.active_channel = None
             caster.is_channeling = False
+
         final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply = True)
-        print(f'final spend: {final_spend}')
-        print(f'caster.resource.current_value: {caster.resource.current_value}')
         caster.resource.spend(final_spend)
-        print(f'caster.resource.current_value: {caster.resource.current_value}')
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
         self.apply_cooldown_locks(caster, sim)
         self.evaluate_on_cast_procs(caster, target, sim)
+
         for action in self.actions:
             success = execute_single_action(sim, caster, target, action, self.name)
             if success and "on_success_actions" in action:

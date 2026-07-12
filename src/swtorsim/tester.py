@@ -54,7 +54,6 @@ def execute_single_worker_task(args):
         sys.stdout.close()
         sys.stdout = old_stdout
 
-
 class Tester:
     def __init__(self, rotation_config, stats_config, abilities_db, procs_db, buffs_db, duration, dummy_hp):
         self.rotation_config = rotation_config
