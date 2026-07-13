@@ -51,8 +51,6 @@ class DamageHit(Event):
     def resolve(self, sim):
         """Evaluates accuracy, calls damage calculation, determines when to apply damage, calls for damage to land,
         calls for proc evaluation."""
-        if not accuracy_roll(self.source, self.action_data.get("hand", "main")):
-            return
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
 
         impact_delay = self.action_data.get("impact_delay", 0.0)
