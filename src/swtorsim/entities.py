@@ -1,6 +1,6 @@
 import math
 from src.swtorsim.combat_math import EFFECTS
-from src.swtorsim.requirements import validate_all
+
 
 class ActiveDot:
     __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
@@ -11,14 +11,6 @@ class ActiveDot:
         self.ticks_remaining = ticks_remaining
         self.action_data = action_data
 
-    def choose_action(self, source, target):
-        valid_actions = []
-        sub_actions = self.action_data.get('actions')
-        for action in sub_actions:
-            conditions = action.get("conditions", {})
-            if validate_all(conditions, source, target):
-                valid_actions.append(action)
-        return valid_actions
 
 class ActiveChannel:
     def __init__(self, name, action_data, total_ticks, tick_interval, tick_cost):
