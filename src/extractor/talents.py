@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from src.extractor.bkt import fqn_to_relative_path
-from src.extractor.graph import NodeRecord
+from extractor.bkt import fqn_to_relative_path
+from extractor.graph import NodeRecord
 
 _RANK_STAT_LIST_FIELDS = (
     "talStatsList",

@@ -65,7 +65,7 @@ def handle_dot_action(sim, caster, target, action, source_name):
 
 
 def handle_channel_action(sim, caster, target, action_data: dict, source_name: str):
-
+    """Flags the caster as channeling, creates the channel instance, and schedules the first tick"""
     caster.is_channeling = True
 
     tick_interval = action_data.get("tick_interval", 3.0)
@@ -103,6 +103,7 @@ def handle_resource_gain_action(sim, caster, action, delay):
         gain_event.resolve(sim)
 
 def handle_cooldown_modification(sim, caster, action):
+    """Applies cooldown reductions or resets to targeted abilities"""
     cooldown_dict = getattr(caster, "cooldowns", {})
     ability_db = sim.ability_db
     if not (cooldown_dict and ability_db and "target_tags" in action):

@@ -6,8 +6,8 @@ import zlib
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.extractor.ids import read_u64_le, u64_str
-from src.extractor.varint import read_cstring, read_length_prefixed_string, read_varint
+from extractor.ids import read_u64_le, u64_str
+from extractor.varint import read_cstring, read_length_prefixed_string, read_varint
 
 PBUK_MAGIC = 0x4B554250
 DBLB_MAGIC = 0x424C4244

@@ -5,14 +5,14 @@ import re
 from pathlib import Path
 from typing import Any
 
-from src.extractor.bkt import fqn_to_relative_path
-from src.extractor.config import OUTPUT_DIR
-from src.extractor.eff_triggers import (
+from extractor.bkt import fqn_to_relative_path
+from extractor.config import OUTPUT_DIR
+from extractor.eff_triggers import (
     EFFECT_DURATION_TRIGGERS,
     decode_trigger_name,
     load_trigger_labels,
 )
-from src.extractor.graph import NodeRecord
+from extractor.graph import NodeRecord
 
 DEFAULT_BASE_GCD = 1.5
 

@@ -6,13 +6,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from src.extractor.bkt import (
+from extractor.bkt import (
     BucketNodeEntry,
     extract_node_payload,
     list_node_entries,
     parse_bucket_names_from_info,
 )
-from src.extractor.config import (
+from extractor.config import (
     COMBAT_REF_FIELD_IDS,
     COMBAT_FQN_PREFIXES,
     ADRENAL_ABILITY_FQNS,
@@ -21,9 +21,9 @@ from src.extractor.config import (
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
     STB_STRING_FIELD_BUCKETS,
 )
-from src.extractor.gom.gom import GomLookup
-from src.extractor.ids import u64_str
-from src.extractor.node import (
+from extractor.gom.gom import GomLookup
+from extractor.ids import u64_str
+from extractor.node import (
     DOM_ENUM,
     DOM_ID,
     ParsedField,
@@ -32,8 +32,8 @@ from src.extractor.node import (
     fields_to_dict,
     parse_node_fields,
 )
-from src.extractor.stable_ids import TagResolver
-from src.extractor.strings import LOC_RETRIEVER_FIELD_IDS, StringResolver
+from extractor.stable_ids import TagResolver
+from extractor.strings import LOC_RETRIEVER_FIELD_IDS, StringResolver
 
 
 @dataclass

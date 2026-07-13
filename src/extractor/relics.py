@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.extractor.config import (
+from extractor.config import (
     RELIC_ABILITY_FQN_PREFIX,
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
 )

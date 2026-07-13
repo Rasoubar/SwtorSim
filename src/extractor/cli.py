@@ -5,36 +5,44 @@ import shutil
 import sys
 from pathlib import Path
 
-from src.extractor.config import (
+from extractor.config import (
     ABILITY_REPLACEMENT_NODE_ID,
+    ALWAYS_EXTRACTED_ABILITY_FQNS,
+    DEFAULT_ITEM_RATING,
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
     ORIGIN_STORIES,
     RELIC_ABILITY_FQN_PREFIX,
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
 )
-from src.extractor.abilities import build_abilities
-from src.extractor.disciplines import build_disciplines
-from src.extractor.talents import build_talents
-from src.extractor.dump import write_node_dump
-from src.extractor.extract import extract_relevant_files
-from src.extractor.gear import build_gear_abilities_talents
-from src.extractor.relics import build_relics
-from src.extractor.gom.gom import GomLookup, parse_gom_js
-from src.extractor.gom_cache import ensure_jedipedia_gom_js
-from src.extractor.graph import (
+from extractor.abilities import build_abilities
+from extractor.adrenals import build_adrenals
+from extractor.disciplines import build_disciplines
+from extractor.talents import build_talents
+from extractor.dump import write_node_dump
+from extractor.extract import extract_relevant_files
+from extractor.gear import build_gear_abilities_talents
+from extractor.relics import build_relics
+from extractor.standard_rating import (
+    load_standard_rating_table,
+    standard_rating_for_item_rating,
+)
+from extractor.gom.gom import GomLookup, parse_gom_js
+from extractor.gom_cache import ensure_jedipedia_gom_js
+from extractor.graph import (
     BucketStore,
+    discover_adrenal_ability_nodes,
     discover_apc_base_nodes,
     discover_dis_nodes,
     discover_item_ability_nodes,
     discover_scaled_relic_ability_nodes,
     traverse_combat_graph,
 )
-from src.extractor.stable_ids import (
+from extractor.stable_ids import (
     TagResolver,
     ensure_jedipedia_fnv1a64_js,
 )
-from src.extractor.strings import StringResolver
+from extractor.strings import StringResolver
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,6 +72,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--keep-work",
         action="store_true",
         help="Keep intermediate extracted files in data/extract_work",
+    )
+    parser.add_argument(
+        "--item-rating",
+        type=int,
+        default=DEFAULT_ITEM_RATING,
+        help=(
+            "Item rating used to resolve relic standard-rating scaled amounts "
+            f"(default: {DEFAULT_ITEM_RATING})"
+        ),
     )
     return parser
 
@@ -100,6 +117,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     item_ability_roots = [
         *discover_item_ability_nodes(store),
         *discover_scaled_relic_ability_nodes(store),
+        *discover_adrenal_ability_nodes(store),
     ]
     base_apc_roots = discover_apc_base_nodes(store, ORIGIN_STORIES)
 
@@ -108,7 +126,11 @@ def run_extraction(config: ExtractorConfig) -> Path:
         gom,
         strings,
         roots=dis_roots,
-        additional_roots=[*item_ability_roots, *base_apc_roots],
+        additional_roots=[
+            *item_ability_roots,
+            *base_apc_roots,
+            *ALWAYS_EXTRACTED_ABILITY_FQNS,
+        ],
         additional_node_ids=[ABILITY_REPLACEMENT_NODE_ID],
         tag_resolver=tag_resolver,
     )
@@ -128,6 +150,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
         if record.entry.fqn.startswith(f"{RELIC_ABILITY_FQN_PREFIX}.")
         and f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}" in record.entry.fqn
     )
+    adrenal_count = len(discover_adrenal_ability_nodes(store))
     index_path = write_node_dump(
         records,
         config.output_dir,
@@ -141,13 +164,25 @@ def run_extraction(config: ExtractorConfig) -> Path:
 
     parsed_dir = config.data_dir / "parsed"
     talent_count = build_talents(records, parsed_dir)
-    ability_count = build_abilities(records, parsed_dir)
+    standard_rating_table = load_standard_rating_table(store, gom, strings)
+    standard_rating = standard_rating_for_item_rating(
+        standard_rating_table,
+        config.item_rating,
+    )
+    ability_count = build_abilities(
+        records,
+        parsed_dir,
+        standard_rating=standard_rating,
+    )
 
     gear_path = config.data_dir / "gear_abilities_talents.json"
     gear_count = build_gear_abilities_talents(store, gom, strings, gear_path)
 
     relics_path = config.data_dir / "relics.json"
     relic_count = build_relics(records, relics_path)
+
+    adrenals_path = config.data_dir / "adrenals.json"
+    adrenal_list_count = build_adrenals(store, adrenals_path)
 
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
@@ -159,8 +194,13 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
     print(f"Wrote {talent_count} talent files to {parsed_dir / 'tal'}")
     print(f"Wrote {ability_count} ability files to {parsed_dir / 'abl'}")
+    print(
+        f"Relic standard rating resolved for item rating {config.item_rating}: "
+        f"{standard_rating}"
+    )
     print(f"Wrote {gear_count} gear entries to {gear_path}")
     print(f"Wrote {relic_count} relics to {relics_path}")
+    print(f"Wrote {adrenal_list_count} adrenals to {adrenals_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")
@@ -168,6 +208,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
         f"{RELIC_ABILITY_FQN_PREFIX}.*.{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT} "
         f"nodes extracted: {scaled_relic_count}"
     )
+    print(f"Adrenal ability nodes extracted: {adrenal_count}")
     return index_path
 
 
@@ -180,6 +221,7 @@ def main(argv: list[str] | None = None) -> int:
         force_hash_update=args.force_hash_update,
         pts=args.pts,
         keep_work_files=args.keep_work,
+        item_rating=args.item_rating,
     )
 
     try:

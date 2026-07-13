@@ -6,11 +6,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.extractor.config import DATA_DIR, WORK_DIR
-from src.extractor.gom.gom import GomLookup, parse_gom_js
-from src.extractor.gom_cache import ensure_jedipedia_gom_js
-from src.extractor.graph import BucketStore, discover_apc_roots, traverse_combat_graph
-from src.extractor.strings import StringResolver
+from extractor.config import DATA_DIR, WORK_DIR
+from extractor.gom.gom import GomLookup, parse_gom_js
+from extractor.gom_cache import ensure_jedipedia_gom_js
+from extractor.graph import BucketStore, discover_apc_roots, traverse_combat_graph
+from extractor.strings import StringResolver
 
 
 def main() -> int:

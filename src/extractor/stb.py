@@ -3,7 +3,7 @@ from __future__ import annotations
 import struct
 from dataclasses import dataclass
 
-from src.extractor.ids import u64_str
+from extractor.ids import u64_str
 
 
 @dataclass

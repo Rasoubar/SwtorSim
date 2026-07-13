@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from src.extractor.graph import NodeRecord
+from extractor.graph import NodeRecord
 
 _APC_SCOPE_LIST_FIELDS = (
     "ablPackageActiveAbilitiesList",
