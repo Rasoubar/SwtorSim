@@ -201,13 +201,13 @@ class Tester:
     @staticmethod
     def _plot_dps_histogram(all_dps, avg_dps, std_dev, iterations):
         """Helper to render and save the Monte Carlo DPS distribution."""
-        plt.figure(figsize=(10, 6))
+        plt.figure(figsize=(10.0, 6.0))
 
         # Determine a dynamic number of bins based on iteration scale
         num_bins = max(10, min(50, iterations // 20))
 
         # Plot the histogram
-        n, bins, patches = plt.hist(
+        plt.hist(
             all_dps,
             bins=num_bins,
             color='#2ca02c',

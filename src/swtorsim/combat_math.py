@@ -209,6 +209,8 @@ def accuracy_roll(source, hand):
         acc = source.stats.get("Main Accuracy")
     elif hand == "off":
         acc = source.stats.get("Off Accuracy")
+    else:
+        acc = source.stats.get("Main Accuracy")
     if random.random() + def_chance > acc:
         print("MISSED")
         return False

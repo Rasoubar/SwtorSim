@@ -40,7 +40,7 @@ class ApplyDamageLand(Event):
         print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
 
 class DamageHit(Event):
-    """ Represents a hit execution. Holds the snapshot data needed to calculate accuracy, damage, and trigger procs."""
+    """ Represents a hit execution. Holds the data needed to calculate damage, and trigger procs."""
     def __init__(self, source: "Player", target: "Target", action_data: dict, ability_name: str):
         super().__init__(f"{ability_name} Hit")
         self.source = source
@@ -49,7 +49,7 @@ class DamageHit(Event):
         self.ability_name = ability_name
 
     def resolve(self, sim):
-        """Evaluates accuracy, calls damage calculation, determines when to apply damage, calls for damage to land,
+        """Calls damage calculation, determines when to apply damage, calls for damage to land,
         calls for proc evaluation."""
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
 

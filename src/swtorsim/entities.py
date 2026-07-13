@@ -127,7 +127,6 @@ class Player(Actor):
         return base_time / (1.0 + cdr)
 
     def apply_buff(self, action: dict, source_name: str, current_time): #can be improved on the refresh
-
         try:
             action_id = action.get("id")
             extracted_stat = EFFECTS[action_id]["stat_name"]

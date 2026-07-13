@@ -7,8 +7,7 @@ from src.swtorsim.config_load import (
     optional_choices,
     load_rotation_from_json,
 )
-from src.swtorsim.batch import ParallelBatchRunner
-from src.swtorsim.tester import SingleTester
+from src.swtorsim.tester import Tester
 
 
 def get_dynamic_loadout():
@@ -100,23 +99,18 @@ if __name__ == "__main__":
     # --- TOGGLE THIS TO SWITCH MODES ---
     RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
     # -----------------------------------
+    tester = Tester(
+        rotation_config=Rotation,
+        stats_config=MY_CUSTOM_CHARACTER_STATS,
+        abilities_db=abilities_db,
+        procs_db=procs_db,
+        buffs_db=buffs_db,
+        duration = 1000,
+        dummy_hp=10000000
+    )
 
     if RUN_MODE == "TEST":
-        tester = SingleTester(
-            rotation_config=Rotation,
-            stats_config=MY_CUSTOM_CHARACTER_STATS,
-            abilities_db=abilities_db,
-            procs_db=procs_db,
-            buffs_db=buffs_db
-        )
-        tester.run_test(duration=1000.0, dummy_hp=10000000)
+        tester.run_test()
 
     elif RUN_MODE == "BATCH":
-        runner = ParallelBatchRunner(
-            rotation_config=Rotation,
-            stats_config=MY_CUSTOM_CHARACTER_STATS,
-            abilities_db=abilities_db,
-            procs_db=procs_db,
-            buffs_db=buffs_db
-        )
-        runner.run_monte_carlo(iterations=5000, duration=300.0, dummy_hp=10000000)
+        tester.run_monte_carlo(iterations=1000)

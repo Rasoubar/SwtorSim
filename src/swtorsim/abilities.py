@@ -6,7 +6,8 @@ from src.swtorsim.requirements import validate_all
 
 
 def execute_single_action(sim, caster, target, action: dict, source_name: str):
-    if not validate_all(action.get("conditions", {}), caster, target):
+    """Calls the appropriate function for the action type"""
+    if not validate_all(action.get("conditions", {}), caster, target, sim=sim):
         return False
     if "chance" in action and random.random() > action["chance"]:
         return False
@@ -16,36 +17,30 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
         return handle_damage_action(sim, caster, target, action, source_name, delay)
     elif action_type == "dot":
         handle_dot_action(sim, caster, target, action, source_name)
-        return True
     elif action_type == "channel":
         handle_channel_action(sim, caster, target, action, source_name)
-        return True
     elif action_type == "buff":
         handle_buff_action(sim, caster, action, source_name, sim.current_time)
-        return True
     elif action_type == "debuff":
         handle_debuff_action(sim, target, action, source_name, sim.current_time)
-        return True
     elif action_type == "resource_gain":
         handle_resource_gain_action(sim, caster, action, delay)
-        return True
     elif action_type == "cooldown_mod":
         handle_cooldown_modification(sim, caster, action)
-        return True
     elif action_type == "grant_charge":
         handle_restore_charge(sim, caster, action)
-        return True
     elif action_type == "buff_remove":
         handle_buff_remove_action(sim, caster, action)
-        return True
     else:
         raise ValueError(
             f"CRITICAL ENGINE ERROR: Unrecognized action_type '{action_type}' "
             f"triggered by '{source_name}'. Please check your JSON blueprints."
         )
+    return True
 
 
 def handle_damage_action(sim, caster, target, action, source_name, delay):
+    """Rolls accuracy then schedules or executes the hit"""
     if not accuracy_roll(caster, action.get("hand", "main")):
         return False
     hit_event = DamageHit(caster, target, action, source_name)
@@ -57,7 +52,7 @@ def handle_damage_action(sim, caster, target, action, source_name, delay):
 
 
 def handle_dot_action(sim, caster, target, action, source_name):
-
+    """Calculates how often the dot ticks, creates the dots, channels the 1st tick"""
     scaled_interval = caster.scale_time_modifier(action["interval"])
     dot_instance = ActiveDot(
         name=source_name,
@@ -87,19 +82,25 @@ def handle_channel_action(sim, caster, target, action_data: dict, source_name: s
 
 
 def handle_buff_action(sim, caster, action, source_name, current_time):
+    """Applies the buff to the caster and schedules it's expiration"""
     buff_key, buff_instance, duration = caster.apply_buff(action, source_name, current_time)
     sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
 
 
 def handle_debuff_action(sim, target, action, source_name, current_time):
+    """Applies the debuff to the target and schedules it's expiration"""
     debuff_key, debuff_instance, duration = target.apply_debuff(action, source_name, current_time)
     sim.schedule_relative(duration, DebuffExpire(target, debuff_key, debuff_instance))
 
 
 def handle_resource_gain_action(sim, caster, action, delay):
+    """Schedules or executes the resource gain event"""
     regen = action.get("value", 0.0)
-    sim.schedule_relative(delay, ResourceGainEvent(caster, regen))
-
+    gain_event = ResourceGainEvent(caster, regen)
+    if delay > 0.0:
+        sim.schedule_relative(delay, gain_event)
+    else:
+        gain_event.resolve(sim)
 
 def handle_cooldown_modification(sim, caster, action):
     cooldown_dict = getattr(caster, "cooldowns", {})
@@ -125,7 +126,8 @@ def handle_cooldown_modification(sim, caster, action):
                     del cooldown_dict[cd_key]
 
 
-def handle_restore_charge(sim, caster, action):
+def handle_restore_charge(sim, caster, action): #might want to change so that the ability_db is on the player
+    """Restores a charge to the target ability"""
     target_ability_name = action.get("target_ability")
     amount = action.get("amount", 1)
     if target_ability_name in sim.ability_db:
@@ -133,6 +135,7 @@ def handle_restore_charge(sim, caster, action):
         ability.add_charge(amount)
 
 def handle_buff_remove_action(sim, caster, action):
+    """Removes a buff from the caster"""
     effect_name = action.get("effect_name")
     if effect_name and caster.has_buff(effect_name):
         caster.cleanup_expired_effects([effect_name])
