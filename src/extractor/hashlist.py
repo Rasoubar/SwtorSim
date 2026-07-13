@@ -7,7 +7,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from extractor.config import JEDIHASH_URL
+from src.extractor.config import JEDIHASH_URL
 
 HASH_FILENAME_TXT = "hashes_filename.txt"
 HASH_FILENAME_BIN = "hashes.bin"

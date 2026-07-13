@@ -50,7 +50,7 @@ class ProcData:
                  required_tags: list , chance: float = 1.0, icd: float = 0.0, affected_by_cdr = False, conditions: dict = None):
         self.name = name
         self.trigger = trigger
-        self.required_tags = required_tags
+        self.required_tags = frozenset(required_tags) if required_tags else frozenset()
         self.chance = chance
         self.icd = icd
         self.actions = actions
@@ -149,7 +149,7 @@ class Player(Actor):
 
         raw_tags = action.get("required_tags")
         if raw_tags is not None:
-            tags_set = set(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else {raw_tags}
+            tags_set = frozenset(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else (frozenset([raw_tags]) if raw_tags else frozenset())
         else:
             tags_set = None
 
@@ -306,7 +306,7 @@ class Target(Actor):
 
 
         raw_tags = action.get("required_tags")
-        tags_set = set(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else ({raw_tags} if raw_tags is not None else None)
+        tags_set = frozenset(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else (frozenset([raw_tags]) if raw_tags else frozenset())
 
         debuff_instance = ActiveBuff(
             id_num=action.get("id"),

@@ -5,8 +5,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-from extractor.config import FNV1A64_JS_URL
-from extractor.hashlist import hash_list_is_stale
+from src.extractor.config import FNV1A64_JS_URL
+from src.extractor.hashlist import hash_list_is_stale
 
 FNV1A64_JS_FILENAME = "fnv1a64.js"
 FNV1A64_OFFSET_BASIS = 0xCBF29CE484222325

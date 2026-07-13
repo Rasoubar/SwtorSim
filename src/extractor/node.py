@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from extractor.ids import apply_field_id_delta, u64_str
-from extractor.varint import (
+from src.extractor.ids import apply_field_id_delta, u64_str
+from src.extractor.varint import (
     read_field_id_delta,
     read_f32_le,
     read_length_prefixed_string,

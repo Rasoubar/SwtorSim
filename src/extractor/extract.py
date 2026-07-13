@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from extractor.hashlist import ensure_jedipedia_hash_list
-from extractor.myp_archive import discover_archives, write_filtered_extract
+from src.extractor.hashlist import ensure_jedipedia_hash_list
+from src.extractor.myp_archive import discover_archives, write_filtered_extract
 
 
 def is_relevant_path(hash_path: str) -> bool:

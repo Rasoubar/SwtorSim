@@ -4,8 +4,8 @@ import json
 import re
 from pathlib import Path
 
-from extractor.config import DATA_DIR
-from extractor.gom.client_gom import ClientGomData, enum_ref_for_field, load_client_gom
+from src.extractor.config import DATA_DIR
+from src.extractor.gom.client_gom import ClientGomData, enum_ref_for_field, load_client_gom
 
 GOM_JS_FILENAME = "gom.js"
 

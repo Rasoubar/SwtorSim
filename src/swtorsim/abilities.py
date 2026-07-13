@@ -107,15 +107,15 @@ def handle_cooldown_modification(sim, caster, action):
     ability_db = sim.ability_db
     if not (cooldown_dict and ability_db and "target_tags" in action):
         return
-    reset_tags = set(action["target_tags"])
+    reset_tags = frozenset(action["target_tags"])
     is_reset = action.get("reset", False)
     for cd_key in list(cooldown_dict.keys()):
         if cooldown_dict[cd_key] <= sim.current_time: #clean the ones gone
             del cooldown_dict[cd_key]
             continue
         ability_data = ability_db.get(cd_key.lower().replace(" ", "_")) #I'll change JSON a bit to get rid of this string manipulation. eventually
-        ability_tags = getattr(ability_data, 'tags', []) if ability_data else []
-        if reset_tags & set(ability_tags):
+        ability_tags = getattr(ability_data, 'tags', frozenset()) if ability_data else frozenset()
+        if reset_tags & ability_tags:
             if is_reset:
                 del cooldown_dict[cd_key]
             else:
@@ -150,7 +150,7 @@ class Ability:
         self.base_gcd = config.get("base_gcd", 1.5)
         self.actions = config.get ("actions", [])
         self.energy_cost = config.get("energy_cost", 0.0)
-        self.tags=config.get("tags",[])
+        self.tags = frozenset(config.get("tags", []))
         self.conditions = config.get("conditions", {})
         self.has_charges = config.get("max_charges", 0) > 0
         if self.has_charges:
@@ -234,7 +234,7 @@ class Ability:
             if proc.trigger != "cast":
                 continue
             if proc.required_tags:
-                if not any(tag in self.tags for tag in proc.required_tags):
+                if proc.required_tags and not (proc.required_tags & self.tags):
                     continue
             if sim.current_time < proc.next_possible_proc:
                 continue

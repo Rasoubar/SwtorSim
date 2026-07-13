@@ -5,11 +5,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from extractor.config import ITEM_FQN_PREFIXES
-from extractor.graph import BucketStore, discover_fqn_prefix_nodes, resolve_fields
-from extractor.gom.gom import GomLookup
-from extractor.node import ParsedField
-from extractor.strings import StringResolver
+from src.extractor.config import ITEM_FQN_PREFIXES
+from src.extractor.graph import BucketStore, discover_fqn_prefix_nodes, resolve_fields
+from src.extractor.gom.gom import GomLookup
+from src.extractor.node import ParsedField
+from src.extractor.strings import StringResolver
 
 ITM_EQUIP_ABILITY_FIELD = "itmEquipAbility"
 ILVL_SEGMENT = re.compile(r"^ilvl_\d+$")

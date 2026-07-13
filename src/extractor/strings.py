@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from extractor.config import LOC_ENGLISH_KEY, LOC_STR_BUCKET_FIELD, LOC_STR_ID_FIELD
-from extractor.stb import StringTable
+from src.extractor.config import LOC_ENGLISH_KEY, LOC_STR_BUCKET_FIELD, LOC_STR_ID_FIELD
+from src.extractor.stb import StringTable
 
 
 def convert_loc_retriever(value: Any) -> dict[str, tuple[str, str]]:

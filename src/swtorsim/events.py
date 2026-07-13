@@ -62,7 +62,7 @@ class DamageHit(Event):
             instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
             instant_land.resolve(sim)
 
-        tags = self.action_data.get("tags", [])
+        tags = frozenset(self.action_data.get("tags", []))
         self.evaluate_on_hit_procs(sim, is_crit, tags)
 
     def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
@@ -81,7 +81,7 @@ class DamageHit(Event):
             return False
         if proc.trigger == "crit" and not is_crit:
             return False
-        if proc.required_tags and not any(tag in tags for tag in proc.required_tags):
+        if proc.required_tags and not (proc.required_tags & tags):
             return False
         if not validate_all(proc.conditions, self.source, self.target):
             return False

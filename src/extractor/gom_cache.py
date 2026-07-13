@@ -3,8 +3,8 @@ from __future__ import annotations
 import urllib.request
 from pathlib import Path
 
-from extractor.config import GOM_JS_URL
-from extractor.hashlist import hash_list_is_stale
+from src.extractor.config import GOM_JS_URL
+from src.extractor.hashlist import hash_list_is_stale
 
 GOM_JS_FILENAME = "gom.js"
 

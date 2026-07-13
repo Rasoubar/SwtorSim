@@ -117,7 +117,7 @@ def read_length_prefixed_string(data: bytes | memoryview, pos: int) -> tuple[str
 
 
 def uint64_to_str(lo: int, hi: int = 0) -> str:
-    from extractor.ids import u64_str
+    from src.extractor.ids import u64_str
 
     return u64_str((hi << 32) | lo)
 
@@ -127,7 +127,7 @@ def combine_lo_hi(lo: int, hi: int = 0) -> int:
 
 
 def read_u64_le(data: bytes | memoryview, pos: int) -> tuple[int, int]:
-    from extractor.ids import read_u64_le as _read
+    from src.extractor.ids import read_u64_le as _read
 
     return _read(data, pos)
 

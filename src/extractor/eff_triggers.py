@@ -4,8 +4,8 @@ import re
 from pathlib import Path
 from typing import Any
 
-from extractor.config import DATA_DIR, WORK_DIR
-from extractor.gom.client_gom import load_client_gom
+from src.extractor.config import DATA_DIR, WORK_DIR
+from src.extractor.gom.client_gom import load_client_gom
 
 EFF_TRIGGER_ENUM_ID = "4611686039404270025"
 

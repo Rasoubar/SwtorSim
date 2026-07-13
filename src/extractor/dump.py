@@ -5,9 +5,9 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from extractor.bkt import fqn_to_relative_path
-from extractor.graph import NodeRecord, collect_traversal_refs, is_allowed_relic_fqn
-from extractor.node import collect_node_refs
+from src.extractor.bkt import fqn_to_relative_path
+from src.extractor.graph import NodeRecord, collect_traversal_refs, is_allowed_relic_fqn
+from src.extractor.node import collect_node_refs
 
 
 def _node_to_json(record: NodeRecord) -> dict[str, Any]:

@@ -5,8 +5,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from extractor.ids import read_u64_le, u64_str
-from extractor.varint import read_swtor_varint
+from src.extractor.ids import read_u64_le, u64_str
+from src.extractor.varint import read_swtor_varint
 
 DBLB_MAGIC = 0x424C4244
 
