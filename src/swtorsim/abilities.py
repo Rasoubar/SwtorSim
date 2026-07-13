@@ -46,10 +46,11 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
 
 
 def handle_damage_action(sim, caster, target, action, source_name, delay):
-    if not accuracy_roll(caster, action.get("hand", "main")):
-        return False
     hit_event = DamageHit(caster, target, action, source_name)
-    sim.schedule_relative(delay, hit_event)
+    if delay > 0.0:
+        sim.schedule_relative(delay, hit_event)
+    else:
+        hit_event.resolve(sim)
     return True
 
 

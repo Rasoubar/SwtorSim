@@ -1,4 +1,6 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
+
+
 from src.swtorsim.combat_math import calculate_hit, EFFECTS, accuracy_roll
 import random
 from src.swtorsim.requirements import validate_all
@@ -93,16 +95,9 @@ class DamageHit(Event):
         """Applies the proc's internal cooldown and executes its actions"""
         current_icd = self.source.scale_time_modifier(proc.icd) if proc.affected_by_cdr else proc.icd
         proc.next_possible_proc = sim.current_time + current_icd
+        from src.swtorsim.abilities import execute_single_action
         for action in proc.actions:
-            action_conditions = action.get("conditions", {})
-            if not validate_all(action_conditions, self.source, self.target):
-                continue
-            if action.get("action_type") == "damage" and action.get("delay", 0.0) == 0.0:
-                instant_hit = DamageHit(self.source, self.target, action, proc.name)
-                instant_hit.resolve(sim)
-            else:
-                from src.swtorsim.abilities import execute_single_action
-                execute_single_action(sim, self.source, self.target, action, proc.name)
+            execute_single_action(sim, self.source, self.target, action, proc.name)
 
 
 class PeriodicProcTick(Event):
@@ -193,11 +188,11 @@ class DotTick(Event):
         if self.target.dots.get(dot_name) is not self.instance_ref:
             return
 
-        valid_actions = self.instance_ref.choose_action(self.source, self.target)
-        for action in valid_actions:
-            hit = DamageHit(source=self.source, target=self.target, action_data = action, ability_name= dot_name)
-            hit.resolve(sim)
-            self.instance_ref.ticks_remaining -= 1
+        actions = self.instance_ref.action_data.get('actions')
+        from src.swtorsim.abilities import execute_single_action
+        for action in actions:
+            execute_single_action(sim, self.source, self.target, action, dot_name)
+        self.instance_ref.ticks_remaining -= 1
         if self.instance_ref.ticks_remaining > 0:
             next_tick_time = sim.current_time + self.instance_ref.interval
             sim.schedule_absolute(next_tick_time, self)
@@ -211,50 +206,36 @@ class ChannelTickEvent(Event):
         Validates resources, executes the action, and schedules the next tick/ cleans up.
         """
     def __init__(self, player, target, channel_instance):
-        super().__init__(f"DoT Tick: {channel_instance.name}")
+        super().__init__(f"Channel Tick: {channel_instance.name}")
         self.source = player
         self.target = target
         self.channel = channel_instance
 
     def resolve(self, sim):
-
-        if self.source.active_channel is not self.channel:
+        """Executes tick actions, consumes resources, and schedules the next tick or ends the channel."""
+        if self.source.active_channel is not self.channel: #safeguard for clipping
             return
 
         acted = False
         from src.swtorsim.abilities import execute_single_action
+
         if self.source.resource.current_value >= self.channel.tick_cost:
             acted = True
-            actions = self.choose_action(self.source, self.target)
+            actions =  self.channel.action_data.get('actions')
             for action in actions:
-                if not validate_all(action.get("conditions", {}), self.source, self.target):
-                    continue
-                action_type = action.get("action_type")
-                if action_type == "damage":
-                    hit = DamageHit(source=self.source, target=self.target, action_data = action, ability_name= self.channel.name)
-                    hit.resolve(sim)
-                else:
-
-                    execute_single_action(sim, self.source, self.target, action, self.channel.name)
+                execute_single_action(sim, self.source, self.target, action, self.channel.name)
             self.source.resource.spend(self.channel.tick_cost)
         self.channel.remaining_ticks -= 1
-        if self.channel.remaining_ticks > 0 and acted == True:
+
+        if self.channel.remaining_ticks > 0 and acted == True: #channel next if channel still going
             next_tick_time = sim.current_time + self.channel.tick_interval
             sim.schedule_absolute(next_tick_time, ChannelTickEvent(self.source, self.target, self.channel))
-        else:
+        else: #if for any reason didn't act/channel is over, end channel and player is ready to act now
             self.source.active_channel = None
             self.source.is_channeling = False
             print(f"[{sim.current_time:.3f}] {self.channel.name} channel over.")
             sim.schedule_absolute(sim.current_time, PlayerReady(self.source, self.target))
-
-    def choose_action(self, source, target):
-        valid_actions = []
-        sub_actions = self.channel.action_data.get('actions')
-        for action in sub_actions:
-            conditions = action.get("conditions", {})
-            if validate_all(conditions, source, target):
-                valid_actions.append(action)
-        return valid_actions
+            #if gcd not ready yet, gcd abilities won't happen from PlayerReady, no worries there
 
 class ResourceTick(Event):
     """Represents the passive energy regen events"""
