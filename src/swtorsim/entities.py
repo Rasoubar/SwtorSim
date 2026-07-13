@@ -5,7 +5,7 @@ from src.swtorsim.requirements import validate_all
 class ActiveDot:
     __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
 
-    def __init__(self, name, interval, ticks_remaining, action_data: list):
+    def __init__(self, name, interval, ticks_remaining, action_data: dict):
         self.name = name
         self.interval = interval
         self.ticks_remaining = ticks_remaining

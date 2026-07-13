@@ -1,14 +1,14 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
 
-from src.swtorsim.combat_math import calculate_hit, EFFECTS, accuracy_roll
+from src.swtorsim.combat_math import calculate_hit, accuracy_roll
 import random
 from src.swtorsim.requirements import validate_all
 
 
 if TYPE_CHECKING:
     from src.swtorsim.entities import Player, Target, ActiveDot, ActiveBuff
-    from abilities import Ability
+
 
 
 class Event:
@@ -171,7 +171,7 @@ class DebuffExpire(Event):
 
 
 class DotTick(Event):
-    "Represents a Dot Tick. Handles action execution, tick's value decrease and following tick scheduling."
+    """Represents a Dot Tick. Handles action execution, tick's value decrease and following tick scheduling."""
     def __init__(self, source: "Player", target: "Target", instance_ref: "ActiveDot"):
         super().__init__(f"DoT Tick: {instance_ref.name}")
         self.source = source
@@ -239,7 +239,7 @@ class ChannelTickEvent(Event):
 
 class ResourceTick(Event):
     """Represents the passive energy regen events"""
-    def __init__(self, player: "Player", interval: float = 1.0): #keeping interval because i dont know how shit is, dont wanna assume it's every second
+    def __init__(self, player: "Player", interval: float = 1.0): #keeping interval because I don't know how shit is, don't want to assume it's every second
         super().__init__(f"Resource Passive Tick")
         self.player = player
         self.interval = interval
