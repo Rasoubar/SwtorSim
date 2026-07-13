@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
 
-from src.swtorsim.combat_math import calculate_hit, accuracy_roll
+from src.swtorsim.combat_math import calculate_hit
 import random
 from src.swtorsim.requirements import validate_all
 
