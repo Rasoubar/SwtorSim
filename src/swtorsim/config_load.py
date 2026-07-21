@@ -1,5 +1,5 @@
 from src.swtorsim.abilities import Ability
-from src.swtorsim.entities import ProcData, ActiveBuff
+from src.swtorsim.effects import ActiveBuff, ProcData
 import json
 import os
 from typing import Dict, Any

@@ -1,68 +1,14 @@
 import math
 from src.swtorsim.combat_math import EFFECTS
+from src.swtorsim.effects import ActiveBuff
+from src.swtorsim.resources import ResourcePool
 
 
-class ActiveDot:
-    __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
-
-    def __init__(self, name, interval, ticks_remaining, action_data: dict):
-        self.name = name
-        self.interval = interval
-        self.ticks_remaining = ticks_remaining
-        self.action_data = action_data
-
-
-class ActiveChannel:
-    def __init__(self, name, action_data, total_ticks, tick_interval, tick_cost):
-        self.name = name
-        self.action_data = action_data
-        self.remaining_ticks = total_ticks
-        self.tick_interval = tick_interval
-        self.tick_cost = tick_cost
-
-
-class ActiveBuff:
-    __slots__ = [
-        'id', 'effect_name', 'stat_name', 'value', 'expires_at', 'source_ability', 'required_tags', 'charges', 'consumable_charges',
-        'max_charges', 'proc_data', 'last_proc_at','target_hp_threshold',"stack_values"]
-
-    def __init__(self, id_num, effect_name, stat_name, value, expires_at, source_ability,
-                 required_tags=None, charges=None, consumable_charges=None, max_charges = None, target_hp_threshold = None,
-                 stack_values = None):
-        self.id = id_num
-        self.effect_name = effect_name
-        self.stat_name = stat_name
-        self.value = value
-        self.expires_at = expires_at
-        self.source_ability = source_ability
-        self.required_tags = required_tags
-        self.charges = charges
-        self.consumable_charges = consumable_charges
-        self.max_charges = max_charges
-        self.target_hp_threshold = target_hp_threshold
-        self.stack_values = stack_values
-
-class ProcData:
-    __slots__ = ['name','actions','chance','icd','next_possible_proc','trigger','required_tags','affected_by_cdr',
-                 'conditions']
-
-    def __init__(self, name: str, trigger: str, actions: list,
-                 required_tags: list , chance: float = 1.0, icd: float = 0.0, affected_by_cdr = False, conditions: dict = None):
-        self.name = name
-        self.trigger = trigger
-        self.required_tags = frozenset(required_tags) if required_tags else frozenset()
-        self.chance = chance
-        self.icd = icd
-        self.actions = actions
-        self.next_possible_proc = 0.0
-        self.affected_by_cdr = affected_by_cdr
-        self.conditions = conditions if conditions is not None else {} #I went with this to not make conditions mandatory in the JSON file. No idea what it implies for performance
-
-class Actor:
+class Entity:
     def __init__(self, name: str):
         self.name = name
 
-class Player(Actor):
+class Player(Entity):
     def __init__(self, name: str):
         super().__init__(name)
         self.next_gcd = 0.0
@@ -233,9 +179,9 @@ class Player(Actor):
         pct_modifiers = 1.0
         flat_reductions = 0.0
         buffs_to_clear = []
+        target_ability = ability_name.lower().replace(" ", "_")
         for effect in self.effects.values():
             meta = EFFECTS[effect.id]
-            target_ability = ability_name.lower().replace(" ", "_") #don't judge me. can make it better later, now i just want it to work
             stat_name = meta['stat_name']
             if stat_name in ("cost_reduction_pct", "cost_reduction_flat"):
                 effect_tags = getattr(effect, "required_tags", [])
@@ -269,7 +215,7 @@ class Player(Actor):
             self.recalculate_stats()
             print(f'Buffs active:{self.effects}')
 
-class Target(Actor):
+class Target(Entity):
     def __init__(self, name: str, hp: int):
         super().__init__(name)
         self.max_hp = hp
@@ -279,6 +225,7 @@ class Target(Actor):
         self.stats = {
             "armor" : 17225
         }
+
 
     def apply_debuff(self, action: dict, source_name: str, current_time: float) -> tuple[str, "ActiveBuff", float]:
 
@@ -349,39 +296,3 @@ class Target(Actor):
     def hp_ratio(self) -> float:
         return self.hp / self.max_hp if self.max_hp > 0 else 1.0
 
-class ResourcePool:
-    def __init__(self, pool_type: str = "Force", max_value: float = 100.0, base_regen: float = 8.0):
-        self.pool_type = pool_type
-        self.max_value = max_value
-        self.current_value = max_value
-        self.base_regen = base_regen
-
-    def can_afford(self, amount: float) -> bool:
-        # heat was dumb to put already, I only really play assassin, pt tank and merc heal so I thought "oh, I can't
-        # account only for force" but forgot about warriors.
-        if self.pool_type == "Heat":
-            return self.current_value + amount <= self.max_value
-        else:
-            return self.current_value >= amount
-
-    def spend(self, amount: float) -> bool:
-        if self.pool_type == "Heat":
-            if self.current_value + amount > self.max_value:
-                return False
-            self.current_value += amount
-            return True
-        else:
-            if self.current_value < amount:
-                return False
-            self.current_value -= amount
-            return True
-
-    def generate(self, amount: float):
-        if self.pool_type == "Heat":
-            self.current_value = max(0.0, self.current_value - amount)
-        else:
-            self.current_value = min(self.max_value, self.current_value + amount)
-
-    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0): #only works properly for force rn
-        actual_regen_rate = self.base_regen * alacrity_modifier
-        self.generate(actual_regen_rate * delta_time)

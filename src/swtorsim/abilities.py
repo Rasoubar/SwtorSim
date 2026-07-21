@@ -1,7 +1,8 @@
 import random
 from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent, ChannelTickEvent
 from src.swtorsim.combat_math import accuracy_roll
-from src.swtorsim.entities import ActiveDot, Player, Target, ActiveChannel
+from src.swtorsim.entities import Player, Target
+from src.swtorsim.effects import ActiveDot, ActiveChannel
 from src.swtorsim.requirements import validate_all
 
 
@@ -127,7 +128,7 @@ def handle_cooldown_modification(sim, caster, action):
                     del cooldown_dict[cd_key]
 
 
-def handle_restore_charge(sim, caster, action): #might want to change so that the ability_db is on the player
+def handle_restore_charge(sim, _caster, action): #might want to change so that the ability_db is on the player
     """Restores a charge to the target ability"""
     target_ability_name = action.get("target_ability")
     amount = action.get("amount", 1)
@@ -144,6 +145,7 @@ def handle_buff_remove_action(sim, caster, action):
 
 
 class Ability:
+    """Represents """
     def __init__(self, config: dict):
         self.name = config["name"]
         self.cooldown = config.get("cooldown",0.0)
@@ -234,14 +236,13 @@ class Ability:
         for proc in caster.procs.values():
             if proc.trigger != "cast":
                 continue
-            if proc.required_tags:
-                if proc.required_tags and not (proc.required_tags & self.tags):
-                    continue
+            if proc.required_tags and not (proc.required_tags & self.tags):
+                continue
             if sim.current_time < proc.next_possible_proc:
                 continue
             print(f'On cast proc {proc.name} triggered.')
             if random.random() < proc.chance:
                 current_icd = caster.scale_time_modifier(proc.icd) if proc.affected_by_cdr else proc.icd
-                proc.next_possible_proc = sim.current_time + current_icd
+                proc.next_possible_proc = round(sim.current_time + current_icd,4)
                 for action in proc.actions:
                     execute_single_action(sim, caster, target, action, proc.name)

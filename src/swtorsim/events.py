@@ -7,8 +7,8 @@ from src.swtorsim.requirements import validate_all
 
 
 if TYPE_CHECKING:
-    from src.swtorsim.entities import Player, Target, ActiveDot, ActiveBuff
-
+    from src.swtorsim.entities import Player, Target
+    from src.swtorsim.effects import ActiveDot, ActiveBuff
 
 
 class Event:
