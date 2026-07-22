@@ -38,6 +38,13 @@ class ActiveEffect:
         self.target_hp_threshold = target_hp_threshold
         self.stack_values = stack_values
 
+    def consume_charge(self, count: int = 1) -> bool:
+        """ Consumes N charges/consumable charges from the effect. Returns bool on if it has reached 0 charges."""
+        if self.consumable_charges is None:
+            return False
+        self.consumable_charges = max(0, self.consumable_charges - count)
+        return self.consumable_charges == 0
+
     @classmethod
     def from_action(cls, action: dict, stat_name: str, effect_key: str,
                     charges: int, expires_at: float, source_name: str):

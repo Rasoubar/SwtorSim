@@ -120,7 +120,7 @@
       {
         "action_type": "buff",
         "id": 68,
-        "value": 30.0,
+        "value": -30.0,
         "duration": 15.0,
         "required_tags": [
           "eradicate"
@@ -180,7 +180,7 @@
           "recklessness"
         ],
         "reset": false,
-        "value": 2.0
+        "value": -2.0
       }
     ],
     "conditions": {}

@@ -39,7 +39,7 @@ def calculate_hit(caster, target, action_data):
     #calculate base damage from caster stats and action_data
     base_damage = calculate_base_damage(caster,action_data, attack_type)
 
-    post_mit_damage = handle_mitigation(caster, target, base_damage, modifiers, damage_type)
+    post_mit_damage = handle_mitigation(caster, target, base_damage, damage_type)
 
     post_mod_damage = post_mit_damage * modifiers['total_multiplier']
 
@@ -122,6 +122,7 @@ def alter_modifier(effect, modifiers, buckets):
 def consume_charges(caster, target, action_tags):
     """Alters charge value according to use. Will be gone on next version as doesn't follow game logic."""
     caster_expired_buffs = []
+    target_expired_debuffs = []
 
     # Consume Caster Buffs
     for effect_id, buff in list(caster.effects.items()):
@@ -131,23 +132,20 @@ def consume_charges(caster, target, action_tags):
             continue
         if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
             continue
-
-        if buff.consumable_charges is not None and buff.id != 68:  # temporary exemption preserved
-            buff.consumable_charges -= 1
-            if buff.consumable_charges <= 0:
-                caster_expired_buffs.append(effect_id)
+        if buff.id != 68 and buff.consume_charge(): #this will be changed once proper expiration is implemented
+            caster_expired_buffs.append(effect_id)
     caster.cleanup_expired_effects(caster_expired_buffs)
 
     # Consume Target Debuffs
-    for effect_id, buff in list(target.effects.items()):
+    for effect_key, buff in list(target.effects.items()):
         if buff.id not in EFFECTS:
             continue
-        if buff.required_tags is not None and not any(tag in action_tags for tag in buff.required_tags):
+        if buff.required_tags and not any(tag in action_tags for tag in buff.required_tags):
             continue
-        if buff.consumable_charges is not None:
-            buff.consumable_charges -= 1
-            if buff.consumable_charges <= 0:
-                del target.effects[effect_id]
+        if buff.consume_charge():
+            target_expired_debuffs.append(effect_key)
+
+    target.cleanup_expired_effects(target_expired_debuffs)
 
 def calculate_base_damage(caster, action_data, attack_type):
     """ Calculates base damage from caster and action data. Returns damage value."""
@@ -179,7 +177,7 @@ def calculate_base_damage(caster, action_data, attack_type):
 
     return ability_damage
 
-def handle_mitigation(caster, target, ability_damage, modifiers, damage_type):
+def handle_mitigation(caster, target, ability_damage, damage_type):
     """Determines if applicable, if so calculates and applies mitigation to damage value. Returns new damage value"""
     if damage_type in (1, 2):
         armor = target.stats.get("armor", 17225)
@@ -213,3 +211,32 @@ def accuracy_roll(source, hand):
         print("MISSED")
         return False
     return True
+
+
+def calc_dr(rating: float, cap: float, k_factor: float) -> float:
+    """
+    AI comment for clarity
+    Calculates percentage gain from a raw rating using SWTOR's Diminishing Returns curve:
+        Gain % = Cap * [ 1 - (1 - 0.01 / Cap) ** ( (1 / K) * (Rating / Level) ) ]
+
+    Parameters:
+        rating (float):   Raw stat rating from gear/buffs (e.g., 2800 Critical Rating)
+        cap (float):      Theoretical max percentage bonus (e.g., 0.30 for 30% Crit Rating cap)
+        k_factor (float): SWTOR scaling constant for this stat:
+                          - 2.41  : Critical Rating
+                          - 3.20  : Alacrity & Accuracy Ratings
+                          - 12.93 : Mastery -> Crit conversion
+
+    Returns:
+        float: Percentage increase as a decimal (e.g., 0.142 for +14.2%)
+    """
+    if not rating:
+        return 0.0
+
+    level_modifier = 80.0
+
+    base_ratio = 1.0 - (0.01 / cap)
+
+    decay_exponent = (1.0 / k_factor) * (rating / level_modifier)
+
+    return cap * (1.0 - (base_ratio ** decay_exponent))

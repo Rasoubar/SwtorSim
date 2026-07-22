@@ -122,7 +122,7 @@ def handle_cooldown_modification(sim, caster, action):
                 del cooldown_dict[cd_key]
             else:
                 reduction = action.get("value", 0.0)
-                new_cd = max(sim.current_time, cooldown_dict[cd_key] - reduction)
+                new_cd = max(sim.current_time, cooldown_dict[cd_key] + reduction)
                 cooldown_dict[cd_key] = new_cd
                 if cooldown_dict[cd_key] <= sim.current_time:
                     del cooldown_dict[cd_key]
@@ -139,7 +139,7 @@ def handle_restore_charge(sim, _caster, action): #might want to change so that t
 def handle_buff_remove_action(sim, caster, action):
     """Removes a buff from the caster"""
     effect_name = action.get("effect_name")
-    if effect_name and caster.has_buff(effect_name):
+    if effect_name and caster.has_effect(effect_name):
         caster.cleanup_expired_effects([effect_name])
         print(f"[{sim.current_time:.3f}] {caster.name} consumed/removed buff: {effect_name}")
 

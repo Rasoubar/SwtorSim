@@ -19,11 +19,11 @@ def check_target_hp(conditions, caster: "Player", target: "Dummy", **_kwargs) ->
 # noinspection PyUnusedLocal
 def check_caster_buff(conditions: Any, caster: "Player", target: "Dummy", **kwargs) -> bool:
     buff_list = [conditions] if isinstance(conditions, str) else conditions
-    return any(caster.has_buff(b) for b in buff_list)
+    return any(caster.has_effect(b) for b in buff_list)
 
 def check_target_debuff(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
     debuff_list = [conditions] if isinstance(conditions, str) else conditions
-    return any(target.has_debuff(d) for d in debuff_list)
+    return any(target.has_effect(d) for d in debuff_list)
 
 def check_exact_dot_amount(conditions: int, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
     return target.count_active_dots == conditions
@@ -59,7 +59,7 @@ def check_target_hp_above(threshold: float, _caster: "Player", target: "Dummy", 
 
 def check_caster_does_not_have_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     buff_list = [conditions] if isinstance(conditions, str) else conditions
-    has_any_buff = any(caster.has_buff(b) for b in buff_list)
+    has_any_buff = any(caster.has_effect(b) for b in buff_list)
     return not has_any_buff
 
 CONDITION_REGISTRY = {

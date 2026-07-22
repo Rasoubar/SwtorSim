@@ -38,7 +38,7 @@
   },
   "FANATICISM": {
     "id": 68,
-    "value": 20.0,
+    "value": -20.0,
     "required_tags": [
       "death_field"
     ],
@@ -92,7 +92,7 @@
   },
   "CLAWS OF DECAY ASSASSINATE_COST": {
     "id": 68,
-    "value": 3.0,
+    "value": -3.0,
     "required_tags": [
       "assassinate"
     ],
