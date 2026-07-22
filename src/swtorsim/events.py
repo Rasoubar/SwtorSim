@@ -258,5 +258,5 @@ class ResourceGainEvent(Event):
 
     def resolve(self, sim):
         """Adds the resource value to the resource pool."""
-        print(f'[{sim.current_time:.2f}s] omg i gained {self.amount}')
+        print(f'[{sim.current_time:.2f}s] Gained {self.amount} {self.player.resource.pool_type}')
         self.player.resource.generate(self.amount)

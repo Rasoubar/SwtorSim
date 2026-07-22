@@ -5,10 +5,85 @@ from src.swtorsim.resources import ResourcePool
 
 
 class Entity:
+    RECALCULATE_STATS = set()
     def __init__(self, name: str):
         self.name = name
+        self.effects = {}
+
+    def apply_effect(self, action: dict, source_name: str, current_time): #can be improved on the refresh
+
+        try:
+            action_id = action.get("id")
+            extracted_stat = EFFECTS[action_id]["stat_name"]
+        except (KeyError, TypeError) as e:
+            print(f" CONFIGURATION CRASH in apply_effect via [{source_name}]")
+            print(f" Action ID {action.get('id')} is completely missing from the EFFECTS database!")
+            raise e
+
+        duration = action["duration"]
+        affected_by_cdr = action.get("affected_by_cdr", False)
+
+        if affected_by_cdr:
+            duration = self.scale_time_modifier(duration)
+
+        effect_key = action.get("effect_name", f"{extracted_stat}")
+        expiration_timestamp = current_time + duration
+
+        existing_effect = self.effects.get(effect_key)
+
+        if existing_effect:
+            existing_effect.expires_at = expiration_timestamp
+            if existing_effect.max_charges is not None:
+                current_charges = min(existing_effect.max_charges, existing_effect.charges + 1) #WATCH
+            elif "charges" in action:
+                current_charges = action["charges"]
+            else:
+                current_charges = existing_effect.charges
+        else:
+            current_charges = action.get("charges", 1)
+
+        raw_tags = action.get("required_tags")
+        if raw_tags is not None:
+            tags_set = frozenset(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else (frozenset([raw_tags]) if raw_tags else frozenset())
+        else:
+            tags_set = None
+
+        effect_instance = ActiveBuff(
+            id_num=action.get("id"),
+            effect_name=effect_key,
+            stat_name=extracted_stat,
+            value=action["value"],
+            expires_at=expiration_timestamp,
+            source_ability=source_name,
+            required_tags=tags_set,
+            charges= current_charges,
+            consumable_charges=action.get("consumable_charges"),
+            max_charges=action.get("max_charges"),
+            target_hp_threshold=action.get("target_hp_threshold"),
+            stack_values=action.get("stack_values")
+        )
+        self.effects[effect_key] = effect_instance
+
+        self.consider_recalculation(effect_instance)
+
+        return effect_key, effect_instance, duration
+
+    def scale_time_modifier(self, base_time: float) -> float:
+        return base_time
+
+    def consider_recalculation(self, effect_instance):
+        effect_id = effect_instance.id
+        if effect_id in EFFECTS:
+            stat_name = EFFECTS[effect_id]["stat_name"]
+            if stat_name in self.RECALCULATE_STATS:
+                self.recalculate_stats()
+
+    def recalculate_stats(self):
+        pass
+
 
 class Player(Entity):
+    RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}
     def __init__(self, name: str):
         super().__init__(name)
         self.next_gcd = 0.0
@@ -139,13 +214,13 @@ class Player(Entity):
                 multiplier = buff.charges if buff.max_charges is not None else 1
                 stat_name = EFFECTS[effect_id]["stat_name"]
                 if stat_name == "Mastery Stat":
-                    bonus_mastery += buff.value
+                    bonus_mastery += (buff.value * multiplier)
                 elif stat_name == "Power Stat":
-                    bonus_power += buff.value
+                    bonus_power += (buff.value * multiplier)
                 elif stat_name == "Critical Stat":
-                    bonus_critical_rating += buff.value
+                    bonus_critical_rating += (buff.value * multiplier)
                 elif stat_name == "Alacrity Rating":
-                    bonus_alacrity_rating += buff.value
+                    bonus_alacrity_rating += (buff.value * multiplier)
                 elif stat_name == "Bonus Damage":
                     damage_bonus_multiplier += (buff.value * multiplier)
                 elif stat_name == "Mastery PCT":
@@ -216,15 +291,17 @@ class Player(Entity):
             print(f'Buffs active:{self.effects}')
 
 class Target(Entity):
+    RECALCULATE_STATS = {"Armor Rating"}
     def __init__(self, name: str, hp: int):
         super().__init__(name)
         self.max_hp = hp
         self.hp = hp
         self.dots = {}
         self.debuffs = {}
-        self.stats = {
+        self.base_stats = {
             "armor" : 17225
         }
+        self.stats = self.base_stats.copy()
 
 
     def apply_debuff(self, action: dict, source_name: str, current_time: float) -> tuple[str, "ActiveBuff", float]:
@@ -279,6 +356,20 @@ class Target(Entity):
                     self.recalculate_stats()
 
         return debuff_key, debuff_instance, duration
+
+    def recalculate_stats(self):
+        temp_stats = self.base_stats.copy()
+        armor_rating_change = 0
+        for effect in self.effects.values():
+            effect_id = effect.id
+            if effect_id in EFFECTS:
+                multiplier = effect.charges if effect.max_charges is not None else 1
+                stat_name = EFFECTS[effect_id]["stat_name"]
+                if stat_name == "Mastery Stat":
+                    armor_rating_change += effect.value * multiplier
+        temp_stats["Armor"] += (1+armor_rating_change)
+        self.stats = temp_stats
+
 
     def has_debuff(self, effect_name:str) -> bool:
         return effect_name in self.debuffs

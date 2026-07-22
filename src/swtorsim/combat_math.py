@@ -58,7 +58,6 @@ def handle_modifiers(caster, target, action_tags):
         'bonus_crit_chance': 0.0,
         'bonus_crit_modifier': 0.0,
         'bonus_armor_pen': 0.0,
-        'target_armor_debuff': 0.0,
         'total_multiplier': 1.0
     }
 
@@ -95,9 +94,9 @@ def handle_target_debuffs(target, action_tags, buckets, modifiers):
             continue
         if debuff.required_tags is not None and not any(tag in action_tags for tag in debuff.required_tags):
             continue
-        alter_modifier(debuff,modifiers,buckets, target = True)
+        alter_modifier(debuff,modifiers,buckets)
 
-def alter_modifier(effect, modifiers, buckets, target = False):
+def alter_modifier(effect, modifiers, buckets):
     """Handles the individual modifier modification fors both buffs and debuffs"""
     meta = EFFECTS[effect.id]
 
@@ -121,9 +120,6 @@ def alter_modifier(effect, modifiers, buckets, target = False):
         modifiers['bonus_crit_modifier'] += total_buff_value
     elif stat_name == "Armor Penetration":
         modifiers['bonus_armor_pen'] += total_buff_value
-    elif stat_name == "Armor Rating" and target is True:
-        modifiers['target_armor_debuff'] += total_buff_value
-
 
 def consume_charges(caster, target, action_tags):
     """Alters charge value according to use. Will be gone on next version as doesn't follow game logic."""
@@ -188,7 +184,7 @@ def calculate_base_damage(caster, action_data, attack_type):
 def handle_mitigation(caster, target, ability_damage, modifiers, damage_type):
     """Determines if applicable, if so calculates and applies mitigation to damage value. Returns new damage value"""
     if damage_type in (1, 2):
-        armor = target.stats.get("armor", 17225) * (1.0 + modifiers['target_armor_debuff'])
+        armor = target.stats.get("armor", 17225)
         total_armor_pen = caster.stats.get("Armor Penetration", 0.0) + modifiers['bonus_armor_pen']
         effective_armor = armor * (1.0 - total_armor_pen)
         armor_dr = effective_armor / (effective_armor + 32000)

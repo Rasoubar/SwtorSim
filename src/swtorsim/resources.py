@@ -25,7 +25,7 @@ class ResourcePool:
             self.current_value -= amount
             return True
 
-    def generate(self, amount: float):
+    def generate(self, amount: float): #Ide doesn't flag uses but they happen
         if self.pool_type == "Heat":
             self.current_value = max(0.0, self.current_value - amount)
         else:
