@@ -83,6 +83,9 @@ class EnergyPool(StandardPool):
     def __init__(self, pool_type: str = "Energy", max_value: float = 100.0, base_regen: float = 5.0):
         super().__init__(pool_type, max_value, base_regen)
 
+    def can_afford(self, amount: float) -> bool:
+        return self.current_value >= amount
+
     def get_current_regen_rate(self) -> float:
         """Exact brackets: >=60 is 5.0, 20-59 is 3.0, <20 is 2.0"""
         if self.current_value >= 60.0:
