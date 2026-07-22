@@ -1,7 +1,7 @@
 import random
 from src.swtorsim.events import DamageHit, EffectExpire, DotTick, ResourceGainEvent, ChannelTickEvent
 from src.swtorsim.combat_math import accuracy_roll
-from src.swtorsim.entities import Player, Target
+from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.effects import ActiveDot, ActiveChannel
 from src.swtorsim.requirements import validate_all
 
@@ -176,7 +176,7 @@ class Ability:
     def add_charge(self, amount=1):
         self.charges = min(self.max_charges, self.charges + amount)
 
-    def can_cast(self, caster: "Player", target: "Target", sim) -> bool:
+    def can_cast(self, caster: "Player", target: "Dummy", sim) -> bool:
         if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
             return False
 

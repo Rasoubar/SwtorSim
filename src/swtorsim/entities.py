@@ -1,6 +1,6 @@
 import math
 from src.swtorsim.combat_math import EFFECTS
-from src.swtorsim.effects import ActiveBuff
+from src.swtorsim.effects import ActiveEffect
 from src.swtorsim.resources import ResourcePool
 
 
@@ -9,63 +9,48 @@ class Entity:
     def __init__(self, name: str):
         self.name = name
         self.effects = {}
+        self.stats = {}
 
     def apply_effect(self, action: dict, source_name: str, current_time): #can be improved on the refresh
 
-        try:
-            action_id = action.get("id")
-            extracted_stat = EFFECTS[action_id]["stat_name"]
-        except (KeyError, TypeError) as e:
-            print(f" CONFIGURATION CRASH in apply_effect via [{source_name}]")
-            print(f" Action ID {action.get('id')} is completely missing from the EFFECTS database!")
-            raise e
+        extracted_stat = self._get_stat_name(action.get("id"), source_name)
 
-        duration = action["duration"]
-        affected_by_cdr = action.get("affected_by_cdr", False)
-
-        if affected_by_cdr:
-            duration = self.scale_time_modifier(duration)
-
-        effect_key = action.get("effect_name", f"{extracted_stat}")
+        duration = self.scale_time_modifier(action["duration"]) if action.get("affected_by_cdr") else action["duration"]
         expiration_timestamp = current_time + duration
 
-        existing_effect = self.effects.get(effect_key)
+        effect_key = action.get("effect_name", extracted_stat)
 
-        charges = action.get("charges",1)
-        if existing_effect:
-            existing_effect.expires_at = expiration_timestamp
-            if existing_effect.max_charges is not None:
-                current_charges = min(existing_effect.max_charges, existing_effect.charges + charges) #WATCH
-            else:
-                current_charges = charges
-        else:
-            current_charges = charges
+        current_charges = self._determine_charges(self.effects.get(effect_key), action.get("charges", 1))
 
-        raw_tags = action.get("required_tags")
-        if raw_tags is not None:
-            tags_set = frozenset(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else (frozenset([raw_tags]) if raw_tags else frozenset())
-        else:
-            tags_set = None
-
-        effect_instance = ActiveBuff(
-            id_num=action.get("id"),
-            effect_name=effect_key,
+        effect_instance = ActiveEffect.from_action(
+            action=action,
             stat_name=extracted_stat,
-            value=action["value"],
+            effect_key=effect_key,
+            charges=current_charges,
             expires_at=expiration_timestamp,
-            source_ability=source_name,
-            required_tags=tags_set,
-            charges= current_charges,
-            consumable_charges=action.get("consumable_charges"),
-            max_charges=action.get("max_charges"),
-            target_hp_threshold=action.get("target_hp_threshold"),
-            stack_values=action.get("stack_values")
+            source_name=source_name
         )
+
         self.effects[effect_key] = effect_instance
 
         self.consider_recalculation(effect_instance)
 
         return effect_key, effect_instance, duration
+
+    @staticmethod
+    def _determine_charges(existing_effect, incoming_charges: int) -> int:
+        if existing_effect and existing_effect.max_charges is not None:
+            return min(existing_effect.max_charges, existing_effect.charges + incoming_charges)
+        return incoming_charges
+
+    @staticmethod
+    def _get_stat_name(action_id, source_name: str) -> str:
+        try:
+            return EFFECTS[action_id]["stat_name"]
+        except (KeyError, TypeError) as e:
+            print(f" CONFIGURATION CRASH in apply_effect via [{source_name}]")
+            print(f" Action ID {action_id} is completely missing from the EFFECTS database!")
+            raise e
 
     def scale_time_modifier(self, base_time: float) -> float:
         return base_time
@@ -92,6 +77,15 @@ class Entity:
         if needs_stat_recalc:
             self.recalculate_stats()
             print(f'Buffs active:{self.effects}')
+
+    def get_stat(self, stat_name: str) -> float:
+        base_value = self.stats.get(stat_name, 0.0)
+        modifier = 0.0
+        for effect in self.effects.values():
+            if effect.stat_name == stat_name:
+                multiplier = effect.charges if effect.max_charges is not None else 1
+                modifier += effect.value * multiplier
+        return base_value + modifier
 
 class Player(Entity):
     RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy", "Armor Penetration"}
@@ -136,15 +130,6 @@ class Player(Entity):
         cooldown = base_cooldown / (1.0 + cdr)
         scaled_cooldown = math.ceil(cooldown * 10) / 10
         return round(scaled_cooldown, 2)
-
-    def get_stat(self, stat_name: str) -> float:
-        base_value = self.stats.get(stat_name, 0.0)
-        modifier = 0.0
-        for effect in self.effects.values():
-            if effect.stat_name == stat_name:
-                multiplier = effect.charges if effect.max_charges is not None else 1
-                modifier += effect.value * multiplier
-        return base_value + modifier
 
     def scale_time_modifier(self, base_time: float) -> float:
         cdr = self.stats.get("Alacrity",0.0)
@@ -233,7 +218,7 @@ class Player(Entity):
         print(self.effects)
         return buff_name in self.effects
 
-class Target(Entity):
+class Dummy(Entity):
     RECALCULATE_STATS = {"Armor Rating"}
     def __init__(self, name: str, hp: int):
         super().__init__(name)

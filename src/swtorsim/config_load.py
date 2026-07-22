@@ -1,5 +1,5 @@
 from src.swtorsim.abilities import Ability
-from src.swtorsim.effects import ActiveBuff, ProcData
+from src.swtorsim.effects import ActiveEffect, ProcData
 import json
 import os
 from typing import Dict, Any
@@ -87,7 +87,7 @@ def load_passives_from_json(filepath: str) -> Dict[str, Any]:
 
 
 def load_permanent_buffs_from_dict(raw_data):
-    buff_registry: Dict[str, ActiveBuff] = {}
+    buff_registry: Dict[str, ActiveEffect] = {}
 
     for buff_key, block in raw_data.items():
         # 🟢 AUTO GENERATION: Fallback to the dictionary key if effect_name is null/empty
@@ -98,7 +98,7 @@ def load_permanent_buffs_from_dict(raw_data):
 
         # Instantiate matching the positional order of your ActiveBuff constructor:
         # (id_num, effect_name, stat_name, value, expires_at, source_ability, ...)
-        buff_registry[effect_name] = ActiveBuff(
+        buff_registry[effect_name] = ActiveEffect(
             id_num=block.get("id"),
             effect_name=effect_name,
             stat_name=None,  # Note: Leave None or pass string if you have an ID-to-Name map lookup
@@ -114,7 +114,7 @@ def load_permanent_buffs_from_dict(raw_data):
 
     return buff_registry
 
-def load_permanent_buffs_from_json(filepath: str) -> Dict[str, ActiveBuff]:
+def load_permanent_buffs_from_json(filepath: str) -> Dict[str, ActiveEffect]:
     """
     Loads raw permanent buff configurations out of JSON files and maps them
     strictly to the positional slots layout of the ActiveBuff class container.

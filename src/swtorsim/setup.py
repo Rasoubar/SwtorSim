@@ -1,7 +1,7 @@
 import copy
 import random
 from src.swtorsim.engine import Simulation
-from src.swtorsim.entities import Player, Target
+from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.rotation import Rotation
 
@@ -36,7 +36,7 @@ def schedule_periodic(player, target, sim):
 def prepare_simulation(rotation_config, stats_config, abilities_db, procs_db, buffs_db, dummy_hp):
     """Sets up the simulation to be run by testers"""
     player = Player(stats_config.get("class_name", "Unknown"))
-    target = Target("Target Dummy", hp=dummy_hp)
+    target = Dummy("Target Dummy", hp=dummy_hp)
     p_stats = player.base_stats
     for stat_key, stat_value in stats_config.get("stats", {}).items():
         p_stats[stat_key] = stat_value

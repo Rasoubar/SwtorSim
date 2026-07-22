@@ -7,8 +7,8 @@ from src.swtorsim.requirements import validate_all
 
 
 if TYPE_CHECKING:
-    from src.swtorsim.entities import Player, Target, Entity
-    from src.swtorsim.effects import ActiveDot, ActiveBuff
+    from src.swtorsim.entities import Player, Dummy, Entity
+    from src.swtorsim.effects import ActiveDot, ActiveEffect
 
 
 class Event:
@@ -41,7 +41,7 @@ class ApplyDamageLand(Event):
 
 class DamageHit(Event):
     """ Represents a hit execution. Holds the data needed to calculate damage, and trigger procs."""
-    def __init__(self, source: "Player", target: "Target", action_data: dict, ability_name: str):
+    def __init__(self, source: "Player", target: "Dummy", action_data: dict, ability_name: str):
         super().__init__(f"{ability_name} Hit")
         self.source = source
         self.target = target
@@ -118,7 +118,7 @@ class PeriodicProcTick(Event):
 
 class PlayerReady(Event):
     """Represents a player's actions/decisions to act"""
-    def __init__(self, player: "Player", target: "Target"):
+    def __init__(self, player: "Player", target: "Dummy"):
         super().__init__("Player Ready")
         self.player = player
         self.target = target
@@ -134,7 +134,7 @@ class PlayerReady(Event):
 
 class EffectExpire(Event):
     """Handles the expiration of player buffs."""
-    def __init__(self, entity: "Entity", effect_name: str, instance_ref: "ActiveBuff"):
+    def __init__(self, entity: "Entity", effect_name: str, instance_ref: "ActiveEffect"):
         super().__init__(f"{effect_name} Expired")
         self.entity = entity
         self.effect_name = effect_name
@@ -154,7 +154,7 @@ class EffectExpire(Event):
 
 class DotTick(Event):
     """Represents a Dot Tick. Handles action execution, tick's value decrease and following tick scheduling."""
-    def __init__(self, source: "Player", target: "Target", instance_ref: "ActiveDot"):
+    def __init__(self, source: "Player", target: "Dummy", instance_ref: "ActiveDot"):
         super().__init__(f"DoT Tick: {instance_ref.name}")
         self.source = source
         self.target = target

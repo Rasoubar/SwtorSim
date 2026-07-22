@@ -17,7 +17,7 @@ class ActiveChannel:
         self.tick_cost = tick_cost
 
 
-class ActiveBuff:
+class ActiveEffect:
     __slots__ = [
         'id', 'effect_name', 'stat_name', 'value', 'expires_at', 'source_ability', 'required_tags', 'charges', 'consumable_charges',
         'max_charges', 'proc_data', 'last_proc_at','target_hp_threshold',"stack_values"]
@@ -37,6 +37,32 @@ class ActiveBuff:
         self.max_charges = max_charges
         self.target_hp_threshold = target_hp_threshold
         self.stack_values = stack_values
+
+    @classmethod
+    def from_action(cls, action: dict, stat_name: str, effect_key: str,
+                    charges: int, expires_at: float, source_name: str):
+        """Constructs an Effect from an action."""
+
+        return cls(
+            id_num=action.get("id"),
+            effect_name=effect_key,
+            stat_name=stat_name,
+            value=action["value"],
+            expires_at=expires_at,
+            source_ability=source_name,
+            required_tags=cls._parse_tags(action.get("required_tags")),
+            charges=charges,
+            consumable_charges=action.get("consumable_charges"),
+            max_charges=action.get("max_charges"),
+            target_hp_threshold=action.get("target_hp_threshold"),
+            stack_values=action.get("stack_values")
+        )
+
+    @staticmethod
+    def _parse_tags(raw_tags) -> frozenset | None:
+        if not raw_tags:
+            return None
+        return frozenset(raw_tags if isinstance(raw_tags, (list, tuple, set)) else [raw_tags])
 
 
 class ProcData:
