@@ -84,13 +84,13 @@ def handle_channel_action(sim, caster, target, action_data: dict, source_name: s
 
 def handle_buff_action(sim, caster, action, source_name, current_time):
     """Applies the buff to the caster and schedules it's expiration"""
-    buff_key, buff_instance, duration = caster.apply_buff(action, source_name, current_time)
+    buff_key, buff_instance, duration = caster.apply_effect(action, source_name, current_time)
     sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
 
 
 def handle_debuff_action(sim, target, action, source_name, current_time):
     """Applies the debuff to the target and schedules it's expiration"""
-    debuff_key, debuff_instance, duration = target.apply_debuff(action, source_name, current_time)
+    debuff_key, debuff_instance, duration = target.apply_effect(action, source_name, current_time)
     sim.schedule_relative(duration, DebuffExpire(target, debuff_key, debuff_instance))
 
 

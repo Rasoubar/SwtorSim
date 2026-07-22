@@ -161,10 +161,10 @@ class DebuffExpire(Event):
 
     def resolve(self, sim):
         """Removes the buff if it's instance is the one for the scheduled event (wasn't refreshed/removed already)."""
-        active_debuff = self.target.debuffs.get(self.debuff_name)
+        active_debuff = self.target.effects.get(self.debuff_name)
         if active_debuff is not self.instance_ref:
             return
-        self.target.debuffs.pop(self.debuff_name, None)
+        self.target.effects.pop(self.debuff_name, None)
         print(f"[{sim.current_time:.2f}s] Debuff expired and cleared: {self.debuff_name} on {self.target.name}")
 
 

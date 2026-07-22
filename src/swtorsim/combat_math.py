@@ -89,7 +89,7 @@ def handle_caster_buffs(caster, target, action_tags, buckets, modifiers):
 
 def handle_target_debuffs(target, action_tags, buckets, modifiers):
     """ Alters modifiers dict according to debuffs on target."""
-    for debuff in target.debuffs.values():
+    for debuff in target.effects.values():
         if debuff.id not in EFFECTS:
             continue
         if debuff.required_tags is not None and not any(tag in action_tags for tag in debuff.required_tags):
@@ -118,8 +118,6 @@ def alter_modifier(effect, modifiers, buckets):
         modifiers['bonus_crit_chance'] += total_buff_value
     elif stat_name == "Critical Damage":
         modifiers['bonus_crit_modifier'] += total_buff_value
-    elif stat_name == "Armor Penetration":
-        modifiers['bonus_armor_pen'] += total_buff_value
 
 def consume_charges(caster, target, action_tags):
     """Alters charge value according to use. Will be gone on next version as doesn't follow game logic."""
@@ -141,7 +139,7 @@ def consume_charges(caster, target, action_tags):
     caster.cleanup_expired_effects(caster_expired_buffs)
 
     # Consume Target Debuffs
-    for effect_id, buff in list(target.debuffs.items()):
+    for effect_id, buff in list(target.effects.items()):
         if buff.id not in EFFECTS:
             continue
         if buff.required_tags is not None and not any(tag in action_tags for tag in buff.required_tags):
@@ -149,7 +147,7 @@ def consume_charges(caster, target, action_tags):
         if buff.consumable_charges is not None:
             buff.consumable_charges -= 1
             if buff.consumable_charges <= 0:
-                del target.debuffs[effect_id]
+                del target.effects[effect_id]
 
 def calculate_base_damage(caster, action_data, attack_type):
     """ Calculates base damage from caster and action data. Returns damage value."""
@@ -186,6 +184,7 @@ def handle_mitigation(caster, target, ability_damage, modifiers, damage_type):
     if damage_type in (1, 2):
         armor = target.stats.get("armor", 17225)
         total_armor_pen = caster.stats.get("Armor Penetration", 0.0) + modifiers['bonus_armor_pen']
+        print(f'ARMOR PEN IS {total_armor_pen}')
         effective_armor = armor * (1.0 - total_armor_pen)
         armor_dr = effective_armor / (effective_armor + 32000)
         ability_damage *= (1.0 - armor_dr)

@@ -31,16 +31,15 @@ class Entity:
 
         existing_effect = self.effects.get(effect_key)
 
+        charges = action.get("charges",1)
         if existing_effect:
             existing_effect.expires_at = expiration_timestamp
             if existing_effect.max_charges is not None:
-                current_charges = min(existing_effect.max_charges, existing_effect.charges + 1) #WATCH
-            elif "charges" in action:
-                current_charges = action["charges"]
+                current_charges = min(existing_effect.max_charges, existing_effect.charges + charges) #WATCH
             else:
-                current_charges = existing_effect.charges
+                current_charges = charges
         else:
-            current_charges = action.get("charges", 1)
+            current_charges = charges
 
         raw_tags = action.get("required_tags")
         if raw_tags is not None:
@@ -83,7 +82,7 @@ class Entity:
 
 
 class Player(Entity):
-    RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}
+    RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy", "Armor Penetration"}
     def __init__(self, name: str):
         super().__init__(name)
         self.next_gcd = 0.0
@@ -139,66 +138,6 @@ class Player(Entity):
         cdr = self.stats.get("Alacrity",0.0)
         return base_time / (1.0 + cdr)
 
-    def apply_buff(self, action: dict, source_name: str, current_time): #can be improved on the refresh
-        try:
-            action_id = action.get("id")
-            extracted_stat = EFFECTS[action_id]["stat_name"]
-        except (KeyError, TypeError) as e:
-            print(f" CONFIGURATION CRASH in apply_buff via [{source_name}]")
-            print(f" Action ID {action.get('id')} is completely missing from the EFFECTS database!")
-            raise e
-        duration = action["duration"]
-        if action.get("affected_by_cdr", False):
-            duration = self.scale_time_modifier(duration)
-
-
-        buff_key = action.get("effect_name", f"{extracted_stat}")
-        expiration_timestamp = current_time + duration
-
-        existing_buff = self.effects.get(buff_key)
-
-        if existing_buff:
-            existing_buff.expires_at = expiration_timestamp
-            if existing_buff.max_charges is not None:
-                current_charges = min(existing_buff.max_charges, existing_buff.charges + 1) #WATCH
-            elif "charges" in action:
-                current_charges = action["charges"]
-            else: #it was this or action.get("charges"), this faster
-                current_charges = existing_buff.charges
-        else:
-            current_charges = action.get("charges", 1)
-
-        raw_tags = action.get("required_tags")
-        if raw_tags is not None:
-            tags_set = frozenset(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else (frozenset([raw_tags]) if raw_tags else frozenset())
-        else:
-            tags_set = None
-
-        buff_instance = ActiveBuff(
-            id_num=action.get("id"),
-            effect_name=buff_key,
-            stat_name=extracted_stat,
-            value=action["value"],
-            expires_at=expiration_timestamp,
-            source_ability=source_name,
-            required_tags=tags_set,
-            charges= current_charges,
-            consumable_charges=action.get("consumable_charges"),
-            max_charges=action.get("max_charges"),
-            target_hp_threshold=action.get("target_hp_threshold"),
-            stack_values=action.get("stack_values")
-        )
-
-        self.effects[buff_key] = buff_instance
-
-        effect_id = buff_instance.id
-        if effect_id in EFFECTS:
-            stat_name = EFFECTS[effect_id]["stat_name"]
-            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}:
-                self.recalculate_stats()
-
-        return buff_key, buff_instance, duration
-
     def recalculate_stats(self): #because relics hate me
         temp_stats = self.base_stats.copy()
         bonus_mastery = 0
@@ -208,6 +147,7 @@ class Player(Entity):
         damage_bonus_multiplier = 1
         mastery_multiplier = 1
         bonus_accuracy = 0
+        bonus_armor_pen = 0
         for buff in self.effects.values():
             effect_id = buff.id
             if effect_id in EFFECTS:
@@ -226,13 +166,16 @@ class Player(Entity):
                 elif stat_name == "Mastery PCT":
                     mastery_multiplier += (buff.value * multiplier)
                 elif stat_name == "Accuracy":
-                    bonus_accuracy += buff.value
+                    bonus_accuracy += (buff.value * multiplier)
+                elif stat_name == "Armor Penetration":
+                    bonus_armor_pen += (buff.value * multiplier)
 
 
         temp_stats["Mastery"]  = (temp_stats["Mastery"] + bonus_mastery) * mastery_multiplier
-        temp_stats["Power"] = temp_stats["Power"] + bonus_power
-        temp_stats["Critical Rating"] = temp_stats["Critical Rating"] + bonus_critical_rating
-        temp_stats["Alacrity Rating"] = temp_stats["Alacrity Rating"] + bonus_alacrity_rating
+        temp_stats["Power"] += bonus_power
+        temp_stats["Critical Rating"] += bonus_critical_rating
+        temp_stats["Alacrity Rating"] += bonus_alacrity_rating
+        temp_stats["Armor Penetration"] += bonus_armor_pen
 
 
         temp_stats["M_Bonus_Damage"] = ((temp_stats["Mastery"] * 0.20) + (temp_stats["Power"] * 0.23)) * damage_bonus_multiplier
@@ -246,6 +189,7 @@ class Player(Entity):
         acc_base = 0.3 * (1 - (1 - 0.01 / 0.3)**((1 / 3.2) * (temp_stats["Accuracy Rating"] / 80)))
         temp_stats["Main Accuracy"] = 1 + acc_base + bonus_accuracy
         temp_stats["Off Accuracy"] = 0.67 + acc_base + bonus_accuracy
+
         self.stats = temp_stats
 
     def calculate_resource_cost(self, ability_name: str, base_cost: float, apply = False) -> float:
@@ -297,65 +241,11 @@ class Target(Entity):
         self.max_hp = hp
         self.hp = hp
         self.dots = {}
-        self.debuffs = {}
+        self.effects = {}
         self.base_stats = {
             "armor" : 17225
         }
         self.stats = self.base_stats.copy()
-
-
-    def apply_debuff(self, action: dict, source_name: str, current_time: float) -> tuple[str, "ActiveBuff", float]:
-
-        try:
-            action_id = action.get("id")
-            extracted_stat = EFFECTS[action_id]["stat_name"]
-        except (KeyError, TypeError) as e:
-            print(f" CONFIGURATION CRASH in apply_debuff via [{source_name}]")
-            print(f" Action ID {action.get('id')} is completely missing from the EFFECTS database!")
-            raise e
-        duration = action["duration"]
-        debuff_key = action.get("effect_name", f"{extracted_stat}")
-        expiration_timestamp = current_time + duration
-
-        incoming_charges = action.get("charges", 1)
-        existing_debuff = self.debuffs.get(debuff_key)
-        if existing_debuff:
-            new_charge_total = existing_debuff.charges + incoming_charges
-            if existing_debuff.max_charges is not None:
-                current_charges = min(existing_debuff.max_charges, new_charge_total)
-            else:
-                current_charges = new_charge_total
-        else:
-            current_charges = incoming_charges
-
-
-        raw_tags = action.get("required_tags")
-        tags_set = frozenset(raw_tags) if isinstance(raw_tags, (list, tuple, set)) else (frozenset([raw_tags]) if raw_tags else frozenset())
-
-        debuff_instance = ActiveBuff(
-            id_num=action.get("id"),
-            effect_name=debuff_key,
-            stat_name=extracted_stat,
-            value=action.get("value", 0.0),
-            expires_at=expiration_timestamp,
-            source_ability=source_name,
-            required_tags=tags_set,
-            charges=current_charges,
-            consumable_charges=action.get("consumable_charges"),
-            max_charges=action.get("max_charges"),
-            target_hp_threshold=action.get("target_hp_threshold"),
-            stack_values=action.get("stack_values")
-        )
-        self.debuffs[debuff_key] = debuff_instance
-
-        effect_id = debuff_instance.id
-        if effect_id in EFFECTS:
-            stat_name = EFFECTS[effect_id]["stat_name"]
-            if stat_name in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Armor Penetration"}:
-                if hasattr(self, "recalculate_stats"):
-                    self.recalculate_stats()
-
-        return debuff_key, debuff_instance, duration
 
     def recalculate_stats(self):
         temp_stats = self.base_stats.copy()
@@ -372,7 +262,7 @@ class Target(Entity):
 
 
     def has_debuff(self, effect_name:str) -> bool:
-        return effect_name in self.debuffs
+        return effect_name in self.effects
 
     def has_dot(self, dot_name: str) -> bool:
         return dot_name in self.dots
