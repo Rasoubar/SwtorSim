@@ -183,7 +183,7 @@ def handle_mitigation(caster, target, ability_damage, modifiers, damage_type):
     """Determines if applicable, if so calculates and applies mitigation to damage value. Returns new damage value"""
     if damage_type in (1, 2):
         armor = target.stats.get("armor", 17225)
-        total_armor_pen = caster.stats.get("Armor Penetration", 0.0) + modifiers['bonus_armor_pen']
+        total_armor_pen = caster.stats.get("Armor Penetration", 0.0)
         print(f'ARMOR PEN IS {total_armor_pen}')
         effective_armor = armor * (1.0 - total_armor_pen)
         armor_dr = effective_armor / (effective_armor + 32000)

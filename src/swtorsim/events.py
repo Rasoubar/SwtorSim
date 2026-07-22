@@ -7,7 +7,7 @@ from src.swtorsim.requirements import validate_all
 
 
 if TYPE_CHECKING:
-    from src.swtorsim.entities import Player, Target
+    from src.swtorsim.entities import Player, Target, Entity
     from src.swtorsim.effects import ActiveDot, ActiveBuff
 
 
@@ -132,40 +132,24 @@ class PlayerReady(Event):
         else:
             sim.schedule_relative(0.1, self)
 
-class BuffExpire(Event):
+class EffectExpire(Event):
     """Handles the expiration of player buffs."""
-    def __init__(self, player: "Player", buff_name: str, instance_ref: "ActiveBuff"):
-        super().__init__(f"{buff_name} Expired")
-        self.player = player
-        self.buff_name = buff_name
+    def __init__(self, entity: "Entity", effect_name: str, instance_ref: "ActiveBuff"):
+        super().__init__(f"{effect_name} Expired")
+        self.entity = entity
+        self.effect_name = effect_name
         self.instance_ref = instance_ref
 
     def resolve(self, sim):
         """Removes the buff if it's instance is the one for the scheduled event (wasn't refreshed/removed already)."""
-        active_buff = self.player.effects.get(self.buff_name)
+        active_buff = self.entity.effects.get(self.effect_name)
 
         if active_buff is not self.instance_ref:
             return
 
-        self.player.cleanup_expired_effects([self.buff_name])
+        self.entity.cleanup_expired_effects([self.effect_name])
 
-        print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.buff_name}")
-
-class DebuffExpire(Event):
-    """Handles the expiration of target debuffs."""
-    def __init__(self, target: "Target", debuff_name: str, instance_ref: "ActiveBuff"):
-        super().__init__(f"{debuff_name} Expired")
-        self.target = target
-        self.debuff_name = debuff_name
-        self.instance_ref = instance_ref
-
-    def resolve(self, sim):
-        """Removes the buff if it's instance is the one for the scheduled event (wasn't refreshed/removed already)."""
-        active_debuff = self.target.effects.get(self.debuff_name)
-        if active_debuff is not self.instance_ref:
-            return
-        self.target.effects.pop(self.debuff_name, None)
-        print(f"[{sim.current_time:.2f}s] Debuff expired and cleared: {self.debuff_name} on {self.target.name}")
+        print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.effect_name}")
 
 
 class DotTick(Event):

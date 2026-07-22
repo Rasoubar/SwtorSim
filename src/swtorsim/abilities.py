@@ -1,5 +1,5 @@
 import random
-from src.swtorsim.events import DamageHit, BuffExpire, DebuffExpire, DotTick, ResourceGainEvent, ChannelTickEvent
+from src.swtorsim.events import DamageHit, EffectExpire, DotTick, ResourceGainEvent, ChannelTickEvent
 from src.swtorsim.combat_math import accuracy_roll
 from src.swtorsim.entities import Player, Target
 from src.swtorsim.effects import ActiveDot, ActiveChannel
@@ -85,13 +85,13 @@ def handle_channel_action(sim, caster, target, action_data: dict, source_name: s
 def handle_buff_action(sim, caster, action, source_name, current_time):
     """Applies the buff to the caster and schedules it's expiration"""
     buff_key, buff_instance, duration = caster.apply_effect(action, source_name, current_time)
-    sim.schedule_relative(duration, BuffExpire(caster, buff_key, buff_instance))
+    sim.schedule_relative(duration, EffectExpire(caster, buff_key, buff_instance))
 
 
 def handle_debuff_action(sim, target, action, source_name, current_time):
     """Applies the debuff to the target and schedules it's expiration"""
     debuff_key, debuff_instance, duration = target.apply_effect(action, source_name, current_time)
-    sim.schedule_relative(duration, DebuffExpire(target, debuff_key, debuff_instance))
+    sim.schedule_relative(duration, EffectExpire(target, debuff_key, debuff_instance))
 
 
 def handle_resource_gain_action(sim, caster, action, delay):

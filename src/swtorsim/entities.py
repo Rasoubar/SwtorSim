@@ -80,6 +80,18 @@ class Entity:
     def recalculate_stats(self):
         pass
 
+    def cleanup_expired_effects(self, expired_keys: list):
+        if not expired_keys:
+            return
+        needs_stat_recalc = False
+        for r_id in expired_keys:
+            popped_buff = self.effects.pop(r_id, None)
+            if popped_buff and popped_buff.id in EFFECTS:
+                if EFFECTS[popped_buff.id]["stat_name"] in self.RECALCULATE_STATS:
+                    needs_stat_recalc = True
+        if needs_stat_recalc:
+            self.recalculate_stats()
+            print(f'Buffs active:{self.effects}')
 
 class Player(Entity):
     RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy", "Armor Penetration"}
@@ -220,19 +232,6 @@ class Player(Entity):
     def has_buff(self, buff_name):
         print(self.effects)
         return buff_name in self.effects
-
-    def cleanup_expired_effects(self, expired_keys: list):
-        if not expired_keys:
-            return
-        needs_stat_recalc = False
-        for r_id in expired_keys:
-            popped_buff = self.effects.pop(r_id, None)
-            if popped_buff and popped_buff.id in EFFECTS:
-                if EFFECTS[popped_buff.id]["stat_name"] in {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy"}:
-                    needs_stat_recalc = True
-        if needs_stat_recalc:
-            self.recalculate_stats()
-            print(f'Buffs active:{self.effects}')
 
 class Target(Entity):
     RECALCULATE_STATS = {"Armor Rating"}
