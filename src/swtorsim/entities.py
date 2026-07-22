@@ -1,8 +1,8 @@
 import math
+from src.swtorsim.resources import create_resource_pool
 from collections import defaultdict #performance choice
 from src.swtorsim.combat_math import EFFECTS, calc_dr
 from src.swtorsim.effects import ActiveEffect
-from src.swtorsim.resources import ResourcePool
 
 
 class Entity:
@@ -94,13 +94,15 @@ class Entity:
 class Player(Entity):
     """Represents a player character and all that entails."""
     RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy", "Armor Penetration", "Alacrity Rating", "Mastery PCT"}
-    def __init__(self, name: str):
+    def __init__(self, name: str, resource = "Force"):
         super().__init__(name)
         self.next_gcd = 0.0
         self.cooldowns= {}
         self.procs = {}
         self.rotation = None
-        self.resource = ResourcePool(pool_type="Force", max_value=100.0, base_regen=8.0)
+        self.resource = create_resource_pool(
+            pool_type=resource
+        )
         self.base_stats = {
             "Alacrity": 0.0,
             "Critical Chance": 0.0,

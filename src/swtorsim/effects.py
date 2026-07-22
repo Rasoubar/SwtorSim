@@ -1,4 +1,5 @@
 class ActiveDot:
+    """Tracks tick timing and state for active Damage-over-Time (DoT) effects."""
     __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
 
     def __init__(self, name, interval, ticks_remaining, action_data: dict):
@@ -9,6 +10,7 @@ class ActiveDot:
 
 
 class ActiveChannel:
+    """Tracks progress, tick intervals, and resource costs for channeled abilities. Can use more testing."""
     def __init__(self, name, action_data, total_ticks, tick_interval, tick_cost):
         self.name = name
         self.action_data = action_data
@@ -18,6 +20,7 @@ class ActiveChannel:
 
 
 class ActiveEffect:
+    """Represents an active buff or debuff instance applied to an entity."""
     __slots__ = [
         'id', 'effect_name', 'stat_name', 'value', 'expires_at', 'source_ability', 'required_tags', 'charges', 'consumable_charges',
         'max_charges', 'proc_data', 'last_proc_at','target_hp_threshold',"stack_values"]
@@ -48,7 +51,7 @@ class ActiveEffect:
     @classmethod
     def from_action(cls, action: dict, stat_name: str, effect_key: str,
                     charges: int, expires_at: float, source_name: str):
-        """Constructs an Effect from an action."""
+        """Constructs an Effect from an action configuration dict."""
 
         return cls(
             id_num=action.get("id"),
@@ -67,12 +70,14 @@ class ActiveEffect:
 
     @staticmethod
     def _parse_tags(raw_tags) -> frozenset | None:
+        """Normalizes action tags into an immutable frozenset for fast lookups."""
         if not raw_tags:
             return None
         return frozenset(raw_tags if isinstance(raw_tags, (list, tuple, set)) else [raw_tags])
 
 
 class ProcData:
+    """Defines trigger conditions, probability, and internal cooldowns (ICD) for passive procs."""
     __slots__ = ['name','actions','chance','icd','next_possible_proc','trigger','required_tags','affected_by_cdr',
                  'conditions']
 
