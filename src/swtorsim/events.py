@@ -244,3 +244,19 @@ class ResourceGainEvent(Event):
         """Adds the resource value to the resource pool."""
         print(f'[{sim.current_time:.2f}s] Gained {self.amount} {self.player.resource.pool_type}')
         self.player.resource.generate(self.amount)
+
+class ChargeRestoreEvent(Event):
+    """Represents a single charge restore event"""
+    def __init__(self, caster: "Player", ability):
+        super().__init__("Charge Restore")
+        self.caster = caster
+        self.ability = ability
+
+    def resolve(self, sim):
+        """Delegates charge restoration to the ability if this event is still active"""
+        if self.ability.active_charge_event is not self:
+            return
+
+        self.ability.restore_charge(self.caster, sim, amount=1, from_timer=True)
+
+

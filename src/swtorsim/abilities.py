@@ -1,5 +1,5 @@
 import random
-from src.swtorsim.events import DamageHit, EffectExpire, DotTick, ResourceGainEvent, ChannelTickEvent
+from src.swtorsim.events import DamageHit, EffectExpire, DotTick, ResourceGainEvent, ChannelTickEvent, ChargeRestoreEvent
 from src.swtorsim.combat_math import accuracy_roll
 from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.effects import ActiveDot, ActiveChannel
@@ -134,7 +134,7 @@ def handle_restore_charge(sim, _caster, action): #might want to change so that t
     amount = action.get("amount", 1)
     if target_ability_name in sim.ability_db:
         ability = sim.ability_db[target_ability_name]
-        ability.add_charge(amount)
+        ability.restore_charge(_caster, sim, amount=amount, from_timer=False)
 
 def handle_buff_remove_action(sim, caster, action):
     """Removes a buff from the caster"""
@@ -145,7 +145,7 @@ def handle_buff_remove_action(sim, caster, action):
 
 
 class Ability:
-    """Represents """
+    """Represents a player used ability/skill/spell"""
     def __init__(self, config: dict):
         self.name = config["name"]
         self.cooldown = config.get("cooldown",0.0)
@@ -157,60 +157,78 @@ class Ability:
         self.conditions = config.get("conditions", {})
         self.has_charges = config.get("max_charges", 0) > 0
         if self.has_charges:
-            self.max_charges = config.get("max_charges",1)
+            self.max_charges = config.get("max_charges", 1)
             self.charges = self.max_charges
             self.recharge_time = config.get("recharge_time", self.cooldown)
-            self.last_charge_time = 0.0
+            self.active_charge_event = None
 
-    def update_charges(self, caster, sim):
-        if  self.recharge_time <= 0:
+
+    def schedule_recharge(self, caster, sim):
+        """Snapshots CDR, creates a new event reference, and schedules it."""
+        actual_recharge = caster.calculate_cooldown(self.recharge_time)
+
+        event = ChargeRestoreEvent(caster, self)
+        self.active_charge_event = event
+        sim.schedule_relative(actual_recharge, event)
+
+    def consume_charge(self, caster, sim):
+        """Deducts a charge and initiates the recharge chain if dropping from max capacity"""
+        if not self.has_charges or self.charges < 1:
             return
-        if self.charges < self.max_charges:
-            time_elapsed = sim.current_time - self.last_charge_time
-            actual_recharge_time = caster.calculate_cooldown(self.recharge_time)
-            charges_gained = int(time_elapsed // actual_recharge_time)
-            if charges_gained > 0:
-                self.charges = min(self.max_charges, self.charges + charges_gained)
-                self.last_charge_time += charges_gained * actual_recharge_time
 
-    def add_charge(self, amount=1):
+        was_at_max = (self.charges == self.max_charges)
+        self.charges -= 1
+
+        if was_at_max:
+            self.schedule_recharge(caster, sim)
+
+    def restore_charge(self, caster, sim, amount: int = 1, from_timer: bool = False):
+        """Grants charge(s), handles max capacity cleanup, and chains timers if needed"""
+        if not self.has_charges:
+            return
+
         self.charges = min(self.max_charges, self.charges + amount)
+        print(f"[{sim.current_time:.2f}s] {self.name} charge restored ({self.charges}/{self.max_charges})")
+
+        if self.charges == self.max_charges:
+            self.active_charge_event = None
+        elif from_timer:
+            self.schedule_recharge(caster, sim)
 
     def can_cast(self, caster: "Player", target: "Dummy", sim) -> bool:
+        """Checks if the ability is ready to cast based on GCD, cooldown, cost, and conditions"""
         if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
             return False
 
         if getattr(caster, "active_channel", None) is not None: #to improve when channel clipping is implemented
             return False
 
-        if self.has_charges:
-            self.update_charges(caster,sim)
-            if self.charges < 1:
-                return False
+        if self.has_charges and self.charges < 1:
+            return False
 
         if sim.current_time < caster.cooldowns.get(self.name, 0.0):
             return False
 
         modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply = False)
 
-        if not caster.resource.can_afford(modified_cost): #I had a more eficient aproach to this. Like this rn, will change
+        if not caster.resource.can_afford(modified_cost): #I had a more efficient approach to this. Like this rn, will change
             return False
 
         return validate_all(self.conditions, caster, target) #validates conditions
 
     def apply_cooldown_locks(self, caster, sim):
-        #fuck floating points but i dont wanna go integer
+        """Deducts charges or sets cooldown, and sets GCD lockouts."""
         caster.next_gcd = round(sim.current_time, 4)
         if self.triggers_gcd:
             caster.next_gcd = round(sim.current_time + caster.calculate_gcd(self.base_gcd), 4)
+
         if self.has_charges:
-            if self.charges == self.max_charges:
-                self.last_charge_time = round(sim.current_time, 4)
-            self.charges -= 1
+            self.consume_charge(caster, sim)
         elif self.cooldown > 0.0:
             caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown), 4)
 
     def cast(self, caster, target, sim) -> bool:
+        """Executes the ability: spends resources, locks cooldowns, triggers procs, and runs actions"""
         if not self.can_cast(caster, target, sim):
             return False
 
@@ -222,6 +240,7 @@ class Ability:
         final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply = True)
         caster.resource.spend(final_spend)
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
+
         self.apply_cooldown_locks(caster, sim)
         self.evaluate_on_cast_procs(caster, target, sim)
 
@@ -233,6 +252,7 @@ class Ability:
         return True
 
     def evaluate_on_cast_procs(self, caster, target, sim):
+        """Evaluates and fires passive effects (procs) that trigger when an ability is cast"""
         for proc in caster.procs.values():
             if proc.trigger != "cast":
                 continue

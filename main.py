@@ -113,4 +113,4 @@ if __name__ == "__main__":
         tester.run_test()
 
     elif RUN_MODE == "BATCH":
-        tester.run_monte_carlo(iterations=1000)
+        tester.run_monte_carlo(iterations=20000)
