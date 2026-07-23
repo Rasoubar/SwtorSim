@@ -23,7 +23,7 @@ class ActiveEffect:
     """Represents an active buff or debuff instance applied to an entity."""
     __slots__ = [
         'id', 'effect_name', 'stat_name', 'value', 'expires_at', 'source_ability', 'required_tags', 'charges', 'consumable_charges',
-        'max_charges', 'proc_data', 'last_proc_at','target_hp_threshold',"stack_values"]
+        'max_charges','target_hp_threshold',"stack_values"]
 
     def __init__(self, id_num, effect_name, stat_name, value, expires_at, source_ability,
                  required_tags=None, charges=None, consumable_charges=None, max_charges = None, target_hp_threshold = None,
@@ -60,7 +60,7 @@ class ActiveEffect:
             value=action["value"],
             expires_at=expires_at,
             source_ability=source_name,
-            required_tags=cls._parse_tags(action.get("required_tags")),
+            required_tags=parse_tags(action.get("required_tags")),
             charges=charges,
             consumable_charges=action.get("consumable_charges"),
             max_charges=action.get("max_charges"),
@@ -68,12 +68,23 @@ class ActiveEffect:
             stack_values=action.get("stack_values")
         )
 
-    @staticmethod
-    def _parse_tags(raw_tags) -> frozenset | None:
-        """Normalizes action tags into an immutable frozenset for fast lookups."""
-        if not raw_tags:
-            return None
-        return frozenset(raw_tags if isinstance(raw_tags, (list, tuple, set)) else [raw_tags])
+    @classmethod
+    def from_dict(cls, data: dict, source_key: str) -> "ActiveEffect":
+        """Constructs a Permanent Effect from a dict config"""
+        name = data.get("effect_name") or source_key
+        return cls(
+            id_num=data.get("id"),
+            effect_name=name,
+            stat_name=None,
+            value=data.get("value"),
+            expires_at=float('inf'),
+            source_ability=source_key,
+            required_tags=data.get("required_tags"),
+            charges=1,
+            consumable_charges=None,
+            max_charges=1,
+            target_hp_threshold=data.get("target_hp_threshold")
+        )
 
 
 class ProcData:
@@ -85,10 +96,34 @@ class ProcData:
                  required_tags: list , chance: float = 1.0, icd: float = 0.0, affected_by_cdr = False, conditions: dict = None):
         self.name = name
         self.trigger = trigger
-        self.required_tags = frozenset(required_tags) if required_tags else frozenset()
+        self.required_tags = parse_tags(required_tags)
         self.chance = chance
         self.icd = icd
         self.actions = actions
         self.next_possible_proc = 0.0
         self.affected_by_cdr = affected_by_cdr
         self.conditions = conditions if conditions is not None else {} #I went with this to not make conditions mandatory in the JSON file. No idea what it implies for performance
+
+    @classmethod
+    def from_dict(cls, data: dict, fallback_name: str) -> "ProcData":
+        """Constructs a Permanent Proc from a dict config"""
+        name = data.get("proc_name") or data.get("name") or fallback_name
+        return cls(
+            name=name,
+            trigger=data.get("trigger", "hit"),
+            actions=data.get("actions", []),
+            required_tags=data.get("required_tags"),
+            chance=data.get("chance", 1.0),
+            icd=data.get("icd", 0.0),
+            affected_by_cdr=data.get("affected_by_cdr", False),
+            conditions=data.get("conditions")
+        )
+def parse_tags(raw_tags) -> frozenset | None:
+    """Normalizes tags to a frozenset, or None if empty."""
+    if not raw_tags:
+        return None
+    if isinstance(raw_tags, frozenset):
+        return raw_tags  # Instant pass-through
+    if isinstance(raw_tags, str):
+        return frozenset([raw_tags])
+    return frozenset(raw_tags)

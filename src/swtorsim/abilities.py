@@ -162,6 +162,13 @@ class Ability:
             self.recharge_time = config.get("recharge_time", self.cooldown)
             self.active_charge_event = None
 
+    @classmethod
+    def from_dict(cls, data: dict, fallback_name: str) -> "Ability":
+        """Factory method to construct an Ability from a raw dictionary."""
+        config = data.copy()
+        config["name"] = data.get("name") or fallback_name
+        return cls(config)
+
 
     def schedule_recharge(self, caster, sim):
         """Snapshots CDR, creates a new event reference, and schedules it."""

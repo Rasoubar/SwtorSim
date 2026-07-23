@@ -87,6 +87,7 @@ class Entity:
             print(f'Effects active:{self.effects}')
 
     def has_effect(self, effect_name):
+        print(f'TEST {effect_name} in {self.effects}')
         """Returns bool on whether effect is present in entity"""
         return effect_name in self.effects
 

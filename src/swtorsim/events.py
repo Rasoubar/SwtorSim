@@ -128,9 +128,10 @@ class PlayerReady(Event):
          tries again 0.1seconds later."""
         acted = self.player.rotation.evaluate(self.player, self.target, sim)
         if acted:
-            sim.schedule_absolute(self.player.next_gcd, self)
+            target_time = max(sim.current_time, self.player.next_gcd) #to prevent any accidental past scheduling
+            sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
         else:
-            sim.schedule_relative(0.1, self)
+            sim.schedule_relative(0.1, PlayerReady(self.player, self.target))
 
 class EffectExpire(Event):
     """Handles the expiration of player buffs."""

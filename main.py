@@ -9,6 +9,8 @@ from src.swtorsim.config_load import (
 )
 from src.swtorsim.tester import Tester
 
+import random
+random.seed(42)
 
 def get_dynamic_loadout():
     print("=== SWTOR Combat Simulator Environment Setup ===")
@@ -97,7 +99,7 @@ if __name__ == "__main__":
     Rotation, MY_CUSTOM_CHARACTER_STATS, abilities_db, procs_db, buffs_db = get_dynamic_loadout()
 
     # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "BATCH"  # Change to "BATCH" for full simulation
+    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
     # -----------------------------------
     tester = Tester(
         rotation_config=Rotation,
@@ -113,4 +115,4 @@ if __name__ == "__main__":
         tester.run_test()
 
     elif RUN_MODE == "BATCH":
-        tester.run_monte_carlo(iterations=20000)
+        tester.run_monte_carlo(iterations=10000)

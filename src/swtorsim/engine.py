@@ -1,7 +1,8 @@
 import heapq
-from .metrics import Metrics
+from src.swtorsim.metrics import Metrics
 
 class Simulation:
+    """Manages the event queue and core combat timeline."""
     def __init__(self,abilities):
         self.queue = []
         self.current_time = 0.0
@@ -9,7 +10,9 @@ class Simulation:
         self.event_counter = 0
         self.tracker = Metrics()
 
-    def build_ability_db(self, abilities):
+    @staticmethod
+    def build_ability_db(abilities):
+        """Normalizes ability keys into lowercase snake_case for fast lookups."""
         ability_db = {
             key.lower().replace(" ", "_"): val
             for key, val in abilities.items()

@@ -24,11 +24,15 @@ class Rotation:
                 continue
 
     def evaluate(self, player, target, sim) -> bool:
-        """Loops through the rotation"""
+        """Evaluates the current step in the sequence.
+        Returns:
+            bool: True if the step resolved and advanced the rotation pointer,
+                  False if the step is blocked (e.g., mandatory ability on cooldown).
+        """
         if self.current_step >= len(self.sequence):
             return False
         step = self.sequence[self.current_step]
-        if step.evaluate(player, target, sim):
+        if step.evaluate(player, target, sim): #evaluates different step kinds acording to their class rules
             self.current_step += 1
             if self.loop and self.current_step >= len(self.sequence):
                 self.current_step = self.loop_start_index
@@ -41,7 +45,7 @@ class FixedAbilityStep:
         self.ability_id = ability_id
 
     def evaluate(self, player, target, sim) -> bool:
-        """Simply tries to cast the ability."""
+        """Mandatory step. Only resolves (returns True) if the ability casts successfully."""
         ability = sim.ability_db.get(self.ability_id)
         return ability.cast(player, target, sim)
 
@@ -51,12 +55,9 @@ class PriorityBlockStep:
         self.pool = pool
 
     def evaluate(self, player, target, sim) -> bool:
-        """Tries to cast the ability according to priority rules"""
+        """Mandatory block step. Resolves if any valid priority option casts successfully."""
         for option in self.pool:
-            print(option)
             wanna_cast = validate_all(option.get("rules", {}), player, target, sim)
-            print(wanna_cast)
-            print(player.cooldowns)
             if wanna_cast:
                 ability = sim.ability_db.get(option["ability_id"])
                 if ability and ability.cast(player, target, sim):
@@ -70,7 +71,7 @@ class OptionalAbilityStep:
         self.rules = rules if rules is not None else {}
 
     def evaluate(self, player, target, sim) -> bool:
-        """Tries to cast the ability if chosen conditions are met."""
+        """Non-blocking step. Tries to cast if rules allow, but ALWAYS resolves so the rotation advances"""
         wanna_cast = validate_all(self.rules, player, target, sim=sim)
         if wanna_cast:
             ability = sim.ability_db.get(self.ability_id)

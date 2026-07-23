@@ -10,28 +10,26 @@ class Metrics:
     def log_damage(self, ability_name: str, dmg_value: float, is_crit: bool, target, current_time: float):
         """Called on every hit, logs the damage and what caused it"""
         self.total_damage += dmg_value
+        self._record_hit(self.breakdown, ability_name, dmg_value, is_crit)
 
-        if ability_name not in self.breakdown:
-            self.breakdown[ability_name] = {"total_damage": 0.0, "hit_count": 0, "crit_count": 0}
-        self.breakdown[ability_name]["total_damage"] += dmg_value
-        self.breakdown[ability_name]["hit_count"] += 1
-        if is_crit:
-            self.breakdown[ability_name]["crit_count"] += 1
-
-        #sub 30 phase
-        if target and target.hp_ratio <= 0.30:
-            #Record the timestamp of the very first sub-30 hit
+        # Sub 30% phase
+        if target and getattr(target, 'hp_ratio', 1.0) <= 0.30:
             if self.execute_start_time is None:
                 self.execute_start_time = current_time
 
             self.total_execute_damage += dmg_value
+            self._record_hit(self.execute_breakdown, ability_name, dmg_value, is_crit)
 
-            if ability_name not in self.execute_breakdown:
-                self.execute_breakdown[ability_name] = {"total_damage": 0.0, "hit_count": 0, "crit_count": 0}
-            self.execute_breakdown[ability_name]["total_damage"] += dmg_value
-            self.execute_breakdown[ability_name]["hit_count"] += 1
-            if is_crit:
-                self.execute_breakdown[ability_name]["crit_count"] += 1
+    @staticmethod
+    def _record_hit(target_dict: dict, ability_name: str, dmg_value: float, is_crit: bool):
+        """Helper to update damage metrics for a breakdown dictionary"""
+        if ability_name not in target_dict:
+            target_dict[ability_name] = {"total_damage": 0.0, "hit_count": 0, "crit_count": 0}
+
+        target_dict[ability_name]["total_damage"] += dmg_value
+        target_dict[ability_name]["hit_count"] += 1
+        if is_crit:
+            target_dict[ability_name]["crit_count"] += 1
 
     def print_metrics(self, duration):
         """Prints the metrics logged data"""

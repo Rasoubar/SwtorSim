@@ -7,7 +7,7 @@ from src.swtorsim.rotation import Rotation
 
 def pre_sim_effects(player,sim):
     """Applies effects that alter abilities at the core and therefore need to be applied before running"""
-    cooldown_effects = [e for e in player.effects.values() if e.id == 64 and e.required_tags]
+    cooldown_effects = [e for e in player.effects.values() if e.id == 64 and e.required_tags]  #temporary fixes
     charge_effects = [e for e in player.effects.values() if e.id == 422 and e.required_tags]
 
     if not cooldown_effects and not charge_effects:
@@ -48,6 +48,7 @@ def prepare_simulation(rotation_config, stats_config, abilities_db, procs_db, bu
     pre_sim_effects(player,sim)
     player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
     sim.schedule_absolute(0.0, PlayerReady(player, target))
+    schedule_periodic(player, target, sim)
     first_regen_tick = random.uniform(0.0, 1.0)
     sim.schedule_absolute(first_regen_tick, ResourceTick(player))
     return sim, player, target

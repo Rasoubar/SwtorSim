@@ -2,6 +2,10 @@ from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from entities import Player, Dummy
 
+def _to_list(val: Any) -> list:
+    """Helper to convert single string/item conditions into an iterable list."""
+    return [val] if isinstance(val, str) else val
+
 def check_target_hp(conditions, caster: "Player", target: "Dummy", **_kwargs) -> bool:
     if isinstance(conditions, dict):
         threshold = conditions.get("pct", 0.3)
@@ -15,15 +19,11 @@ def check_target_hp(conditions, caster: "Player", target: "Dummy", **_kwargs) ->
         return True
     return False
 
-
-# noinspection PyUnusedLocal
-def check_caster_buff(conditions: Any, caster: "Player", target: "Dummy", **kwargs) -> bool:
-    buff_list = [conditions] if isinstance(conditions, str) else conditions
-    return any(caster.has_effect(b) for b in buff_list)
+def check_caster_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
+    return any(caster.has_effect(b) for b in _to_list(conditions))
 
 def check_target_debuff(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    debuff_list = [conditions] if isinstance(conditions, str) else conditions
-    return any(target.has_effect(d) for d in debuff_list)
+    return any(target.has_effect(d) for d in _to_list(conditions))
 
 def check_exact_dot_amount(conditions: int, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
     return target.count_active_dots == conditions
@@ -35,8 +35,7 @@ def inverse_check_target_debuff(conditions: Any, caster: "Player", target: "Dumm
     return not check_target_debuff(conditions, caster, target, **kwargs)
 
 def has_specific_dot(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    dot_list = [conditions] if isinstance(conditions, str) else conditions
-    return any(target.has_dot(d) for d in dot_list)
+    return any(target.has_dot(d) for d in _to_list(conditions))
 
 def check_caster_energy_above(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     return caster.resource.current_value >= threshold
@@ -47,7 +46,7 @@ def check_dot_absent(dot_name: str, _caster: "Player", target: "Dummy", **_kwarg
 def check_caster_energy_below(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     return caster.resource.current_value < threshold
 
-def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim) -> bool:
+def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
     proc = caster.procs.get(data["name"])
     remaining_cooldown = proc.next_possible_proc - sim.current_time
 

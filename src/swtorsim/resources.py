@@ -1,5 +1,5 @@
 class ResourcePool:
-    """Base class for resource pools."""
+    """Base class for resource pools"""
 
     def __init__(self, pool_type: str, max_value: float = 100.0, base_regen: float = 0.0):
         self.pool_type = pool_type
@@ -8,21 +8,24 @@ class ResourcePool:
         self.current_value = max_value
 
     def can_afford(self, amount: float) -> bool:
+        """Returns True if the pool has sufficient resource to pay `amount`."""
         raise NotImplementedError
 
     def spend(self, amount: float) -> bool:
+        """Deducts `amount` if affordable. Returns True on success, False otherwise."""
         raise NotImplementedError
 
     def generate(self, amount: float):
+        """Adds `amount` of resource to the pool, capped at `max_value`."""
         raise NotImplementedError
 
     def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0):
-        """Ticks passive regeneration over time."""
+        """Ticks passive regeneration over time"""
         pass
 
 
 class StandardPool(ResourcePool):
-    """Force: Flat regen rate regardless of current value."""
+    """Force: Flat regen rate regardless of current value"""
 
     def __init__(self, pool_type: str = "Force", max_value: float = 100.0, base_regen: float = 8.0):
         super().__init__(pool_type, max_value, base_regen)
@@ -45,7 +48,11 @@ class StandardPool(ResourcePool):
 
 
 class HeatPool(ResourcePool):
-    """Heat: Starts at 0, builds up to 100. Vents faster when low, slower when high."""
+    """Heat: Starts at 0, builds up to 100. Vents faster when low, slower when high.
+
+    Note: To maintain interface consistency with other pools, `spend()` builds heat
+    and `generate()` vents/reduces heat.
+    """
 
     def __init__(self, pool_type: str = "Heat", max_value: float = 100.0, base_regen: float = 5.0):
         super().__init__(pool_type, max_value, base_regen)
@@ -61,7 +68,7 @@ class HeatPool(ResourcePool):
         return True
 
     def generate(self, amount: float):
-        """Vents heat (lowers value towards 0)."""
+        """Vents heat (lowers value towards 0)"""
         self.current_value = max(0.0, self.current_value - amount)
 
     def get_current_regen_rate(self) -> float:
@@ -137,6 +144,6 @@ RESOURCE_POOL_MAP = {
 
 
 def create_resource_pool(pool_type: str = "Force", max_value: float = 100.0, base_regen: float = 8.0) -> ResourcePool:
-    """Factory helper to instantiate the appropriate ResourcePool subclass."""
+    """Helper to instantiate the appropriate ResourcePool subclass."""
     cls = RESOURCE_POOL_MAP.get(pool_type.lower(), StandardPool)
     return cls(pool_type=pool_type, max_value=max_value, base_regen=base_regen)
