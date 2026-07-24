@@ -3,21 +3,11 @@ from src.swtorsim.metrics import Metrics
 
 class Simulation:
     """Manages the event queue and core combat timeline."""
-    def __init__(self,abilities):
+    def __init__(self):
         self.queue = []
         self.current_time = 0.0
-        self.ability_db = self.build_ability_db(abilities)
         self.event_counter = 0
         self.tracker = Metrics()
-
-    @staticmethod
-    def build_ability_db(abilities):
-        """Normalizes ability keys into lowercase snake_case for fast lookups."""
-        ability_db = {
-            key.lower().replace(" ", "_"): val
-            for key, val in abilities.items()
-        }
-        return ability_db
 
     def schedule_relative(self, delay, event):
         self.event_counter += 1

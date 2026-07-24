@@ -5,7 +5,7 @@ from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.rotation import Rotation
 
-def pre_sim_effects(player,sim):
+def pre_sim_effects(player):
     """Applies effects that alter abilities at the core and therefore need to be applied before running"""
     cooldown_effects = [e for e in player.effects.values() if e.id == 64 and e.required_tags]  #temporary fixes
     charge_effects = [e for e in player.effects.values() if e.id == 422 and e.required_tags]
@@ -13,7 +13,7 @@ def pre_sim_effects(player,sim):
     if not cooldown_effects and not charge_effects:
         return
 
-    for ability in sim.ability_db.values():
+    for ability in player.ability_db.values():
         if not hasattr(ability, "tags") or not ability.tags:
             continue
         for effect in cooldown_effects:
@@ -35,17 +35,17 @@ def schedule_periodic(player, target, sim):
 
 def prepare_simulation(rotation_config, stats_config, abilities_db, procs_db, buffs_db, dummy_hp):
     """Sets up the simulation to be run by testers"""
-    player = Player(stats_config.get("class_name", "Unknown"))
+    abilities_copy = copy.deepcopy(abilities_db)
+    player = Player(stats_config.get("class_name", "Unknown"),abilities_copy)
     target = Dummy("Target Dummy", hp=dummy_hp)
     p_stats = player.base_stats
     for stat_key, stat_value in stats_config.get("stats", {}).items():
         p_stats[stat_key] = stat_value
-    abilities_copy = copy.deepcopy(abilities_db)
-    sim = Simulation(abilities_copy)
+    sim = Simulation()
     player.procs = copy.deepcopy(procs_db)
     player.effects = copy.deepcopy(buffs_db)
     player.recalculate_stats()
-    pre_sim_effects(player,sim)
+    pre_sim_effects(player)
     player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     schedule_periodic(player, target, sim)

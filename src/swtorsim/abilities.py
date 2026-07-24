@@ -106,7 +106,7 @@ def handle_resource_gain_action(sim, caster, action, delay):
 def handle_cooldown_modification(sim, caster, action):
     """Applies cooldown reductions or resets to targeted abilities"""
     cooldown_dict = getattr(caster, "cooldowns", {})
-    ability_db = sim.ability_db
+    ability_db = caster.ability_db
     if not (cooldown_dict and ability_db and "target_tags" in action):
         return
     reset_tags = frozenset(action["target_tags"])
@@ -128,13 +128,13 @@ def handle_cooldown_modification(sim, caster, action):
                     del cooldown_dict[cd_key]
 
 
-def handle_restore_charge(sim, _caster, action): #might want to change so that the ability_db is on the player
+def handle_restore_charge(sim, caster, action): #might want to change so that the ability_db is on the player
     """Restores a charge to the target ability"""
     target_ability_name = action.get("target_ability")
     amount = action.get("amount", 1)
-    if target_ability_name in sim.ability_db:
-        ability = sim.ability_db[target_ability_name]
-        ability.restore_charge(_caster, sim, amount=amount, from_timer=False)
+    if target_ability_name in caster.ability_db:
+        ability = caster.ability_db[target_ability_name]
+        ability.restore_charge(caster, sim, amount=amount, from_timer=False)
 
 def handle_buff_remove_action(sim, caster, action):
     """Removes a buff from the caster"""

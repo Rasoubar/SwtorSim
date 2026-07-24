@@ -95,11 +95,12 @@ class Entity:
 class Player(Entity):
     """Represents a player character and all that entails."""
     RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy", "Armor Penetration", "Alacrity Rating", "Mastery PCT"}
-    def __init__(self, name: str, resource = "Force"):
+    def __init__(self, name: str, abilities, resource = "Force"):
         super().__init__(name)
         self.next_gcd = 0.0
         self.cooldowns= {}
         self.procs = {}
+        self.ability_db = self.build_ability_db(abilities)
         self.rotation = None
         self.resource = create_resource_pool(
             pool_type=resource
@@ -126,6 +127,15 @@ class Player(Entity):
             "Armor Penetration": 0.0
         }
         self.stats = self.base_stats.copy()
+
+    @staticmethod
+    def build_ability_db(abilities):
+        """Normalizes ability keys into lowercase snake_case for fast lookups."""
+        ability_db = {
+            key.lower().replace(" ", "_"): val
+            for key, val in abilities.items()
+        }
+        return ability_db
 
     def calculate_gcd(self, base_gcd: float = 1.5) -> float:
         """Calculates GCD duration scaled by Alacrity, rounded up to the nearest tenth of a second as ingame"""

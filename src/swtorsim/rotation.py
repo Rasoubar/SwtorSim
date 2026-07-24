@@ -46,7 +46,7 @@ class FixedAbilityStep:
 
     def evaluate(self, player, target, sim) -> bool:
         """Mandatory step. Only resolves (returns True) if the ability casts successfully."""
-        ability = sim.ability_db.get(self.ability_id)
+        ability = player.ability_db.get(self.ability_id)
         return ability.cast(player, target, sim)
 
 class PriorityBlockStep:
@@ -59,7 +59,7 @@ class PriorityBlockStep:
         for option in self.pool:
             wanna_cast = validate_all(option.get("rules", {}), player, target, sim)
             if wanna_cast:
-                ability = sim.ability_db.get(option["ability_id"])
+                ability = player.ability_db.get(option["ability_id"])
                 if ability and ability.cast(player, target, sim):
                     return True
         return False
@@ -74,6 +74,6 @@ class OptionalAbilityStep:
         """Non-blocking step. Tries to cast if rules allow, but ALWAYS resolves so the rotation advances"""
         wanna_cast = validate_all(self.rules, player, target, sim=sim)
         if wanna_cast:
-            ability = sim.ability_db.get(self.ability_id)
+            ability = player.ability_db.get(self.ability_id)
             ability.cast(player, target, sim)
         return True
