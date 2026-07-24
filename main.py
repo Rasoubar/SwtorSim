@@ -1,118 +1,45 @@
-import json
-import os
-from src.swtorsim.config_load import (
-    load_abilities_from_json,
-    load_passives_from_json,
-    load_permanent_buffs_from_json,
-    optional_choices,
-    load_rotation_from_json,
-)
+import random
+from src.swtorsim.cli import select_loadout_paths, prompt_optional_choices, prompt_run_mode
+from src.swtorsim.config_load import load_rotation_from_json, build_complete_loadout
 from src.swtorsim.tester import Tester
 
-import random
-random.seed(42)
 
-def get_dynamic_loadout():
-    print("=== SWTOR Combat Simulator Environment Setup ===")
-    data_root = "data"
+def run():
+    """Interactively prompts for loadout choices, loads databases, and executes simulation test mode."""
 
-    print(f"\n📂 Available Classes inside '{data_root}':")
-    class_options = sorted([
-        d for d in os.listdir(data_root)
-        if os.path.isdir(os.path.join(data_root, d))
-    ])
-    for idx, name in enumerate(class_options, 1):
-        print(f"  [{idx}] {name}")
+    run_mode, iterations = prompt_run_mode()
 
-    class_idx = int(input("Select Class Number: ").strip()) - 1
-    class_name = class_options[class_idx]
+    # 1. Prompt user for class/spec/build/rotation selections
+    base_dir, stats_config, rotation_path = select_loadout_paths()
 
-    class_dir = os.path.join(data_root, class_name)
-    print(f"\n📂 Available Specializations inside '{class_name}':")
-    spec_options = sorted([
-        d for d in os.listdir(class_dir)
-        if os.path.isdir(os.path.join(class_dir, d))
-    ])
-    for idx, name in enumerate(spec_options, 1):
-        print(f"  [{idx}] {name}")
-
-    spec_idx = int(input("Select Specialization Number: ").strip()) - 1
-    spec_name = spec_options[spec_idx]
-
-    base_dir = f"data/{class_name}/{spec_name}"
+    # 2. Prompt user for optional gear/tree choices (relics, tacticals, tree, implants)
+    raw_opt_abilities, raw_opt_buffs, raw_opt_procs = prompt_optional_choices(base_dir)
 
 
-    builds_dir = f"{base_dir}/PlayerBuilds"
-    print(f"\n📂 Available Stat Profiles in '{builds_dir}':")
-    stat_options = sorted([f for f in os.listdir(builds_dir) if f.endswith(".json")])
-    for idx, f_name in enumerate(stat_options, 1):
-        print(f"  [{idx}] {f_name}")
-
-    stat_idx = int(input("Select Stats Profile Number: ").strip()) - 1
-    stats_choice = stat_options[stat_idx]
-    stats_path = f"{builds_dir}/{stats_choice}"
-
-    with open(stats_path, "r", encoding="utf-8") as f:
-        stats_data = json.load(f)
-
-    my_custom_character_stats = {
-        "class_name": class_name,
-        "stats": stats_data
-    }
-
-    rotations_dir = f"{base_dir}/Rotations"
-    print(f"\n📂 Available Rotations in '{rotations_dir}':")
-    rotation_options = sorted([f for f in os.listdir(rotations_dir) if f.endswith(".json")])
-    for idx, f_name in enumerate(rotation_options, 1):
-        print(f"  [{idx}] {f_name}")
-
-    rot_idx = int(input("Select Rotation Sequence Number: ").strip()) - 1
-    rotation_file = rotation_options[rot_idx]
-    rotation_path = f"{rotations_dir}/{rotation_file}"
+    # 3. Load rotation and build full database loadout
     rotation_config = load_rotation_from_json(rotation_path)
+    abilities_db, procs_db, buffs_db = build_complete_loadout(
+        base_dir, raw_opt_abilities, raw_opt_buffs, raw_opt_procs
+    )
 
-    abilities_db = load_abilities_from_json(f"{base_dir}/Abilities.json")
-    buffs_db = load_permanent_buffs_from_json(f"{base_dir}/PermanentBuffs.json")
-    procs_db = load_passives_from_json(f"{base_dir}/BaseProcs.json")
+    # 4. Initialize and run tester
 
-    optional_paths = {
-        "relics": f"{base_dir}/choices/relics.json",
-        "tree": f"{base_dir}/choices/tree.json",
-        "tactical": f"{base_dir}/choices/tacticals.json",
-        "implants": f"{base_dir}/choices/implants.json"
-    }
-
-    # 7. Run interactive choices drafting loops
-    choices = optional_choices(optional_paths)
-    print(f"choices are {choices}")
-
-    # 8. Merge selected modifications directly into active databases
-    abilities_db.update(choices[0])
-    buffs_db.update(choices[1])
-    procs_db.update(choices[2])
-
-    return rotation_config, my_custom_character_stats, abilities_db, procs_db, buffs_db
-
-
-if __name__ == "__main__":
-    # Dynamically resolve paths and harvest complete dataset at startup
-    Rotation, MY_CUSTOM_CHARACTER_STATS, abilities_db, procs_db, buffs_db = get_dynamic_loadout()
-
-    # --- TOGGLE THIS TO SWITCH MODES ---
-    RUN_MODE = "TEST"  # Change to "BATCH" for full simulation
-    # -----------------------------------
     tester = Tester(
-        rotation_config=Rotation,
-        stats_config=MY_CUSTOM_CHARACTER_STATS,
+        rotation_config=rotation_config,
+        stats_config=stats_config,
         abilities_db=abilities_db,
         procs_db=procs_db,
         buffs_db=buffs_db,
-        duration = 1000,
+        duration=1000,
         dummy_hp=10000000
     )
 
-    if RUN_MODE == "TEST":
+    if run_mode == "TEST":
         tester.run_test()
+    elif run_mode == "BATCH":
+        tester.run_monte_carlo(iterations=iterations)
 
-    elif RUN_MODE == "BATCH":
-        tester.run_monte_carlo(iterations=10000)
+if __name__ == "__main__":
+    # Fixed seed applied at entry point for reproducible test runs
+    random.seed(42)
+    run()
