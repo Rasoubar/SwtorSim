@@ -13,6 +13,7 @@ from extractor.eff_triggers import (
     load_trigger_labels,
 )
 from extractor.graph import NodeRecord
+from extractor.naming import normalize_stack_charge
 
 DEFAULT_BASE_GCD = 1.5
 
@@ -56,7 +57,7 @@ def _snake_case(name: str) -> str:
             break
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
     s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
-    return s2.lower()
+    return normalize_stack_charge(s2.lower())
 
 
 MS_PER_SECOND = 1000.0
@@ -639,20 +640,42 @@ def _effect_field_interval_seconds(record: NodeRecord, name: str) -> float | Non
         return None
 
 
-def _effect_stack_limit(effect_record: NodeRecord) -> dict[str, Any] | None:
-    limit = _field_value(effect_record, "effStackLimit")
-    if limit is None:
+def _effect_int_field(effect_record: NodeRecord, name: str) -> int | None:
+    value = _field_value(effect_record, name)
+    if value is None:
         return None
     try:
-        max_count = int(str(limit))
+        return int(str(value))
     except (TypeError, ValueError):
         return None
 
-    stack_limit: dict[str, Any] = {"max_stack_count": max_count}
+
+def _effect_stack_charge(effect_record: NodeRecord) -> dict[str, Any] | None:
+    stack_charge: dict[str, Any] = {}
+
+    initial = _effect_int_field(effect_record, "effInitialCharges")
+    if initial is not None:
+        stack_charge["initial"] = initial
+
+    maximum = _effect_int_field(effect_record, "effMaxCharges")
+    if maximum is not None:
+        stack_charge["max"] = maximum
+
+    nr_occurances = _effect_int_field(effect_record, "effStackLimit")
+    if nr_occurances is not None:
+        stack_charge["nr_occurances"] = nr_occurances
+
+    if _has_field(effect_record, "effScalesWithCharges"):
+        stack_charge["scales_with_stack_charge"] = bool(
+            _field_value(effect_record, "effScalesWithCharges")
+        )
+
     if _has_field(effect_record, "effStackLimitIsByTag"):
-        stack_limit["is_by_tag"] = bool(_field_value(effect_record, "effStackLimitIsByTag"))
+        stack_charge["is_by_tag"] = bool(
+            _field_value(effect_record, "effStackLimitIsByTag")
+        )
     if _has_field(effect_record, "effStackLimitIsByCaster"):
-        stack_limit["is_per_caster"] = bool(
+        stack_charge["is_per_caster"] = bool(
             _field_value(effect_record, "effStackLimitIsByCaster")
         )
 
@@ -664,11 +687,11 @@ def _effect_stack_limit(effect_record: NodeRecord) -> dict[str, Any] | None:
             if isinstance(entry, dict) and entry.get("value")
         ]
         if len(tag_keys) == 1:
-            stack_limit["relevant_tags"] = tag_keys[0]
+            stack_charge["relevant_tags"] = tag_keys[0]
         elif tag_keys:
-            stack_limit["relevant_tags"] = tag_keys
+            stack_charge["relevant_tags"] = tag_keys
 
-    return stack_limit
+    return stack_charge or None
 
 
 def _effect_has_meaningful_metadata(
@@ -676,27 +699,27 @@ def _effect_has_meaningful_metadata(
     tags: list[str] | None = None,
     duration: float | None = None,
     tick_interval: float | None = None,
-    stack_limit: dict[str, Any] | None = None,
+    stack_charge: dict[str, Any] | None = None,
 ) -> bool:
     return (
         bool(tags)
         or duration is not None
         or tick_interval is not None
-        or bool(stack_limit)
+        or bool(stack_charge)
     )
 
 
-def _merge_stack_limit_from_initializers(
-    stack_limit: dict[str, Any] | None,
+def _merge_stack_charge_from_initializers(
+    stack_charge: dict[str, Any] | None,
     branches: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     for branch in branches:
         for initializer in branch.get("initializers", []):
-            if initializer.get("initializer_type") != "set_stack_limit":
+            if initializer.get("initializer_type") != "set_stack_charge_limit":
                 continue
-            merged = dict(stack_limit or {})
+            merged = dict(stack_charge or {})
             for key in (
-                "max_stack_count",
+                "nr_occurances",
                 "is_by_tag",
                 "is_per_caster",
                 "is_multi_target",
@@ -705,7 +728,7 @@ def _merge_stack_limit_from_initializers(
                 if key in initializer:
                     merged[key] = initializer[key]
             return merged
-    return stack_limit
+    return stack_charge
 
 
 def _effect_timing(effect_record: NodeRecord) -> tuple[float | None, float | None]:
@@ -1104,7 +1127,7 @@ def _prune_dropped_effect_references(
                 tags=effect.get("tags"),
                 duration=effect.get("duration"),
                 tick_interval=effect.get("tick_interval"),
-                stack_limit=effect.get("stack_limit"),
+                stack_charge=effect.get("stack_charge"),
             ):
                 updated_effect = dict(effect)
                 updated_effect["branches"] = []
@@ -1177,13 +1200,13 @@ def _decode_initializer(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
 
     if initializer_name == "effInitializer_SetStackLimit":
         decoded: dict[str, Any] = {
-            "initializer_type": "set_stack_limit",
+            "initializer_type": "set_stack_charge_limit",
             "is_by_tag": bool(bool_params.get("effParam_IsByTag", False)),
             "is_per_caster": bool(bool_params.get("effParam_IsPerCaster", False)),
             "is_multi_target": bool(bool_params.get("effParam_IsMultiTarget", False)),
         }
         if "effParam_MaxStackCount" in int_params:
-            decoded["max_stack_count"] = _int_param(int_params, "effParam_MaxStackCount")
+            decoded["nr_occurances"] = _int_param(int_params, "effParam_MaxStackCount")
         relevant_tags = string_params.get("effParam_RelevantTags")
         if isinstance(relevant_tags, str) and relevant_tags:
             decoded["relevant_tags"] = relevant_tags
@@ -1340,7 +1363,7 @@ def _decode_effect(
     tags = _effect_tags(effect_record)
     tag_set = set(tags)
     duration, tick_interval = _effect_timing(effect_record)
-    stack_limit = _effect_stack_limit(effect_record)
+    stack_charge = _effect_stack_charge(effect_record)
 
     branches: list[dict[str, Any]] = []
     for branch_index, branch in enumerate(_sub_effects(effect_record)):
@@ -1360,11 +1383,11 @@ def _decode_effect(
         tags=tags,
         duration=duration,
         tick_interval=tick_interval,
-        stack_limit=stack_limit,
+        stack_charge=stack_charge,
     ):
         return None
 
-    stack_limit = _merge_stack_limit_from_initializers(stack_limit, branches)
+    stack_charge = _merge_stack_charge_from_initializers(stack_charge, branches)
 
     decoded: dict[str, Any] = {
         "number": number,
@@ -1373,8 +1396,8 @@ def _decode_effect(
     }
     if tags:
         decoded["tags"] = tags
-    if stack_limit:
-        decoded["stack_limit"] = stack_limit
+    if stack_charge:
+        decoded["stack_charge"] = stack_charge
     if duration is not None:
         decoded["duration"] = duration
     if tick_interval is not None:

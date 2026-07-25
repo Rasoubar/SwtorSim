@@ -6,6 +6,7 @@ from typing import Any
 
 from extractor.config import DATA_DIR, WORK_DIR
 from extractor.gom.client_gom import load_client_gom
+from extractor.naming import normalize_stack_charge
 
 EFF_TRIGGER_ENUM_ID = "4611686039404270025"
 
@@ -92,7 +93,7 @@ def _trigger_label_from_member(member: str) -> str:
         name = name[len("_UNUSED_") :]
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
     s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
-    return s2.lower()
+    return normalize_stack_charge(s2.lower())
 
 
 def _labels_from_client_gom(path: Path) -> dict[str, str] | None:
@@ -118,7 +119,10 @@ def load_trigger_labels() -> dict[str, str]:
         labels = _labels_from_client_gom(path)
         if labels:
             return labels
-    return dict(EMBEDDED_TRIGGER_LABELS)
+    return {
+        key: normalize_stack_charge(label)
+        for key, label in EMBEDDED_TRIGGER_LABELS.items()
+    }
 
 
 def decode_trigger_name(raw: Any, labels: dict[str, str]) -> tuple[str, int | None]:
