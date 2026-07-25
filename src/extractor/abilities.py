@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -22,8 +23,17 @@ ACTOR_LABELS: dict[str, str] = {
     "3": "target",
 }
 
+# cbtComparisonEnum members, each confirmed against Jedipedia's rendering of the
+# matching condition: 2/3/5 from abl.sith_warrior.endure_pain/14/1 ("< 100%",
+# "> 33%", "<= 33%"), 4 from abl.sith_inquisitor.severing_slash/43/4 ("is not =
+# Champion", negated), 6 from abl.sith_inquisitor.whirlwind/41/3 (">= Strong").
+# Values 0 and 1 never occur in the extracted data, so they stay unmapped.
 COMPARISON_LABELS: dict[str, str] = {
+    "2": "lt",
+    "3": "gt",
+    "4": "eq",
     "5": "lte",
+    "6": "gte",
 }
 
 LOGIC_OP_LABELS: dict[str, str] = {
@@ -277,6 +287,8 @@ def _simplify_condition_logic(logic: dict[str, Any] | None) -> dict[str, Any] | 
 
 def _finalize_conditions(
     conditions: dict[str, Any] | None,
+    *,
+    context: str | None = None,
 ) -> dict[str, Any] | None:
     if conditions is None:
         return None
@@ -286,6 +298,12 @@ def _finalize_conditions(
     if logic is None and len(conditions["list"]) == 1:
         logic = {"condition": conditions["list"][0]["id"]}
     if logic is None:
+        ids = ", ".join(item["id"] for item in conditions["list"])
+        print(
+            f"Warning: dropping {len(conditions['list'])} conditions without a "
+            f"logic tree on {context or 'unknown node'}: {ids}",
+            file=sys.stderr,
+        )
         return None
     return {"list": conditions["list"], "logic": logic}
 
@@ -305,9 +323,22 @@ def _decode_actor(raw: Any) -> str:
     return ACTOR_LABELS.get(key, f"actor_{key}")
 
 
-def _decode_comparison(raw: Any) -> str:
+_warned_comparisons: set[str] = set()
+
+
+def _decode_comparison(raw: Any, *, context: str | None = None) -> str:
     key = str(raw)
-    return COMPARISON_LABELS.get(key, f"cmp_{key}")
+    label = COMPARISON_LABELS.get(key)
+    if label is not None:
+        return label
+    if key not in _warned_comparisons:
+        _warned_comparisons.add(key)
+        print(
+            f"Warning: unmapped comparison value {key} on "
+            f"{context or 'unknown node'}; emitting cmp_{key}",
+            file=sys.stderr,
+        )
+    return f"cmp_{key}"
 
 
 def _ability_name(record: NodeRecord) -> str | None:
@@ -452,6 +483,7 @@ def _decode_condition(
     condition_entry: list[dict[str, Any]],
     *,
     id_to_fqn: dict[str, str] | None = None,
+    context: str | None = None,
 ) -> dict[str, Any] | None:
     fields = _condition_fields(condition_entry)
     condition_name = fields.get("effConditionName")
@@ -481,7 +513,10 @@ def _decode_condition(
     if "effParam_FromActor" in int_params:
         decoded["from_actor"] = _decode_actor(int_params["effParam_FromActor"])
     if "effParam_Comparison" in int_params:
-        decoded["comparison"] = _decode_comparison(int_params["effParam_Comparison"])
+        decoded["comparison"] = _decode_comparison(
+            int_params["effParam_Comparison"],
+            context=f"{context or 'unknown node'} condition {condition_id}",
+        )
     if "effParam_Count" in int_params:
         decoded["count"] = int(int_params["effParam_Count"])
     if "effParam_AbilitySpec" in int_params:
@@ -591,11 +626,11 @@ def _collect_conditions(
                         continue
                     all_conditions[key] = value
 
-        logic = _sub_effect_field(sub_effect, "effConditionLogic")
-        if isinstance(logic, dict):
-            logic_list = logic.get("list")
-            if isinstance(logic_list, list) and logic_list:
-                logic_lists.append(logic_list)
+        postfix = _sub_effect_field(sub_effect, "effPostfixElements")
+        if isinstance(postfix, dict):
+            postfix_list = postfix.get("list")
+            if isinstance(postfix_list, list) and postfix_list:
+                logic_lists.append(postfix_list)
 
     if not all_conditions:
         return None
@@ -603,7 +638,14 @@ def _collect_conditions(
     decoded_list = [
         decoded
         for condition_id, entry in sorted(all_conditions.items())
-        if (decoded := _decode_condition(condition_id, entry, id_to_fqn=id_to_fqn))
+        if (
+            decoded := _decode_condition(
+                condition_id,
+                entry,
+                id_to_fqn=id_to_fqn,
+                context=effect_record.entry.fqn,
+            )
+        )
         is not None
     ]
     if not decoded_list:
@@ -621,7 +663,10 @@ def _collect_conditions(
             logic = candidate
             break
 
-    return _finalize_conditions({"list": decoded_list, "logic": logic})
+    return _finalize_conditions(
+        {"list": decoded_list, "logic": logic},
+        context=effect_record.entry.fqn,
+    )
 
 
 def _entry_fields(entry: list[dict[str, Any]]) -> dict[str, Any]:
@@ -861,9 +906,10 @@ def _branch_conditions(
     branch: list[dict[str, Any]],
     *,
     id_to_fqn: dict[str, str] | None = None,
+    context: str | None = None,
 ) -> tuple[ElseMarker | None, dict[str, Any] | None]:
     conditions_raw = _sub_effect_field(branch, "effConditions")
-    logic_raw = _sub_effect_field(branch, "effConditionLogic")
+    postfix_raw = _sub_effect_field(branch, "effPostfixElements")
 
     if not isinstance(conditions_raw, list):
         conditions_raw = []
@@ -892,7 +938,14 @@ def _branch_conditions(
     decoded_list = [
         decoded
         for condition_id, entry in sorted(kept_conditions.items())
-        if (decoded := _decode_condition(condition_id, entry, id_to_fqn=id_to_fqn))
+        if (
+            decoded := _decode_condition(
+                condition_id,
+                entry,
+                id_to_fqn=id_to_fqn,
+                context=context,
+            )
+        )
         is not None
     ]
     if not decoded_list:
@@ -901,15 +954,18 @@ def _branch_conditions(
     valid_ids = {item["id"] for item in decoded_list}
 
     logic: dict[str, Any] | None = None
-    if isinstance(logic_raw, dict):
-        logic_list = logic_raw.get("list")
-        if isinstance(logic_list, list) and logic_list:
+    if isinstance(postfix_raw, dict):
+        postfix_list = postfix_raw.get("list")
+        if isinstance(postfix_list, list) and postfix_list:
             logic = _filter_condition_logic(
-                _decode_condition_logic(logic_list),
+                _decode_condition_logic(postfix_list),
                 valid_ids,
             )
 
-    return marker, _finalize_conditions({"list": decoded_list, "logic": logic})
+    return marker, _finalize_conditions(
+        {"list": decoded_list, "logic": logic},
+        context=context,
+    )
 
 
 def _decode_action(
@@ -1374,11 +1430,16 @@ def _decode_branch(
     effect_tick_interval: float | None = None,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
+    context: str | None = None,
 ) -> dict[str, Any] | None:
     if _is_redundant_self_aoe_branch(branch, effect_tags):
         return None
 
-    _marker, conditions = _branch_conditions(branch, id_to_fqn=id_to_fqn)
+    _marker, conditions = _branch_conditions(
+        branch,
+        id_to_fqn=id_to_fqn,
+        context=context,
+    )
     actions = _branch_actions(
         branch,
         id_to_fqn=id_to_fqn,
@@ -1442,6 +1503,7 @@ def _decode_effect(
             effect_tick_interval=tick_interval,
             id_to_fqn=id_to_fqn,
             standard_rating=standard_rating,
+            context=f"{effect_record.entry.fqn} sub-effect {raw_index}",
         )
         if decoded_branch is not None:
             branches.append(decoded_branch)
