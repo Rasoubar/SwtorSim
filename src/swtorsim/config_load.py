@@ -100,12 +100,12 @@ def build_complete_loadout(
 ) -> Tuple[Dict[str, Ability], Dict[str, ProcData], Dict[str, ActiveEffect]]:
     """Loads base databases and merges optional drafted dicts into active registries."""
     abilities_db = load_abilities_from_json(f"{base_dir}/Abilities.json")
-    buffs_db = load_permanent_effects_from_json(f"{base_dir}/PermanentBuffs.json")
+    effects_db = load_permanent_effects_from_json(f"{base_dir}/PermanentBuffs.json")
     procs_db = load_procs_from_json(f"{base_dir}/BaseProcs.json")
 
     # Convert drafted raw dicts and update base databases
     abilities_db.update(load_abilities_from_dict(raw_opt_abilities))
-    buffs_db.update(load_permanent_effects_from_dict(raw_opt_buffs))
+    effects_db.update(load_permanent_effects_from_dict(raw_opt_buffs))
     procs_db.update(load_procs_from_dict(raw_opt_procs))
 
-    return abilities_db, procs_db, buffs_db
+    return abilities_db, procs_db, effects_db
