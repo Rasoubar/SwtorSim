@@ -72,15 +72,19 @@ def load_permanent_effects_from_json(filepath: str) -> Dict[str, ActiveEffect]:
     raw_data = load_json_file(filepath)
     return load_permanent_effects_from_dict(raw_data)
 
+def load_character_stats_from_json(class_name: str, filepath: str) -> dict:
+    """Loads character stat profile JSON and formats it for the player."""
+    stats_data = load_json_file(filepath)
+    return {
+        "class_name": class_name,
+        "stats": stats_data
+    }
+
 
 def load_rotation_from_json(filepath: str) -> Any:
     """Loads rotation step sequences directly from a JSON file."""
     return load_json_file(filepath)
 
-
-def load_character_stats_from_json(filepath: str) -> dict:
-    """Loads character stat profiles from a JSON file."""
-    return load_json_file(filepath)
 
 
 # -----------------------------------------------------------------------------

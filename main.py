@@ -1,6 +1,6 @@
 import random
 from src.swtorsim.cli import select_loadout_paths, prompt_optional_choices, prompt_run_mode
-from src.swtorsim.config_load import load_rotation_from_json, build_complete_loadout
+from src.swtorsim.config_load import load_rotation_from_json, build_complete_loadout, load_character_stats_from_json
 from src.swtorsim.tester import Tester
 
 
@@ -11,12 +11,13 @@ def run():
     run_mode, iterations = prompt_run_mode()
 
     # 1. Prompt user for class/spec/build/rotation selections
-    base_dir, stats_config, rotation_path = select_loadout_paths()
+    class_name, base_dir, stats_path, rotation_path = select_loadout_paths()
 
     # 2. Prompt user for optional gear/tree choices (relics, tacticals, tree, implants)
     raw_opt_abilities, raw_opt_buffs, raw_opt_procs = prompt_optional_choices(base_dir)
 
-    # 3. Load rotation and build full database loadout
+    # 3. Load rotation, character stats and build full database loadout
+    stats_config = load_character_stats_from_json(class_name, stats_path)
     rotation_config = load_rotation_from_json(rotation_path)
     abilities_db, procs_db, buffs_db = build_complete_loadout(
         base_dir, raw_opt_abilities, raw_opt_buffs, raw_opt_procs

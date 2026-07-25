@@ -1,5 +1,4 @@
 import os
-import json
 from typing import Tuple
 from src.swtorsim.config_load import load_json_file
 
@@ -49,14 +48,7 @@ def select_loadout_paths(data_root: str = "data"):
     print(f"\n📂 Available Stat Profiles in '{builds_dir}':")
     stat_options = sorted([f for f in os.listdir(builds_dir) if f.endswith(".json")])
     stats_choice = prompt_menu_choice(stat_options, "Select Stats Profile Number: ")
-
-    with open(os.path.join(builds_dir, stats_choice), "r", encoding="utf-8") as f:
-        stats_data = json.load(f)
-
-    character_stats = {
-        "class_name": class_name,
-        "stats": stats_data
-    }
+    stats_path = os.path.join(builds_dir, stats_choice)
 
     # 4. Select Rotation
     rotations_dir = os.path.join(base_dir, "Rotations")
@@ -65,7 +57,7 @@ def select_loadout_paths(data_root: str = "data"):
     rotation_file = prompt_menu_choice(rotation_options, "Select Rotation Sequence Number: ")
     rotation_path = os.path.join(rotations_dir, rotation_file)
 
-    return base_dir, character_stats, rotation_path
+    return class_name, base_dir, stats_path, rotation_path
 
 
 def _process_item_additions(to_add_list: list, abilities: dict, procs: dict, buffs: dict) -> None:
