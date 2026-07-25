@@ -186,6 +186,69 @@ def _is_else_condition(condition_name: Any) -> bool:
     return isinstance(condition_name, str) and condition_name in ELSE_CONDITION_TYPES
 
 
+# ("else", None) for effCondition_Else, ("block", block_id) for IfElseBlock.
+ElseMarker = tuple[str, str | None]
+
+
+def _else_marker_from_fields(fields: dict[str, Any]) -> ElseMarker | None:
+    """Read an if/else gating marker from a single condition's fields."""
+    condition_name = fields.get("effConditionName")
+    if condition_name == "effCondition_Else":
+        return ("else", None)
+    if condition_name == "effCondition_IfElseBlock":
+        int_params = _lookup_list_to_dict(fields.get("effIntParams"))
+        block_id = int_params.get("effParam_BlockIdentifier")
+        return ("block", str(block_id) if block_id is not None else "1")
+    return None
+
+
+def _branch_else_markers(branch: list[dict[str, Any]]) -> list[ElseMarker]:
+    """Collect every Else / IfElseBlock marker on a raw sub-effect."""
+    conditions_raw = _sub_effect_field(branch, "effConditions")
+    if not isinstance(conditions_raw, list):
+        return []
+    markers: list[ElseMarker] = []
+    for entry in conditions_raw:
+        if not isinstance(entry, dict):
+            continue
+        value = entry.get("value")
+        if not isinstance(value, list):
+            continue
+        marker = _else_marker_from_fields(_condition_fields(value))
+        if marker is not None:
+            markers.append(marker)
+    return markers
+
+
+def _resolve_run_if_none_ran(
+    markers_by_index: dict[int, list[ElseMarker]],
+) -> dict[int, list[int]]:
+    """Resolve each marked branch's gate to a list of earlier raw indices.
+
+    Literal reading: Else gates on the immediately previous raw index;
+    IfElseBlock gates on every earlier member of the same block. Both markers
+    on one sub-effect (currently unused) produce the union.
+    """
+    gates: dict[int, list[int]] = {}
+    for index, markers in sorted(markers_by_index.items()):
+        gate: set[int] = set()
+        for kind, block_id in markers:
+            if kind == "else":
+                if index > 1:
+                    gate.add(index - 1)
+            elif kind == "block":
+                for earlier, earlier_markers in markers_by_index.items():
+                    if earlier >= index:
+                        continue
+                    if any(
+                        m[0] == "block" and m[1] == block_id for m in earlier_markers
+                    ):
+                        gate.add(earlier)
+        if gate:
+            gates[index] = sorted(gate)
+    return gates
+
+
 def _simplify_condition_logic(logic: dict[str, Any] | None) -> dict[str, Any] | None:
     if logic is None:
         return None
@@ -798,8 +861,7 @@ def _branch_conditions(
     branch: list[dict[str, Any]],
     *,
     id_to_fqn: dict[str, str] | None = None,
-    is_first_branch: bool = False,
-) -> tuple[bool, dict[str, Any] | None]:
+) -> tuple[ElseMarker | None, dict[str, Any] | None]:
     conditions_raw = _sub_effect_field(branch, "effConditions")
     logic_raw = _sub_effect_field(branch, "effConditionLogic")
 
@@ -807,7 +869,7 @@ def _branch_conditions(
         conditions_raw = []
 
     kept_conditions: dict[str, list[dict[str, Any]]] = {}
-    is_else = False
+    marker: ElseMarker | None = None
     for entry in conditions_raw:
         if not isinstance(entry, dict):
             continue
@@ -816,17 +878,16 @@ def _branch_conditions(
         if not isinstance(value, list):
             continue
         fields = _condition_fields(value)
-        condition_name = fields.get("effConditionName")
-        if _is_else_condition(condition_name):
-            if condition_name == "effCondition_Else" or not is_first_branch:
-                is_else = True
+        condition_marker = _else_marker_from_fields(fields)
+        if condition_marker is not None:
+            marker = condition_marker
             continue
-        if _should_drop_condition(condition_name):
+        if _should_drop_condition(fields.get("effConditionName")):
             continue
         kept_conditions[key] = value
 
     if not kept_conditions:
-        return is_else, None
+        return marker, None
 
     decoded_list = [
         decoded
@@ -835,7 +896,7 @@ def _branch_conditions(
         is not None
     ]
     if not decoded_list:
-        return is_else, None
+        return marker, None
 
     valid_ids = {item["id"] for item in decoded_list}
 
@@ -848,7 +909,7 @@ def _branch_conditions(
                 valid_ids,
             )
 
-    return is_else, _finalize_conditions({"list": decoded_list, "logic": logic})
+    return marker, _finalize_conditions({"list": decoded_list, "logic": logic})
 
 
 def _decode_action(
@@ -1307,20 +1368,17 @@ def _decode_branch(
     branch: list[dict[str, Any]],
     effect_tags: set[str],
     *,
+    index: int,
+    gate: list[int] | None = None,
     effect_duration: float | None = None,
     effect_tick_interval: float | None = None,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
-    is_first_branch: bool = False,
 ) -> dict[str, Any] | None:
     if _is_redundant_self_aoe_branch(branch, effect_tags):
         return None
 
-    is_else, conditions = _branch_conditions(
-        branch,
-        id_to_fqn=id_to_fqn,
-        is_first_branch=is_first_branch,
-    )
+    _marker, conditions = _branch_conditions(branch, id_to_fqn=id_to_fqn)
     actions = _branch_actions(
         branch,
         id_to_fqn=id_to_fqn,
@@ -1332,9 +1390,9 @@ def _decode_branch(
     if not actions and conditions is None:
         return None
 
-    decoded: dict[str, Any] = {}
-    if is_else:
-        decoded["else"] = True
+    decoded: dict[str, Any] = {"index": index}
+    if gate:
+        decoded["run_if_none_ran"] = gate
     if conditions is not None:
         decoded["conditions"] = conditions
     if initializers:
@@ -1365,16 +1423,25 @@ def _decode_effect(
     duration, tick_interval = _effect_timing(effect_record)
     stack_charge = _effect_stack_charge(effect_record)
 
+    sub_effects = _sub_effects(effect_record)
+    markers_by_index: dict[int, list[ElseMarker]] = {}
+    for raw_index, branch in enumerate(sub_effects, start=1):
+        markers = _branch_else_markers(branch)
+        if markers:
+            markers_by_index[raw_index] = markers
+    gates = _resolve_run_if_none_ran(markers_by_index)
+
     branches: list[dict[str, Any]] = []
-    for branch_index, branch in enumerate(_sub_effects(effect_record)):
+    for raw_index, branch in enumerate(sub_effects, start=1):
         decoded_branch = _decode_branch(
             branch,
             tag_set,
+            index=raw_index,
+            gate=gates.get(raw_index),
             effect_duration=duration,
             effect_tick_interval=tick_interval,
             id_to_fqn=id_to_fqn,
             standard_rating=standard_rating,
-            is_first_branch=branch_index == 0,
         )
         if decoded_branch is not None:
             branches.append(decoded_branch)
