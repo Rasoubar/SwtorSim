@@ -193,7 +193,7 @@ A multithreaded, event-driven combat simulator for *Star Wars: The Old Republic*
 
 ## 🗺️ Roadmap & Next Steps
 
-The simulator is transitioning from handwritten JSON blueprints to raw extracted game data to achieve 100% data fidelity with live SWTOR servers. With the **Extracted Data Parser Engine** already completed—resolving internal SWTOR node hashes, 64-bit integer IDs, and effect references into clean blueprint structures (all nida/sinrai) —the next phase focuses on integrating the new file format directly into the engine runtime:
+The simulator is transitioning from handwritten JSON blueprints to raw extracted game data to achieve 100% data fidelity with live SWTOR servers. With the **Extracted Data Parser Engine** already completed—resolving internal SWTOR node hashes, 64-bit integer IDs, and effect references into clean blueprint structures (all nida/sinrai) — the next phase focuses on integrating the new file format directly into the engine runtime:
 
 ### 1. Ingestion & Load Routine Refactor
 * **Data Loader Overhaul (`config_load.py`):** Rewrite loading routines to parse the new extracted file schemas and databases, mapping nida-resolved node hashes directly to runtime entity models.
