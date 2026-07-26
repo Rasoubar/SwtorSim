@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from extractor.eff_triggers import (
     load_trigger_labels,
 )
 from extractor.graph import NodeRecord
+from extractor.naming import normalize_stack_charge
 
 DEFAULT_BASE_GCD = 1.5
 
@@ -21,8 +23,17 @@ ACTOR_LABELS: dict[str, str] = {
     "3": "target",
 }
 
+# cbtComparisonEnum members, each confirmed against Jedipedia's rendering of the
+# matching condition: 2/3/5 from abl.sith_warrior.endure_pain/14/1 ("< 100%",
+# "> 33%", "<= 33%"), 4 from abl.sith_inquisitor.severing_slash/43/4 ("is not =
+# Champion", negated), 6 from abl.sith_inquisitor.whirlwind/41/3 (">= Strong").
+# Values 0 and 1 never occur in the extracted data, so they stay unmapped.
 COMPARISON_LABELS: dict[str, str] = {
+    "2": "lt",
+    "3": "gt",
+    "4": "eq",
     "5": "lte",
+    "6": "gte",
 }
 
 LOGIC_OP_LABELS: dict[str, str] = {
@@ -56,7 +67,7 @@ def _snake_case(name: str) -> str:
             break
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
     s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
-    return s2.lower()
+    return normalize_stack_charge(s2.lower())
 
 
 MS_PER_SECOND = 1000.0
@@ -185,6 +196,69 @@ def _is_else_condition(condition_name: Any) -> bool:
     return isinstance(condition_name, str) and condition_name in ELSE_CONDITION_TYPES
 
 
+# ("else", None) for effCondition_Else, ("block", block_id) for IfElseBlock.
+ElseMarker = tuple[str, str | None]
+
+
+def _else_marker_from_fields(fields: dict[str, Any]) -> ElseMarker | None:
+    """Read an if/else gating marker from a single condition's fields."""
+    condition_name = fields.get("effConditionName")
+    if condition_name == "effCondition_Else":
+        return ("else", None)
+    if condition_name == "effCondition_IfElseBlock":
+        int_params = _lookup_list_to_dict(fields.get("effIntParams"))
+        block_id = int_params.get("effParam_BlockIdentifier")
+        return ("block", str(block_id) if block_id is not None else "1")
+    return None
+
+
+def _branch_else_markers(branch: list[dict[str, Any]]) -> list[ElseMarker]:
+    """Collect every Else / IfElseBlock marker on a raw sub-effect."""
+    conditions_raw = _sub_effect_field(branch, "effConditions")
+    if not isinstance(conditions_raw, list):
+        return []
+    markers: list[ElseMarker] = []
+    for entry in conditions_raw:
+        if not isinstance(entry, dict):
+            continue
+        value = entry.get("value")
+        if not isinstance(value, list):
+            continue
+        marker = _else_marker_from_fields(_condition_fields(value))
+        if marker is not None:
+            markers.append(marker)
+    return markers
+
+
+def _resolve_run_if_none_ran(
+    markers_by_index: dict[int, list[ElseMarker]],
+) -> dict[int, list[int]]:
+    """Resolve each marked branch's gate to a list of earlier raw indices.
+
+    Literal reading: Else gates on the immediately previous raw index;
+    IfElseBlock gates on every earlier member of the same block. Both markers
+    on one sub-effect (currently unused) produce the union.
+    """
+    gates: dict[int, list[int]] = {}
+    for index, markers in sorted(markers_by_index.items()):
+        gate: set[int] = set()
+        for kind, block_id in markers:
+            if kind == "else":
+                if index > 1:
+                    gate.add(index - 1)
+            elif kind == "block":
+                for earlier, earlier_markers in markers_by_index.items():
+                    if earlier >= index:
+                        continue
+                    if any(
+                        m[0] == "block" and m[1] == block_id for m in earlier_markers
+                    ):
+                        gate.add(earlier)
+        if gate:
+            gates[index] = sorted(gate)
+    return gates
+
+
 def _simplify_condition_logic(logic: dict[str, Any] | None) -> dict[str, Any] | None:
     if logic is None:
         return None
@@ -213,6 +287,8 @@ def _simplify_condition_logic(logic: dict[str, Any] | None) -> dict[str, Any] | 
 
 def _finalize_conditions(
     conditions: dict[str, Any] | None,
+    *,
+    context: str | None = None,
 ) -> dict[str, Any] | None:
     if conditions is None:
         return None
@@ -222,6 +298,12 @@ def _finalize_conditions(
     if logic is None and len(conditions["list"]) == 1:
         logic = {"condition": conditions["list"][0]["id"]}
     if logic is None:
+        ids = ", ".join(item["id"] for item in conditions["list"])
+        print(
+            f"Warning: dropping {len(conditions['list'])} conditions without a "
+            f"logic tree on {context or 'unknown node'}: {ids}",
+            file=sys.stderr,
+        )
         return None
     return {"list": conditions["list"], "logic": logic}
 
@@ -241,9 +323,22 @@ def _decode_actor(raw: Any) -> str:
     return ACTOR_LABELS.get(key, f"actor_{key}")
 
 
-def _decode_comparison(raw: Any) -> str:
+_warned_comparisons: set[str] = set()
+
+
+def _decode_comparison(raw: Any, *, context: str | None = None) -> str:
     key = str(raw)
-    return COMPARISON_LABELS.get(key, f"cmp_{key}")
+    label = COMPARISON_LABELS.get(key)
+    if label is not None:
+        return label
+    if key not in _warned_comparisons:
+        _warned_comparisons.add(key)
+        print(
+            f"Warning: unmapped comparison value {key} on "
+            f"{context or 'unknown node'}; emitting cmp_{key}",
+            file=sys.stderr,
+        )
+    return f"cmp_{key}"
 
 
 def _ability_name(record: NodeRecord) -> str | None:
@@ -388,6 +483,7 @@ def _decode_condition(
     condition_entry: list[dict[str, Any]],
     *,
     id_to_fqn: dict[str, str] | None = None,
+    context: str | None = None,
 ) -> dict[str, Any] | None:
     fields = _condition_fields(condition_entry)
     condition_name = fields.get("effConditionName")
@@ -417,7 +513,10 @@ def _decode_condition(
     if "effParam_FromActor" in int_params:
         decoded["from_actor"] = _decode_actor(int_params["effParam_FromActor"])
     if "effParam_Comparison" in int_params:
-        decoded["comparison"] = _decode_comparison(int_params["effParam_Comparison"])
+        decoded["comparison"] = _decode_comparison(
+            int_params["effParam_Comparison"],
+            context=f"{context or 'unknown node'} condition {condition_id}",
+        )
     if "effParam_Count" in int_params:
         decoded["count"] = int(int_params["effParam_Count"])
     if "effParam_AbilitySpec" in int_params:
@@ -527,11 +626,11 @@ def _collect_conditions(
                         continue
                     all_conditions[key] = value
 
-        logic = _sub_effect_field(sub_effect, "effConditionLogic")
-        if isinstance(logic, dict):
-            logic_list = logic.get("list")
-            if isinstance(logic_list, list) and logic_list:
-                logic_lists.append(logic_list)
+        postfix = _sub_effect_field(sub_effect, "effPostfixElements")
+        if isinstance(postfix, dict):
+            postfix_list = postfix.get("list")
+            if isinstance(postfix_list, list) and postfix_list:
+                logic_lists.append(postfix_list)
 
     if not all_conditions:
         return None
@@ -539,7 +638,14 @@ def _collect_conditions(
     decoded_list = [
         decoded
         for condition_id, entry in sorted(all_conditions.items())
-        if (decoded := _decode_condition(condition_id, entry, id_to_fqn=id_to_fqn))
+        if (
+            decoded := _decode_condition(
+                condition_id,
+                entry,
+                id_to_fqn=id_to_fqn,
+                context=effect_record.entry.fqn,
+            )
+        )
         is not None
     ]
     if not decoded_list:
@@ -557,7 +663,10 @@ def _collect_conditions(
             logic = candidate
             break
 
-    return _finalize_conditions({"list": decoded_list, "logic": logic})
+    return _finalize_conditions(
+        {"list": decoded_list, "logic": logic},
+        context=effect_record.entry.fqn,
+    )
 
 
 def _entry_fields(entry: list[dict[str, Any]]) -> dict[str, Any]:
@@ -639,20 +748,42 @@ def _effect_field_interval_seconds(record: NodeRecord, name: str) -> float | Non
         return None
 
 
-def _effect_stack_limit(effect_record: NodeRecord) -> dict[str, Any] | None:
-    limit = _field_value(effect_record, "effStackLimit")
-    if limit is None:
+def _effect_int_field(effect_record: NodeRecord, name: str) -> int | None:
+    value = _field_value(effect_record, name)
+    if value is None:
         return None
     try:
-        max_count = int(str(limit))
+        return int(str(value))
     except (TypeError, ValueError):
         return None
 
-    stack_limit: dict[str, Any] = {"max_stack_count": max_count}
+
+def _effect_stack_charge(effect_record: NodeRecord) -> dict[str, Any] | None:
+    stack_charge: dict[str, Any] = {}
+
+    initial = _effect_int_field(effect_record, "effInitialCharges")
+    if initial is not None:
+        stack_charge["initial"] = initial
+
+    maximum = _effect_int_field(effect_record, "effMaxCharges")
+    if maximum is not None:
+        stack_charge["max"] = maximum
+
+    nr_occurances = _effect_int_field(effect_record, "effStackLimit")
+    if nr_occurances is not None:
+        stack_charge["nr_occurances"] = nr_occurances
+
+    if _has_field(effect_record, "effScalesWithCharges"):
+        stack_charge["scales_with_stack_charge"] = bool(
+            _field_value(effect_record, "effScalesWithCharges")
+        )
+
     if _has_field(effect_record, "effStackLimitIsByTag"):
-        stack_limit["is_by_tag"] = bool(_field_value(effect_record, "effStackLimitIsByTag"))
+        stack_charge["is_by_tag"] = bool(
+            _field_value(effect_record, "effStackLimitIsByTag")
+        )
     if _has_field(effect_record, "effStackLimitIsByCaster"):
-        stack_limit["is_per_caster"] = bool(
+        stack_charge["is_per_caster"] = bool(
             _field_value(effect_record, "effStackLimitIsByCaster")
         )
 
@@ -664,11 +795,11 @@ def _effect_stack_limit(effect_record: NodeRecord) -> dict[str, Any] | None:
             if isinstance(entry, dict) and entry.get("value")
         ]
         if len(tag_keys) == 1:
-            stack_limit["relevant_tags"] = tag_keys[0]
+            stack_charge["relevant_tags"] = tag_keys[0]
         elif tag_keys:
-            stack_limit["relevant_tags"] = tag_keys
+            stack_charge["relevant_tags"] = tag_keys
 
-    return stack_limit
+    return stack_charge or None
 
 
 def _effect_has_meaningful_metadata(
@@ -676,27 +807,27 @@ def _effect_has_meaningful_metadata(
     tags: list[str] | None = None,
     duration: float | None = None,
     tick_interval: float | None = None,
-    stack_limit: dict[str, Any] | None = None,
+    stack_charge: dict[str, Any] | None = None,
 ) -> bool:
     return (
         bool(tags)
         or duration is not None
         or tick_interval is not None
-        or bool(stack_limit)
+        or bool(stack_charge)
     )
 
 
-def _merge_stack_limit_from_initializers(
-    stack_limit: dict[str, Any] | None,
+def _merge_stack_charge_from_initializers(
+    stack_charge: dict[str, Any] | None,
     branches: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
     for branch in branches:
         for initializer in branch.get("initializers", []):
-            if initializer.get("initializer_type") != "set_stack_limit":
+            if initializer.get("initializer_type") != "set_stack_charge_limit":
                 continue
-            merged = dict(stack_limit or {})
+            merged = dict(stack_charge or {})
             for key in (
-                "max_stack_count",
+                "nr_occurances",
                 "is_by_tag",
                 "is_per_caster",
                 "is_multi_target",
@@ -705,7 +836,7 @@ def _merge_stack_limit_from_initializers(
                 if key in initializer:
                     merged[key] = initializer[key]
             return merged
-    return stack_limit
+    return stack_charge
 
 
 def _effect_timing(effect_record: NodeRecord) -> tuple[float | None, float | None]:
@@ -775,16 +906,16 @@ def _branch_conditions(
     branch: list[dict[str, Any]],
     *,
     id_to_fqn: dict[str, str] | None = None,
-    is_first_branch: bool = False,
-) -> tuple[bool, dict[str, Any] | None]:
+    context: str | None = None,
+) -> tuple[ElseMarker | None, dict[str, Any] | None]:
     conditions_raw = _sub_effect_field(branch, "effConditions")
-    logic_raw = _sub_effect_field(branch, "effConditionLogic")
+    postfix_raw = _sub_effect_field(branch, "effPostfixElements")
 
     if not isinstance(conditions_raw, list):
         conditions_raw = []
 
     kept_conditions: dict[str, list[dict[str, Any]]] = {}
-    is_else = False
+    marker: ElseMarker | None = None
     for entry in conditions_raw:
         if not isinstance(entry, dict):
             continue
@@ -793,39 +924,48 @@ def _branch_conditions(
         if not isinstance(value, list):
             continue
         fields = _condition_fields(value)
-        condition_name = fields.get("effConditionName")
-        if _is_else_condition(condition_name):
-            if condition_name == "effCondition_Else" or not is_first_branch:
-                is_else = True
+        condition_marker = _else_marker_from_fields(fields)
+        if condition_marker is not None:
+            marker = condition_marker
             continue
-        if _should_drop_condition(condition_name):
+        if _should_drop_condition(fields.get("effConditionName")):
             continue
         kept_conditions[key] = value
 
     if not kept_conditions:
-        return is_else, None
+        return marker, None
 
     decoded_list = [
         decoded
         for condition_id, entry in sorted(kept_conditions.items())
-        if (decoded := _decode_condition(condition_id, entry, id_to_fqn=id_to_fqn))
+        if (
+            decoded := _decode_condition(
+                condition_id,
+                entry,
+                id_to_fqn=id_to_fqn,
+                context=context,
+            )
+        )
         is not None
     ]
     if not decoded_list:
-        return is_else, None
+        return marker, None
 
     valid_ids = {item["id"] for item in decoded_list}
 
     logic: dict[str, Any] | None = None
-    if isinstance(logic_raw, dict):
-        logic_list = logic_raw.get("list")
-        if isinstance(logic_list, list) and logic_list:
+    if isinstance(postfix_raw, dict):
+        postfix_list = postfix_raw.get("list")
+        if isinstance(postfix_list, list) and postfix_list:
             logic = _filter_condition_logic(
-                _decode_condition_logic(logic_list),
+                _decode_condition_logic(postfix_list),
                 valid_ids,
             )
 
-    return is_else, _finalize_conditions({"list": decoded_list, "logic": logic})
+    return marker, _finalize_conditions(
+        {"list": decoded_list, "logic": logic},
+        context=context,
+    )
 
 
 def _decode_action(
@@ -1104,7 +1244,7 @@ def _prune_dropped_effect_references(
                 tags=effect.get("tags"),
                 duration=effect.get("duration"),
                 tick_interval=effect.get("tick_interval"),
-                stack_limit=effect.get("stack_limit"),
+                stack_charge=effect.get("stack_charge"),
             ):
                 updated_effect = dict(effect)
                 updated_effect["branches"] = []
@@ -1177,13 +1317,13 @@ def _decode_initializer(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
 
     if initializer_name == "effInitializer_SetStackLimit":
         decoded: dict[str, Any] = {
-            "initializer_type": "set_stack_limit",
+            "initializer_type": "set_stack_charge_limit",
             "is_by_tag": bool(bool_params.get("effParam_IsByTag", False)),
             "is_per_caster": bool(bool_params.get("effParam_IsPerCaster", False)),
             "is_multi_target": bool(bool_params.get("effParam_IsMultiTarget", False)),
         }
         if "effParam_MaxStackCount" in int_params:
-            decoded["max_stack_count"] = _int_param(int_params, "effParam_MaxStackCount")
+            decoded["nr_occurances"] = _int_param(int_params, "effParam_MaxStackCount")
         relevant_tags = string_params.get("effParam_RelevantTags")
         if isinstance(relevant_tags, str) and relevant_tags:
             decoded["relevant_tags"] = relevant_tags
@@ -1284,19 +1424,21 @@ def _decode_branch(
     branch: list[dict[str, Any]],
     effect_tags: set[str],
     *,
+    index: int,
+    gate: list[int] | None = None,
     effect_duration: float | None = None,
     effect_tick_interval: float | None = None,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
-    is_first_branch: bool = False,
+    context: str | None = None,
 ) -> dict[str, Any] | None:
     if _is_redundant_self_aoe_branch(branch, effect_tags):
         return None
 
-    is_else, conditions = _branch_conditions(
+    _marker, conditions = _branch_conditions(
         branch,
         id_to_fqn=id_to_fqn,
-        is_first_branch=is_first_branch,
+        context=context,
     )
     actions = _branch_actions(
         branch,
@@ -1309,9 +1451,9 @@ def _decode_branch(
     if not actions and conditions is None:
         return None
 
-    decoded: dict[str, Any] = {}
-    if is_else:
-        decoded["else"] = True
+    decoded: dict[str, Any] = {"index": index}
+    if gate:
+        decoded["run_if_none_ran"] = gate
     if conditions is not None:
         decoded["conditions"] = conditions
     if initializers:
@@ -1340,18 +1482,28 @@ def _decode_effect(
     tags = _effect_tags(effect_record)
     tag_set = set(tags)
     duration, tick_interval = _effect_timing(effect_record)
-    stack_limit = _effect_stack_limit(effect_record)
+    stack_charge = _effect_stack_charge(effect_record)
+
+    sub_effects = _sub_effects(effect_record)
+    markers_by_index: dict[int, list[ElseMarker]] = {}
+    for raw_index, branch in enumerate(sub_effects, start=1):
+        markers = _branch_else_markers(branch)
+        if markers:
+            markers_by_index[raw_index] = markers
+    gates = _resolve_run_if_none_ran(markers_by_index)
 
     branches: list[dict[str, Any]] = []
-    for branch_index, branch in enumerate(_sub_effects(effect_record)):
+    for raw_index, branch in enumerate(sub_effects, start=1):
         decoded_branch = _decode_branch(
             branch,
             tag_set,
+            index=raw_index,
+            gate=gates.get(raw_index),
             effect_duration=duration,
             effect_tick_interval=tick_interval,
             id_to_fqn=id_to_fqn,
             standard_rating=standard_rating,
-            is_first_branch=branch_index == 0,
+            context=f"{effect_record.entry.fqn} sub-effect {raw_index}",
         )
         if decoded_branch is not None:
             branches.append(decoded_branch)
@@ -1360,11 +1512,11 @@ def _decode_effect(
         tags=tags,
         duration=duration,
         tick_interval=tick_interval,
-        stack_limit=stack_limit,
+        stack_charge=stack_charge,
     ):
         return None
 
-    stack_limit = _merge_stack_limit_from_initializers(stack_limit, branches)
+    stack_charge = _merge_stack_charge_from_initializers(stack_charge, branches)
 
     decoded: dict[str, Any] = {
         "number": number,
@@ -1373,8 +1525,8 @@ def _decode_effect(
     }
     if tags:
         decoded["tags"] = tags
-    if stack_limit:
-        decoded["stack_limit"] = stack_limit
+    if stack_charge:
+        decoded["stack_charge"] = stack_charge
     if duration is not None:
         decoded["duration"] = duration
     if tick_interval is not None:
