@@ -53,14 +53,8 @@ class DamageHit(Event):
         calls for proc evaluation."""
         final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
 
-        impact_delay = self.action_data.get("impact_delay", 0.0)
-        if impact_delay > 0.0:
-            sim.schedule_relative(impact_delay, ApplyDamageLand(
-                self.source, self.target, final_damage, is_crit, self.ability_name
-            ))
-        else: #no scheduling as it lands immediately, don't want another even scheduled for the same time to skip ahead
-            instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
-            instant_land.resolve(sim)
+        instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
+        instant_land.resolve(sim)
 
         tags = frozenset(self.action_data.get("tags", []))
         self.evaluate_on_hit_procs(sim, is_crit, tags)
