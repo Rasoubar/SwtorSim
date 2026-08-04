@@ -251,9 +251,17 @@ def _resolve_enum_value(
     return gom.enum_member(resolved_type, index)
 
 
-def _resolve_id_name(id_str: Any, store: BucketStore) -> Any:
+def _resolve_id_name(
+    id_str: Any,
+    store: BucketStore,
+    tag_resolver: TagResolver | None = None,
+) -> Any:
     entry = store.index.get(str(id_str))
-    return entry.fqn if entry else id_str
+    if entry:
+        return entry.fqn
+    if tag_resolver is not None:
+        return tag_resolver.resolve(id_str)
+    return id_str
 
 
 def _resolve_value(
@@ -267,7 +275,7 @@ def _resolve_value(
     dom_type: int | None = None,
 ) -> Any:
     if dom_type == DOM_ID and isinstance(value, str):
-        return _resolve_id_name(value, store)
+        return _resolve_id_name(value, store, tag_resolver)
 
     if field_id in STB_STRING_FIELD_BUCKETS and isinstance(value, str):
         text = strings.resolve(STB_STRING_FIELD_BUCKETS[field_id], value)
