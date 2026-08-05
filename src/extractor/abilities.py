@@ -13,6 +13,7 @@ from extractor.eff_triggers import (
     decode_trigger_name,
     load_trigger_labels,
 )
+from extractor.mod_stats import decode_stat_name, get_stat_labels
 from extractor.graph import NodeRecord
 from extractor.naming import normalize_stack_charge
 
@@ -1028,7 +1029,10 @@ def _decode_action(
     if action_name == "effAction_ModifyStat":
         decoded = {
             "action_type": "modify_stat",
-            "stat": _int_param(int_params, "effParam_Stat"),
+            "stat": decode_stat_name(
+                _int_param(int_params, "effParam_Stat"),
+                get_stat_labels(),
+            ),
             "amount_percent": _float_param(float_params, "effParam_AmountPercent"),
             "amount_min": _float_param(float_params, "effParam_AmountMin"),
             "amount_max": _float_param(float_params, "effParam_AmountMax"),
