@@ -99,6 +99,8 @@ One file per root `abl.*` node with base class `ablAbility`:
 {"fqn": "abl.agent.adrenaline_probe", "name": "Adrenaline Probe", "cooldown": 120.0}
 ```
 
+`modify_stat` actions store `stat` as the `modStatEnum` member name string (e.g. `"STAT_rtg_armor"`), resolved from `client.gom` during parsing.
+
 ### Talents (`data/parsed/tal/`)
 
 One file per root `tal.*` node with base class `talTalent`:
