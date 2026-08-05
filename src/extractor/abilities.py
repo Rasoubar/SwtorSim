@@ -1003,10 +1003,14 @@ def _decode_action(
             decoded["flurry_min"] = _int_param(int_params, "effParam_FlurryBlowsMin")
         if "effParam_FlurryBlowsMax" in int_params:
             decoded["flurry_max"] = _int_param(int_params, "effParam_FlurryBlowsMax")
+        if "effParam_HealthStealPercentage" in float_params:
+            decoded["health_steal_percent"] = _float_param(
+                float_params, "effParam_HealthStealPercentage"
+            )
         return decoded
 
     if action_name == "effAction_SpellDamage":
-        return {
+        decoded = {
             "action_type": "damage",
             "attack_type": 3,
             "damage_type": _int_param(int_params, "effParam_DamageType"),
@@ -1015,6 +1019,11 @@ def _decode_action(
             "shp_min": _float_param(float_params, "effParam_StandardHealthPercentMin"),
             "shp_max": _float_param(float_params, "effParam_StandardHealthPercentMax"),
         }
+        if "effParam_HealthStealPercentage" in float_params:
+            decoded["health_steal_percent"] = _float_param(
+                float_params, "effParam_HealthStealPercentage"
+            )
+        return decoded
 
     if action_name == "effAction_ModifyStat":
         decoded = {
