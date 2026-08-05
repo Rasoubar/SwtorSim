@@ -42,6 +42,44 @@ LOGIC_OP_LABELS: dict[str, str] = {
     "effLogicOpAnd": "and",
 }
 
+# effTargetOverrideEnum members from client.gom (1-based index → snake_case).
+TARGET_OVERRIDE_LABELS: dict[str, str] = {
+    "1": "invalid",
+    "2": "caster",
+    "3": "aoe_sphere",
+    "4": "primary_target",
+    "5": "aoe_cone",
+    "6": "pet",
+    "7": "master",
+    "8": "companion",
+    "9": "all_aura_occupants",
+    "10": "attacker",
+    "11": "defender",
+    "12": "enemies_list",
+    "13": "owner",
+    "14": "aura_occupant",
+    "15": "aoe_cylinder",
+    "16": "attackers_list",
+    "17": "projectile_hit_target",
+    "18": "random_enemy",
+    "19": "trigger_target",
+    "20": "trigger_caster",
+    "21": "party_members",
+    "22": "raid_members",
+    "23": "space_sphere",
+    "24": "warzone_team",
+    "25": "containing_control_point",
+}
+
+# SortType int values on target overrides. Only 1 and 6 appear in extracted
+# data; labels confirmed against Jedipedia / in-game behavior (e.g. ion_pulse
+# SortType=1 → Closest, volt_rush effect 5 SortType=6 → Least Health).
+# These do not match 1-based ordinals of aoeTargetSortTypeEnum in client.gom.
+AOE_TARGET_SORT_LABELS: dict[str, str] = {
+    "1": "closest",
+    "6": "least_health",
+}
+
 
 def _field_value(record: NodeRecord, name: str) -> Any:
     for field in record.resolved_fields:
@@ -62,10 +100,18 @@ def _float_field(record: NodeRecord, name: str) -> float | None:
 
 
 def _snake_case(name: str) -> str:
-    for prefix in ("effParam_", "effCondition_", "effAction_", "effTrigger_"):
+    for prefix in (
+        "effParam_",
+        "effCondition_",
+        "effAction_",
+        "effTrigger_",
+        "effTargetOverride_",
+    ):
         if name.startswith(prefix):
             name = name[len(prefix) :]
             break
+    if name.startswith("_UNUSED_"):
+        name = name[len("_UNUSED_") :]
     s1 = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", name)
     s2 = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1)
     return normalize_stack_charge(s2.lower())
@@ -580,8 +626,14 @@ def _decode_condition_logic(logic_list: list[Any]) -> dict[str, Any] | None:
         if not isinstance(entry, list):
             continue
         fields = _logic_entry_fields(entry)
-        logic_type = fields.get("effConditionLogicType")
-        logic_value = fields.get("effConditionLogicValue")
+        # Extracted nodes store postfix RPN as effPostfixElement*; keep the
+        # legacy effConditionLogic* names as a fallback for older dumps.
+        logic_type = fields.get("effPostfixElementType") or fields.get(
+            "effConditionLogicType"
+        )
+        logic_value = fields.get("effPostfixElementId")
+        if logic_value is None:
+            logic_value = fields.get("effConditionLogicValue")
         if logic_type in LOGIC_OP_LABELS:
             if len(stack) < 2:
                 continue
@@ -809,34 +861,39 @@ def _effect_has_meaningful_metadata(
     duration: float | None = None,
     tick_interval: float | None = None,
     stack_charge: dict[str, Any] | None = None,
+    conditions: dict[str, Any] | None = None,
+    target_overrides: list[dict[str, Any]] | None = None,
+    initializers: list[dict[str, Any]] | None = None,
 ) -> bool:
     return (
         bool(tags)
         or duration is not None
         or tick_interval is not None
         or bool(stack_charge)
+        or conditions is not None
+        or bool(target_overrides)
+        or bool(initializers)
     )
 
 
 def _merge_stack_charge_from_initializers(
     stack_charge: dict[str, Any] | None,
-    branches: list[dict[str, Any]],
+    initializers: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
-    for branch in branches:
-        for initializer in branch.get("initializers", []):
-            if initializer.get("initializer_type") != "set_stack_charge_limit":
-                continue
-            merged = dict(stack_charge or {})
-            for key in (
-                "nr_occurances",
-                "is_by_tag",
-                "is_per_caster",
-                "is_multi_target",
-                "relevant_tags",
-            ):
-                if key in initializer:
-                    merged[key] = initializer[key]
-            return merged
+    for initializer in initializers:
+        if initializer.get("initializer_type") != "set_stack_charge_limit":
+            continue
+        merged = dict(stack_charge or {})
+        for key in (
+            "nr_occurances",
+            "is_by_tag",
+            "is_per_caster",
+            "is_multi_target",
+            "relevant_tags",
+        ):
+            if key in initializer:
+                merged[key] = initializer[key]
+        return merged
     return stack_charge
 
 
@@ -1258,6 +1315,9 @@ def _prune_dropped_effect_references(
                 duration=effect.get("duration"),
                 tick_interval=effect.get("tick_interval"),
                 stack_charge=effect.get("stack_charge"),
+                conditions=effect.get("conditions"),
+                target_overrides=effect.get("target_overrides"),
+                initializers=effect.get("initializers"),
             ):
                 updated_effect = dict(effect)
                 updated_effect["branches"] = []
@@ -1385,6 +1445,123 @@ def _branch_initializers(branch: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return initializers
 
 
+def _decode_aoe_target_sort(raw: Any) -> str:
+    key = str(raw)
+    label = AOE_TARGET_SORT_LABELS.get(key)
+    if label is not None:
+        return label
+    if key.startswith("aoeTargetSort_"):
+        return _snake_case(key[len("aoeTargetSort_") :])
+    return f"sort_{key}"
+
+
+def _decode_target_override_type(raw: Any) -> str:
+    key = str(raw)
+    label = TARGET_OVERRIDE_LABELS.get(key)
+    if label is not None:
+        return label
+    if key.startswith("effTargetOverride_"):
+        return _snake_case(key)
+    return f"override_{key}"
+
+
+def _decode_target_override(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
+    fields = _entry_fields(entry)
+    override_name = fields.get("effTargetOverrideName")
+    if override_name is None:
+        return None
+
+    params = _action_param_dicts(entry)
+    decoded: dict[str, Any] = {"type": _decode_target_override_type(override_name)}
+
+    for key, value in params["bool"].items():
+        decoded[_snake_case(str(key))] = bool(value)
+    for key, value in params["int"].items():
+        param_key = _snake_case(str(key))
+        if param_key == "sort_type":
+            decoded[param_key] = _decode_aoe_target_sort(value)
+        elif str(value).lstrip("-").isdigit():
+            decoded[param_key] = int(value)
+    for key, value in params["float"].items():
+        if isinstance(value, (int, float)):
+            decoded[_snake_case(str(key))] = float(value)
+    for key, value in params["string"].items():
+        if isinstance(value, str) and value:
+            decoded[_snake_case(str(key))] = value
+
+    return decoded
+
+
+def _branch_target_overrides(branch: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    overrides_raw = _sub_effect_field(branch, "effTargetOverrides")
+    if not isinstance(overrides_raw, dict):
+        return []
+    override_list = overrides_raw.get("list")
+    if not isinstance(override_list, list):
+        return []
+
+    decoded: list[dict[str, Any]] = []
+    for entry in override_list:
+        if not isinstance(entry, list):
+            continue
+        override = _decode_target_override(entry)
+        if override is not None:
+            decoded.append(override)
+    return decoded
+
+
+def _non_stack_initializers(
+    initializers: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    return [
+        initializer
+        for initializer in initializers
+        if initializer.get("initializer_type") != "set_stack_charge_limit"
+    ]
+
+
+def _hoist_effect_header(
+    header: list[dict[str, Any]],
+    *,
+    id_to_fqn: dict[str, str] | None = None,
+    standard_rating: float | None = None,
+    context: str,
+) -> tuple[
+    dict[str, Any] | None,
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+]:
+    """Lift sub-effect 1 (effect gate / targeting) out of the branch list."""
+    actions = _branch_actions(
+        header,
+        id_to_fqn=id_to_fqn,
+        standard_rating=standard_rating,
+    )
+    if actions:
+        print(
+            f"Warning: {context} sub-effect 1 has {len(actions)} action(s); "
+            f"expected effect header with no actions",
+            file=sys.stderr,
+        )
+
+    triggers = _branch_triggers(header, id_to_fqn=id_to_fqn)
+    if triggers:
+        print(
+            f"Warning: {context} sub-effect 1 has {len(triggers)} trigger(s); "
+            f"expected effect header with no triggers",
+            file=sys.stderr,
+        )
+
+    _marker, conditions = _branch_conditions(
+        header,
+        id_to_fqn=id_to_fqn,
+        context=f"{context} sub-effect 1",
+    )
+    target_overrides = _branch_target_overrides(header)
+    initializers = _branch_initializers(header)
+    return conditions, target_overrides, initializers
+
+
 def _is_redundant_self_aoe_branch(
     branch: list[dict[str, Any]],
     effect_tags: set[str],
@@ -1460,8 +1637,9 @@ def _decode_branch(
     )
     triggers = _branch_triggers(branch, id_to_fqn=id_to_fqn)
     initializers = _branch_initializers(branch)
+    target_overrides = _branch_target_overrides(branch)
 
-    if not actions and conditions is None:
+    if not actions and conditions is None and not target_overrides:
         return None
 
     decoded: dict[str, Any] = {"index": index}
@@ -1469,6 +1647,8 @@ def _decode_branch(
         decoded["run_if_none_ran"] = gate
     if conditions is not None:
         decoded["conditions"] = conditions
+    if target_overrides:
+        decoded["target_overrides"] = target_overrides
     if initializers:
         decoded["initializers"] = initializers
     if actions:
@@ -1498,15 +1678,33 @@ def _decode_effect(
     stack_charge = _effect_stack_charge(effect_record)
 
     sub_effects = _sub_effects(effect_record)
+    effect_conditions: dict[str, Any] | None = None
+    effect_target_overrides: list[dict[str, Any]] = []
+    header_initializers: list[dict[str, Any]] = []
+    if sub_effects:
+        effect_conditions, effect_target_overrides, header_initializers = (
+            _hoist_effect_header(
+                sub_effects[0],
+                id_to_fqn=id_to_fqn,
+                standard_rating=standard_rating,
+                context=effect_record.entry.fqn,
+            )
+        )
+
     markers_by_index: dict[int, list[ElseMarker]] = {}
     for raw_index, branch in enumerate(sub_effects, start=1):
+        if raw_index == 1:
+            continue
         markers = _branch_else_markers(branch)
         if markers:
             markers_by_index[raw_index] = markers
     gates = _resolve_run_if_none_ran(markers_by_index)
 
     branches: list[dict[str, Any]] = []
+    branch_initializers: list[dict[str, Any]] = []
     for raw_index, branch in enumerate(sub_effects, start=1):
+        if raw_index == 1:
+            continue
         decoded_branch = _decode_branch(
             branch,
             tag_set,
@@ -1520,22 +1718,36 @@ def _decode_effect(
         )
         if decoded_branch is not None:
             branches.append(decoded_branch)
+            branch_initializers.extend(decoded_branch.get("initializers", []))
+
+    effect_initializers = _non_stack_initializers(header_initializers)
+    stack_charge = _merge_stack_charge_from_initializers(
+        stack_charge,
+        header_initializers + branch_initializers,
+    )
 
     if not branches and not _effect_has_meaningful_metadata(
         tags=tags,
         duration=duration,
         tick_interval=tick_interval,
         stack_charge=stack_charge,
+        conditions=effect_conditions,
+        target_overrides=effect_target_overrides,
+        initializers=effect_initializers,
     ):
         return None
-
-    stack_charge = _merge_stack_charge_from_initializers(stack_charge, branches)
 
     decoded: dict[str, Any] = {
         "number": number,
         "entry": not _effect_has_if_called_by_effect(effect_record),
         "branches": branches,
     }
+    if effect_conditions is not None:
+        decoded["conditions"] = effect_conditions
+    if effect_target_overrides:
+        decoded["target_overrides"] = effect_target_overrides
+    if effect_initializers:
+        decoded["initializers"] = effect_initializers
     if tags:
         decoded["tags"] = tags
     if stack_charge:
