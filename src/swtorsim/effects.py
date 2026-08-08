@@ -23,11 +23,11 @@ class ActiveEffect:
     """Represents an active buff or debuff instance applied to an entity."""
     __slots__ = [
         'id', 'effect_name', 'stat_name', 'value', 'expires_at', 'source_ability', 'required_tags', 'charges', 'consumable_charges',
-        'max_charges','target_hp_threshold',"stack_values"]
+        'max_charges','target_hp_threshold',"stack_values", "required_damage_type"]
 
     def __init__(self, id_num, effect_name, stat_name, value, expires_at, source_ability,
                  required_tags=None, charges=None, consumable_charges=None, max_charges = None, target_hp_threshold = None,
-                 stack_values = None):
+                 stack_values = None, required_damage_type = None):
         self.id = id_num
         self.effect_name = effect_name
         self.stat_name = stat_name
@@ -40,6 +40,7 @@ class ActiveEffect:
         self.max_charges = max_charges
         self.target_hp_threshold = target_hp_threshold
         self.stack_values = stack_values
+        self.required_damage_type = required_damage_type
 
     def consume_charge(self, count: int = 1) -> bool:
         """ Consumes N charges/consumable charges from the effect. Returns bool on if it has reached 0 charges."""
@@ -47,6 +48,7 @@ class ActiveEffect:
             return False
         self.consumable_charges = max(0, self.consumable_charges - count)
         return self.consumable_charges == 0
+
 
     @classmethod
     def from_action(cls, action: dict, stat_name: str, effect_key: str,
@@ -65,7 +67,8 @@ class ActiveEffect:
             consumable_charges=action.get("consumable_charges"),
             max_charges=action.get("max_charges"),
             target_hp_threshold=action.get("target_hp_threshold"),
-            stack_values=action.get("stack_values")
+            stack_values=action.get("stack_values"),
+            required_damage_type=action.get("required_damage_type", None)
         )
 
     @classmethod
@@ -83,7 +86,8 @@ class ActiveEffect:
             charges=1,
             consumable_charges=None,
             max_charges=1,
-            target_hp_threshold=data.get("target_hp_threshold")
+            target_hp_threshold=data.get("target_hp_threshold"),
+            required_damage_type=data.get("required_damage_type", None)
         )
 
 

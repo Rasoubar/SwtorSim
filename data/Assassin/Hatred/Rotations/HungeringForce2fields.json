@@ -204,10 +204,6 @@
         }
     },
     {
-        "type": "fixed",
-        "ability_id": "death_field"
-    },
-    {
         "type": "optional",
         "ability_id": "recklessness",
         "rules": {}
@@ -247,6 +243,10 @@
         ]
     },
     {
+        "type": "fixed",
+        "ability_id": "death_field"
+    },
+    {
         "type": "priority_block",
         "name": "dots",
         "pool": [
@@ -283,12 +283,6 @@
         "name": "FillerPriority",
         "pool": [
 			{"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
-            {
-                "ability_id": "leeching_strike",
-                "rules": {
-                    "exact_dot_amount": 3
-                }
-            },
             {
                 "ability_id": "assassinate",
                 "rules": {}

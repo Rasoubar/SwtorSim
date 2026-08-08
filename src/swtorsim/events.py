@@ -64,7 +64,6 @@ class DamageHit(Event):
         for proc in self.source.procs.values():
             if not self.hit_proc_can_trigger(proc, sim, is_crit, tags):
                 continue
-            print(f'[{sim.current_time}] Proc {proc.name} triggered')
             self._trigger_proc_effects(proc, sim)
 
     def hit_proc_can_trigger(self, proc, sim, is_crit: bool, tags) -> bool:
@@ -237,7 +236,6 @@ class ResourceGainEvent(Event):
 
     def resolve(self, sim):
         """Adds the resource value to the resource pool."""
-        print(f'[{sim.current_time:.2f}s] Gained {self.amount} {self.player.resource.pool_type}')
         self.player.resource.generate(self.amount)
 
 class ChargeRestoreEvent(Event):

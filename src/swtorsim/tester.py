@@ -10,7 +10,7 @@ from src.swtorsim.setup import prepare_simulation
 
 
 class Tester:
-    def __init__(self, rotation_config, stats_config, abilities_db, procs_db, buffs_db, duration, dummy_hp):
+    def __init__(self, rotation_config, stats_config, abilities_db, procs_db, buffs_db, duration, dummy_hp, debuff_module):
         self.rotation_config = rotation_config
         self.stats_config = stats_config
         self.abilities_db = abilities_db
@@ -18,12 +18,13 @@ class Tester:
         self.buffs_db = buffs_db
         self.duration = duration
         self.dummy_hp = dummy_hp
+        self.debuff_module = debuff_module
 
     def run_test(self):
         """Orchestrates a single simulation"""
         print(f"--- Starting Single Test Run ({self.duration}s) ---")
 
-        sim, player, target = prepare_simulation(self.rotation_config, self.stats_config, self.abilities_db, self.procs_db, self.buffs_db, self.dummy_hp)
+        sim, player, target = prepare_simulation(self.rotation_config, self.stats_config, self.abilities_db, self.procs_db, self.buffs_db, self.dummy_hp, self.debuff_module)
 
         sim.run_timed(duration=self.duration, target=target)
         sim.tracker.print_metrics(sim.current_time)
@@ -46,7 +47,7 @@ class Tester:
 
         task_payloads = [
             (i, self.duration, self.dummy_hp, self.rotation_config, self.stats_config,
-             self.abilities_db, self.procs_db, self.buffs_db)
+             self.abilities_db, self.procs_db, self.buffs_db, self.debuff_module)
             for i in range(iterations)
         ]
 
@@ -61,13 +62,13 @@ class Tester:
     @staticmethod
     def execute_single_worker_task(args):
         """Single simulation for monte carlo"""
-        run_id, duration, dummy_hp, rotation_config, stats_config, abilities_db, procs_db, buffs_db = args
+        run_id, duration, dummy_hp, rotation_config, stats_config, abilities_db, procs_db, buffs_db, debuff_module = args
         old_stdout = sys.stdout
         sys.stdout = open(os.devnull, 'w')
 
         try:
             sim, player, target = prepare_simulation(rotation_config, stats_config, abilities_db, procs_db, buffs_db,
-                                                     dummy_hp)
+                                                     dummy_hp, debuff_module)
             sim.run_timed(duration, target)
 
             elapsed_time = sim.current_time

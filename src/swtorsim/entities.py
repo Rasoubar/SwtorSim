@@ -16,11 +16,10 @@ class Entity:
     def apply_effect(self, action: dict, source_name: str, current_time): #can be improved on the refresh
         """Applies or refreshes an active effect, calculates expiration, and triggers stat updates if needed."""
         extracted_stat = self._get_stat_name(action.get("id"), source_name)
-
-        duration = self.scale_time_modifier(action["duration"]) if action.get("affected_by_cdr") else action["duration"]
-        expiration_timestamp = current_time + duration
-
         effect_key = action.get("effect_name", extracted_stat)
+        duration = self.scale_time_modifier(action["duration"]) if action.get("affected_by_cdr") else action["duration"]
+        expiration_timestamp = self._determine_duration(self.effects.get(effect_key),duration,current_time)
+
 
         current_charges = self._determine_charges(self.effects.get(effect_key), action.get("charges", 1))
 
@@ -45,6 +44,14 @@ class Entity:
         if existing_effect and existing_effect.max_charges is not None:
             return min(existing_effect.max_charges, existing_effect.charges + incoming_charges)
         return incoming_charges
+
+    @staticmethod
+    def _determine_duration(existing_effect, extra_duration, current_time):
+        """Calculates expiration time for an active effect."""
+        new_expires_at = current_time + extra_duration
+        if existing_effect and existing_effect.expires_at is not None:
+            return max(existing_effect.expires_at, new_expires_at)
+        return new_expires_at
 
     @staticmethod
     def _get_stat_name(action_id, source_name: str) -> str:
@@ -87,7 +94,6 @@ class Entity:
             print(f'Effects active:{self.effects}')
 
     def has_effect(self, effect_name):
-        print(f'TEST {effect_name} in {self.effects}')
         """Returns bool on whether effect is present in entity"""
         return effect_name in self.effects
 

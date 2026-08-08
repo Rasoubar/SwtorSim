@@ -4,6 +4,9 @@ EFFECTS = {
     0: {"stat_name": "PlaceHolder"},
     79: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
     386: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
+    384: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
+    370: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
+    376: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
     220: {"stat_name": "Damage Modifier", "modifier_bucket": "sub_30"},
     116: {"stat_name": "Critical Chance"},
     117: {"stat_name": "Critical Damage"},
@@ -20,7 +23,7 @@ EFFECTS = {
     64:{ "stat_name": "Base Cooldown Modifier"},
     154:{"stat_name": "Accuracy"},
     422:{"stat_name": "Ability Base Charges"},
-    48:{"stat:name": "Armor Rating"}
+    48:{"stat_name": "Armor Rating"}
 }
 def calculate_hit(caster, target, action_data):
     """Calculates the hit value of an action from a caster to a targe. Returns value and whether it was a crit"""
@@ -31,10 +34,9 @@ def calculate_hit(caster, target, action_data):
         damage_type = 1
     else:
         damage_type = action_data["damage_type"]
-    action_tags = action_data.get("tags", [])
 
     #calculate damage calculation modifiers
-    modifiers = handle_modifiers(caster, target, action_tags)
+    modifiers = handle_modifiers(caster, target, action_data)
 
     #calculate base damage from caster stats and action_data
     base_damage = calculate_base_damage(caster,action_data, attack_type)
@@ -47,7 +49,7 @@ def calculate_hit(caster, target, action_data):
 
     return int(post_crit_damage), is_crit
 
-def handle_modifiers(caster, target, action_tags):
+def handle_modifiers(caster, target, action_data):
     """Determines numeric modifiers to the hit. Both direct and that affect mitigation. Returns Modifiers dict"""
 
     """buckets are needed to handle buffs/debuffs that will affect total_multiplier in different ways.
@@ -62,8 +64,10 @@ def handle_modifiers(caster, target, action_tags):
     }
 
     #modify the modifiers with applicable target and caster buffs/debuffs
-    handle_caster_buffs(caster, target, action_tags, buckets, modifiers)
-    handle_target_debuffs(target, action_tags, buckets, modifiers)
+    action_tags = action_data.get("tags", [])
+    damage_type = action_data.get("damage_type", False)
+    handle_caster_buffs(caster, target, action_tags, damage_type, buckets, modifiers)
+    handle_target_debuffs(target, action_tags, damage_type, buckets, modifiers)
 
     #consume relevant charges. (this will be changed as it doesn't reflect the actual mechanism in the game)
     consume_charges(caster, target, action_tags)
@@ -73,7 +77,7 @@ def handle_modifiers(caster, target, action_tags):
 
     return modifiers
 
-def handle_caster_buffs(caster, target, action_tags, buckets, modifiers):
+def handle_caster_buffs(caster, target, action_tags, damage_type, buckets, modifiers):
     """ Alters modifiers dict according to buffs on caster."""
     for buff in caster.effects.values():
         if buff.id not in EFFECTS:
@@ -84,16 +88,22 @@ def handle_caster_buffs(caster, target, action_tags, buckets, modifiers):
             continue
         if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
             continue
-
+        if buff.required_damage_type is not None and buff.required_damage_type != damage_type:
+            continue
+        print(buff.effect_name)
         alter_modifier(buff,modifiers,buckets)
 
-def handle_target_debuffs(target, action_tags, buckets, modifiers):
+def handle_target_debuffs(target, action_tags, damage_type, buckets, modifiers):
     """ Alters modifiers dict according to debuffs on target."""
     for debuff in target.effects.values():
         if debuff.id not in EFFECTS:
             continue
         if debuff.required_tags is not None and not any(tag in action_tags for tag in debuff.required_tags):
             continue
+
+        if debuff.required_damage_type is not None and debuff.required_damage_type != damage_type:
+            continue
+        print(debuff.effect_name)
         alter_modifier(debuff,modifiers,buckets)
 
 def alter_modifier(effect, modifiers, buckets):
@@ -180,9 +190,8 @@ def calculate_base_damage(caster, action_data, attack_type):
 def handle_mitigation(caster, target, ability_damage, damage_type):
     """Determines if applicable, if so calculates and applies mitigation to damage value. Returns new damage value"""
     if damage_type in (1, 2):
-        armor = target.stats.get("armor", 17225)
+        armor = target.stats.get("Armor", 17225)
         total_armor_pen = caster.stats.get("Armor Penetration", 0.0)
-        print(f'ARMOR PEN IS {total_armor_pen}')
         effective_armor = armor * (1.0 - total_armor_pen)
         armor_dr = effective_armor / (effective_armor + 32000)
         ability_damage *= (1.0 - armor_dr)

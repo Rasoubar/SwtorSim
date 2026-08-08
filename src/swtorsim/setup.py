@@ -33,11 +33,13 @@ def schedule_periodic(player, target, sim):
             first_tick = random.uniform(0.0, interval)
             sim.schedule_absolute(first_tick, PeriodicProcTick(player, target, proc))
 
-def prepare_simulation(rotation_config, stats_config, abilities_db, procs_db, buffs_db, dummy_hp):
+def prepare_simulation(rotation_config, stats_config, abilities_db, procs_db, buffs_db, dummy_hp, debuff_module):
     """Sets up the simulation to be run by testers"""
     abilities_copy = copy.deepcopy(abilities_db)
     player = Player(stats_config.get("class_name", "Unknown"),abilities_copy)
     target = Dummy("Target Dummy", hp=dummy_hp)
+    target.effects = copy.deepcopy(debuff_module)
+    target.recalculate_stats()
     p_stats = player.base_stats
     for stat_key, stat_value in stats_config.get("stats", {}).items():
         p_stats[stat_key] = stat_value
