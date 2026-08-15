@@ -55,11 +55,17 @@ def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", si
 def check_target_hp_above(threshold: float, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
     return target.hp_ratio > threshold
 
-
 def check_caster_does_not_have_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     buff_list = [conditions] if isinstance(conditions, str) else conditions
     has_any_buff = any(caster.has_effect(b) for b in buff_list)
     return not has_any_buff
+
+def check_ability_cooldown_under(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
+    print(caster.cooldowns)
+    cooldown = caster.cooldowns.get(data["name"],0)
+    remaining_cooldown = cooldown - sim.current_time
+
+    return remaining_cooldown < data["value"]
 
 CONDITION_REGISTRY = {
     "target_hp_below_pct": check_target_hp,
@@ -74,7 +80,8 @@ CONDITION_REGISTRY = {
     "dot_absent": check_dot_absent,
     "target_hp_above_pct": check_target_hp_above,
     "proc_cooldown_above": check_proc_cooldown_above,
-    "caster_does_not_have_buff": check_caster_does_not_have_buff
+    "caster_does_not_have_buff": check_caster_does_not_have_buff,
+    "ability_cooldown_under": check_ability_cooldown_under
 }
 
 def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy", sim = None) -> bool:

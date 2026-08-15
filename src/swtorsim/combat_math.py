@@ -90,7 +90,6 @@ def handle_caster_buffs(caster, target, action_tags, damage_type, buckets, modif
             continue
         if buff.required_damage_type is not None and buff.required_damage_type != damage_type:
             continue
-        print(buff.effect_name)
         alter_modifier(buff,modifiers,buckets)
 
 def handle_target_debuffs(target, action_tags, damage_type, buckets, modifiers):
@@ -103,7 +102,6 @@ def handle_target_debuffs(target, action_tags, damage_type, buckets, modifiers):
 
         if debuff.required_damage_type is not None and debuff.required_damage_type != damage_type:
             continue
-        print(debuff.effect_name)
         alter_modifier(debuff,modifiers,buckets)
 
 def alter_modifier(effect, modifiers, buckets):
