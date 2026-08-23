@@ -23,6 +23,7 @@ Options:
 - `--force-hash-update` — re-download Jedipedia hash/name data
 - `--pts` — use PTS (`_test_`) archives instead of live
 - `--keep-work` — retain intermediate files in `data/extract_work/`
+- `--extract-icons` — extract referenced ability/effect icons from gfx TOR archives as PNG into `data/icons/`
 
 ## Pipeline
 
@@ -38,6 +39,7 @@ Options:
    - `talents.py`, `abilities.py` → `data/parsed/tal/`, `data/parsed/abl/`
    - `gear.py` → `data/gear_abilities_talents.json`
    - `relics.py` → `data/relics.json`
+   - `icons.py` (with `--extract-icons`) → `data/icons/*.png`
 
 ## Extraction graph
 
@@ -72,6 +74,7 @@ Three additional seed sources are always included:
 | `data/disciplines/<class>/<discipline>.json` | Trimmed discipline manifests (see below) |
 | `data/parsed/abl/...` | Trimmed root-ability JSON (`ablAbility` nodes only) |
 | `data/parsed/tal/...` | Trimmed talent JSON (`talTalent` nodes only) |
+| `data/icons/` | PNG ability/effect icons extracted with `--extract-icons` |
 | `data/gear_abilities_talents.json` | Item display name → implant ability/talent FQN lookup |
 | `data/relics.json` | Sorted list of root `abl.itm.relic.*.scales_with_item_rating` ability FQNs |
 
@@ -96,8 +99,15 @@ Each file contains:
 One file per root `abl.*` node with base class `ablAbility`:
 
 ```json
-{"fqn": "abl.agent.adrenaline_probe", "name": "Adrenaline Probe", "cooldown": 120.0}
+{
+  "fqn": "abl.agent.adrenaline_probe",
+  "name": "Adrenaline Probe",
+  "icon": "adrenalineprobe.png",
+  "cooldown": 120.0
+}
 ```
+
+`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`.
 
 `modify_stat` actions store `stat` as the `modStatEnum` member name string (e.g. `"STAT_rtg_armor"`), resolved from `client.gom` during parsing.
 
@@ -177,6 +187,7 @@ The extractor inverts the known `tag.*` strings published in Jedipedia's `fnv1a6
 | `dump.py` | Raw JSON dump and index writer |
 | `disciplines.py` | Discipline manifest builder |
 | `talents.py` / `abilities.py` | Trimmed talent and ability writers |
+| `icons.py` | Optional gfx-icon TOR extract and DDS→PNG conversion |
 | `gear.py` / `relics.py` | Gear lookup and relic list builders |
 | `tools/validate_workdir.py` | Validate an existing work dir without re-reading archives |
 

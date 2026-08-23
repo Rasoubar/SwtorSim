@@ -12,6 +12,7 @@ FNV1A64_JS_URL = (
 DATA_DIR = Path("data")
 WORK_DIR = Path("data/extract_work")
 OUTPUT_DIR = Path("data/extracted")
+ICONS_DIR = Path("data/icons")
 
 # FQN prefixes whose nodes are followed during combat graph traversal.
 COMBAT_FQN_PREFIXES = (
@@ -107,6 +108,7 @@ class ExtractorConfig:
     pts: bool = False
     keep_work_files: bool = False
     item_rating: int = DEFAULT_ITEM_RATING
+    extract_icons: bool = False
 
     @property
     def data_dir(self) -> Path:
@@ -115,6 +117,10 @@ class ExtractorConfig:
     @property
     def work_dir(self) -> Path:
         return WORK_DIR
+
+    @property
+    def icons_dir(self) -> Path:
+        return ICONS_DIR
 
     @property
     def output_dir(self) -> Path:
