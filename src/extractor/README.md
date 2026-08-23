@@ -88,8 +88,8 @@ One file per `dis.*` node, path derived from the FQN with the `dis.` prefix remo
 Each file contains:
 
 - `tab_name`, `package_name` — resolved discipline display names
-- `active_abilities` — union of abilities from the class base APC, style base APC, and discipline APC (including talents from `ablPackageTalentsList`), with ability-replacement rules applied
-- `skill_tree` — level → choice → ability FQN mapping from `disLevelToAbilities`
+- `active_abilities` — union of `ablPackageAbilitiesList` and `ablPackageTalentsList` from the class base APC (`apc.<origin>.base`), style base APC (`apc.<origin>.<style>.base`), and discipline APC, with ability-replacement rules applied. Proficiency, item, and legacy entries (`abl.player.proficiency.*`, `abl.itm.*`, `abl.legacy.*`) are omitted. The utility/mods APC from `disDisciplineUtilityPackageId` is used for replacements and the skill tree, not this baseline list.
+- `skill_tree` — level → choice → ability FQN mapping from `disDisciplineUnlockLevelToUtilityBits` and `disDisciplineUtilityBitToUnlockedAsset` (the mods/utility package choices)
 
 ### Abilities (`data/parsed/abl/`)
 
