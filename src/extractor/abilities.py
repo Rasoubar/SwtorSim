@@ -95,6 +95,12 @@ def _has_field(record: NodeRecord, name: str) -> bool:
     return any(field.get("name") == name for field in record.resolved_fields)
 
 
+def _ignore_alacrity(record: NodeRecord, name: str, *, default: bool) -> bool:
+    if _has_field(record, name):
+        return bool(_field_value(record, name))
+    return default
+
+
 def _float_field(record: NodeRecord, name: str) -> float | None:
     value = _field_value(record, name)
     if isinstance(value, (int, float)):
@@ -1842,6 +1848,12 @@ def _decode_effect(
         decoded["duration"] = duration
     if tick_interval is not None:
         decoded["tick_interval"] = tick_interval
+    if duration is not None or tick_interval is not None:
+        decoded["effIgnoreAlacrity"] = _ignore_alacrity(
+            effect_record,
+            "effIgnoreAlacrity",
+            default=False if tick_interval is not None else True,
+        )
     return decoded
 
 
@@ -1895,6 +1907,9 @@ def _build_ability_payload(
         payload["icon"] = icon
     payload["type"] = ability_type
     payload["cooldown"] = _cooldown(record)
+    payload["ablIgnoreAlacrity"] = _ignore_alacrity(
+        record, "ablIgnoreAlacrity", default=False
+    )
     payload["energy_cost"] = _energy_cost(record)
 
     if ability_type == "active":

@@ -103,11 +103,16 @@ One file per root `abl.*` node with base class `ablAbility`:
   "fqn": "abl.agent.adrenaline_probe",
   "name": "Adrenaline Probe",
   "icon": "adrenalineprobe.png",
-  "cooldown": 120.0
+  "cooldown": 120.0,
+  "ablIgnoreAlacrity": false
 }
 ```
 
 `icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`.
+
+`ablIgnoreAlacrity` sits immediately under `cooldown`. The GOM field is sparse (written only when `true`); when absent the parsed value is `false`.
+
+Effects that have `duration` and/or `tick_interval` include `effIgnoreAlacrity` as a sibling after those fields. The GOM field is likewise sparse. Defaults when it is absent: `false` if the effect has a `tick_interval` (DoT/HoT ticks scale with alacrity), `true` if it does not (buff duration does not). An explicit stored boolean overrides the default. Instant effects with neither timing field omit the flag.
 
 `modify_stat` actions store `stat` as the `modStatEnum` member name string (e.g. `"STAT_rtg_armor"`), resolved from `client.gom` during parsing.
 
