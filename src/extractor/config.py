@@ -93,6 +93,12 @@ STB_STRING_FIELD_BUCKETS: dict[str, str] = {
     "4611686359990757005": SKILL_TREES_STB_BUCKET,  # disDisciplineTabName
 }
 
+# Jedipedia: integer values under effParam_Results are this enum (1-based).
+RESULTS_ENUM_ID = "4611686018505192446"
+LOOKUP_LIST_VALUE_ENUM_BY_KEY: dict[str, str] = {
+    "effParam_Results": RESULTS_ENUM_ID,
+}
+
 
 @dataclass
 class ExtractorConfig:

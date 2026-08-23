@@ -101,6 +101,8 @@ One file per root `abl.*` node with base class `ablAbility`:
 
 `modify_stat` actions store `stat` as the `modStatEnum` member name string (e.g. `"STAT_rtg_armor"`), resolved from `client.gom` during parsing.
 
+Triggers may include `effResults` when `effParam_Results` lists Crit (`effResultCrit` only for now).
+
 ### Talents (`data/parsed/tal/`)
 
 One file per root `tal.*` node with base class `talTalent`:
@@ -135,7 +137,7 @@ Field values of DOM type `ID` are replaced with the referenced node's FQN when t
 
 `NodeRef` fields are resolved to `{ref_id, fqn, base_class}` objects.
 
-Enum fields are resolved to their GOM member names via `client.gom` and `gom.js`.
+Enum fields are resolved to their GOM member names via `client.gom` and `gom.js`. Integer lists keyed by `effParam_Results` are resolved the same way, using enum `4611686018505192446`.
 
 ## STB string resolution
 

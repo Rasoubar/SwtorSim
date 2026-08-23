@@ -19,6 +19,9 @@ from extractor.naming import normalize_stack_charge
 
 DEFAULT_BASE_GCD = 1.5
 
+CRIT_RESULT_NAME = "effResultCrit"
+CRIT_RESULT_TOKENS = frozenset({CRIT_RESULT_NAME, "32"})
+
 ACTOR_LABELS: dict[str, str] = {
     "2": "caster",
     "3": "target",
@@ -740,7 +743,27 @@ def _action_param_dicts(entry: list[dict[str, Any]]) -> dict[str, Any]:
         "string": _lookup_list_to_dict(fields.get("effStringParams")),
         "tags": _lookup_list_to_dict(fields.get("effFunctionTags")),
         "time_interval": _lookup_list_to_dict(fields.get("effTimeIntervalParams")),
+        "int_list": _lookup_list_to_dict(fields.get("effIntListParams")),
     }
+
+
+def _int_list_items(value: Any) -> list[str]:
+    if isinstance(value, dict):
+        items = value.get("list")
+    elif isinstance(value, list):
+        items = value
+    else:
+        return []
+    if not isinstance(items, list):
+        return []
+    return [str(item) for item in items]
+
+
+def _decode_eff_results(int_list_params: dict[str, Any]) -> list[str]:
+    tokens = _int_list_items(int_list_params.get("effParam_Results"))
+    if any(token in CRIT_RESULT_TOKENS for token in tokens):
+        return [CRIT_RESULT_NAME]
+    return []
 
 
 def _raw_time_interval_seconds(value: Any) -> float | None:
@@ -1215,6 +1238,10 @@ def _decode_trigger(
     }
     if floats:
         decoded["floats"] = floats
+
+    eff_results = _decode_eff_results(params["int_list"])
+    if eff_results:
+        decoded["effResults"] = eff_results
 
     return decoded
 
