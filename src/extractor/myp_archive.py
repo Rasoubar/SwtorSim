@@ -129,6 +129,7 @@ def iter_archive_files(
     hash_dictionary: dict[int, str],
     *,
     path_filter: Callable[[str], bool] | None = None,
+    hash_filter: set[int] | None = None,
 ) -> Iterable[tuple[str, bytes]]:
     """Yield (hash_path, decompressed_bytes) for entries matching the filter."""
     with archive_path.open("rb") as stream:
@@ -146,6 +147,9 @@ def iter_archive_files(
                 if next_pos == 0:
                     break
                 if entry is None:
+                    stream.seek(next_pos)
+                    continue
+                if hash_filter is not None and entry.hash not in hash_filter:
                     stream.seek(next_pos)
                     continue
 

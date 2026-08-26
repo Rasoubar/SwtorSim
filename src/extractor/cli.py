@@ -22,6 +22,7 @@ from extractor.talents import build_talents
 from extractor.dump import write_node_dump
 from extractor.extract import extract_relevant_files
 from extractor.gear import build_gear_abilities_talents
+from extractor.icons import extract_ability_icons
 from extractor.relics import build_relics
 from extractor.standard_rating import (
     load_standard_rating_table,
@@ -82,6 +83,14 @@ def build_parser() -> argparse.ArgumentParser:
             f"(default: {DEFAULT_ITEM_RATING})"
         ),
     )
+    parser.add_argument(
+        "--extract-icons",
+        action="store_true",
+        help=(
+            "Extract referenced ability/effect icons from gfx TOR archives "
+            "and write PNGs to data/icons/"
+        ),
+    )
     return parser
 
 
@@ -96,7 +105,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     )
     tag_resolver = TagResolver.from_jedipedia_js(fnv1a64_js_path)
 
-    resources_root = extract_relevant_files(
+    resources_root, hash_dictionary = extract_relevant_files(
         config.assets_path,
         config.work_dir,
         config.data_dir,
@@ -169,11 +178,22 @@ def run_extraction(config: ExtractorConfig) -> Path:
         standard_rating_table,
         config.item_rating,
     )
-    ability_count = build_abilities(
+    ability_count, icon_stems = build_abilities(
         records,
         parsed_dir,
         standard_rating=standard_rating,
     )
+
+    icon_count = 0
+    if config.extract_icons:
+        icon_count = extract_ability_icons(
+            icon_stems,
+            assets_path=config.assets_path,
+            output_dir=config.icons_dir,
+            hash_dictionary=hash_dictionary,
+            pts=config.pts,
+            keep_work_dir=config.work_dir if config.keep_work_files else None,
+        )
 
     gear_path = config.data_dir / "gear_abilities_talents.json"
     gear_count = build_gear_abilities_talents(store, gom, strings, gear_path)
@@ -194,6 +214,8 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
     print(f"Wrote {talent_count} talent files to {parsed_dir / 'tal'}")
     print(f"Wrote {ability_count} ability files to {parsed_dir / 'abl'}")
+    if config.extract_icons:
+        print(f"Wrote {icon_count} icon files to {config.icons_dir}")
     print(
         f"Relic standard rating resolved for item rating {config.item_rating}: "
         f"{standard_rating}"
@@ -222,6 +244,7 @@ def main(argv: list[str] | None = None) -> int:
         pts=args.pts,
         keep_work_files=args.keep_work,
         item_rating=args.item_rating,
+        extract_icons=args.extract_icons,
     )
 
     try:

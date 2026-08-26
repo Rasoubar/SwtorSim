@@ -19,6 +19,9 @@ from extractor.naming import normalize_stack_charge
 
 DEFAULT_BASE_GCD = 1.5
 
+CRIT_RESULT_NAME = "effResultCrit"
+CRIT_RESULT_TOKENS = frozenset({CRIT_RESULT_NAME, "32"})
+
 ACTOR_LABELS: dict[str, str] = {
     "2": "caster",
     "3": "target",
@@ -92,11 +95,46 @@ def _has_field(record: NodeRecord, name: str) -> bool:
     return any(field.get("name") == name for field in record.resolved_fields)
 
 
+def _ignore_alacrity(record: NodeRecord, name: str, *, default: bool) -> bool:
+    if _has_field(record, name):
+        return bool(_field_value(record, name))
+    return default
+
+
 def _float_field(record: NodeRecord, name: str) -> float | None:
     value = _field_value(record, name)
     if isinstance(value, (int, float)):
         return float(value)
     return None
+
+
+def _icon_png_name(spec: Any) -> str | None:
+    if not isinstance(spec, str):
+        return None
+    spec = spec.strip()
+    if not spec:
+        return None
+    lower = spec.lower()
+    if lower.endswith(".png") or lower.endswith(".dds"):
+        spec = spec[: spec.rfind(".")]
+        if not spec:
+            return None
+    return f"{spec}.png"
+
+
+def icon_stems_from_payload(payload: dict[str, Any]) -> set[str]:
+    stems: set[str] = set()
+
+    def _add(name: Any) -> None:
+        png = _icon_png_name(name)
+        if png is not None:
+            stems.add(png[:-4])
+
+    _add(payload.get("icon"))
+    for effect in payload.get("effects") or []:
+        if isinstance(effect, dict):
+            _add(effect.get("icon"))
+    return stems
 
 
 def _snake_case(name: str) -> str:
@@ -740,7 +778,27 @@ def _action_param_dicts(entry: list[dict[str, Any]]) -> dict[str, Any]:
         "string": _lookup_list_to_dict(fields.get("effStringParams")),
         "tags": _lookup_list_to_dict(fields.get("effFunctionTags")),
         "time_interval": _lookup_list_to_dict(fields.get("effTimeIntervalParams")),
+        "int_list": _lookup_list_to_dict(fields.get("effIntListParams")),
     }
+
+
+def _int_list_items(value: Any) -> list[str]:
+    if isinstance(value, dict):
+        items = value.get("list")
+    elif isinstance(value, list):
+        items = value
+    else:
+        return []
+    if not isinstance(items, list):
+        return []
+    return [str(item) for item in items]
+
+
+def _decode_eff_results(int_list_params: dict[str, Any]) -> list[str]:
+    tokens = _int_list_items(int_list_params.get("effParam_Results"))
+    if any(token in CRIT_RESULT_TOKENS for token in tokens):
+        return [CRIT_RESULT_NAME]
+    return []
 
 
 def _raw_time_interval_seconds(value: Any) -> float | None:
@@ -1094,18 +1152,13 @@ def _decode_action(
             "amount_min": _float_param(float_params, "effParam_AmountMin"),
             "amount_max": _float_param(float_params, "effParam_AmountMax"),
         }
-        if standard_rating is not None and (
-            "effParam_StandardRatingPercentMin" in float_params
-            or "effParam_StandardRatingPercentMax" in float_params
-        ):
-            decoded["amount_min"] = (
-                _float_param(float_params, "effParam_StandardRatingPercentMin")
-                * standard_rating
-            )
-            decoded["amount_max"] = (
-                _float_param(float_params, "effParam_StandardRatingPercentMax")
-                * standard_rating
-            )
+        # Schema always includes StandardRatingPercent keys (often 0). Only
+        # rating-scaled actions (relics/adrenals) have a non-zero percent.
+        sr_min = _float_param(float_params, "effParam_StandardRatingPercentMin")
+        sr_max = _float_param(float_params, "effParam_StandardRatingPercentMax")
+        if standard_rating is not None and (sr_min != 0.0 or sr_max != 0.0):
+            decoded["amount_min"] = sr_min * standard_rating
+            decoded["amount_max"] = sr_max * standard_rating
         return decoded
 
     if action_name in {"effAction_RestoreForce", "effAction_RestoreEnergy"}:
@@ -1215,6 +1268,10 @@ def _decode_trigger(
     }
     if floats:
         decoded["floats"] = floats
+
+    eff_results = _decode_eff_results(params["int_list"])
+    if eff_results:
+        decoded["effResults"] = eff_results
 
     return decoded
 
@@ -1373,6 +1430,38 @@ def _branch_triggers(
         if isinstance(entry, list):
             triggers.append(_decode_trigger(entry, id_to_fqn=id_to_fqn))
     return triggers
+
+
+def _set_icon_spec_from_initializers(effect_record: NodeRecord) -> str | None:
+    for branch in _sub_effects(effect_record):
+        initializers_raw = _sub_effect_field(branch, "effInitializers")
+        if not isinstance(initializers_raw, dict):
+            continue
+        initializer_list = initializers_raw.get("list")
+        if not isinstance(initializer_list, list):
+            continue
+        for entry in initializer_list:
+            if not isinstance(entry, list):
+                continue
+            fields = _entry_fields(entry)
+            if fields.get("effInitializerName") != "effInitializer_SetIcon":
+                continue
+            string_params = _action_param_dicts(entry)["string"]
+            spec = string_params.get("effParam_IconSpec")
+            if not isinstance(spec, str) or not spec.strip():
+                raw = fields.get("effStringParams")
+                entries = raw.get("list") if isinstance(raw, dict) else raw
+                spec = _lookup_list_to_dict(entries).get("effParam_IconSpec")
+            if isinstance(spec, str) and spec.strip():
+                return spec.strip()
+    return None
+
+
+def _effect_icon_png(effect_record: NodeRecord) -> str | None:
+    png = _icon_png_name(_field_value(effect_record, "effIcon"))
+    if png is not None:
+        return png
+    return _icon_png_name(_set_icon_spec_from_initializers(effect_record))
 
 
 def _decode_initializer(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -1740,8 +1829,11 @@ def _decode_effect(
     decoded: dict[str, Any] = {
         "number": number,
         "entry": not _effect_has_if_called_by_effect(effect_record),
-        "branches": branches,
     }
+    icon = _effect_icon_png(effect_record)
+    if icon:
+        decoded["icon"] = icon
+    decoded["branches"] = branches
     if effect_conditions is not None:
         decoded["conditions"] = effect_conditions
     if effect_target_overrides:
@@ -1756,6 +1848,12 @@ def _decode_effect(
         decoded["duration"] = duration
     if tick_interval is not None:
         decoded["tick_interval"] = tick_interval
+    if duration is not None or tick_interval is not None:
+        decoded["effIgnoreAlacrity"] = _ignore_alacrity(
+            effect_record,
+            "effIgnoreAlacrity",
+            default=False if tick_interval is not None else True,
+        )
     return decoded
 
 
@@ -1803,10 +1901,16 @@ def _build_ability_payload(
     payload: dict[str, Any] = {
         "fqn": record.entry.fqn,
         "name": _ability_name(record),
-        "type": ability_type,
-        "cooldown": _cooldown(record),
-        "energy_cost": _energy_cost(record),
     }
+    icon = _icon_png_name(_field_value(record, "ablIconSpec"))
+    if icon:
+        payload["icon"] = icon
+    payload["type"] = ability_type
+    payload["cooldown"] = _cooldown(record)
+    payload["ablIgnoreAlacrity"] = _ignore_alacrity(
+        record, "ablIgnoreAlacrity", default=False
+    )
+    payload["energy_cost"] = _energy_cost(record)
 
     if ability_type == "active":
         triggers_gcd, base_gcd = _gcd_fields(record)
@@ -1837,13 +1941,14 @@ def build_abilities(
     output_dir: Path,
     *,
     standard_rating: float | None = None,
-) -> int:
+) -> tuple[int, set[str]]:
     """Build trimmed root-ability JSON files from extracted node records."""
     output_dir.mkdir(parents=True, exist_ok=True)
     records_by_fqn = {record.entry.fqn: record for record in records.values()}
     id_to_fqn = build_id_to_fqn(records)
 
     count = 0
+    icon_stems: set[str] = set()
     for record in records.values():
         if not record.entry.fqn.startswith("abl."):
             continue
@@ -1855,6 +1960,7 @@ def build_abilities(
             id_to_fqn=id_to_fqn,
             standard_rating=standard_rating,
         )
+        icon_stems |= icon_stems_from_payload(payload)
         dest = output_dir / fqn_to_relative_path(record.entry.fqn)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(
@@ -1862,4 +1968,4 @@ def build_abilities(
             encoding="utf-8",
         )
         count += 1
-    return count
+    return count, icon_stems
