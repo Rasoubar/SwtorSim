@@ -9,9 +9,10 @@ FNV1A64_JS_URL = (
     "https://swtor.jedipedia.net/static/js/reader/lib/fnv1a64.js"
 )
 
-DATA_DIR = Path("data/extractor")
-WORK_DIR = Path("data/extractor/extract_work")
-OUTPUT_DIR = Path("data/extractor/extracted")
+DATA_DIR = Path("data")
+WORK_DIR = Path("data/extract_work")
+OUTPUT_DIR = Path("data/extracted")
+ICONS_DIR = Path("data/icons")
 
 # FQN prefixes whose nodes are followed during combat graph traversal.
 COMBAT_FQN_PREFIXES = (
@@ -93,6 +94,12 @@ STB_STRING_FIELD_BUCKETS: dict[str, str] = {
     "4611686359990757005": SKILL_TREES_STB_BUCKET,  # disDisciplineTabName
 }
 
+# Jedipedia: integer values under effParam_Results are this enum (1-based).
+RESULTS_ENUM_ID = "4611686018505192446"
+LOOKUP_LIST_VALUE_ENUM_BY_KEY: dict[str, str] = {
+    "effParam_Results": RESULTS_ENUM_ID,
+}
+
 
 @dataclass
 class ExtractorConfig:
@@ -101,6 +108,7 @@ class ExtractorConfig:
     pts: bool = False
     keep_work_files: bool = False
     item_rating: int = DEFAULT_ITEM_RATING
+    extract_icons: bool = False
 
     @property
     def data_dir(self) -> Path:
@@ -109,6 +117,10 @@ class ExtractorConfig:
     @property
     def work_dir(self) -> Path:
         return WORK_DIR
+
+    @property
+    def icons_dir(self) -> Path:
+        return ICONS_DIR
 
     @property
     def output_dir(self) -> Path:

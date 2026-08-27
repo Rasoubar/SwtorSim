@@ -23,6 +23,7 @@ Options:
 - `--force-hash-update` — re-download Jedipedia hash/name data
 - `--pts` — use PTS (`_test_`) archives instead of live
 - `--keep-work` — retain intermediate files in `data/extract_work/`
+- `--extract-icons` — extract referenced ability/effect icons from gfx TOR archives as PNG into `data/icons/`
 
 ## Pipeline
 
@@ -38,6 +39,7 @@ Options:
    - `talents.py`, `abilities.py` → `data/parsed/tal/`, `data/parsed/abl/`
    - `gear.py` → `data/gear_abilities_talents.json`
    - `relics.py` → `data/relics.json`
+   - `icons.py` (with `--extract-icons`) → `data/icons/*.png`
 
 ## Extraction graph
 
@@ -72,6 +74,7 @@ Three additional seed sources are always included:
 | `data/disciplines/<class>/<discipline>.json` | Trimmed discipline manifests (see below) |
 | `data/parsed/abl/...` | Trimmed root-ability JSON (`ablAbility` nodes only) |
 | `data/parsed/tal/...` | Trimmed talent JSON (`talTalent` nodes only) |
+| `data/icons/` | PNG ability/effect icons extracted with `--extract-icons` |
 | `data/gear_abilities_talents.json` | Item display name → implant ability/talent FQN lookup |
 | `data/relics.json` | Sorted list of root `abl.itm.relic.*.scales_with_item_rating` ability FQNs |
 
@@ -88,18 +91,32 @@ One file per `dis.*` node, path derived from the FQN with the `dis.` prefix remo
 Each file contains:
 
 - `tab_name`, `package_name` — resolved discipline display names
-- `active_abilities` — union of abilities from the class base APC, style base APC, and discipline APC (including talents from `ablPackageTalentsList`), with ability-replacement rules applied
-- `skill_tree` — level → choice → ability FQN mapping from `disLevelToAbilities`
+- `active_abilities` — union of `ablPackageAbilitiesList` and `ablPackageTalentsList` from the class base APC (`apc.<origin>.base`), style base APC (`apc.<origin>.<style>.base`), and discipline APC, with ability-replacement rules applied. Proficiency, item, and legacy entries (`abl.player.proficiency.*`, `abl.itm.*`, `abl.legacy.*`) are omitted. The utility/mods APC from `disDisciplineUtilityPackageId` is used for replacements and the skill tree, not this baseline list.
+- `skill_tree` — level → choice → ability FQN mapping from `disDisciplineUnlockLevelToUtilityBits` and `disDisciplineUtilityBitToUnlockedAsset` (the mods/utility package choices)
 
 ### Abilities (`data/parsed/abl/`)
 
 One file per root `abl.*` node with base class `ablAbility`:
 
 ```json
-{"fqn": "abl.agent.adrenaline_probe", "name": "Adrenaline Probe", "cooldown": 120.0}
+{
+  "fqn": "abl.agent.adrenaline_probe",
+  "name": "Adrenaline Probe",
+  "icon": "adrenalineprobe.png",
+  "cooldown": 120.0,
+  "ablIgnoreAlacrity": false
+}
 ```
 
+`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`.
+
+`ablIgnoreAlacrity` sits immediately under `cooldown`. The GOM field is sparse (written only when `true`); when absent the parsed value is `false`.
+
+Effects that have `duration` and/or `tick_interval` include `effIgnoreAlacrity` as a sibling after those fields. The GOM field is likewise sparse. Defaults when it is absent: `false` if the effect has a `tick_interval` (DoT/HoT ticks scale with alacrity), `true` if it does not (buff duration does not). An explicit stored boolean overrides the default. Instant effects with neither timing field omit the flag.
+
 `modify_stat` actions store `stat` as the `modStatEnum` member name string (e.g. `"STAT_rtg_armor"`), resolved from `client.gom` during parsing.
+
+Triggers may include `effResults` when `effParam_Results` lists Crit (`effResultCrit` only for now).
 
 ### Talents (`data/parsed/tal/`)
 
@@ -135,7 +152,7 @@ Field values of DOM type `ID` are replaced with the referenced node's FQN when t
 
 `NodeRef` fields are resolved to `{ref_id, fqn, base_class}` objects.
 
-Enum fields are resolved to their GOM member names via `client.gom` and `gom.js`.
+Enum fields are resolved to their GOM member names via `client.gom` and `gom.js`. Integer lists keyed by `effParam_Results` are resolved the same way, using enum `4611686018505192446`.
 
 ## STB string resolution
 
@@ -175,6 +192,7 @@ The extractor inverts the known `tag.*` strings published in Jedipedia's `fnv1a6
 | `dump.py` | Raw JSON dump and index writer |
 | `disciplines.py` | Discipline manifest builder |
 | `talents.py` / `abilities.py` | Trimmed talent and ability writers |
+| `icons.py` | Optional gfx-icon TOR extract and DDS→PNG conversion |
 | `gear.py` / `relics.py` | Gear lookup and relic list builders |
 | `tools/validate_workdir.py` | Validate an existing work dir without re-reading archives |
 
