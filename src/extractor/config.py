@@ -9,9 +9,9 @@ FNV1A64_JS_URL = (
     "https://swtor.jedipedia.net/static/js/reader/lib/fnv1a64.js"
 )
 
-DATA_DIR = Path("data")
-WORK_DIR = Path("data/extract_work")
-OUTPUT_DIR = Path("data/extracted")
+DATA_DIR = Path("data/extractor")
+WORK_DIR = Path("data/extractor/extract_work")
+OUTPUT_DIR = Path("data/extractor/extracted")
 
 # FQN prefixes whose nodes are followed during combat graph traversal.
 COMBAT_FQN_PREFIXES = (
