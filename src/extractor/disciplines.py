@@ -7,8 +7,14 @@ from typing import Any
 from extractor.graph import NodeRecord
 
 _APC_SCOPE_LIST_FIELDS = (
-    "ablPackageActiveAbilitiesList",
+    "ablPackageAbilitiesList",
     "ablPackageTalentsList",
+)
+
+_EXCLUDED_ABILITY_PREFIXES = (
+    "abl.player.proficiency.",
+    "abl.itm.",
+    "abl.legacy.",
 )
 
 
@@ -31,6 +37,14 @@ def _field_value(record: NodeRecord, name: str) -> Any:
     return None
 
 
+def _first_field_value(record: NodeRecord, *names: str) -> Any:
+    for name in names:
+        value = _field_value(record, name)
+        if value is not None:
+            return value
+    return None
+
+
 def _lookup_list_to_dict(entries: list[dict[str, Any]] | None) -> dict[str, Any]:
     if not entries:
         return {}
@@ -47,6 +61,8 @@ def _active_abilities_from_apc(record: NodeRecord | None) -> list[str]:
             continue
         value = field["value"]
         for entry in _entries_from_apc_list_field(value):
+            if entry.startswith(_EXCLUDED_ABILITY_PREFIXES):
+                continue
             if entry not in seen:
                 seen.add(entry)
                 result.append(entry)
@@ -202,7 +218,7 @@ def _build_discipline_payload(
         )
     discipline_apc = package_ids["list"][0]
 
-    mods_apc = _field_value(record, "disAbilityPackageChooseableAbilities")
+    mods_apc = _field_value(record, "disDisciplineUtilityPackageId")
     class_base, style_base = _apc_bases_from_discipline_apc(discipline_apc)
 
     active_abilities = _union_active_abilities(
@@ -212,8 +228,21 @@ def _build_discipline_payload(
         discipline_apc,
     )
 
-    abilities_list = _lookup_list_to_dict(_field_value(record, "disAbilitiesList"))
-    level_to_abilities = _field_value(record, "disLevelToAbilities") or []
+    abilities_list = _lookup_list_to_dict(
+        _first_field_value(
+            record,
+            "disDisciplineUtilityBitToUnlockedAsset",
+            "disAbilitiesList",
+        )
+    )
+    level_to_abilities = (
+        _first_field_value(
+            record,
+            "disDisciplineUnlockLevelToUtilityBits",
+            "disLevelToAbilities",
+        )
+        or []
+    )
     skill_tree = _build_skill_tree(abilities_list, level_to_abilities)
 
     replacements = _replacements_for_apcs(

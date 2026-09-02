@@ -28,7 +28,7 @@ def extract_relevant_files(
     *,
     force_hash_update: bool = False,
     pts: bool = False,
-) -> Path:
+) -> tuple[Path, dict[int, str]]:
     hash_dictionary = ensure_jedipedia_hash_list(
         cache_dir, force_download=force_hash_update
     )
@@ -47,4 +47,4 @@ def extract_relevant_files(
         raise RuntimeError(
             "No relevant files extracted. Check hash list and assets path."
         )
-    return resources_root
+    return resources_root, hash_dictionary

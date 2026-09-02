@@ -17,6 +17,7 @@ from extractor.config import (
     COMBAT_FQN_PREFIXES,
     ADRENAL_ABILITY_FQNS,
     ITEM_ABILITY_FQN_PREFIXES,
+    LOOKUP_LIST_VALUE_ENUM_BY_KEY,
     RELIC_ABILITY_FQN_PREFIX,
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
     STB_STRING_FIELD_BUCKETS,
@@ -322,11 +323,16 @@ def _resolve_value(
                     enum_type_id=key_enum_ref,
                     dom_type=key_type,
                 )
+            item_enum_ref = val_enum_ref
+            if isinstance(resolved_key, str):
+                item_enum_ref = LOOKUP_LIST_VALUE_ENUM_BY_KEY.get(
+                    resolved_key, val_enum_ref
+                )
             if value_type == DOM_ENUM and isinstance(val, dict) and "index" in val:
                 resolved_val: Any = _resolve_enum_value(
                     gom,
                     int(val["index"]),
-                    enum_type_id=val_enum_ref,
+                    enum_type_id=item_enum_ref,
                     field_id=field_id,
                 )
             else:
@@ -337,7 +343,7 @@ def _resolve_value(
                     gom,
                     tag_resolver,
                     field_id,
-                    enum_type_id=val_enum_ref,
+                    enum_type_id=item_enum_ref,
                     dom_type=value_type,
                 )
             entries.append({"key": resolved_key, "value": resolved_val})
@@ -426,6 +432,18 @@ def _resolve_value(
                     )
                 )
         return resolved
+
+    if (
+        enum_type_id is not None
+        and isinstance(value, str)
+        and value.isdigit()
+    ):
+        return _resolve_enum_value(
+            gom,
+            int(value),
+            enum_type_id=enum_type_id,
+            field_id=field_id,
+        )
 
     if tag_resolver is not None:
         return tag_resolver.resolve(value)
