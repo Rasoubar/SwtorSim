@@ -1,10 +1,7 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
-
 from src.swtorsim.combat_math import calculate_hit
-import random
-from src.swtorsim.requirements import validate_all
-
+from src.swtorsim.abilities import Ability
 
 if TYPE_CHECKING:
     from src.swtorsim.entities import Player, Dummy, Entity
@@ -20,6 +17,18 @@ class Event:
     def __lt__(self,other):
         """Tiebreaker for 2 events at the same time"""
         return False
+
+class AbilityCast(Event):
+    """Represents a single ability cast event
+        TEMPORARY PLACEHOLDER"""
+    def __init__(self,source,target,ability):
+        super().__init__(f"Ability Cast {ability.name}")
+        self.source = source
+        self.target = target
+        self.ability = ability
+
+    def resolve(self, sim):
+        Ability.cast(self.ability, self.source, self.target,sim)
 
 class ApplyDamageLand(Event):
     """Applies pre-calculated damage to the target. Needed because of impact_delay, when damage is calculated earlier
@@ -57,7 +66,6 @@ class DamageHit(Event):
         instant_land.resolve(sim)
 
         tags = frozenset(self.action_data.get("tags", []))
-        self.evaluate_on_hit_procs(sim, is_crit, tags)
 
 class PeriodicProcTick(Event):
     """Represents tics that are pre-scheduled and always happening."""
