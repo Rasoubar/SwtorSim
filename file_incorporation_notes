@@ -1,5 +1,25 @@
-won't need changes
+Won't need changes
+-engine.py
+-rotation.py
+-resources.py
 
-engine.py
-rotation.py
-resources.py
+
+Waiting on files
+-loading data
+
+
+To do (prio1)
+-ability execution
+-trigger listener
+-pre-sim setup
+
+
+To do (prio2)
+-heals
+
+
+Log
+
+
+Notes
+-for effects, if affected by alacrity they should have tick_interval (effInterval in files)

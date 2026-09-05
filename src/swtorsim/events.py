@@ -59,38 +59,6 @@ class DamageHit(Event):
         tags = frozenset(self.action_data.get("tags", []))
         self.evaluate_on_hit_procs(sim, is_crit, tags)
 
-    def evaluate_on_hit_procs(self, sim, is_crit: bool, tags):
-        """Evaluates and triggers all eligible procs for the source based on the current hit."""
-        for proc in self.source.procs.values():
-            if not self.hit_proc_can_trigger(proc, sim, is_crit, tags):
-                continue
-            self._trigger_proc_effects(proc, sim)
-
-    def hit_proc_can_trigger(self, proc, sim, is_crit: bool, tags) -> bool:
-        """Validates if a specific proc can fire"""
-        if proc.trigger in ("cast", "periodic"):
-            return False
-        if sim.current_time < proc.next_possible_proc:
-            return False
-        if proc.trigger == "crit" and not is_crit:
-            return False
-        if proc.required_tags and not (proc.required_tags & tags):
-            return False
-        if not validate_all(proc.conditions, self.source, self.target):
-            return False
-        if random.random() > proc.chance:
-            return False
-        return True
-
-    def _trigger_proc_effects(self, proc, sim):
-        """Applies the proc's internal cooldown and executes its actions"""
-        current_icd = self.source.scale_time_modifier(proc.icd) if proc.affected_by_cdr else proc.icd
-        proc.next_possible_proc = sim.current_time + current_icd
-        from src.swtorsim.abilities import execute_single_action
-        for action in proc.actions:
-            execute_single_action(sim, self.source, self.target, action, proc.name)
-
-
 class PeriodicProcTick(Event):
     """Represents tics that are pre-scheduled and always happening."""
     def __init__(self, player, target, proc):
