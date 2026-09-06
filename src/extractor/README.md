@@ -116,7 +116,9 @@ Effects that have `duration` and/or `tick_interval` include `effIgnoreAlacrity` 
 
 `modify_stat` actions store `stat` as the `modStatEnum` member name string (e.g. `"STAT_rtg_armor"`), resolved from `client.gom` during parsing.
 
-Triggers may include `effResults` when `effParam_Results` lists Crit (`effResultCrit` only for now).
+Every effect branch has a `triggers` list. Apply-time branches (no GOM `effTriggers`) use `[{"trigger": "on_apply"}]`. There is no branch `timing` field.
+
+Triggers may include `effResults` when `effParam_Results` lists Crit (`effResultCrit` only for now). Triggers may include `excluded_tags` from `effTagExclusions` (enabled keys only; omitted when empty).
 
 ### Talents (`data/parsed/tal/`)
 
@@ -171,7 +173,7 @@ Loc retriever fields on abilities and talents (`locTextRetrieverMap`) are resolv
 
 Ability tag values are stable IDs: unsigned 64-bit FNV-1a hashes of uppercase names, rather than GOM node references. For example, `tag.abl.smuggler.healing_ability` hashes to `711562958929859131`.
 
-The extractor inverts the known `tag.*` strings published in Jedipedia's `fnv1a64.js`. Matching hashes anywhere in resolved field values are written as tag names; hashes missing from Jedipedia's dictionary remain unchanged as decimal IDs.
+The extractor inverts the known `tag.*` strings published in Jedipedia's `fnv1a64.js`. Matching hashes anywhere in resolved field values are written as tag names. Unknown hashes that match a known GOM node ID (typically an ability used as a tag key) resolve to that node's FQN; remaining IDs stay decimal.
 
 ## Module layout
 

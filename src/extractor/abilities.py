@@ -273,6 +273,17 @@ def _decode_generic_ints(
     return ints
 
 
+def _resolved_conditional_tag(int_params: dict[str, Any]) -> str | None:
+    """Return a resolved tag string stored in the int-param ConditionalTag slot."""
+    raw = int_params.get("effParam_ConditionalTag")
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value or value.isdigit():
+        return None
+    return value
+
+
 def _should_drop_condition(condition_name: Any) -> bool:
     return isinstance(condition_name, str) and condition_name in DROPPED_CONDITION_TYPES
 
@@ -1210,6 +1221,9 @@ def _decode_action(
         for key, value in params["string"].items()
         if key not in DROPPED_ACTION_PARAMS and isinstance(value, str)
     }
+    resolved_tag = _resolved_conditional_tag(int_params)
+    if resolved_tag and not strings.get("conditional_tag"):
+        strings["conditional_tag"] = resolved_tag
     if strings:
         generic["strings"] = strings
 
@@ -1230,6 +1244,11 @@ def _decode_trigger(
     tag_keys = [key for key, enabled in params["tags"].items() if enabled is True]
     if tag_keys:
         decoded["tags"] = tag_keys
+
+    exclusion_map = _lookup_list_to_dict(fields.get("effTagExclusions"))
+    excluded_tags = [key for key, enabled in exclusion_map.items() if enabled is True]
+    if excluded_tags:
+        decoded["excluded_tags"] = excluded_tags
 
     if "effParam_TickNumber" in params["int"]:
         decoded["tick_number"] = _int_param(params["int"], "effParam_TickNumber")
@@ -1745,9 +1764,8 @@ def _decode_branch(
     if triggers:
         _enrich_trigger_timing(triggers, effect_duration, effect_tick_interval)
         decoded["triggers"] = triggers
-        decoded["timing"] = "triggered"
     else:
-        decoded["timing"] = "immediate"
+        decoded["triggers"] = [{"trigger": "on_apply"}]
     return decoded
 
 
