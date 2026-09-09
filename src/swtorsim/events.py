@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
 from src.swtorsim.combat_math import calculate_hit
-from src.swtorsim.abilities import Ability
+
 
 if TYPE_CHECKING:
     from src.swtorsim.entities import Player, Dummy, Entity
@@ -28,6 +28,7 @@ class AbilityCast(Event):
         self.ability = ability
 
     def resolve(self, sim):
+        from src.swtorsim.abilities import Ability
         Ability.cast(self.ability, self.source, self.target,sim)
 
 class ApplyDamageLand(Event):
@@ -121,7 +122,6 @@ class EffectExpire(Event):
 
         print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.effect_name}")
 
-
 class DotTick(Event):
     """Represents a Dot Tick. Handles action execution, tick's value decrease and following tick scheduling."""
     def __init__(self, source: "Player", target: "Dummy", instance_ref: "ActiveDot"):
@@ -151,7 +151,6 @@ class DotTick(Event):
         else:
             del self.target.dots[dot_name]
             print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
-
 
 class ChannelTickEvent(Event):
     """ Represents a single tick of a channeled ability.

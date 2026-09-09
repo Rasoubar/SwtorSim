@@ -1,29 +1,152 @@
 import random
-from src.swtorsim.events import DamageHit, EffectExpire, DotTick, ResourceGainEvent, ChannelTickEvent, ChargeRestoreEvent
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
 from src.swtorsim.combat_math import accuracy_roll
-from src.swtorsim.entities import Player, Dummy
-from src.swtorsim.effects import ActiveDot, ActiveChannel
+from src.swtorsim.entities import Dummy, Player
+from src.swtorsim.events import ChargeRestoreEvent, DamageHit, ResourceGainEvent
 from src.swtorsim.requirements import validate_all
 
 
-def execute_single_action(sim, caster, target, action: dict, source_name: str):
-    """Calls the appropriate function for the action type"""
+# --- Effect Data Structures & Execution ---
+
+
+@dataclass(slots=True)
+class Branch:
+    index: int
+    triggers: List[Dict[str, Any]] = field(default_factory=list)
+    conditions: Optional[Dict[str, Any]] = None
+    actions: List[Dict[str, Any]] = field(default_factory=list)
+    target_overrides: List[Dict[str, Any]] = field(default_factory=list)
+    run_if_none_ran: List[int] = field(default_factory=list)
+    is_attack: bool = False
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Branch":
+        return cls(
+            index=data.get("index", 0),
+            triggers=data.get("triggers", []),
+            conditions=data.get("conditions"),
+            actions=data.get("actions", []),
+            target_overrides=data.get("target_overrides", []),
+            run_if_none_ran=data.get("run_if_none_ran", []),
+            is_attack=data.get("is_attack", False),
+        )
+
+    def execute(self, sim, caster, target, context=None, ability=None) -> tuple[bool, bool]:
+        """
+        Evaluates branch conditions and executes actions.
+        Returns: (ran, success)
+          - ran: True if conditions passed and actions were attempted.
+          - success: False only if an action failed (e.g. accuracy miss).
+        """
+        actual_target = target
+
+        # 1. Target overrides
+        for override in self.target_overrides:
+            if override.get("type") == "trigger_target" and context and "target" in context:
+                actual_target = context["target"]
+
+        # 2. Branch conditions (failing conditions skips the branch, not an attack miss)
+        if self.conditions:
+            if not validate_all(self.conditions, caster, actual_target, sim=sim, context=context):
+                return False, True
+
+        # 3. Actions execution
+        source_name = ability.name if ability else "Unknown"
+        for action in self.actions:
+            success = execute_single_action(
+                sim, caster, actual_target, action, source_name, ability=ability
+            )
+            if not success:
+                return True, False
+
+        return True, True
+
+
+@dataclass(slots=True)
+class Effect:
+    number: int
+    entry: bool
+    duration: float = 0.0
+    tick_interval: float = 0.0
+    eff_ignore_alacrity: bool = False
+    is_passive: bool = False
+    tags: List[str] = field(default_factory=list)
+    branches: List[Branch] = field(default_factory=list)
+    stack_charge: Optional[Dict[str, Any]] = None
+    conditions: Optional[Dict[str, Any]] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Effect":
+        is_passive = any(
+            init.get("initializer_type") == "eff_initializer__set_passive"
+            and init.get("bools", {}).get("is_passive", False)
+            for init in data.get("initializers", [])
+        )
+        return cls(
+            number=data["number"],
+            entry=data.get("entry", False),
+            duration=float(data.get("duration", 0.0)),
+            tick_interval=float(data.get("tick_interval", 0.0)),
+            eff_ignore_alacrity=data.get("effIgnoreAlacrity", False),
+            is_passive=is_passive,
+            tags=data.get("tags", []),
+            branches=[Branch.from_dict(b) for b in data.get("branches", [])],
+            stack_charge=data.get("stack_charge"),
+            conditions=data.get("conditions"),
+        )
+
+    @property
+    def is_persistent(self) -> bool:
+        """True if the effect is a timed buff/debuff or permanent passive."""
+        return self.duration > 0.0 or self.is_passive
+
+    @property
+    def is_instant(self) -> bool:
+        """True if the effect evaluates immediately and does not live on an actor."""
+        return not self.is_persistent
+
+    def execute(self, sim, caster, target, context=None, ability=None):
+        """Resolves an effect: routes persistent effects to actor, or resolves instant branches."""
+        # 1. Persistent Fork
+        if self.is_persistent:
+            target.apply_effect(sim, ability, self, caster)
+            return
+
+        # 2. Instant Fork
+        executed_branches = set()
+        for branch in self.branches:
+            triggers = getattr(branch, "triggers", [])
+            is_immediate = not triggers or any(t.get("trigger") == "on_apply" for t in triggers)
+            if not is_immediate:
+                continue
+
+            if branch.run_if_none_ran and any(b in executed_branches for b in branch.run_if_none_ran):
+                continue
+
+            ran, success = branch.execute(sim, caster, target, context=context, ability=ability)
+            if ran:
+                executed_branches.add(branch.index)
+            if not success and getattr(branch, "is_attack", False):
+                break
+
+
+# --- Action Handlers ---
+
+
+def execute_single_action(sim, caster, target, action, source_name, ability=None):
+    """Calls the appropriate function for the action type."""
     if not validate_all(action.get("conditions", {}), caster, target, sim=sim):
         return False
     if "chance" in action and random.random() > action["chance"]:
         return False
+
     action_type = action.get("action_type")
     delay = action.get("delay", 0.0)
+
     if action_type == "damage":
         return handle_damage_action(sim, caster, target, action, source_name, delay)
-    elif action_type == "dot":
-        handle_dot_action(sim, caster, target, action, source_name)
-    elif action_type == "channel":
-        handle_channel_action(sim, caster, target, action, source_name)
-    elif action_type == "buff":
-        handle_buff_action(sim, caster, action, source_name, sim.current_time)
-    elif action_type == "debuff":
-        handle_debuff_action(sim, target, action, source_name, sim.current_time)
     elif action_type == "resource_gain":
         handle_resource_gain_action(sim, caster, action, delay)
     elif action_type == "cooldown_mod":
@@ -32,6 +155,11 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
         handle_restore_charge(sim, caster, action)
     elif action_type == "buff_remove":
         handle_buff_remove_action(sim, caster, action)
+    elif action_type == "call_effect":
+        if ability and "effect" in action:
+            ability.execute_effect(action["effect"], caster, target, sim)
+    elif action_type == "modify_stack_charge":
+        pass
     else:
         raise ValueError(
             f"CRITICAL ENGINE ERROR: Unrecognized action_type '{action_type}' "
@@ -41,7 +169,7 @@ def execute_single_action(sim, caster, target, action: dict, source_name: str):
 
 
 def handle_damage_action(sim, caster, target, action, source_name, delay):
-    """Rolls accuracy then schedules or executes the hit"""
+    """Rolls accuracy then schedules or executes the hit."""
     if not accuracy_roll(caster, action.get("hand", "main")):
         return False
     hit_event = DamageHit(caster, target, action, source_name)
@@ -52,50 +180,8 @@ def handle_damage_action(sim, caster, target, action, source_name, delay):
     return True
 
 
-def handle_dot_action(sim, caster, target, action, source_name):
-    """Calculates how often the dot ticks, creates the dots, channels the 1st tick"""
-    scaled_interval = caster.scale_time_modifier(action["interval"])
-    dot_instance = ActiveDot(
-        name=source_name,
-        interval=scaled_interval,
-        ticks_remaining=action["total_ticks"],
-        action_data=action
-    )
-    target.dots[source_name] = dot_instance
-    sim.schedule_relative(scaled_interval, DotTick(caster, target, dot_instance))
-
-
-def handle_channel_action(sim, caster, target, action_data: dict, source_name: str):
-    """Flags the caster as channeling, creates the channel instance, and schedules the first tick"""
-    caster.is_channeling = True
-
-    tick_interval = action_data.get("tick_interval", 3.0)
-    total_ticks = action_data.get("channel_ticks", 4)
-    tick_cost = action_data.get("tick_cost", 0.0)
-
-    new_channel = ActiveChannel(source_name, action_data, total_ticks, tick_interval, tick_cost)
-    caster.active_channel = new_channel
-    print(f"[{sim.current_time:.3f}] {caster.name} started channeling {source_name}.")
-
-    first_tick_time = sim.current_time
-
-    sim.schedule_absolute(first_tick_time, ChannelTickEvent(caster, target, new_channel))
-
-
-def handle_buff_action(sim, caster, action, source_name, current_time):
-    """Applies the buff to the caster and schedules it's expiration"""
-    buff_key, buff_instance, duration = caster.apply_effect(action, source_name, current_time)
-    sim.schedule_relative(duration, EffectExpire(caster, buff_key, buff_instance))
-
-
-def handle_debuff_action(sim, target, action, source_name, current_time):
-    """Applies the debuff to the target and schedules it's expiration"""
-    debuff_key, debuff_instance, duration = target.apply_effect(action, source_name, current_time)
-    sim.schedule_relative(duration, EffectExpire(target, debuff_key, debuff_instance))
-
-
 def handle_resource_gain_action(sim, caster, action, delay):
-    """Schedules or executes the resource gain event"""
+    """Schedules or executes the resource gain event."""
     regen = action.get("value", 0.0)
     gain_event = ResourceGainEvent(caster, regen)
     if delay > 0.0:
@@ -103,8 +189,9 @@ def handle_resource_gain_action(sim, caster, action, delay):
     else:
         gain_event.resolve(sim)
 
+
 def handle_cooldown_modification(sim, caster, action):
-    """Applies cooldown reductions or resets to targeted abilities"""
+    """Applies cooldown reductions or resets to targeted abilities."""
     cooldown_dict = getattr(caster, "cooldowns", {})
     ability_db = caster.ability_db
     if not (cooldown_dict and ability_db and "target_tags" in action):
@@ -112,11 +199,11 @@ def handle_cooldown_modification(sim, caster, action):
     reset_tags = frozenset(action["target_tags"])
     is_reset = action.get("reset", False)
     for cd_key in list(cooldown_dict.keys()):
-        if cooldown_dict[cd_key] <= sim.current_time: #clean the ones gone
+        if cooldown_dict[cd_key] <= sim.current_time:
             del cooldown_dict[cd_key]
             continue
-        ability_data = ability_db.get(cd_key.lower().replace(" ", "_")) #I'll change JSON a bit to get rid of this string manipulation. eventually
-        ability_tags = getattr(ability_data, 'tags', frozenset()) if ability_data else frozenset()
+        ability_data = ability_db.get(cd_key.lower().replace(" ", "_"))
+        ability_tags = getattr(ability_data, "tags", frozenset()) if ability_data else frozenset()
         if reset_tags & ability_tags:
             if is_reset:
                 del cooldown_dict[cd_key]
@@ -128,58 +215,70 @@ def handle_cooldown_modification(sim, caster, action):
                     del cooldown_dict[cd_key]
 
 
-def handle_restore_charge(sim, caster, action): #might want to change so that the ability_db is on the player
-    """Restores a charge to the target ability"""
+def handle_restore_charge(sim, caster, action):
+    """Restores a charge to the target ability."""
     target_ability_name = action.get("target_ability")
     amount = action.get("amount", 1)
     if target_ability_name in caster.ability_db:
         ability = caster.ability_db[target_ability_name]
         ability.restore_charge(caster, sim, amount=amount, from_timer=False)
 
+
 def handle_buff_remove_action(sim, caster, action):
-    """Removes a buff from the caster"""
+    """Removes a buff from the caster."""
     effect_name = action.get("effect_name")
     if effect_name and caster.has_effect(effect_name):
         caster.cleanup_expired_effects([effect_name])
         print(f"[{sim.current_time:.3f}] {caster.name} consumed/removed buff: {effect_name}")
 
 
+# --- Ability Container ---
+
+
 class Ability:
-    """Represents a player used ability/skill/spell"""
-    def __init__(self, config: dict):
-        self.name = config["name"]
-        self.cooldown = config.get("cooldown",0.0)
-        self.triggers_gcd = config.get("triggers_gcd", True)
-        self.base_gcd = config.get("base_gcd", 1.5)
-        self.actions = config.get ("actions", [])
-        self.energy_cost = config.get("energy_cost", 0.0)
-        self.tags = frozenset(config.get("tags", []))
-        self.conditions = config.get("conditions", {})
-        self.has_charges = config.get("max_charges", 0) > 0
-        if self.has_charges:
-            self.max_charges = config.get("max_charges", 1)
-            self.charges = self.max_charges
-            self.recharge_time = config.get("recharge_time", self.cooldown)
-            self.active_charge_event = None
+    """Represents a combat ability with resource management, charges, and effect delegation."""
 
-    @classmethod
-    def from_dict(cls, data: dict, fallback_name: str) -> "Ability":
-        """Factory method to construct an Ability from a raw dictionary."""
-        config = data.copy()
-        config["name"] = data.get("name") or fallback_name
-        return cls(config)
+    def __init__(self, blueprint):
+        self.blueprint = blueprint
+        self.name = blueprint.name
+        self.fqn = blueprint.fqn
+        self.type = blueprint.type
+        self.cooldown = blueprint.cooldown
+        self.base_gcd = blueprint.base_gcd
+        self.energy_cost = blueprint.energy_cost
+        self.triggers_gcd = blueprint.type == "active"
+        self.tags = frozenset(blueprint.tags or [])
+        self.conditions = {}
 
+        # Effect graph
+        self.effects = blueprint.effects
+        self.entry_effect_ids = blueprint.entry_effect_ids
+
+        # Charges
+        self.max_charges = getattr(blueprint, "max_charges", 0)
+        self.charges = self.max_charges
+        self.recharge_time = getattr(blueprint, "recharge_time", self.cooldown)
+        self.active_charge_event = None
+
+    @property
+    def has_charges(self):
+        return self.max_charges > 0
+
+    def execute_effect(self, effect_id, caster, target, sim, context=None):
+        """Delegates effect execution directly to the target Effect instance."""
+        effect = self.effects.get(effect_id)
+        if effect:
+            effect.execute(sim, caster, target, context=context, ability=self)
 
     def schedule_recharge(self, caster, sim):
         """Snapshots CDR, creates a new event reference, and schedules it."""
         actual_recharge = caster.calculate_cooldown(self.recharge_time)
-
         event = ChargeRestoreEvent(caster, self)
         self.active_charge_event = event
         sim.schedule_relative(actual_recharge, event)
 
     def consume_charge(self, caster, sim):
-        """Deducts a charge and initiates the recharge chain if dropping from max capacity"""
+        """Deducts a charge and initiates the recharge chain if dropping from max capacity."""
         if not self.has_charges or self.charges < 1:
             return
 
@@ -190,7 +289,7 @@ class Ability:
             self.schedule_recharge(caster, sim)
 
     def restore_charge(self, caster, sim, amount: int = 1, from_timer: bool = False):
-        """Grants charge(s), handles max capacity cleanup, and chains timers if needed"""
+        """Grants charge(s), handles max capacity cleanup, and chains timers if needed."""
         if not self.has_charges:
             return
 
@@ -203,11 +302,11 @@ class Ability:
             self.schedule_recharge(caster, sim)
 
     def can_cast(self, caster: "Player", target: "Dummy", sim) -> bool:
-        """Checks if the ability is ready to cast based on GCD, cooldown, cost, and conditions"""
-        if self.triggers_gcd and sim.current_time < caster.next_gcd: #redundant right now, possibly will catch bugs
+        """Checks if the ability is ready to cast based on GCD, cooldown, cost, and conditions."""
+        if self.triggers_gcd and sim.current_time < caster.next_gcd:
             return False
 
-        if getattr(caster, "active_channel", None) is not None: #to improve when channel clipping is implemented
+        if getattr(caster, "active_channel", None) is not None:
             return False
 
         if self.has_charges and self.charges < 1:
@@ -216,12 +315,12 @@ class Ability:
         if sim.current_time < caster.cooldowns.get(self.name, 0.0):
             return False
 
-        modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply = False)
+        modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply=False)
 
-        if not caster.resource.can_afford(modified_cost): #I had a more efficient approach to this. Like this rn, will change
+        if not caster.resource.can_afford(modified_cost):
             return False
 
-        return validate_all(self.conditions, caster, target) #validates conditions
+        return validate_all(self.conditions, caster, target)
 
     def apply_cooldown_locks(self, caster, sim):
         """Deducts charges or sets cooldown, and sets GCD lockouts."""
@@ -234,25 +333,23 @@ class Ability:
         elif self.cooldown > 0.0:
             caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown), 4)
 
-    def cast(self, caster, target, sim) -> bool:
-        """Executes the ability: spends resources, locks cooldowns, triggers procs, and runs actions"""
+    def cast(self, caster, target, sim):
+        """Executes the ability: spends resources, locks cooldowns, and triggers entry effects."""
         if not self.can_cast(caster, target, sim):
             return False
 
         if getattr(caster, "active_channel", None) is not None:
-            print(f"[{sim.current_time:.3f}] {caster.class_name} interrupted channel to cast {self.name}!")
+            print(f"[{sim.current_time:.3f}] {caster.name} interrupted channel to cast {self.name}!")
             caster.active_channel = None
             caster.is_channeling = False
 
-        final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply = True)
+        final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply=True)
         caster.resource.spend(final_spend)
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
 
         self.apply_cooldown_locks(caster, sim)
 
-        for action in self.actions:
-            success = execute_single_action(sim, caster, target, action, self.name)
-            if success and "on_success_actions" in action:
-                for child_action in action["on_success_actions"]:
-                    execute_single_action(sim, caster, target, child_action, self.name)
+        for entry_id in self.entry_effect_ids:
+            self.execute_effect(entry_id, caster, target, sim)
+
         return True
