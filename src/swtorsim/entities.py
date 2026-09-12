@@ -101,12 +101,14 @@ class Entity:
 class Player(Entity):
     """Represents a player character and all that entails."""
     RECALCULATE_STATS = {"Mastery Stat", "Power Stat", "Bonus Damage", "Critical Stat", "Accuracy", "Armor Penetration", "Alacrity Rating", "Mastery PCT"}
-    def __init__(self, name: str, abilities, resource = "Force"):
+
+    def __init__(self, name: str, abilities: dict = None, passives: dict = None, resource: str = "Force"):
         super().__init__(name)
         self.next_gcd = 0.0
-        self.cooldowns= {}
+        self.cooldowns = {}
         self.procs = {}
-        self.ability_db = self.build_ability_db(abilities)
+        self.passive_blueprints = passives or {}
+        self.ability_db = self.build_ability_db(abilities or {})
         self.rotation = None
         self.resource = create_resource_pool(
             pool_type=resource
@@ -116,8 +118,8 @@ class Player(Entity):
             "Critical Chance": 0.0,
             "Critical Modifier": 0.0,
             "Critical Rating": 0.0,
-            "Accuracy Rating":0.0,
-            "Main Accuracy":0.0,
+            "Accuracy Rating": 0.0,
+            "Main Accuracy": 0.0,
             "Off Accuracy": 0.0,
             "Mastery": 0.0,
             "Power": 0.0,
@@ -135,12 +137,17 @@ class Player(Entity):
         self.stats = self.base_stats.copy()
 
     @staticmethod
-    def build_ability_db(abilities):
-        """Normalizes ability keys into lowercase snake_case for fast lookups."""
-        ability_db = {
-            key.lower().replace(" ", "_"): val
-            for key, val in abilities.items()
-        }
+    def build_ability_db(abilities: dict) -> dict:
+        """Indexes abilities by both their FQN and their normalized name (e.g. 'thrash')."""
+        ability_db = {}
+        for key, abl in abilities.items():
+            # Store primary key (FQN or original string)
+            ability_db[key] = abl
+            # Store normalized key
+            ability_db[key.lower().replace(" ", "_")] = abl
+            # Store normalized human-readable name if available
+            if hasattr(abl, "name"):
+                ability_db[abl.name.lower().replace(" ", "_")] = abl
         return ability_db
 
     def calculate_gcd(self, base_gcd: float = 1.5) -> float:

@@ -1,6 +1,7 @@
 import copy
 import random
 from src.swtorsim.engine import Simulation
+from src.swtorsim.abilities import Ability
 from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.rotation import Rotation
@@ -33,24 +34,44 @@ def schedule_periodic(player, target, sim):
             first_tick = random.uniform(0.0, interval)
             sim.schedule_absolute(first_tick, PeriodicProcTick(player, target, proc))
 
-def prepare_simulation(rotation_config, stats_config, abilities_db, procs_db, buffs_db, dummy_hp, debuff_module):
-    """Sets up the simulation to be run by testers"""
-    abilities_copy = copy.deepcopy(abilities_db)
-    player = Player(stats_config.get("class_name", "Unknown"),abilities_copy)
+def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module):
+    """Prepares simulation entities from unified loadout blueprints."""
+    active_abilities = {}
+    passive_blueprints = {}
+
+    # Separate active abilities from passives/gear
+    for fqn, bp in loadout_blueprints.items():
+        if bp.type == "active" and not fqn.startswith("tal."):
+            # Instantiate runtime Ability from blueprint
+            active_abilities[fqn] = Ability(bp)
+        else:
+            passive_blueprints[fqn] = bp
+
+    # Initialize Player and Target
+    player = Player(
+        name=stats_config.get("class_name", "Unknown"),
+        abilities=active_abilities,
+        passives=passive_blueprints
+    )
+
+    # Set up player base stats
+    for stat_key, stat_value in stats_config.get("stats", {}).items():
+        player.base_stats[stat_key] = stat_value
+    player.recalculate_stats()
+
+    # Set up dummy
     target = Dummy("Target Dummy", hp=dummy_hp)
     target.effects = copy.deepcopy(debuff_module)
     target.recalculate_stats()
-    p_stats = player.base_stats
-    for stat_key, stat_value in stats_config.get("stats", {}).items():
-        p_stats[stat_key] = stat_value
+
     sim = Simulation()
-    player.procs = copy.deepcopy(procs_db)
-    player.effects = copy.deepcopy(buffs_db)
-    player.recalculate_stats()
-    pre_sim_effects(player)
+
+    # Assign rotation
     player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
+
+    # Schedule initial lifecycle events
     sim.schedule_absolute(0.0, PlayerReady(player, target))
-    schedule_periodic(player, target, sim)
     first_regen_tick = random.uniform(0.0, 1.0)
     sim.schedule_absolute(first_regen_tick, ResourceTick(player))
+
     return sim, player, target

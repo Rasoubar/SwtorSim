@@ -1,11 +1,13 @@
 import random
+import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-
+from pathlib import Path
 from src.swtorsim.combat_math import accuracy_roll
 from src.swtorsim.entities import Dummy, Player
 from src.swtorsim.events import ChargeRestoreEvent, DamageHit, ResourceGainEvent
 from src.swtorsim.requirements import validate_all
+
 
 
 # --- Effect Data Structures & Execution ---
@@ -84,14 +86,18 @@ class Effect:
             and init.get("bools", {}).get("is_passive", False)
             for init in data.get("initializers", [])
         )
+
+        raw_duration = data.get("duration")
+        raw_tick = data.get("tick_interval")
+
         return cls(
             number=data["number"],
-            entry=data.get("entry", False),
-            duration=float(data.get("duration", 0.0)),
-            tick_interval=float(data.get("tick_interval", 0.0)),
-            eff_ignore_alacrity=data.get("effIgnoreAlacrity", False),
+            entry=bool(data.get("entry", False)),
+            duration=float(raw_duration) if raw_duration is not None else 0.0,
+            tick_interval=float(raw_tick) if raw_tick is not None else 0.0,
+            eff_ignore_alacrity=bool(data.get("effIgnoreAlacrity", False)),
             is_passive=is_passive,
-            tags=data.get("tags", []),
+            tags=data.get("tags") or [],
             branches=[Branch.from_dict(b) for b in data.get("branches", [])],
             stack_charge=data.get("stack_charge"),
             conditions=data.get("conditions"),
@@ -131,6 +137,52 @@ class Effect:
             if not success and getattr(branch, "is_attack", False):
                 break
 
+
+@dataclass(slots=True)
+class AbilityBlueprint:
+    fqn: str
+    name: str
+    type: str  # "active" or "passive"
+    energy_cost: float
+    base_gcd: float
+    cooldown: float
+    tags: List[str] = field(default_factory=list)
+    effects: Dict[int, Effect] = field(default_factory=dict)
+    entry_effect_ids: List[int] = field(default_factory=list)
+    file_path: Optional[Path] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any], file_path: Optional[Path] = None) -> "AbilityBlueprint":
+        effects_map: Dict[int, Effect] = {}
+        entry_ids: List[int] = []
+
+        for eff_data in data.get("effects") or []:
+            effect = Effect.from_dict(eff_data)
+            effects_map[effect.number] = effect
+            if effect.entry:
+                entry_ids.append(effect.number)
+
+        raw_cost = data.get("energy_cost")
+        raw_gcd = data.get("base_gcd")
+        raw_cd = data.get("cooldown")
+
+        return cls(
+            fqn=data.get("fqn") or "",
+            name=data.get("name") or "Unknown Ability",
+            type=data.get("type") or "active",
+            energy_cost=float(raw_cost) if raw_cost is not None else 0.0,
+            base_gcd=float(raw_gcd) if raw_gcd is not None else 1.5,
+            cooldown=float(raw_cd) if raw_cd is not None else 0.0,
+            tags=data.get("tags") or [],
+            effects=effects_map,
+            entry_effect_ids=entry_ids,
+            file_path=file_path,
+        )
+
+    @classmethod
+    def from_file(cls, filepath: Path) -> "AbilityBlueprint":
+        with filepath.open("r", encoding="utf-8") as f:
+            return cls.from_dict(json.load(f), file_path=filepath)
 
 # --- Action Handlers ---
 

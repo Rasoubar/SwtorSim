@@ -1,11 +1,52 @@
 import json
 import os
 from typing import Dict, Any, Tuple
-
+from pathlib import Path
+from typing import Dict, List
+from src.swtorsim.abilities import AbilityBlueprint
 from src.swtorsim.abilities import Ability
 from src.swtorsim.effects import ActiveEffect, ProcData
 
 
+
+def fqn_to_relative_path(fqn: str) -> Path:
+    """Converts dot-notation FQN to a relative filesystem path."""
+    return Path(*fqn.strip().split(".")).with_suffix(".json")
+
+
+def load_complete_loadout(
+    selected_fqns: List[str],
+    selected_relic_paths: List[str],
+    parsed_dir: str = "data/extractor/parsed"
+) -> Dict[str, AbilityBlueprint]:
+    """Resolves and loads all ability, talent, gear, and relic blueprints into a unified dictionary."""
+    base_parsed_path = Path(parsed_dir).resolve()
+    blueprints: Dict[str, AbilityBlueprint] = {}
+
+    # 1. Load abilities, passives, tacticals, and implants by FQN
+    for fqn in selected_fqns:
+        rel_path = fqn_to_relative_path(fqn)
+        full_path = base_parsed_path / rel_path
+
+        if not full_path.is_file():
+            print(f"⚠️ [WARN] Blueprint file not found for FQN '{fqn}': {full_path}")
+            continue
+
+        blueprint = AbilityBlueprint.from_file(full_path)
+        blueprints[blueprint.fqn] = blueprint
+
+    # 2. Load relics directly from chosen paths
+    for relic_path_str in selected_relic_paths:
+        relic_path = Path(relic_path_str).resolve()
+        if not relic_path.is_file():
+            print(f"⚠️ [WARN] Relic file not found: {relic_path}")
+            continue
+
+        relic_blueprint = AbilityBlueprint.from_file(relic_path)
+        blueprints[relic_blueprint.fqn] = relic_blueprint
+
+    print(f"✅ Loaded {len(blueprints)} total blueprints into unified loadout database.")
+    return blueprints
 # -----------------------------------------------------------------------------
 # JSON Helper
 # -----------------------------------------------------------------------------
@@ -24,25 +65,6 @@ def load_json_file(filepath: str) -> Any:
 
     return raw_data
 
-
-def load_abilities_from_dict(raw_data: dict) -> Dict[str, Ability]:
-    """Converts a dictionary of raw ability configs into Ability instances."""
-    registry = {}
-    for k, v in raw_data.items():
-        ability = Ability.from_dict(v, k)
-        registry[ability.name] = ability
-    return registry
-
-
-def load_procs_from_dict(raw_data: dict) -> Dict[str, ProcData]:
-    """Converts a dictionary of raw proc configs into ProcData instances."""
-    registry = {}
-    for k, v in raw_data.items():
-        proc = ProcData.from_dict(v, k)
-        registry[proc.name] = proc
-    return registry
-
-
 def load_permanent_effects_from_dict(raw_data: dict) -> Dict[str, ActiveEffect]:
     """Converts a dictionary of raw effects configs into ActiveEffect instances."""
     registry = {}
@@ -54,17 +76,6 @@ def load_permanent_effects_from_dict(raw_data: dict) -> Dict[str, ActiveEffect]:
 # -----------------------------------------------------------------------------
 # JSON Loaders (Normalized Wrappers)
 # -----------------------------------------------------------------------------
-
-def load_abilities_from_json(filepath: str) -> Dict[str, Ability]:
-    """Loads ability definitions from a JSON file into Ability instances."""
-    raw_data = load_json_file(filepath)
-    return load_abilities_from_dict(raw_data)
-
-
-def load_procs_from_json(filepath: str) -> Dict[str, ProcData]:
-    """Loads proc definitions from a JSON file into ProcData instances."""
-    raw_data = load_json_file(filepath)
-    return load_procs_from_dict(raw_data)
 
 
 def load_permanent_effects_from_json(filepath: str) -> Dict[str, ActiveEffect]:
@@ -85,27 +96,3 @@ def load_rotation_from_json(filepath: str) -> Any:
     """Loads rotation step sequences directly from a JSON file."""
     return load_json_file(filepath)
 
-
-
-# -----------------------------------------------------------------------------
-# Interactive Drafter CLI
-# -----------------------------------------------------------------------------
-
-
-def build_complete_loadout(
-        base_dir: str,
-        raw_opt_abilities: dict,
-        raw_opt_buffs: dict,
-        raw_opt_procs: dict
-) -> Tuple[Dict[str, Ability], Dict[str, ProcData], Dict[str, ActiveEffect]]:
-    """Loads base databases and merges optional drafted dicts into active registries."""
-    abilities_db = load_abilities_from_json(f"{base_dir}/Abilities.json")
-    effects_db = load_permanent_effects_from_json(f"{base_dir}/PermanentBuffs.json")
-    procs_db = load_procs_from_json(f"{base_dir}/BaseProcs.json")
-
-    # Convert drafted raw dicts and update base databases
-    abilities_db.update(load_abilities_from_dict(raw_opt_abilities))
-    effects_db.update(load_permanent_effects_from_dict(raw_opt_buffs))
-    procs_db.update(load_procs_from_dict(raw_opt_procs))
-
-    return abilities_db, procs_db, effects_db
