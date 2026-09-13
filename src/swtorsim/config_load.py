@@ -1,12 +1,9 @@
 import json
 import os
-from typing import Dict, Any, Tuple
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Dict, List
 from src.swtorsim.abilities import AbilityBlueprint
-from src.swtorsim.abilities import Ability
-from src.swtorsim.effects import ActiveEffect, ProcData
-
+from src.swtorsim.effects import ActiveEffect
 
 
 def fqn_to_relative_path(fqn: str) -> Path:
@@ -47,8 +44,10 @@ def load_complete_loadout(
 
     print(f"✅ Loaded {len(blueprints)} total blueprints into unified loadout database.")
     return blueprints
+
+
 # -----------------------------------------------------------------------------
-# JSON Helper
+# JSON Helpers & Config Loaders
 # -----------------------------------------------------------------------------
 
 def load_json_file(filepath: str) -> Any:
@@ -59,29 +58,26 @@ def load_json_file(filepath: str) -> Any:
     with open(filepath, "r", encoding="utf-8") as f:
         raw_data = json.load(f)
 
-    # Safeguard against double-serialized JSON content
     if isinstance(raw_data, str):
         raw_data = json.loads(raw_data)
 
     return raw_data
 
+
 def load_permanent_effects_from_dict(raw_data: dict) -> Dict[str, ActiveEffect]:
-    """Converts a dictionary of raw effects configs into ActiveEffect instances."""
+    """Converts raw debuff configs into ActiveEffect instances."""
     registry = {}
     for k, v in raw_data.items():
         buff = ActiveEffect.from_dict(v, k)
         registry[buff.effect_name] = buff
     return registry
 
-# -----------------------------------------------------------------------------
-# JSON Loaders (Normalized Wrappers)
-# -----------------------------------------------------------------------------
-
 
 def load_permanent_effects_from_json(filepath: str) -> Dict[str, ActiveEffect]:
-    """Loads permanent effect definitions from a JSON file into ActiveEffect instances."""
+    """Loads permanent debuff module definitions from JSON into ActiveEffect instances."""
     raw_data = load_json_file(filepath)
     return load_permanent_effects_from_dict(raw_data)
+
 
 def load_character_stats_from_json(class_name: str, filepath: str) -> dict:
     """Loads character stat profile JSON and formats it for the player."""
@@ -95,4 +91,3 @@ def load_character_stats_from_json(class_name: str, filepath: str) -> dict:
 def load_rotation_from_json(filepath: str) -> Any:
     """Loads rotation step sequences directly from a JSON file."""
     return load_json_file(filepath)
-
