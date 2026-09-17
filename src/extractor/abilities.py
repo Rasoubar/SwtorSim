@@ -108,6 +108,16 @@ def _float_field(record: NodeRecord, name: str) -> float | None:
     return None
 
 
+def _int_field(record: NodeRecord, name: str) -> int | None:
+    value = _field_value(record, name)
+    if value is None:
+        return None
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def _icon_png_name(spec: Any) -> str | None:
     if not isinstance(spec, str):
         return None
@@ -879,13 +889,7 @@ def _effect_field_interval_seconds(record: NodeRecord, name: str) -> float | Non
 
 
 def _effect_int_field(effect_record: NodeRecord, name: str) -> int | None:
-    value = _field_value(effect_record, name)
-    if value is None:
-        return None
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return None
+    return _int_field(effect_record, name)
 
 
 def _effect_stack_charge(effect_record: NodeRecord) -> dict[str, Any] | None:
@@ -1962,6 +1966,9 @@ def _build_ability_payload(
         payload["icon"] = icon
     payload["type"] = ability_type
     payload["cooldown"] = _cooldown(record)
+    max_charges = _int_field(record, "ablMaxCharges")
+    if max_charges is not None:
+        payload["max_charges"] = max_charges
     payload["ablIgnoreAlacrity"] = _ignore_alacrity(
         record, "ablIgnoreAlacrity", default=False
     )
