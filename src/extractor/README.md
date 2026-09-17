@@ -108,7 +108,7 @@ One file per root `abl.*` node with base class `ablAbility`:
 }
 ```
 
-`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`.
+`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`. Effects may include `name` from `effInitializer_SetName` / `effParam_Name` (XML tags and surrounding whitespace stripped; omitted when missing). `effInitializer_SetName` is not kept in `initializers`.
 
 `ablIgnoreAlacrity` sits immediately under `cooldown`. The GOM field is sparse (written only when `true`); when absent the parsed value is `false`.
 

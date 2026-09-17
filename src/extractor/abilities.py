@@ -122,6 +122,14 @@ def _icon_png_name(spec: Any) -> str | None:
     return f"{spec}.png"
 
 
+def _clean_effect_name(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    stripped = re.sub(r"<[^>]+>", "", raw)
+    cleaned = " ".join(stripped.split())
+    return cleaned or None
+
+
 def icon_stems_from_payload(payload: dict[str, Any]) -> set[str]:
     stems: set[str] = set()
 
@@ -1483,6 +1491,32 @@ def _effect_icon_png(effect_record: NodeRecord) -> str | None:
     return _icon_png_name(_set_icon_spec_from_initializers(effect_record))
 
 
+def _set_name_from_initializers(effect_record: NodeRecord) -> str | None:
+    for branch in _sub_effects(effect_record):
+        initializers_raw = _sub_effect_field(branch, "effInitializers")
+        if not isinstance(initializers_raw, dict):
+            continue
+        initializer_list = initializers_raw.get("list")
+        if not isinstance(initializer_list, list):
+            continue
+        for entry in initializer_list:
+            if not isinstance(entry, list):
+                continue
+            fields = _entry_fields(entry)
+            if fields.get("effInitializerName") != "effInitializer_SetName":
+                continue
+            string_params = _action_param_dicts(entry)["string"]
+            name = string_params.get("effParam_Name")
+            if not isinstance(name, str) or not name.strip():
+                raw = fields.get("effStringParams")
+                entries = raw.get("list") if isinstance(raw, dict) else raw
+                name = _lookup_list_to_dict(entries).get("effParam_Name")
+            cleaned = _clean_effect_name(name)
+            if cleaned:
+                return cleaned
+    return None
+
+
 def _decode_initializer(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
     fields = _entry_fields(entry)
     initializer_name = fields.get("effInitializerName")
@@ -1848,6 +1882,9 @@ def _decode_effect(
         "number": number,
         "entry": not _effect_has_if_called_by_effect(effect_record),
     }
+    name = _set_name_from_initializers(effect_record)
+    if name:
+        decoded["name"] = name
     icon = _effect_icon_png(effect_record)
     if icon:
         decoded["icon"] = icon
