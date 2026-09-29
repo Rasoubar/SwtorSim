@@ -108,9 +108,11 @@ One file per root `abl.*` node with base class `ablAbility`:
 }
 ```
 
-`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`.
+`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`. Effects may include `name` from `effInitializer_SetName` / `effParam_Name` (XML tags and surrounding whitespace stripped; omitted when missing). `effInitializer_SetName` is not kept in `initializers`.
 
-`ablIgnoreAlacrity` sits immediately under `cooldown`. The GOM field is sparse (written only when `true`); when absent the parsed value is `false`.
+`max_charges` is copied from sparse `ablMaxCharges` when that field is present and sits immediately under `cooldown`. It is omitted when the GOM field is missing.
+
+`ablIgnoreAlacrity` sits immediately under `cooldown` (or under `max_charges` when that field is present). The GOM field is sparse (written only when `true`); when absent the parsed value is `false`.
 
 Effects that have `duration` and/or `tick_interval` include `effIgnoreAlacrity` as a sibling after those fields. The GOM field is likewise sparse. Defaults when it is absent: `false` if the effect has a `tick_interval` (DoT/HoT ticks scale with alacrity), `true` if it does not (buff duration does not). An explicit stored boolean overrides the default. Instant effects with neither timing field omit the flag.
 
