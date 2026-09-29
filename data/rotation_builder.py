@@ -1,6 +1,17 @@
 import json
 import os
-import copy  # 🟢 NEW: Needed to safely clone saved templates
+import sys
+import copy
+from dataclasses import dataclass
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from src.swtorsim.cli import select_choices_path, select_discipline_path
+from src.swtorsim.config_load import fqn_to_relative_path, load_json_file
+from src.swtorsim.run_config import resolve_skill_tree_fqns
+
+PARSED_DIR = Path("data/extractor/parsed")
 
 
 def get_input(prompt, type_func=str, default=None):
@@ -83,13 +94,127 @@ def build_rules(indent="  "):
     return rules
 
 
+@dataclass(frozen=True)
+class CastableAbility:
+    fqn: str
+    name: str
+    triggers_gcd: bool
+
+
+def loadout_fqns(spec_data: dict, choices: dict) -> list[str]:
+    """Baseline discipline abilities plus the chosen skill-tree slots, without gear."""
+    baseline = spec_data.get("active_abilities", [])
+    if not isinstance(baseline, list):
+        raise ValueError("Discipline file active_abilities must be a list.")
+
+    tree_fqns = resolve_skill_tree_fqns(spec_data.get("skill_tree", {}), choices)
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for fqn in [*baseline, *tree_fqns]:
+        if not isinstance(fqn, str) or not fqn.strip():
+            print(f"⚠️ [WARN] Skipping invalid ability id: {fqn!r}")
+            continue
+        if fqn in seen:
+            continue
+        seen.add(fqn)
+        ordered.append(fqn)
+    return ordered
+
+
+def build_castable_catalog(
+    spec_path: str,
+    choices_path: str,
+    parsed_dir: Path = PARSED_DIR,
+) -> list[CastableAbility]:
+    """Returns active abilities for a discipline and skill-tree selection, sorted by name."""
+    spec_data = load_json_file(spec_path)
+    choices = load_json_file(choices_path)
+    actives: list[CastableAbility] = []
+    passive_count = 0
+    talent_count = 0
+
+    for fqn in loadout_fqns(spec_data, choices):
+        if fqn.startswith("tal."):
+            talent_count += 1
+            continue
+
+        full_path = parsed_dir / fqn_to_relative_path(fqn)
+        if not full_path.is_file():
+            print(f"⚠️ [WARN] Blueprint file not found for FQN '{fqn}': {full_path}")
+            continue
+
+        data = load_json_file(str(full_path))
+        ability_type = data.get("type")
+        if ability_type == "passive":
+            passive_count += 1
+            continue
+        if ability_type != "active":
+            print(
+                f"⚠️ [WARN] Skipping '{fqn}': type is {ability_type!r}, "
+                "expected 'active' or 'passive'."
+            )
+            continue
+
+        name = data.get("name")
+        if not isinstance(name, str) or not name.strip():
+            name = fqn
+        actives.append(CastableAbility(
+            fqn=fqn,
+            name=name,
+            triggers_gcd=data.get("triggers_gcd") is not False,
+        ))
+
+    actives.sort(key=lambda ability: (ability.name.lower(), ability.fqn))
+    on_gcd = sum(ability.triggers_gcd for ability in actives)
+    off_gcd = len(actives) - on_gcd
+    print(
+        f"\nCastable abilities: {len(actives)} "
+        f"({on_gcd} on GCD, {off_gcd} off-GCD). "
+        f"Omitted {passive_count} passives and {talent_count} talents."
+    )
+    return actives
+
+
+def pick_ability(catalog: list[CastableAbility], prompt: str = "Select ability number: ") -> str:
+    """Shows the castable list and returns the chosen ability FQN."""
+    if not catalog:
+        raise ValueError("No castable abilities to choose from.")
+
+    for idx, ability in enumerate(catalog, 1):
+        suffix = "" if ability.triggers_gcd else " (off-GCD)"
+        print(f"  [{idx}] {ability.name}{suffix}")
+
+    while True:
+        try:
+            choice_idx = int(input(prompt).strip()) - 1
+            if 0 <= choice_idx < len(catalog):
+                return catalog[choice_idx].fqn
+            print(f"  ❌ Invalid selection. Please enter a number between 1 and {len(catalog)}.")
+        except ValueError:
+            print(f"  ❌ Invalid selection. Please enter a number between 1 and {len(catalog)}.")
+
+
+def rotation_folder_defaults(spec_path: str) -> tuple[str, str]:
+    """Class and spec folder names from a discipline path, not its display names."""
+    path = Path(spec_path)
+    return path.parent.name, path.stem
+
+
 def main():
     print("=========================================")
     print("      SWTOR SIM - ROTATION BUILDER       ")
     print("=========================================")
 
+    _class_name, _spec, spec_path = select_discipline_path()
+    choices_path = select_choices_path()
+    catalog = build_castable_catalog(spec_path, choices_path)
+    if not catalog:
+        print("No castable abilities found. Exiting without saving.")
+        return
+
+    default_class, default_spec = rotation_folder_defaults(spec_path)
     rotation = []
-    saved_templates = {}  # 🟢 NEW: Local clipboard for the session
+    saved_templates = {}  # Local clipboard for the session
 
     while True:
         print("\nWhat kind of step do you want to add to the timeline?")
@@ -107,7 +232,7 @@ def main():
 
         elif choice == 1:
             print("\n--- Adding FIXED Step ---")
-            ability_id = get_input("Ability ID (e.g., eradicate)", str)
+            ability_id = pick_ability(catalog)
             rotation.append({
                 "type": "fixed",
                 "ability_id": ability_id
@@ -116,7 +241,7 @@ def main():
 
         elif choice == 2:
             print("\n--- Adding OPTIONAL Step ---")
-            ability_id = get_input("Ability ID (e.g., recklessness)", str)
+            ability_id = pick_ability(catalog)
             rules = build_rules()
 
             step_dict = {
@@ -144,7 +269,7 @@ def main():
                 if not add_ability:
                     break
 
-                ab_id = get_input("  Ability ID", str)
+                ab_id = pick_ability(catalog, prompt="  Select ability number: ")
                 ab_rules = build_rules(indent="    ")
                 pool.append({
                     "ability_id": ab_id,
@@ -202,8 +327,8 @@ def main():
     print("\n=========================================")
     print("             SAVE & EXPORT               ")
 
-    class_name = get_input("Enter Class folder (e.g., assassin)", str, "assassin")
-    spec_name = get_input("Enter Spec folder (e.g., hatred)", str, "hatred")
+    class_name = get_input("Enter Class folder (e.g., assassin)", str, default_class)
+    spec_name = get_input("Enter Spec folder (e.g., hatred)", str, default_spec)
 
     target_dir = os.path.join("data", "rotations", class_name, spec_name)
     os.makedirs(target_dir, exist_ok=True)
