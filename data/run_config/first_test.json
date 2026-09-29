@@ -1,0 +1,18 @@
+{
+  "spec_path": "data/extractor/disciplines/assassin/hatred.json",
+  "stats_path": "data/builds/RedStimBuild.json",
+  "rotation_path": "data/rotations/assassin/hatred/BasicMaliPS.json",
+  "choices_path": "data/choices/assassin/mali.json",
+  "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
+  "legendary_fqns": [
+    "abl.itm.legendary.inq_con.dynamic_force",
+    "abl.itm.legendary.inq_con.sin_shad.force_training"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_power.scales_with_item_rating"
+  ],
+  "mode": "TEST",
+  "level": 85,
+  "training_dummy_armor_debuff": true
+}

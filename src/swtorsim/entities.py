@@ -242,6 +242,14 @@ class Player(Entity):
         final_cost = (base_cost * pct_modifiers) + flat_reductions
         return max(0.0, final_cost) #safeguard tbh
 
+
+def _effect_modifiers(effect):
+    getter = getattr(effect, "get_effective_modifiers", None)
+    if getter is None:
+        return ()
+    return getter()
+
+
 class Dummy(Entity):
     """Represents a dummy and all it entails."""
     RECALCULATE_STATS = {"Armor Rating"}
@@ -260,12 +268,15 @@ class Dummy(Entity):
         temp_stats = self.base_stats.copy()
         armor_rating_change = 0
         for effect in self.effects.values():
-            effect_id = effect.id
+            effect_id = getattr(effect, "id", None)
             if effect_id in EFFECTS:
                 multiplier = effect.charges if effect.max_charges is not None else 1
                 stat_name = EFFECTS[effect_id]["stat_name"]
                 if stat_name == "Armor Rating":
                     armor_rating_change += effect.value * multiplier
+            for modifier in _effect_modifiers(effect):
+                if modifier.stat == "STAT_rtg_armor":
+                    armor_rating_change += modifier.value
         temp_stats["Armor"] *= (1+armor_rating_change)
         self.stats = temp_stats
 

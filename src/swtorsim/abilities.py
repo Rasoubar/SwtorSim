@@ -198,7 +198,9 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
     delay = action.get("delay", 0.0)
 
     if action_type == "damage":
-        return handle_damage_action(sim, caster, target, action, source_name, delay)
+        return handle_damage_action(
+            sim, caster, target, action, source_name, delay, ability=ability
+        )
     elif action_type == "resource_gain":
         handle_resource_gain_action(sim, caster, action, delay)
     elif action_type == "cooldown_mod":
@@ -220,16 +222,31 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
     return True
 
 
-def handle_damage_action(sim, caster, target, action, source_name, delay):
+def handle_damage_action(sim, caster, target, action, source_name, delay, ability=None):
     """Rolls accuracy then schedules or executes the hit."""
     if not accuracy_roll(caster, action.get("hand", "main")):
         return False
-    hit_event = DamageHit(caster, target, action, source_name)
+    hit_action = dict(action)
+    hit_action["tags"] = _tags_for_hit(action, ability)
+    hit_event = DamageHit(caster, target, hit_action, source_name)
     if delay > 0.0:
         sim.schedule_relative(delay, hit_event)
     else:
         hit_event.resolve(sim)
     return True
+
+
+def _tags_for_hit(action, ability) -> list:
+    """Action tags plus the owning ability and effect tags, so target debuffs can match them."""
+    tags = set(action.get("tags") or [])
+    if ability is None:
+        return list(tags)
+    tags.update(ability.tags)
+    for effect in ability.effects.values():
+        for branch in effect.branches:
+            if action in branch.actions:
+                tags.update(effect.tags)
+    return list(tags)
 
 
 def handle_resource_gain_action(sim, caster, action, delay):

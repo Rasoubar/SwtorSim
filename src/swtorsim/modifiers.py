@@ -35,6 +35,14 @@ def _auto_load_stat_map() -> None:
 _auto_load_stat_map()
 
 
+def _modify_stat_amount(action: Dict[str, Any]) -> float:
+    """Uses the percent when it is set, otherwise the flat minimum."""
+    percent = float(action.get("amount_percent") or 0.0)
+    if percent:
+        return percent
+    return float(action.get("amount_min") or 0.0)
+
+
 def resolve_stat(raw_stat: Union[str, int]) -> str:
     """Translates integer Global IDs to canonical strings, or returns existing strings."""
     if isinstance(raw_stat, int):
@@ -107,11 +115,10 @@ class Modifier:
     @classmethod
     def from_modify_stat(cls, action: Dict[str, Any]) -> "Modifier":
         """Builds a Modifier from a flat modify_stat action node."""
-        value = action.get("amount_min", action.get("amount_percent", 0.0))
         raw_stat = action.get("stat") or action.get("name", "")
         return cls(
             stat=resolve_stat(raw_stat),
-            value=float(value),
+            value=_modify_stat_amount(action),
             targets=extract_targets(action),
         )
 

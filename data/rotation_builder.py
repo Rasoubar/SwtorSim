@@ -202,10 +202,10 @@ def main():
     print("\n=========================================")
     print("             SAVE & EXPORT               ")
 
-    class_name = get_input("Enter Class name (e.g., Assassin)", str, "Assassin")
-    spec_name = get_input("Enter Spec name (e.g., Hatred)", str, "Hatred")
+    class_name = get_input("Enter Class folder (e.g., assassin)", str, "assassin")
+    spec_name = get_input("Enter Spec folder (e.g., hatred)", str, "hatred")
 
-    target_dir = os.path.join("data", class_name, spec_name, "Rotations")
+    target_dir = os.path.join("data", "rotations", class_name, spec_name)
     os.makedirs(target_dir, exist_ok=True)
 
     save_path = get_input("Enter filename to save (e.g., Hybrid.json)", str, "StandardRotation.json")

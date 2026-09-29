@@ -1,9 +1,17 @@
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, NamedTuple
 from src.swtorsim.abilities import AbilityBlueprint
 from src.swtorsim.effects import ActiveEffect
+from src.swtorsim.effects_temp import ActiveEffect as ParsedEffect
+from src.swtorsim.run_config import (
+    TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
+    TRAINING_DUMMY_ARMOR_DEBUFF_PATH,
+    RunConfig,
+    resolve_skill_tree_fqns,
+    validate_run_config,
+)
 
 
 def fqn_to_relative_path(fqn: str) -> Path:
@@ -11,16 +19,77 @@ def fqn_to_relative_path(fqn: str) -> Path:
     return Path(*fqn.strip().split(".")).with_suffix(".json")
 
 
+class SimulationInputs(NamedTuple):
+    """Objects already expected by Tester."""
+
+    rotation_config: Any
+    stats_config: dict
+    loadout_blueprints: Dict[str, AbilityBlueprint]
+    debuff_module: Dict[str, Any]
+
+
+def load_from_run_config(config: RunConfig) -> SimulationInputs:
+    """Resolves a run config into rotation, stats, blueprints, and debuffs."""
+    validate_run_config(config)
+    loadout_blueprints = load_complete_loadout(selected_fqns_from_config(config))
+    debuff_module: dict[str, Any] = {}
+    if config.training_dummy_armor_debuff:
+        debuff = load_training_dummy_armor_debuff()
+        debuff_module[debuff.name] = debuff
+    return SimulationInputs(
+        rotation_config=load_rotation_from_json(config.rotation_path),
+        stats_config=load_character_stats_from_json(config.class_name, config.stats_path),
+        loadout_blueprints=loadout_blueprints,
+        debuff_module=debuff_module,
+    )
+
+
+def load_training_dummy_armor_debuff() -> ParsedEffect:
+    """Loads the operation dummy armor debuff as a permanent target effect."""
+    data = load_json_file(TRAINING_DUMMY_ARMOR_DEBUFF_PATH)
+    fqn = data.get("fqn") or ""
+    parsed = None
+    for node in data.get("effects") or []:
+        effect = ParsedEffect.from_effect_node(
+            fqn, TRAINING_DUMMY_ARMOR_DEBUFF_LABEL, node
+        )
+        if effect.modifiers:
+            parsed = effect
+            break
+    if parsed is None:
+        raise ValueError(
+            f"'{TRAINING_DUMMY_ARMOR_DEBUFF_PATH}' has no stat modifiers to apply."
+        )
+    parsed.name = TRAINING_DUMMY_ARMOR_DEBUFF_LABEL
+    return parsed
+
+
+def selected_fqns_from_config(config: RunConfig) -> List[str]:
+    """Baseline discipline abilities, the chosen skill-tree slots, then gear and relic FQNs."""
+    spec_data = load_json_file(config.spec_path)
+    baseline = spec_data.get("active_abilities", [])
+    if not isinstance(baseline, list):
+        raise ValueError(f"Discipline file '{config.spec_path}' active_abilities must be a list.")
+
+    choices = load_json_file(config.choices_path)
+    tree_fqns = resolve_skill_tree_fqns(spec_data.get("skill_tree", {}), choices)
+    return [
+        *baseline,
+        *tree_fqns,
+        config.tactical_fqn,
+        *config.legendary_fqns,
+        *config.relic_fqns,
+    ]
+
+
 def load_complete_loadout(
     selected_fqns: List[str],
-    selected_relic_paths: List[str],
-    parsed_dir: str = "data/extractor/parsed"
+    parsed_dir: str = "data/extractor/parsed",
 ) -> Dict[str, AbilityBlueprint]:
-    """Resolves and loads all ability, talent, gear, and relic blueprints into a unified dictionary."""
+    """Resolves ability, talent, gear, and relic FQNs into a unified blueprint dictionary."""
     base_parsed_path = Path(parsed_dir).resolve()
     blueprints: Dict[str, AbilityBlueprint] = {}
 
-    # 1. Load abilities, passives, tacticals, and implants by FQN
     for fqn in selected_fqns:
         rel_path = fqn_to_relative_path(fqn)
         full_path = base_parsed_path / rel_path
@@ -31,16 +100,6 @@ def load_complete_loadout(
 
         blueprint = AbilityBlueprint.from_file(full_path)
         blueprints[blueprint.fqn] = blueprint
-
-    # 2. Load relics directly from chosen paths
-    for relic_path_str in selected_relic_paths:
-        relic_path = Path(relic_path_str).resolve()
-        if not relic_path.is_file():
-            print(f"⚠️ [WARN] Relic file not found: {relic_path}")
-            continue
-
-        relic_blueprint = AbilityBlueprint.from_file(relic_path)
-        blueprints[relic_blueprint.fqn] = relic_blueprint
 
     print(f"✅ Loaded {len(blueprints)} total blueprints into unified loadout database.")
     return blueprints

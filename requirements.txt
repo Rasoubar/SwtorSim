@@ -1,2 +1,3 @@
-zstandard>=0.22.0
-Pillow>=10.0.0
+matplotlib
+Pillow
+zstandard
