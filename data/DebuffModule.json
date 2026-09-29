@@ -1,0 +1,36 @@
+{
+  "VULNERABLE": {
+    "id": 386,
+			"value": 0.05,
+			"required_tags": [
+			  "force_attack",
+			  "force_ability"
+			],
+    "effect_name": "Vulnerable"
+  },
+  "SUNDERED": {
+    "id": 48,
+			"value": -0.20,
+    "effect_name": "sundered"
+  },
+  "BEAT_DOWN": {
+    "id": 384,
+			"value": 0.05,
+			"required_tags": [
+			  "melee_ability"
+			],
+    "effect_name": "beat_down"
+  },
+  "ASSAILABLE (internal)": {
+    "id": 370,
+			"value": 0.07,
+			"required_damage_type": 4,
+    "effect_name": "assailable (internal)"
+  },
+  "ASSAILABLE (elemental)": {
+    "id": 376,
+			"value": 0.07,
+			"required_damage_type": 3,
+    "effect_name": "assailable (elemental)"
+  }
+}
