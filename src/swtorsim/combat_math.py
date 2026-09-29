@@ -1,5 +1,7 @@
 import random
 
+from src.swtorsim.combat_curves import armor_constants
+
 EFFECTS = {
     0: {"stat_name": "PlaceHolder"},
     79: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
@@ -43,7 +45,9 @@ def calculate_hit(caster, target, action_data):
 
     post_mit_damage = handle_mitigation(caster, target, base_damage, damage_type)
 
-    post_mod_damage = post_mit_damage * modifiers['total_multiplier']
+    tags = action_data.get("tags") or []
+    taken = damage_taken_multiplier(target, tags, attack_type, damage_type)
+    post_mod_damage = post_mit_damage * modifiers['total_multiplier'] * taken
 
     post_crit_damage, is_crit = calculate_crit(caster, post_mod_damage, modifiers)
 
@@ -95,7 +99,7 @@ def handle_caster_buffs(caster, target, action_tags, damage_type, buckets, modif
 def handle_target_debuffs(target, action_tags, damage_type, buckets, modifiers):
     """ Alters modifiers dict according to debuffs on target."""
     for debuff in target.effects.values():
-        if debuff.id not in EFFECTS:
+        if getattr(debuff, "id", None) not in EFFECTS:
             continue
         if debuff.required_tags is not None and not any(tag in action_tags for tag in debuff.required_tags):
             continue
@@ -146,7 +150,7 @@ def consume_charges(caster, target, action_tags):
 
     # Consume Target Debuffs
     for effect_key, buff in list(target.effects.items()):
-        if buff.id not in EFFECTS:
+        if getattr(buff, "id", None) not in EFFECTS:
             continue
         if buff.required_tags and not any(tag in action_tags for tag in buff.required_tags):
             continue
@@ -154,6 +158,71 @@ def consume_charges(caster, target, action_tags):
             target_expired_debuffs.append(effect_key)
 
     target.cleanup_expired_effects(target_expired_debuffs)
+
+_CHANNEL_TAG_SUFFIXES = (
+    ("melee_ability", "melee"),
+    ("ranged_ability", "ranged"),
+    ("tech_attack", "tech"),
+    ("tech_ability", "tech"),
+    ("force_attack", "force"),
+    ("force_ability", "force"),
+)
+
+_DAMAGE_TYPE_NAMES = {
+    1: "kinetic",
+    2: "energy",
+    3: "elemental",
+    4: "internal",
+}
+
+
+def _channel_for_hit(tags, attack_type):
+    for tag in tags:
+        for suffix, channel in _CHANNEL_TAG_SUFFIXES:
+            if str(tag).endswith(suffix):
+                return channel
+    if attack_type in (1, 2):
+        return "melee"
+    if attack_type in (3, 4):
+        return "force"
+    return None
+
+
+def _hit_is_aoe(tags) -> bool:
+    return any(str(tag).endswith("is_aoe") or str(tag).endswith("aoe_ability") for tag in tags)
+
+
+def damage_taken_multiplier(target, tags, attack_type, damage_type) -> float:
+    """Scales damage by parsed target modifiers such as the training dummy armor debuff."""
+    channel = _channel_for_hit(tags, attack_type)
+    type_name = _DAMAGE_TYPE_NAMES.get(damage_type)
+    tag_set = frozenset(tags)
+    aoe = _hit_is_aoe(tags)
+    bonus = 0.0
+
+    for effect in target.effects.values():
+        getter = getattr(effect, "get_effective_modifiers", None)
+        if getter is None:
+            continue
+        for modifier in getter():
+            stat = modifier.stat
+            if "damage_taken_scale_channel_" in stat:
+                if channel and f"channel_{channel}_" in stat:
+                    bonus += modifier.value
+                continue
+            if "damage_taken_scale_type_" in stat:
+                if type_name and f"type_{type_name}_" in stat:
+                    bonus += modifier.value
+                continue
+            if stat == "STAT_rtg_armor" or not modifier.targets:
+                continue
+            if modifier.applies_to(ability_tags=tag_set):
+                bonus += modifier.value
+            elif aoe and any(str(target_tag).endswith("is_aoe") for target_tag in modifier.targets):
+                bonus += modifier.value
+
+    return 1.0 + bonus
+
 
 def calculate_base_damage(caster, action_data, attack_type):
     """ Calculates base damage from caster and action data. Returns damage value."""
@@ -191,7 +260,8 @@ def handle_mitigation(caster, target, ability_damage, damage_type):
         armor = target.stats.get("Armor", 17225)
         total_armor_pen = caster.stats.get("Armor Penetration", 0.0)
         effective_armor = armor * (1.0 - total_armor_pen)
-        armor_dr = effective_armor / (effective_armor + 32000)
+        multiplier, additive = armor_constants(caster.level)
+        armor_dr = effective_armor / (effective_armor + multiplier * caster.level + additive)
         ability_damage *= (1.0 - armor_dr)
     return ability_damage
 
@@ -220,30 +290,11 @@ def accuracy_roll(source, hand):
     return True
 
 
-def calc_dr(rating: float, cap: float, k_factor: float) -> float:
-    """
-    AI comment for clarity
-    Calculates percentage gain from a raw rating using SWTOR's Diminishing Returns curve:
-        Gain % = Cap * [ 1 - (1 - 0.01 / Cap) ** ( (1 / K) * (Rating / Level) ) ]
-
-    Parameters:
-        rating (float):   Raw stat rating from gear/buffs (e.g., 2800 Critical Rating)
-        cap (float):      Theoretical max percentage bonus (e.g., 0.30 for 30% Crit Rating cap)
-        k_factor (float): SWTOR scaling constant for this stat:
-                          - 2.41  : Critical Rating
-                          - 3.20  : Alacrity & Accuracy Ratings
-                          - 12.93 : Mastery -> Crit conversion
-
-    Returns:
-        float: Percentage increase as a decimal (e.g., 0.142 for +14.2%)
-    """
+def calc_dr(rating: float, cap: float, k_factor: float, level: int) -> float:
+    """Percentage from a rating: Cap * [1 - (1 - 0.01 / Cap) ** ((1 / divisor) * (Rating / Level))]."""
     if not rating:
         return 0.0
 
-    level_modifier = 80.0
-
     base_ratio = 1.0 - (0.01 / cap)
-
-    decay_exponent = (1.0 / k_factor) * (rating / level_modifier)
-
+    decay_exponent = (1.0 / k_factor) * (rating / level)
     return cap * (1.0 - (base_ratio ** decay_exponent))

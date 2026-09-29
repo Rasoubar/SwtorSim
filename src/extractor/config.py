@@ -24,6 +24,14 @@ COMBAT_FQN_PREFIXES = (
 
 ABILITY_REPLACEMENT_NODE_ID = "16141053964861013368"
 STANDARD_RATING_INFO_NODE_ID = "16140953577088069180"
+
+# Combat curve tables. FQNs differ from the names used in the parsed JSON.
+DERIVED_STAT_MODIFIERS_FQN = "modDerivedStatModifiersList"
+DERIVED_STAT_MAPPING_FQN = "modDerivedStatMappingList"
+COMBAT_SYSTEMS_PER_LEVEL_FQN = "dcvCombatSystemsPerLevelPrototype"
+STANDARD_DAMAGE_FQN = "cbtStandardDamageInfo"
+STANDARD_HEALING_FQN = "cbtStandardHealingInfo"
+
 DEFAULT_ITEM_RATING = 344
 
 ORIGIN_STORIES = (

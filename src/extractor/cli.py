@@ -17,6 +17,7 @@ from extractor.config import (
 )
 from extractor.abilities import build_abilities
 from extractor.adrenals import build_adrenals
+from extractor.combat_curves import build_combat_curves
 from extractor.disciplines import build_disciplines
 from extractor.talents import build_talents
 from extractor.dump import write_node_dump
@@ -204,6 +205,9 @@ def run_extraction(config: ExtractorConfig) -> Path:
     adrenals_path = config.data_dir / "adrenals.json"
     adrenal_list_count = build_adrenals(store, adrenals_path)
 
+    combat_curves_path = config.data_dir / "combat_curves.json"
+    build_combat_curves(store, gom, combat_curves_path)
+
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
 
@@ -223,6 +227,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Wrote {gear_count} gear entries to {gear_path}")
     print(f"Wrote {relic_count} relics to {relics_path}")
     print(f"Wrote {adrenal_list_count} adrenals to {adrenals_path}")
+    print(f"Wrote combat curves to {combat_curves_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")

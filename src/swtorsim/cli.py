@@ -1,29 +1,26 @@
-import os
-from typing import List, Tuple
-from src.swtorsim.config_load import load_json_file
+from pathlib import Path
 
-CLASS_FQN_KEYWORDS = {
-    "assassin": ["sin_shad", "inq_con"],
-    "shadow": ["sin_shad", "inq_con"],
-    "sorcerer": ["sorc_sage", "inq_con"],
-    "sage": ["sorc_sage", "inq_con"],
-    "juggernaut": ["jug_guar", "jug_gua", "war_kni"],
-    "guardian": ["jug_guar", "jug_gua", "war_kni"],
-    "marauder": ["mar_sen", "war_kni"],
-    "sentinel": ["mar_sen", "war_kni"],
-    "operative": ["op_sco", "ope_sco", "age_smu"],
-    "scoundrel": ["op_sco", "ope_sco", "age_smu"],
-    "sniper": ["sni_gun", "age_smu"],
-    "gunslinger": ["sni_gun", "age_smu"],
-    "mercenary": ["mer_com", "merc_com", "bh_tr", "bou_tro"],
-    "commando": ["mer_com", "merc_com", "bh_tr", "bou_tro"],
-    "powertech": ["pow_vang", "powertech", "bh_tr", "bou_tro"],
-    "specialist": ["pow_vang", "powertech", "bh_tr", "bou_tro"],
-}
+from src.swtorsim.config_load import load_json_file
+from src.swtorsim.run_config import (
+    BUILDS_DIR,
+    CHOICES_DIR,
+    DISCIPLINES_DIR,
+    GEAR_PATH,
+    LEGENDARY_PREFIX,
+    RELICS_PATH,
+    ROTATIONS_DIR,
+    TACTICAL_PREFIX,
+    TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
+    RunConfig,
+    discipline_names,
+    filter_gear_for_class,
+    relic_menu_label,
+    validate_run_config,
+)
 
 
 def prompt_menu_choice(options: list[str], prompt: str) -> str:
-    """Helper to display a numbered list and repeatedly prompt until a valid choice is made."""
+    """Displays a numbered list and prompts until the selection is valid."""
     for idx, name in enumerate(options, 1):
         print(f"  [{idx}] {name}")
 
@@ -37,188 +34,214 @@ def prompt_menu_choice(options: list[str], prompt: str) -> str:
             print(f"  ❌ Invalid selection. Please enter a number between 1 and {len(options)}.")
 
 
-def select_discipline_path(disciplines_dir: str = "data/extractor/disciplines") -> Tuple[str, str, str]:
-    """Interactively prompts the user to select Class and Specialization JSON."""
+def collect_run_config_interactive() -> RunConfig:
+    """Prompts for every selection and returns a validated run config."""
+    mode, iterations = prompt_run_mode()
+
     print("=== SWTOR Combat Simulator Loadout Setup ===")
+    class_name, spec, spec_path = select_discipline_path()
+    stats_path = select_stats_path()
+    rotation_path = select_rotation_path()
+    choices_path = select_choices_path()
+    tactical_fqn = select_tactical(class_name)
+    legendary_fqns = select_legendaries(class_name)
+    relic_fqns = select_relics()
+    training_dummy_armor_debuff = prompt_training_dummy_armor_debuff()
 
-    print(f"\n📂 Available Classes inside '{disciplines_dir}':")
-    class_options = sorted([
-        d for d in os.listdir(disciplines_dir)
-        if os.path.isdir(os.path.join(disciplines_dir, d))
-    ])
-    class_name = prompt_menu_choice(class_options, "Select Class Number: ")
-    class_dir = os.path.join(disciplines_dir, class_name)
-
-    print(f"\n📂 Available Specializations inside '{class_name}':")
-    spec_files = sorted([
-        f for f in os.listdir(class_dir)
-        if f.endswith(".json")
-    ])
-    spec_choice = prompt_menu_choice(spec_files, "Select Specialization Number: ")
-    spec_path = os.path.join(class_dir, spec_choice)
-    spec_name = os.path.splitext(spec_choice)[0]
-
-    return class_name, spec_name, spec_path
-
-
-def select_stats_path(stats_dir: str = "data/Choices/Stats") -> str:
-    """Prompts user to select a stats profile JSON."""
-    print(f"\n📂 Available Stat Profiles in '{stats_dir}':")
-    stat_options = sorted([f for f in os.listdir(stats_dir) if f.endswith(".json")])
-    stats_choice = prompt_menu_choice(stat_options, "Select Stats Profile Number: ")
-    return os.path.join(stats_dir, stats_choice)
+    config = RunConfig(
+        spec_path=spec_path,
+        class_name=class_name,
+        spec=spec,
+        stats_path=stats_path,
+        rotation_path=rotation_path,
+        choices_path=choices_path,
+        tactical_fqn=tactical_fqn,
+        legendary_fqns=legendary_fqns,
+        relic_fqns=relic_fqns,
+        training_dummy_armor_debuff=training_dummy_armor_debuff,
+        mode=mode,
+        iterations=iterations,
+    )
+    validate_run_config(config)
+    return config
 
 
-def select_rotation_path(spec_name: str, specs_dir: str = "data/Choices/Specs") -> str:
-    """Prompts user to select a rotation sequence JSON for the chosen specialization."""
-    rotations_dir = os.path.join(specs_dir, spec_name, "Rotations")
-    print(f"\n📂 Available Rotations in '{rotations_dir}':")
-    rotation_options = sorted([f for f in os.listdir(rotations_dir) if f.endswith(".json")])
-    rotation_file = prompt_menu_choice(rotation_options, "Select Rotation Sequence Number: ")
-    return os.path.join(rotations_dir, rotation_file)
+def select_discipline_path(
+    disciplines_dir: str = DISCIPLINES_DIR,
+) -> tuple[str, str, str]:
+    """Prompts for a class (tab_name) and spec (package_name). Returns both plus the JSON path."""
+    disciplines = index_disciplines(disciplines_dir)
+
+    print("\n📂 Available Classes:")
+    class_name = prompt_menu_choice(sorted(disciplines), "Select Class Number: ")
+
+    print(f"\n📂 Available Specs for {class_name}:")
+    spec = prompt_menu_choice(sorted(disciplines[class_name]), "Select Spec Number: ")
+    return class_name, spec, disciplines[class_name][spec]
 
 
-def _filter_gear_by_type_and_class(
-    gear_data: dict[str, str], prefix: str, class_name: str
-) -> dict[str, str]:
-    """Filters gear items by FQN prefix and class compatibility."""
-    keywords = CLASS_FQN_KEYWORDS.get(class_name.lower(), [])
-    filtered = {}
+def index_disciplines(disciplines_dir: str = DISCIPLINES_DIR) -> dict[str, dict[str, str]]:
+    """Maps tab_name -> package_name -> discipline JSON path."""
+    root = Path(disciplines_dir)
+    if not root.is_dir():
+        raise FileNotFoundError(f"Discipline directory not found: {disciplines_dir}")
 
-    for name, fqn in gear_data.items():
-        if not fqn.startswith(prefix):
+    disciplines: dict[str, dict[str, str]] = {}
+    for path in sorted(root.rglob("*.json")):
+        if not path.is_file():
             continue
+        spec_data = load_json_file(str(path))
+        class_name, spec = discipline_names(spec_data, str(path))
+        specs = disciplines.setdefault(class_name, {})
+        if spec in specs:
+            raise ValueError(
+                f"Duplicate spec '{spec}' for class '{class_name}' in '{path}'."
+            )
+        specs[spec] = str(path)
 
-        if "generic" in fqn or any(k in fqn for k in keywords):
-            filtered[name] = fqn
+    if not disciplines:
+        raise FileNotFoundError(f"No discipline JSON files found in '{disciplines_dir}'.")
+    return disciplines
 
-    return filtered
+
+def select_stats_path(builds_dir: str = BUILDS_DIR) -> str:
+    """Prompts for a build JSON from the top level of the builds directory."""
+    options = catalog_json_files(builds_dir, recursive=False)
+    print(f"\n📂 Available Builds in '{builds_dir}':")
+    choice = prompt_menu_choice(sorted(options), "Select Build Number: ")
+    return options[choice]
+
+
+def select_rotation_path(rotations_dir: str = ROTATIONS_DIR) -> str:
+    """Prompts for a rotation JSON, including files in subdirectories."""
+    options = catalog_json_files(rotations_dir, recursive=True)
+    print(f"\n📂 Available Rotations in '{rotations_dir}':")
+    choice = prompt_menu_choice(sorted(options), "Select Rotation Number: ")
+    return options[choice]
+
+
+def select_choices_path(choices_dir: str = CHOICES_DIR) -> str:
+    """Prompts for a skill-tree choice JSON, including files in subdirectories."""
+    options = catalog_json_files(choices_dir, recursive=True)
+    print(f"\n📂 Available Skill Tree Choices in '{choices_dir}':")
+    choice = prompt_menu_choice(sorted(options), "Select Choices Number: ")
+    return options[choice]
+
+
+def catalog_json_files(directory: str, recursive: bool) -> dict[str, str]:
+    """Maps a display label (path without .json) to the file path. Raises if the catalog is empty."""
+    root = Path(directory)
+    if not root.is_dir():
+        raise FileNotFoundError(f"Catalog directory not found: {directory}")
+
+    paths = root.rglob("*.json") if recursive else root.glob("*.json")
+    options: dict[str, str] = {}
+    for path in sorted(paths):
+        if not path.is_file():
+            continue
+        label = path.relative_to(root).with_suffix("").as_posix()
+        options[label] = str(path)
+
+    if not options:
+        raise FileNotFoundError(f"No JSON files found in '{directory}'.")
+    return options
 
 
 def select_tactical(
     class_name: str,
-    gear_path: str = "data/extractor/gear_abilities_talents.json",
+    gear_path: str = GEAR_PATH,
 ) -> str:
-    """Prompts user to select 1 Tactical and returns its FQN."""
-    gear_data = load_json_file(gear_path)
-    tacticals = _filter_gear_by_type_and_class(gear_data, "abl.itm.tactical.", class_name)
-
+    """Prompts for one class-compatible tactical and returns its FQN."""
+    tacticals = _gear_options(class_name, TACTICAL_PREFIX, gear_path)
     print("\n📂 Available Tacticals:")
-    options = sorted(tacticals.keys())
-    chosen_name = prompt_menu_choice(options, "Select Tactical Number: ")
+    chosen_name = prompt_menu_choice(sorted(tacticals), "Select Tactical Number: ")
     return tacticals[chosen_name]
 
 
-def select_implants(
+def select_legendaries(
     class_name: str,
-    gear_path: str = "data/extractor/gear_abilities_talents.json",
-) -> List[str]:
-    """Prompts user to select 2 unique Legendary Implants and returns their FQNs."""
-    gear_data = load_json_file(gear_path)
-    implants = _filter_gear_by_type_and_class(gear_data, "abl.itm.legendary.", class_name)
-
+    gear_path: str = GEAR_PATH,
+) -> list[str]:
+    """Prompts for two unique class-compatible legendary implants and returns their FQNs."""
+    legendaries = _gear_options(class_name, LEGENDARY_PREFIX, gear_path)
+    if len(legendaries) < 2:
+        raise ValueError(
+            f"Need at least 2 legendary implants for class '{class_name}', found {len(legendaries)}."
+        )
     print("\n📂 Available Legendary Implants (Select 2):")
-    options = sorted(implants.keys())
+    options = sorted(legendaries)
 
-    first_choice = prompt_menu_choice(options, "Select First Implant Number: ")
+    first_choice = prompt_menu_choice(options, "Select First Legendary Number: ")
     options.remove(first_choice)
-
-    second_choice = prompt_menu_choice(options, "Select Second Implant Number: ")
-
-    return [implants[first_choice], implants[second_choice]]
+    second_choice = prompt_menu_choice(options, "Select Second Legendary Number: ")
+    return [legendaries[first_choice], legendaries[second_choice]]
 
 
-def prompt_optional_choices(class_name: str) -> Tuple[List[str], List[str]]:
-    """Prompts for tacticals, implants, and relics.
+def select_relics(relics_path: str = RELICS_PATH) -> list[str]:
+    """Prompts for 0, 1, or 2 unique relics and returns their FQNs."""
+    catalog = load_json_file(relics_path)
+    if not isinstance(catalog, list):
+        raise ValueError(f"Relic catalog '{relics_path}' must be a JSON array.")
 
-    Returns:
-        (gear_fqns, relic_paths)
-    """
-    tactical_fqn = select_tactical(class_name)
-    implant_fqns = select_implants(class_name)
-    relic_paths = select_relics()
+    print("\n📂 Relics:")
+    count = _prompt_relic_count()
+    if count == 0:
+        return []
 
-    gear_fqns = [tactical_fqn, *implant_fqns]
-    return gear_fqns, relic_paths
+    remaining = [fqn for fqn in catalog if isinstance(fqn, str) and fqn.strip()]
+    if len(remaining) < count:
+        raise ValueError(
+            f"Relic catalog '{relics_path}' does not contain {count} relics."
+        )
 
-def _traverse_relic_folder(current_dir: str) -> str:
-    """Interactively navigates subdirectories until a leaf folder is reached,
+    selected: list[str] = []
+    for index in range(1, count + 1):
+        labels = _relic_menu_options(remaining)
+        print(f"\n📂 Relic {index}:")
+        chosen_label = prompt_menu_choice(sorted(labels), "Select Relic Number: ")
+        chosen = labels[chosen_label]
+        selected.append(chosen)
+        remaining.remove(chosen)
+    return selected
 
-    then selects the single JSON file inside it.
-    """
+
+def _prompt_relic_count() -> int:
+    """Asks for a relic count of 0, 1, or 2."""
     while True:
-        subdirs = sorted([
-            d
-            for d in os.listdir(current_dir)
-            if os.path.isdir(os.path.join(current_dir, d))
-        ])
-        if not subdirs:
-            break
-
-        print(f"\n📂 Choices in '{os.path.basename(current_dir)}':")
-        choice = prompt_menu_choice(subdirs, "Select Folder Number: ")
-        current_dir = os.path.join(current_dir, choice)
-
-    # Reached the final folder; pick the single JSON inside it
-    json_files = [f for f in os.listdir(current_dir) if f.endswith(".json")]
-    if not json_files:
-        raise FileNotFoundError(f"No JSON file found in '{current_dir}'")
-
-    selected_file = os.path.join(current_dir, json_files[0])
-    print(f"  ✅ Selected: {os.path.basename(current_dir)} ({json_files[0]})")
-    return selected_file
+        user_input = input("How many relics? (0-2): ").strip()
+        if user_input in {"0", "1", "2"}:
+            return int(user_input)
+        print("  ❌ Enter 0, 1, or 2.")
 
 
-def select_relics(
-    relic_dir: str = "data/extractor/parsed/abl/itm/relic", count: int = 2
-) -> List[str]:
-    """Prompts user to select relics by directory path."""
-    print(f"\n=== Select {count} Relics ===")
-    selected_relic_paths = []
+def _relic_menu_options(fqns: list[str]) -> dict[str, str]:
+    """Maps a menu label to a relic FQN. Duplicate short labels fall back to the full FQN."""
+    short_counts: dict[str, int] = {}
+    for fqn in fqns:
+        label = relic_menu_label(fqn)
+        short_counts[label] = short_counts.get(label, 0) + 1
 
-    for i in range(1, count + 1):
-        print(f"\n--- Relic #{i} ---")
-        relic_path = _traverse_relic_folder(relic_dir)
-        selected_relic_paths.append(relic_path)
-
-    return selected_relic_paths
-
-
-def select_skill_tree_choices(skill_tree_data: dict) -> List[str]:
-    """Prompts the user to pick one talent/ability per level tier in the skill tree."""
-    selected_fqns: List[str] = []
-    sorted_tiers = sorted(skill_tree_data.keys(), key=int)
-
-    print("\n=== Select Skill Tree Talents ===")
-    for tier in sorted_tiers:
-        tier_choices = skill_tree_data[tier]
-        sorted_choice_keys = sorted(tier_choices.keys(), key=int)
-
-        # Build human-readable lines showing the FQNs in each slot
-        display_options = [
-            ", ".join(tier_choices[k]) for k in sorted_choice_keys
-        ]
-
-        print(f"\n📂 Level {tier} Option:")
-        chosen_display = prompt_menu_choice(display_options, f"Select Tier {tier} Choice: ")
-        chosen_idx = sorted_choice_keys[display_options.index(chosen_display)]
-        selected_fqns.extend(tier_choices[chosen_idx])
-
-    return selected_fqns
+    options: dict[str, str] = {}
+    for fqn in fqns:
+        label = relic_menu_label(fqn)
+        if short_counts[label] > 1:
+            label = fqn
+        options[label] = fqn
+    return options
 
 
-def load_discipline_fqns(spec_path: str) -> List[str]:
-    """Loads a discipline JSON, grants baseline abilities, and prompts for skill tree choices."""
-    spec_data = load_json_file(spec_path)
-    baseline_fqns: List[str] = spec_data.get("active_abilities", [])
+def prompt_training_dummy_armor_debuff() -> bool:
+    """Asks whether the operation training dummy armor debuff is on the target."""
+    print("\n📂 Target Debuff:")
+    choice = prompt_menu_choice(
+        ["No", TRAINING_DUMMY_ARMOR_DEBUFF_LABEL],
+        "Select Target Debuff: ",
+    )
+    return choice == TRAINING_DUMMY_ARMOR_DEBUFF_LABEL
 
-    skill_tree_data = spec_data.get("skill_tree", {})
-    tree_fqns = select_skill_tree_choices(skill_tree_data) if skill_tree_data else []
 
-    return baseline_fqns + tree_fqns
-
-def prompt_run_mode() -> Tuple[str, int]:
-    """Prompts user to select execution mode and iteration count."""
+def prompt_run_mode() -> tuple[str, int]:
+    """Prompts for a single test run or a Monte Carlo batch, plus the iteration count."""
     print("\n📂 Select Execution Mode:")
     mode_options = ["TEST (Single Test Run)", "BATCH (Monte Carlo Simulation)"]
     selected = prompt_menu_choice(mode_options, "Select Mode Number: ")
@@ -236,3 +259,14 @@ def prompt_run_mode() -> Tuple[str, int]:
     except ValueError:
         print("⚠️ Invalid input. Using default (1000).")
         return "BATCH", 1000
+
+
+def _gear_options(class_name: str, prefix: str, gear_path: str) -> dict[str, str]:
+    gear_data = load_json_file(gear_path)
+    if not isinstance(gear_data, dict):
+        raise ValueError(f"Gear catalog '{gear_path}' must be a JSON object.")
+    options = filter_gear_for_class(gear_data, prefix, class_name)
+    if not options:
+        kind = "tacticals" if prefix == TACTICAL_PREFIX else "legendary implants"
+        raise ValueError(f"No {kind} available for class '{class_name}'.")
+    return options

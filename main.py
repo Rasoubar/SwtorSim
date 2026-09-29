@@ -1,58 +1,48 @@
+import argparse
 import random
-from src.swtorsim.cli import (
-    select_discipline_path,
-    select_stats_path,
-    select_rotation_path,
-    load_discipline_fqns,
-    prompt_optional_choices,
-    prompt_run_mode,
-)
-from src.swtorsim.config_load import (
-    load_complete_loadout,
-    load_rotation_from_json,
-    load_character_stats_from_json,
-    load_permanent_effects_from_json,
-)
+
+from src.swtorsim.cli import collect_run_config_interactive
+from src.swtorsim.config_load import load_from_run_config
+from src.swtorsim.run_config import load_run_config
 from src.swtorsim.tester import Tester
 
 
-def run():
-    run_mode, iterations = prompt_run_mode()
+def run(config):
+    random.seed(config.seed)
+    inputs = load_from_run_config(config)
 
-    # 1. Selection prompts
-    class_name, spec_name, spec_path = select_discipline_path()
-    stats_path = select_stats_path()
-    rotation_path = select_rotation_path(spec_name)
-
-    # 2. Select baseline abilities and skill tree talents
-    discipline_fqns = load_discipline_fqns(spec_path)
-
-    # 3. Select tactical, implants, and relics
-    selected_gear_fqns, selected_relic_paths = prompt_optional_choices(class_name)
-    all_selected_fqns = discipline_fqns + selected_gear_fqns
-
-    # 4. Load blueprints, stats, rotation, and debuffs
-    loadout_blueprints = load_complete_loadout(all_selected_fqns, selected_relic_paths)
-    stats_config = load_character_stats_from_json(class_name, stats_path)
-    rotation_config = load_rotation_from_json(rotation_path)
-    debuff_module = load_permanent_effects_from_json("data/DebuffModule.json")
-
-    # 5. Initialize and run tester
     tester = Tester(
-        rotation_config=rotation_config,
-        stats_config=stats_config,
-        loadout_blueprints=loadout_blueprints,
-        duration=1000,
-        dummy_hp=10000000,
-        debuff_module=debuff_module,
+        rotation_config=inputs.rotation_config,
+        stats_config=inputs.stats_config,
+        loadout_blueprints=inputs.loadout_blueprints,
+        duration=config.duration,
+        dummy_hp=config.dummy_hp,
+        debuff_module=inputs.debuff_module,
     )
 
-    if run_mode == "TEST":
+    if config.mode == "TEST":
         tester.run_test()
-    elif run_mode == "BATCH":
-        tester.run_monte_carlo(iterations=iterations)
+    elif config.mode == "BATCH":
+        tester.run_monte_carlo(iterations=config.iterations)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="SWTOR combat simulator. Omit the config path to use the interactive CLI."
+    )
+    parser.add_argument(
+        "run_config",
+        nargs="?",
+        help="Path to a run_config.json with the loadout already selected.",
+    )
+    args = parser.parse_args()
+    config = (
+        load_run_config(args.run_config)
+        if args.run_config
+        else collect_run_config_interactive()
+    )
+    run(config)
 
 
 if __name__ == "__main__":
-    random.seed(42)
-    run()
+    main()

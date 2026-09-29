@@ -1,6 +1,15 @@
 import math
 from src.swtorsim.resources import create_resource_pool
 from collections import defaultdict #performance choice
+from src.swtorsim.combat_curves import (
+    ACCURACY_RATING,
+    ALACRITY_RATING,
+    CRITICAL_CHANCE_TARGET,
+    CRITICAL_DAMAGE_TARGET,
+    CRITICAL_RATING,
+    MASTERY,
+    derived_stat,
+)
 from src.swtorsim.combat_math import EFFECTS, calc_dr
 from src.swtorsim.effects import ActiveEffect
 
@@ -109,6 +118,7 @@ class Player(Entity):
         self.procs = {}
         self.passive_blueprints = passives or {}
         self.ability_db = self.build_ability_db(abilities or {})
+        self.level = 85
         self.rotation = None
         self.resource = create_resource_pool(
             pool_type=resource
@@ -194,14 +204,36 @@ class Player(Entity):
         temp_stats["F_Bonus_Damage"] = (base_bonus_damage + (temp_stats["Force Power"] * 0.23)) * damage_bonus_multiplier
 
         #diminishing returns
-        temp_stats["Alacrity"] = calc_dr(temp_stats["Alacrity Rating"], cap=0.3, k_factor=3.2)
-        acc_base = calc_dr(temp_stats["Accuracy Rating"], cap=0.3, k_factor=3.2)
-        critical_cc = calc_dr(temp_stats["Critical Rating"], cap=0.3, k_factor=2.41)
-        mastery_cc = calc_dr(temp_stats["Mastery"], cap=0.2, k_factor=12.93)
+        alacrity_divisor, alacrity_cap = derived_stat(ALACRITY_RATING, self.level)
+        accuracy_divisor, accuracy_cap = derived_stat(ACCURACY_RATING, self.level)
+        crit_chance_divisor, crit_chance_cap = derived_stat(
+            CRITICAL_RATING, self.level, CRITICAL_CHANCE_TARGET
+        )
+        crit_damage_divisor, crit_damage_cap = derived_stat(
+            CRITICAL_RATING, self.level, CRITICAL_DAMAGE_TARGET
+        )
+        mastery_divisor, mastery_cap = derived_stat(
+            MASTERY, self.level, CRITICAL_CHANCE_TARGET
+        )
+        temp_stats["Alacrity"] = calc_dr(
+            temp_stats["Alacrity Rating"], alacrity_cap, alacrity_divisor, self.level
+        )
+        acc_base = calc_dr(
+            temp_stats["Accuracy Rating"], accuracy_cap, accuracy_divisor, self.level
+        )
+        critical_chance = calc_dr(
+            temp_stats["Critical Rating"], crit_chance_cap, crit_chance_divisor, self.level
+        )
+        critical_damage = calc_dr(
+            temp_stats["Critical Rating"], crit_damage_cap, crit_damage_divisor, self.level
+        )
+        mastery_cc = calc_dr(
+            temp_stats["Mastery"], mastery_cap, mastery_divisor, self.level
+        )
 
         #dependant statts
-        temp_stats["Critical Chance"] = 0.05 + critical_cc + mastery_cc
-        temp_stats["Critical Modifier"] = 0.5 + critical_cc
+        temp_stats["Critical Chance"] = 0.05 + critical_chance + mastery_cc
+        temp_stats["Critical Modifier"] = 0.5 + critical_damage
         temp_stats["Main Accuracy"] = 1 + acc_base + bonuses["Accuracy"]
         temp_stats["Off Accuracy"] = 0.67 + acc_base + bonuses["Accuracy"]
 
@@ -242,6 +274,14 @@ class Player(Entity):
         final_cost = (base_cost * pct_modifiers) + flat_reductions
         return max(0.0, final_cost) #safeguard tbh
 
+
+def _effect_modifiers(effect):
+    getter = getattr(effect, "get_effective_modifiers", None)
+    if getter is None:
+        return ()
+    return getter()
+
+
 class Dummy(Entity):
     """Represents a dummy and all it entails."""
     RECALCULATE_STATS = {"Armor Rating"}
@@ -260,12 +300,15 @@ class Dummy(Entity):
         temp_stats = self.base_stats.copy()
         armor_rating_change = 0
         for effect in self.effects.values():
-            effect_id = effect.id
+            effect_id = getattr(effect, "id", None)
             if effect_id in EFFECTS:
                 multiplier = effect.charges if effect.max_charges is not None else 1
                 stat_name = EFFECTS[effect_id]["stat_name"]
                 if stat_name == "Armor Rating":
                     armor_rating_change += effect.value * multiplier
+            for modifier in _effect_modifiers(effect):
+                if modifier.stat == "STAT_rtg_armor":
+                    armor_rating_change += modifier.value
         temp_stats["Armor"] *= (1+armor_rating_change)
         self.stats = temp_stats
 
