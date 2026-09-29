@@ -22,18 +22,31 @@ def _float_list_field(resolved_fields: list[dict[str, Any]], name: str) -> list[
     return None
 
 
+# Current clients store three item-rating curves. Relic and adrenal stat amounts
+# use the stat curve. Older gom.js named that same field cbtStandardRatingInfo.
+_STAT_RATING_FIELDS = (
+    "cbtStandardRatingStatValueMap",
+    "cbtStandardRatingInfo",
+)
+
+
 def load_standard_rating_table(
     store: BucketStore,
     gom: GomLookup,
     strings: StringResolver,
 ) -> list[float]:
-    """Load the item-rating -> standard-rating lookup from cbtStandardRatingInfo."""
+    """Load the item-rating -> standard-rating lookup used for stat amounts."""
     parsed = store.parse_node(STANDARD_RATING_INFO_NODE_ID, gom)
     resolved = resolve_fields(parsed.fields, store, strings, gom)
-    table = _float_list_field(resolved, "cbtStandardRatingInfo")
+    table = None
+    for name in _STAT_RATING_FIELDS:
+        table = _float_list_field(resolved, name)
+        if table:
+            break
     if not table:
         raise RuntimeError(
-            f"Failed to load cbtStandardRatingInfo from node {STANDARD_RATING_INFO_NODE_ID}"
+            "Failed to load cbtStandardRatingStatValueMap from node "
+            f"{STANDARD_RATING_INFO_NODE_ID}"
         )
     return table
 
