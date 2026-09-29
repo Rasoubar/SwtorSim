@@ -78,13 +78,18 @@ class Effect:
     branches: List[Branch] = field(default_factory=list)
     stack_charge: Optional[Dict[str, Any]] = None
     conditions: Optional[Dict[str, Any]] = None
+    name: Optional[str] = None
+    icon: Optional[str] = None
+    target_overrides: List[Dict[str, Any]] = field(default_factory=list)
+    initializers: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Effect":
+        initializers = list(data.get("initializers") or [])
         is_passive = any(
             init.get("initializer_type") == "eff_initializer__set_passive"
             and init.get("bools", {}).get("is_passive", False)
-            for init in data.get("initializers", [])
+            for init in initializers
         )
 
         raw_duration = data.get("duration")
@@ -101,6 +106,10 @@ class Effect:
             branches=[Branch.from_dict(b) for b in data.get("branches", [])],
             stack_charge=data.get("stack_charge"),
             conditions=data.get("conditions"),
+            name=data.get("name"),
+            icon=data.get("icon"),
+            target_overrides=list(data.get("target_overrides") or []),
+            initializers=initializers,
         )
 
     @property
@@ -150,6 +159,13 @@ class AbilityBlueprint:
     effects: Dict[int, Effect] = field(default_factory=dict)
     entry_effect_ids: List[int] = field(default_factory=list)
     file_path: Optional[Path] = None
+    icon: Optional[str] = None
+    max_charges: Optional[int] = None
+    abl_ignore_alacrity: bool = False
+    triggers_gcd: bool = False
+    activation: Optional[Dict[str, Any]] = None
+    conditions: Optional[Dict[str, Any]] = None
+    stat_changes: List[Dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], file_path: Optional[Path] = None) -> "AbilityBlueprint":
@@ -162,21 +178,42 @@ class AbilityBlueprint:
             if effect.entry:
                 entry_ids.append(effect.number)
 
+        ability_type = data.get("type") or "passive"
         raw_cost = data.get("energy_cost")
         raw_gcd = data.get("base_gcd")
         raw_cd = data.get("cooldown")
+        raw_charges = data.get("max_charges")
+
+        if "triggers_gcd" in data:
+            triggers_gcd = bool(data["triggers_gcd"])
+        else:
+            triggers_gcd = ability_type == "active"
+
+        if raw_gcd is not None:
+            base_gcd = float(raw_gcd)
+        elif ability_type == "active":
+            base_gcd = 1.5
+        else:
+            base_gcd = 0.0
 
         return cls(
             fqn=data.get("fqn") or "",
             name=data.get("name") or "Unknown Ability",
-            type=data.get("type") or "active",
+            type=ability_type,
             energy_cost=float(raw_cost) if raw_cost is not None else 0.0,
-            base_gcd=float(raw_gcd) if raw_gcd is not None else 1.5,
+            base_gcd=base_gcd,
             cooldown=float(raw_cd) if raw_cd is not None else 0.0,
             tags=data.get("tags") or [],
             effects=effects_map,
             entry_effect_ids=entry_ids,
             file_path=file_path,
+            icon=data.get("icon"),
+            max_charges=int(raw_charges) if raw_charges is not None else None,
+            abl_ignore_alacrity=bool(data.get("ablIgnoreAlacrity", False)),
+            triggers_gcd=triggers_gcd,
+            activation=data.get("activation"),
+            conditions=data.get("conditions"),
+            stat_changes=list(data.get("stat_changes") or []),
         )
 
     @classmethod
@@ -315,8 +352,11 @@ class Ability:
         self.cooldown = blueprint.cooldown
         self.base_gcd = blueprint.base_gcd
         self.energy_cost = blueprint.energy_cost
-        self.triggers_gcd = blueprint.type == "active"
+        self.triggers_gcd = blueprint.triggers_gcd
+        self.abl_ignore_alacrity = blueprint.abl_ignore_alacrity
         self.tags = frozenset(blueprint.tags or [])
+        # Extracted cast conditions stay on the blueprint. validate_all does not
+        # understand that tree and would raise on cast.
         self.conditions = {}
 
         # Effect graph
@@ -324,10 +364,16 @@ class Ability:
         self.entry_effect_ids = blueprint.entry_effect_ids
 
         # Charges
-        self.max_charges = getattr(blueprint, "max_charges", 0)
+        self.max_charges = blueprint.max_charges or 0
         self.charges = self.max_charges
         self.recharge_time = getattr(blueprint, "recharge_time", self.cooldown)
         self.active_charge_event = None
+
+    def cooldown_duration(self, caster, base: float) -> float:
+        """Cooldown length. Abilities that ignore alacrity keep the base value."""
+        if self.abl_ignore_alacrity:
+            return base
+        return caster.calculate_cooldown(base)
 
     @property
     def has_charges(self):
@@ -341,7 +387,7 @@ class Ability:
 
     def schedule_recharge(self, caster, sim):
         """Snapshots CDR, creates a new event reference, and schedules it."""
-        actual_recharge = caster.calculate_cooldown(self.recharge_time)
+        actual_recharge = self.cooldown_duration(caster, self.recharge_time)
         event = ChargeRestoreEvent(caster, self)
         self.active_charge_event = event
         sim.schedule_relative(actual_recharge, event)
@@ -400,7 +446,9 @@ class Ability:
         if self.has_charges:
             self.consume_charge(caster, sim)
         elif self.cooldown > 0.0:
-            caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown), 4)
+            caster.cooldowns[self.name] = round(
+                sim.current_time + self.cooldown_duration(caster, self.cooldown), 4
+            )
 
     def cast(self, caster, target, sim):
         """Executes the ability: spends resources, locks cooldowns, and triggers entry effects."""
