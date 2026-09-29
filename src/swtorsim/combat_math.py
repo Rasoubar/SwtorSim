@@ -1,5 +1,7 @@
 import random
 
+from src.swtorsim.combat_curves import armor_constants
+
 EFFECTS = {
     0: {"stat_name": "PlaceHolder"},
     79: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
@@ -258,7 +260,8 @@ def handle_mitigation(caster, target, ability_damage, damage_type):
         armor = target.stats.get("Armor", 17225)
         total_armor_pen = caster.stats.get("Armor Penetration", 0.0)
         effective_armor = armor * (1.0 - total_armor_pen)
-        armor_dr = effective_armor / (effective_armor + 32000)
+        multiplier, additive = armor_constants(caster.level)
+        armor_dr = effective_armor / (effective_armor + multiplier * caster.level + additive)
         ability_damage *= (1.0 - armor_dr)
     return ability_damage
 
@@ -287,30 +290,11 @@ def accuracy_roll(source, hand):
     return True
 
 
-def calc_dr(rating: float, cap: float, k_factor: float) -> float:
-    """
-    AI comment for clarity
-    Calculates percentage gain from a raw rating using SWTOR's Diminishing Returns curve:
-        Gain % = Cap * [ 1 - (1 - 0.01 / Cap) ** ( (1 / K) * (Rating / Level) ) ]
-
-    Parameters:
-        rating (float):   Raw stat rating from gear/buffs (e.g., 2800 Critical Rating)
-        cap (float):      Theoretical max percentage bonus (e.g., 0.30 for 30% Crit Rating cap)
-        k_factor (float): SWTOR scaling constant for this stat:
-                          - 2.41  : Critical Rating
-                          - 3.20  : Alacrity & Accuracy Ratings
-                          - 12.93 : Mastery -> Crit conversion
-
-    Returns:
-        float: Percentage increase as a decimal (e.g., 0.142 for +14.2%)
-    """
+def calc_dr(rating: float, cap: float, k_factor: float, level: int) -> float:
+    """Percentage from a rating: Cap * [1 - (1 - 0.01 / Cap) ** ((1 / divisor) * (Rating / Level))]."""
     if not rating:
         return 0.0
 
-    level_modifier = 80.0
-
     base_ratio = 1.0 - (0.01 / cap)
-
-    decay_exponent = (1.0 / k_factor) * (rating / level_modifier)
-
+    decay_exponent = (1.0 / k_factor) * (rating / level)
     return cap * (1.0 - (base_ratio ** decay_exponent))

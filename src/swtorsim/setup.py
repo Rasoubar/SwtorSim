@@ -4,6 +4,7 @@ from src.swtorsim.engine import Simulation
 from src.swtorsim.abilities import Ability
 from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
+from src.swtorsim.combat_curves import player_standard_health
 from src.swtorsim.rotation import Rotation
 
 def pre_sim_effects(player):
@@ -54,9 +55,13 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
         passives=passive_blueprints
     )
 
-    # Set up player base stats
+    # Set up player base stats. Standard health comes from the level curve.
+    player.level = stats_config.get("level", player.level)
     for stat_key, stat_value in stats_config.get("stats", {}).items():
+        if stat_key == "Standard_health":
+            continue
         player.base_stats[stat_key] = stat_value
+    player.base_stats["Standard_health"] = player_standard_health(player.level)
     player.recalculate_stats()
 
     # Set up dummy

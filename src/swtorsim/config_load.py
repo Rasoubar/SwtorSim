@@ -38,7 +38,9 @@ def load_from_run_config(config: RunConfig) -> SimulationInputs:
         debuff_module[debuff.name] = debuff
     return SimulationInputs(
         rotation_config=load_rotation_from_json(config.rotation_path),
-        stats_config=load_character_stats_from_json(config.class_name, config.stats_path),
+        stats_config=load_character_stats_from_json(
+            config.class_name, config.stats_path, config.level
+        ),
         loadout_blueprints=loadout_blueprints,
         debuff_module=debuff_module,
     )
@@ -138,11 +140,12 @@ def load_permanent_effects_from_json(filepath: str) -> Dict[str, ActiveEffect]:
     return load_permanent_effects_from_dict(raw_data)
 
 
-def load_character_stats_from_json(class_name: str, filepath: str) -> dict:
+def load_character_stats_from_json(class_name: str, filepath: str, level: int) -> dict:
     """Loads character stat profile JSON and formats it for the player."""
     stats_data = load_json_file(filepath)
     return {
         "class_name": class_name,
+        "level": level,
         "stats": stats_data
     }
 
