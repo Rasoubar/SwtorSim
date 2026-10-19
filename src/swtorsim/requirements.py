@@ -84,7 +84,7 @@ CONDITION_REGISTRY = {
     "ability_cooldown_under": check_ability_cooldown_under
 }
 
-def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy", sim = None) -> bool:
+def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy", sim = None, context = None) -> bool:
     """applies the condition_registry so that the correct functions for the requirement is run"""
     if not requirements:
         return True
