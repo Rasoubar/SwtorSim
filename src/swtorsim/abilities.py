@@ -451,7 +451,10 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
     hand = action.get("hand", "main")
     if hand == "off" and getattr(caster, "stats", {}).get("Off_hand_max", 0) <= 0:
         return True
-    if not accuracy_roll(caster, hand):
+    is_periodic = bool((context or {}).get("is_periodic", False)) or any(
+        "periodic_damage" in str(t) for t in (context or {}).get("effect_tags", ())
+    )
+    if not is_periodic and not accuracy_roll(caster, hand):
         return False
     combined_tags = (
         set(action.get("tags") or ())
@@ -466,6 +469,7 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
         source_name,
         tags=combined_tags,
         from_proc=from_proc,
+        ability_fqn=getattr(ability, "fqn", None),
     )
     if delay > 0.0:
         sim.schedule_relative(delay, hit_event)

@@ -184,7 +184,11 @@ class ActiveEffect:
             computed_expires_at = None
 
         stack_charge = getattr(effect, "stack_charge", None) or {}
-        max_stacks = stack_charge.get("nr_occurances", 1)
+        max_stacks = int(stack_charge.get("max", stack_charge.get("nr_occurances", 1)) or 1)
+        scales_with_stacks = bool(
+            stack_charge.get("scales_with_stack_charge", False)
+            or getattr(effect, "scales_with_stacks", False)
+        )
 
         raw_branches = getattr(effect, "branches", None) or []
         parsed_modifiers: List[Modifier] = []
@@ -231,7 +235,7 @@ class ActiveEffect:
             tick_interval=tick_interval,
             stacks=1,
             max_stacks=max_stacks,
-            scales_with_stacks=False,
+            scales_with_stacks=scales_with_stacks,
             modifiers=parsed_modifiers,
             branches=serialized_branches,
             is_passive=is_passive,

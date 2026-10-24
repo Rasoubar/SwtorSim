@@ -43,7 +43,7 @@ def calculate_hit(caster, target, action_data):
     #calculate base damage from caster stats and action_data
     base_damage = calculate_base_damage(caster,action_data, attack_type)
 
-    post_mit_damage = handle_mitigation(caster, target, base_damage, damage_type)
+    post_mit_damage = handle_mitigation(caster, target, base_damage, damage_type, modifiers)
 
     tags = action_data.get("tags") or []
     taken = damage_taken_multiplier(target, tags, attack_type, damage_type)
@@ -68,10 +68,13 @@ def handle_modifiers(caster, target, action_data):
     }
 
     #modify the modifiers with applicable target and caster buffs/debuffs
-    action_tags = action_data.get("tags", [])
-    damage_type = action_data.get("damage_type", False)
-    handle_caster_buffs(caster, target, action_tags, damage_type, buckets, modifiers)
-    handle_target_debuffs(target, action_tags, damage_type, buckets, modifiers)
+    action_tags = frozenset(action_data.get("tags") or ())
+    ability_fqn = action_data.get("ability_fqn")
+    attack_type = action_data.get("attack_type", 1)
+    damage_type = action_data.get("damage_type", 1)
+
+    handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers)
+    handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers)
 
     #consume relevant charges. (this will be changed as it doesn't reflect the actual mechanism in the game)
     consume_charges(caster, target, action_tags)
@@ -81,32 +84,133 @@ def handle_modifiers(caster, target, action_data):
 
     return modifiers
 
-def handle_caster_buffs(caster, target, action_tags, damage_type, buckets, modifiers):
-    """ Alters modifiers dict according to buffs on caster."""
+def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers):
+    """ Alters modifiers dict according to active effects and buffs on caster."""
+    is_weapon = attack_type in (1, 2)
+    is_force = attack_type in (3, 4)
+
     for buff in caster.effects.values():
-        if getattr(buff, "id", None) not in EFFECTS:
+        if getattr(buff, "is_expired", False):
             continue
-        if buff.consumable_charges is not None and buff.consumable_charges <= 0:
-            continue
-        if buff.required_tags is not None and not any(tag in action_tags for tag in buff.required_tags):
-            continue
-        if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
-            continue
-        if buff.required_damage_type is not None and buff.required_damage_type != damage_type:
-            continue
-        alter_modifier(buff,modifiers,buckets)
 
-def handle_target_debuffs(target, action_tags, damage_type, buckets, modifiers):
-    """ Alters modifiers dict according to debuffs on target."""
+        # Legacy effect compatibility
+        effect_id = getattr(buff, "id", None)
+        if effect_id in EFFECTS:
+            if getattr(buff, "consumable_charges", None) is not None and buff.consumable_charges <= 0:
+                continue
+            if getattr(buff, "required_tags", None) is not None and not any(tag in action_tags for tag in buff.required_tags):
+                continue
+            if getattr(buff, "target_hp_threshold", None) is not None and getattr(target, "hp_ratio", 1.0) > buff.target_hp_threshold:
+                continue
+            if getattr(buff, "required_damage_type", None) is not None and buff.required_damage_type != damage_type:
+                continue
+            alter_modifier(buff, modifiers, buckets)
+            continue
+
+        getter = getattr(buff, "get_effective_modifiers", None)
+        eff_mods = getter() if getter is not None else getattr(buff, "modifiers", [])
+        if not eff_mods:
+            continue
+
+        for mod in eff_mods:
+            stat = str(mod.stat)
+            val = float(mod.value)
+
+            # Skip untargeted character base stats that were already processed in recalculate_stats
+            if not mod.targets and stat in (
+                "STAT_att_mastery", "414", "4140",
+                "STAT_rtg_attack_power", "155", "STAT_att_power",
+                "STAT_rtg_crit", "156",
+                "STAT_rtg_alacrity", "Alacrity Rating",
+                "STAT_rtg_accuracy", "154", "Accuracy",
+                "STAT_cbt_melee_damage_bonus",
+                "STAT_cbt_force_damage_bonus",
+                "STAT_cbt_damage_bonus",
+                "STAT_att_endurance",
+                "STAT_cbtStealthEffectiveLevel",
+            ):
+                continue
+
+            # Check ability FQN / tags matching
+            if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
+                continue
+
+            # 1. Damage Done Percentage Modifiers
+            if stat in ("STAT_cbt_damage_done_modifier_percentage", "79", "386", "384", "370", "376", "46"):
+                buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat in ("STAT_cbt_damage_done_if_target_health_low_modifier_percentage", "220"):
+                if getattr(target, "hp_ratio", 1.0) <= 0.30:
+                    buckets["sub_30"] = buckets.get("sub_30", 0.0) + val
+
+            elif stat == "stat_cbt_damage_dealt_scale_channel_melee_modifier_percentage":
+                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat == "stat_cbt_damage_dealt_scale_channel_force_modifier_percentage":
+                if is_force or any("force" in str(t).lower() for t in action_tags):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            # 2. Critical Chance Modifiers
+            elif stat in ("STAT_cbt_force_critical_chance", "133"):
+                if is_force or any("force" in str(t).lower() for t in action_tags):
+                    modifiers['bonus_crit_chance'] += val
+
+            elif stat in ("STAT_cbt_melee_critical_chance", "116"):
+                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                    modifiers['bonus_crit_chance'] += val
+
+            elif stat in ("STAT_cbt_tech_critical_chance", "STAT_cbt_ranged_critical_chance"):
+                if not is_weapon and not is_force:
+                    modifiers['bonus_crit_chance'] += val
+
+            elif stat == "Critical Chance":
+                modifiers['bonus_crit_chance'] += val
+
+            # 3. Critical Damage Modifiers
+            elif stat in ("STAT_cbt_force_critical_damage", "134"):
+                if is_force or any("force" in str(t).lower() for t in action_tags):
+                    modifiers['bonus_crit_modifier'] += val
+
+            elif stat in ("STAT_cbt_melee_critical_damage", "117"):
+                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                    modifiers['bonus_crit_modifier'] += val
+
+            elif stat == "Critical Damage":
+                modifiers['bonus_crit_modifier'] += val
+
+            # 4. Armor Penetration
+            elif stat in ("STAT_cbt_armor_penetration", "166"):
+                modifiers['bonus_armor_pen'] += val
+
+def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers):
+    """ Alters modifiers dict according to active debuffs on target."""
     for debuff in target.effects.values():
-        if getattr(debuff, "id", None) not in EFFECTS:
-            continue
-        if debuff.required_tags is not None and not any(tag in action_tags for tag in debuff.required_tags):
+        if getattr(debuff, "is_expired", False):
             continue
 
-        if debuff.required_damage_type is not None and debuff.required_damage_type != damage_type:
+        # Legacy debuff compatibility
+        effect_id = getattr(debuff, "id", None)
+        if effect_id in EFFECTS:
+            if getattr(debuff, "required_tags", None) is not None and not any(tag in action_tags for tag in debuff.required_tags):
+                continue
+            if getattr(debuff, "required_damage_type", None) is not None and debuff.required_damage_type != damage_type:
+                continue
+            alter_modifier(debuff, modifiers, buckets)
             continue
-        alter_modifier(debuff,modifiers,buckets)
+
+        getter = getattr(debuff, "get_effective_modifiers", None)
+        eff_mods = getter() if getter is not None else getattr(debuff, "modifiers", [])
+        if not eff_mods:
+            continue
+
+        for mod in eff_mods:
+            if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
+                continue
+            stat = str(mod.stat)
+            val = float(mod.value)
+            if stat == "STAT_cbt_damage_received_modifier_percentage":
+                buckets["target_vuln"] = buckets.get("target_vuln", 0.0) + val
 
 def alter_modifier(effect, modifiers, buckets):
     """Handles the individual modifier modification fors both buffs and debuffs"""
@@ -254,12 +358,13 @@ def calculate_base_damage(caster, action_data, attack_type):
 
     return ability_damage
 
-def handle_mitigation(caster, target, ability_damage, damage_type):
+def handle_mitigation(caster, target, ability_damage, damage_type, modifiers=None):
     """Determines if applicable, if so calculates and applies mitigation to damage value. Returns new damage value"""
     if damage_type in (1, 2):
         armor = target.stats.get("Armor", 17225)
-        total_armor_pen = caster.stats.get("Armor Penetration", 0.0)
-        effective_armor = armor * (1.0 - total_armor_pen)
+        bonus_pen = (modifiers.get('bonus_armor_pen', 0.0) if modifiers else 0.0)
+        total_armor_pen = min(1.0, caster.stats.get("Armor Penetration", 0.0) + bonus_pen)
+        effective_armor = max(0.0, armor * (1.0 - total_armor_pen))
         multiplier, additive = armor_constants(caster.level)
         armor_dr = effective_armor / (effective_armor + multiplier * caster.level + additive)
         ability_damage *= (1.0 - armor_dr)

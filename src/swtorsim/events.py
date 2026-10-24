@@ -51,7 +51,7 @@ class ApplyDamageLand(Event):
 
 class DamageHit(Event):
     """ Represents a hit execution. Holds the data needed to calculate damage, and trigger procs."""
-    def __init__(self, source: "Player", target: "Dummy", action_data: dict, ability_name: str, tags=None, from_proc: bool = False):
+    def __init__(self, source: "Player", target: "Dummy", action_data: dict, ability_name: str, tags=None, from_proc: bool = False, ability_fqn: str = None):
         super().__init__(f"{ability_name} Hit")
         self.source = source
         self.target = target
@@ -59,11 +59,17 @@ class DamageHit(Event):
         self.ability_name = ability_name
         self.tags = frozenset(tags if tags is not None else action_data.get("tags", []))
         self.from_proc = from_proc
+        self.ability_fqn = ability_fqn
 
     def resolve(self, sim):
         """Calls damage calculation, determines when to apply damage, calls for damage to land,
         calls for proc evaluation."""
-        final_damage, is_crit = calculate_hit(self.source, self.target, self.action_data)
+        action_with_ctx = dict(self.action_data)
+        action_with_ctx["tags"] = self.tags
+        action_with_ctx["ability_fqn"] = self.ability_fqn
+        action_with_ctx["ability_name"] = self.ability_name
+
+        final_damage, is_crit = calculate_hit(self.source, self.target, action_with_ctx)
 
         instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
         instant_land.resolve(sim)

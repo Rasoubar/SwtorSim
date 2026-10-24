@@ -98,8 +98,13 @@ class Modifier:
             return True
         if ability_fqn and ability_fqn in self.targets:
             return True
-        if ability_tags and not self.targets.isdisjoint(ability_tags):
+        if ability_tags and not self.targets.isdisjoint(set(ability_tags)):
             return True
+        if ability_fqn:
+            for t in self.targets:
+                stem = str(t).split(".")[-1]
+                if stem and ability_fqn.endswith(f".{stem}_plus"):
+                    return True
         return False
 
     @classmethod

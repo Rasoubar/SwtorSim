@@ -183,6 +183,8 @@ class SimulationIntegrationTests(unittest.TestCase):
         """[TODO #8] Verifies Saber Strike evaluates effect-level conditions and deals >0 damage per hit."""
         self.sim.queue.clear()
         # Ensure 100% hit chance for deterministic multi-hit testing
+        self.player.base_stats["Accuracy Rating"] = 999999
+        self.player.recalculate_stats()
         self.player.stats["Main Accuracy"] = 2.0
         self.player.stats["Off Accuracy"] = 2.0
 

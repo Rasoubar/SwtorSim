@@ -266,11 +266,39 @@ class Player(Entity):
 
         bonuses = defaultdict(float)
         for effect in self.effects.values():
+            if getattr(effect, "is_expired", False):
+                continue
             effect_id = getattr(effect, "id", None)
             if effect_id in EFFECTS:
-                multiplier = effect.charges if effect.max_charges is not None else 1
+                multiplier = effect.charges if getattr(effect, "max_charges", None) is not None else 1
                 stat_name = EFFECTS[effect_id]["stat_name"]
                 bonuses[stat_name] += effect.value * multiplier
+            for modifier in _effect_modifiers(effect):
+                if modifier.targets:
+                    continue  # Ability-specific modifiers are evaluated during calculate_hit
+                stat = str(modifier.stat)
+                val = float(modifier.value)
+                if stat in ("STAT_att_mastery", "414", "4140"):
+                    if abs(val) <= 1.0:
+                        bonuses["Mastery PCT"] += val
+                    else:
+                        bonuses["Mastery Stat"] += val
+                elif stat in ("STAT_rtg_attack_power", "155", "STAT_att_power"):
+                    bonuses["Power Stat"] += val
+                elif stat in ("STAT_rtg_crit", "156"):
+                    bonuses["Critical Stat"] += val
+                elif stat in ("STAT_rtg_alacrity", "Alacrity Rating"):
+                    bonuses["Alacrity Rating"] += val
+                elif stat in ("STAT_rtg_accuracy", "154", "Accuracy"):
+                    bonuses["Accuracy"] += val
+                elif stat in ("STAT_cbt_armor_penetration", "166"):
+                    bonuses["Armor Penetration"] += val
+                elif stat == "STAT_cbt_melee_damage_bonus":
+                    bonuses["M_Bonus_Damage_PCT"] += val
+                elif stat == "STAT_cbt_force_damage_bonus":
+                    bonuses["F_Bonus_Damage_PCT"] += val
+                elif stat in ("STAT_cbt_damage_bonus", "26"):
+                    bonuses["Bonus Damage"] += val
 
         #independent stats
         temp_stats["Mastery"] = (temp_stats["Mastery"] + bonuses["Mastery Stat"]) * (1 + bonuses["Mastery PCT"])
@@ -280,10 +308,11 @@ class Player(Entity):
         temp_stats["Armor Penetration"] += bonuses["Armor Penetration"]
 
         #bonus damage
-        damage_bonus_multiplier = 1 + bonuses["Bonus Damage"]
         base_bonus_damage = (temp_stats["Mastery"] * 0.20) + (temp_stats["Power"] * 0.23)
-        temp_stats["M_Bonus_Damage"] = base_bonus_damage * damage_bonus_multiplier
-        temp_stats["F_Bonus_Damage"] = (base_bonus_damage + (temp_stats["Force Power"] * 0.23)) * damage_bonus_multiplier
+        m_damage_bonus_multiplier = 1 + bonuses["Bonus Damage"] + bonuses["M_Bonus_Damage_PCT"]
+        f_damage_bonus_multiplier = 1 + bonuses["Bonus Damage"] + bonuses["F_Bonus_Damage_PCT"]
+        temp_stats["M_Bonus_Damage"] = base_bonus_damage * m_damage_bonus_multiplier
+        temp_stats["F_Bonus_Damage"] = (base_bonus_damage + (temp_stats["Force Power"] * 0.23)) * f_damage_bonus_multiplier
 
         #diminishing returns
         alacrity_divisor, alacrity_cap = derived_stat(ALACRITY_RATING, self.level)
