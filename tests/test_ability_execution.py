@@ -53,7 +53,7 @@ class AbilityExecutionTests(unittest.TestCase):
             lambda a: a.type == "active" and a.energy_cost > 0 and a.triggers_gcd
         )
 
-        initial_resource = self.player.resource.current
+        initial_resource = self.player.resource.current_value
         self.assertTrue(
             ability.can_cast(self.player, self.target, self.sim),
             f"Ability {ability.name} should be ready to cast",
@@ -64,7 +64,7 @@ class AbilityExecutionTests(unittest.TestCase):
 
         # Verify resource was spent
         self.assertLess(
-            self.player.resource.current,
+            self.player.resource.current_value,
             initial_resource,
             "Player resource was not deducted after casting",
         )
@@ -76,7 +76,7 @@ class AbilityExecutionTests(unittest.TestCase):
         )
 
         # Force resource to 0
-        self.player.resource.spend(self.player.resource.current)
+        self.player.resource.spend(self.player.resource.current_value)
 
         self.assertFalse(
             ability.can_cast(self.player, self.target, self.sim),
