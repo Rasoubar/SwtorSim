@@ -48,8 +48,22 @@ def check_caster_energy_below(threshold: int, caster: "Player", _target: "Dummy"
     return caster.resource.current_value < threshold
 
 def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
-    proc = caster.procs.get(data["name"])
-    remaining_cooldown = proc.next_possible_proc - sim.current_time
+    name = data["name"]
+    if caster.has_effect(name):
+        return False
+
+    current_time = sim.current_time if sim is not None else 0.0
+    remaining_cooldown = 0.0
+    proc = getattr(caster, "procs", {}).get(name)
+    if proc is not None and hasattr(proc, "next_possible_proc"):
+        remaining_cooldown = max(0.0, proc.next_possible_proc - current_time)
+    else:
+        for eff in getattr(caster, "effects", {}).values():
+            if getattr(eff, "is_expired", False):
+                continue
+            if getattr(eff, "name", None) == name and any("lockout" in t for t in getattr(eff, "tags", ())):
+                if getattr(eff, "expires_at", None) is not None:
+                    remaining_cooldown = max(remaining_cooldown, eff.expires_at - current_time)
 
     return remaining_cooldown > data["value"]
 
@@ -223,10 +237,19 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
     elif cond_type in ("is_party_member", "is_friend"):
         res = (actor is caster)
 
-    elif cond_type in ("passes_conditional", "is_discipline", "has_melee_weapon", "is_not_dual_wielding", "is_in_combat", "is_not_in_cover"):
+    elif cond_type == "has_melee_weapon":
+        res = getattr(actor, "stats", {}).get("Main_hand_max", 0) > 0
+
+    elif cond_type == "is_dual_wielding":
+        res = getattr(actor, "stats", {}).get("Off_hand_max", 0) > 0
+
+    elif cond_type == "is_not_dual_wielding":
+        res = getattr(actor, "stats", {}).get("Off_hand_max", 0) <= 0
+
+    elif cond_type in ("passes_conditional", "is_discipline", "is_in_combat", "is_not_in_cover"):
         res = True
 
-    elif cond_type in ("is_dual_wielding", "is_not_in_combat", "is_in_cover", "is_companion"):
+    elif cond_type in ("is_not_in_combat", "is_in_cover", "is_companion"):
         res = False
 
     else:

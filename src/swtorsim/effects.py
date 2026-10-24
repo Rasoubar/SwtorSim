@@ -49,9 +49,11 @@ class ActiveEffect:
     branches: List[Dict[str, Any]] = field(default_factory=list)
 
     # State
+    is_passive: bool = False
     is_expired: bool = False
     total_ticks: int = 0
     ticks_remaining: int = 0
+    owner_id: Optional[str] = None
     effect_blueprint: Any = field(default=None, repr=False, compare=False)
     ability_ref: Any = field(default=None, repr=False, compare=False)
     caster_ref: Any = field(default=None, repr=False, compare=False)
@@ -232,6 +234,7 @@ class ActiveEffect:
             scales_with_stacks=False,
             modifiers=parsed_modifiers,
             branches=serialized_branches,
+            is_passive=is_passive,
             effect_blueprint=effect,
             ability_ref=ability,
         )

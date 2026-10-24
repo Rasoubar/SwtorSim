@@ -70,6 +70,29 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
     target.recalculate_stats()
 
     sim = Simulation()
+    player.current_target = target
+
+    # Instantiate and activate passive blueprints (skill tree passives, tacticals, legendaries, relics)
+    from src.swtorsim.effects import ActiveEffect
+    for fqn, bp in passive_blueprints.items():
+        passive_abl = Ability(bp)
+        player.passive_db[fqn] = passive_abl
+        if passive_abl.name:
+            player.passive_db[passive_abl.name.lower().replace(" ", "_")] = passive_abl
+        if getattr(bp, "stat_changes", None):
+            eff = ActiveEffect.from_stat_changes(
+                {
+                    "fqn": bp.fqn,
+                    "name": bp.name,
+                    "tags": list(bp.tags or []),
+                    "stat_changes": bp.stat_changes,
+                }
+            )
+            eff.is_passive = True
+            player.effects[bp.name or bp.fqn] = eff
+        for entry_id in passive_abl.entry_effect_ids:
+            passive_abl.execute_effect(entry_id, player, player, sim)
+    player.recalculate_stats()
 
     # Assign rotation
     player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)

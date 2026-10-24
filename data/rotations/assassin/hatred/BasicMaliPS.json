@@ -27,7 +27,7 @@
         "type": "priority_block",
         "name": "Reck+DF+MPRIO1 Window 1",
         "pool": [
-            {"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
+            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "leeching_strike"},
             {"ability_id": "saber_strike"}
         ]
@@ -50,10 +50,10 @@
         "name": "Reck+DF+MPRIO1 Window 1",
         "pool": [
             {"ability_id": "leeching_strike", "rules": {"target_hp_below_pct" : 0.3}},
-            {"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
+            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "death_field", "rules": {"caster_has_buff": "Recklessness"}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 70}},
-            {"ability_id": "assassinate", "rules": {}},
+            {"ability_id": "assassinate+", "rules": {}},
             {"ability_id": "leeching_strike", "rules": {}},
 			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "thrash", "rules": {}},
@@ -80,7 +80,7 @@
         "pool": [
             {"ability_id": "death_field"},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
+            {"ability_id": "assassinate+", "rules": {}},
             {"ability_id": "leeching_strike", "rules": {}},
 			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "thrash", "rules": {}},
@@ -105,10 +105,10 @@
         "type": "priority_block",
         "name": "MPRIO 2 Window",
         "pool": [
-            {"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
+            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "leeching_strike", "rules": {}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
+            {"ability_id": "assassinate+", "rules": {}},
 			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "thrash", "rules": {}},
             {"ability_id": "saber_strike", "rules": {}}
@@ -129,7 +129,7 @@
         "pool": [
             {"ability_id": "eradicate", "rules": {}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate", "rules": {}},
+            {"ability_id": "assassinate+", "rules": {}},
 			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "thrash", "rules": {}},
             {"ability_id": "saber_strike", "rules": {}}
@@ -150,7 +150,7 @@
         "pool": [
             {"ability_id": "leeching_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 30}},
-            {"ability_id": "assassinate", "rules": {}},
+            {"ability_id": "assassinate+", "rules": {}},
             {"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "leeching_strike", "rules": {}},
             {"ability_id": "thrash", "rules": {}},
@@ -172,7 +172,7 @@
         "pool": [
             {"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 30}},
-            {"ability_id": "assassinate", "rules": {}},
+            {"ability_id": "assassinate+", "rules": {}},
             {"ability_id": "leeching_strike", "rules": {}},
             {"ability_id": "thrash", "rules": {}},
             {"ability_id": "saber_strike", "rules": {}}
@@ -182,9 +182,9 @@
         "type": "priority_block",
         "name": "MPRIO 3 Window",
         "pool": [
-            {"ability_id": "assassinate", "rules": {"target_hp_below_pct" : 0.3}},
+            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "saber_strike", "rules": {"caster_energy_below": 50}},
-            {"ability_id": "assassinate", "rules": {}},
+            {"ability_id": "assassinate+", "rules": {}},
             {"ability_id": "leeching_strike", "rules": {}},
 			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.3}},
             {"ability_id": "thrash", "rules": {}},

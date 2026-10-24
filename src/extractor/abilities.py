@@ -1127,12 +1127,21 @@ def _decode_action(
     float_params = params["float"]
 
     if action_name == "effAction_WeaponDamage":
+        slots = set(_int_list_items(params["int_list"].get("effParam_Slots")))
+        if slots & {"3", "4"}:
+            hand = "off"
+        elif slots & {"2", "5"}:
+            hand = "main"
+        else:
+            hand = (
+                "main"
+                if bool_params.get("effParam_IgnoreDualWieldModifier")
+                else "off"
+            )
         decoded: dict[str, Any] = {
             "action_type": "damage",
             "attack_type": 1,
-            "hand": "main"
-            if bool_params.get("effParam_IgnoreDualWieldModifier")
-            else "off",
+            "hand": hand,
             "coeff": _float_param(float_params, "effParam_Coefficient"),
             "amp": _float_param(float_params, "effParam_AmountModifierPercent"),
             "shp_min": _float_param(float_params, "effParam_StandardHealthPercentMin"),

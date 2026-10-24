@@ -51,12 +51,14 @@ class ApplyDamageLand(Event):
 
 class DamageHit(Event):
     """ Represents a hit execution. Holds the data needed to calculate damage, and trigger procs."""
-    def __init__(self, source: "Player", target: "Dummy", action_data: dict, ability_name: str):
+    def __init__(self, source: "Player", target: "Dummy", action_data: dict, ability_name: str, tags=None, from_proc: bool = False):
         super().__init__(f"{ability_name} Hit")
         self.source = source
         self.target = target
         self.action_data = action_data
         self.ability_name = ability_name
+        self.tags = frozenset(tags if tags is not None else action_data.get("tags", []))
+        self.from_proc = from_proc
 
     def resolve(self, sim):
         """Calls damage calculation, determines when to apply damage, calls for damage to land,
@@ -66,7 +68,22 @@ class DamageHit(Event):
         instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
         instant_land.resolve(sim)
 
-        tags = frozenset(self.action_data.get("tags", []))
+        if not self.from_proc and sim is not None and hasattr(sim, "triggers"):
+            attack_type = self.action_data.get("attack_type", 1)
+            spell_type = 1 if attack_type in (1, 2) else 3
+            ctx = {
+                "caster": self.source,
+                "target": self.target,
+                "enemy_target": self.target,
+                "tags": self.tags,
+                "is_crit": is_crit,
+                "damage_type": self.action_data.get("damage_type", 1),
+                "attack_type": attack_type,
+                "spell_type": spell_type,
+                "is_weapon_attack": attack_type in (1, 2),
+            }
+            sim.triggers.dispatch("on_damage_dealt", sim, ctx)
+            sim.triggers.dispatch("on_damage_taken", sim, ctx)
 
 class PeriodicProcTick(Event):
     """Represents tics that are pre-scheduled and always happening."""
@@ -147,6 +164,8 @@ class DotTick(Event):
 
             total_ticks = getattr(self.instance_ref, "total_ticks", 0)
             current_tick = (total_ticks - self.instance_ref.ticks_remaining + 1) if total_ticks > 0 else 1
+            eff_tags = set(getattr(self.instance_ref, "tags", frozenset()))
+            eff_tags.add("tag.abl.sith_inquisitor.periodic_damage")
             effect_blueprint.execute_triggered_branches(
                 "on_tick",
                 sim,
@@ -155,6 +174,7 @@ class DotTick(Event):
                 ability=getattr(self.instance_ref, "ability_ref", None),
                 include_untriggered=False,
                 tick_number=current_tick,
+                context={"effect_tags": frozenset(eff_tags)},
             )
             self.instance_ref.ticks_remaining -= 1
             if self.instance_ref.ticks_remaining > 0 and self.instance_ref.tick_interval:

@@ -71,10 +71,25 @@ class Entity:
             if existing.expires_at is not None and expires_at is not None:
                 effect_instance.expires_at = max(existing.expires_at, expires_at)
 
+        owner_id = f"{id(self)}:{effect_key}"
+        effect_instance.owner_id = owner_id
         self.effects[effect_key] = effect_instance
         self.consider_recalculation(effect_instance)
 
         if sim is not None:
+            self._sim_ref = sim
+            if hasattr(sim, "triggers") and ability is not None:
+                sim.triggers.unsubscribe(owner_id)
+                for branch in getattr(effect, "branches", ()) or ():
+                    sim.triggers.subscribe(
+                        owner_id,
+                        ability,
+                        branch,
+                        caster or self,
+                        self,
+                        effect_key=effect_key,
+                    )
+
             if total_ticks > 0 and scaled_tick is not None:
                 from src.swtorsim.events import DotTick
                 sim.schedule_absolute(
@@ -139,12 +154,16 @@ class Entity:
         if not expired_keys:
             return
         needs_stat_recalc = False
+        sim_ref = getattr(self, "_sim_ref", None)
         for r_id in expired_keys:
             popped_effect = self.effects.pop(r_id, None)
             if popped_effect is None:
                 continue
             if hasattr(popped_effect, "is_expired"):
                 popped_effect.is_expired = True
+            owner_id = getattr(popped_effect, "owner_id", None)
+            if owner_id and sim_ref is not None and hasattr(sim_ref, "triggers"):
+                sim_ref.triggers.unsubscribe(owner_id)
             if getattr(popped_effect, "modifiers", None):
                 needs_stat_recalc = True
             elif getattr(popped_effect, "id", None) in EFFECTS:
@@ -152,16 +171,20 @@ class Entity:
                     needs_stat_recalc = True
         if needs_stat_recalc:
             self.recalculate_stats()
-            print(f'Effects active:{self.effects}')
 
     def has_effect(self, effect_name):
         """Returns bool on whether effect is present in entity"""
-        if effect_name in self.effects:
+        direct = self.effects.get(effect_name)
+        if direct is not None and not getattr(direct, "is_expired", False):
             return True
-        return any(
-            getattr(eff, "name", None) == effect_name and not getattr(eff, "is_expired", False)
-            for eff in self.effects.values()
-        )
+        for eff in self.effects.values():
+            if getattr(eff, "is_expired", False) or getattr(eff, "is_passive", False):
+                continue
+            if any("lockout" in t for t in getattr(eff, "tags", ())):
+                continue
+            if getattr(eff, "name", None) == effect_name:
+                return True
+        return False
 
 
 class Player(Entity):
@@ -174,6 +197,7 @@ class Player(Entity):
         self.cooldowns = {}
         self.procs = {}
         self.passive_blueprints = passives or {}
+        self.passive_db = {}
         self.ability_db = self.build_ability_db(abilities or {})
         self.level = 85
         self.rotation = None
@@ -306,8 +330,28 @@ class Player(Entity):
         flat_reductions = 0.0
         effects_to_clear = []
         target_ability = ability_name.lower().replace(" ", "_")
+        abl_obj = self.ability_db.get(ability_name) or self.ability_db.get(target_ability)
+        abl_fqn = getattr(abl_obj, "fqn", None)
+        abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
 
         for effect in self.effects.values():
+            if getattr(effect, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(effect):
+                if mod.stat in ("68", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
+                    matched = mod.applies_to(abl_fqn, abl_tags)
+                    if not matched and abl_fqn:
+                        for t in mod.targets:
+                            stem = str(t).split(".")[-1]
+                            if stem and abl_fqn.endswith(f".{stem}_plus"):
+                                matched = True
+                                break
+                    if matched:
+                        if abs(mod.value) <= 1.0:
+                            pct_modifiers += mod.value
+                        else:
+                            flat_reductions += mod.value
+
             effect_id = getattr(effect, "id", None)
             if effect_id not in EFFECTS:
                 continue
