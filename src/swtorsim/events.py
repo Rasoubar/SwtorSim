@@ -124,20 +124,48 @@ class EffectExpire(Event):
 
 class DotTick(Event):
     """Represents a Dot Tick. Handles action execution, tick's value decrease and following tick scheduling."""
-    def __init__(self, source: "Player", target: "Dummy", instance_ref: "ActiveDot"):
+    def __init__(self, source: "Player", target: "Dummy", instance_ref, effect_key: str = None):
         super().__init__(f"DoT Tick: {instance_ref.name}")
         self.source = source
         self.target = target
         self.instance_ref = instance_ref
+        self.effect_key = effect_key or instance_ref.name
 
     def resolve(self, sim):
         """If it's instance's DoT has not been overlapped:
         Executes the tick according to DoT data, decreases ticks remaining and schedules next one if still ticks
         remaining. If not, deletes dot from target. """
 
-        dot_name = self.instance_ref.name
+        dot_name = self.effect_key
+        effect_blueprint = getattr(self.instance_ref, "effect_blueprint", None)
 
-        if self.target.dots.get(dot_name) is not self.instance_ref:
+        if effect_blueprint is not None:
+            if self.target.effects.get(dot_name) is not self.instance_ref:
+                return
+            if getattr(self.instance_ref, "is_expired", False):
+                return
+
+            total_ticks = getattr(self.instance_ref, "total_ticks", 0)
+            current_tick = (total_ticks - self.instance_ref.ticks_remaining + 1) if total_ticks > 0 else 1
+            effect_blueprint.execute_triggered_branches(
+                "on_tick",
+                sim,
+                self.source,
+                self.target,
+                ability=getattr(self.instance_ref, "ability_ref", None),
+                include_untriggered=False,
+                tick_number=current_tick,
+            )
+            self.instance_ref.ticks_remaining -= 1
+            if self.instance_ref.ticks_remaining > 0 and self.instance_ref.tick_interval:
+                next_tick_time = sim.current_time + self.instance_ref.tick_interval
+                sim.schedule_absolute(next_tick_time, self)
+            else:
+                self.target.cleanup_expired_effects([dot_name])
+                print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
+            return
+
+        if getattr(self.target, "dots", {}).get(dot_name) is not self.instance_ref:
             return
 
         actions = self.instance_ref.action_data.get('actions')
@@ -226,5 +254,3 @@ class ChargeRestoreEvent(Event):
             return
 
         self.ability.restore_charge(self.caster, sim, amount=1, from_timer=True)
-
-

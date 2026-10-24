@@ -92,7 +92,16 @@ def _check_branch(raw: dict, branch: Any) -> list[str]:
         ("actions", raw.get("actions", []), "actions"),
         ("target_overrides", raw.get("target_overrides", []), "target_overrides"),
         ("run_if_none_ran", raw.get("run_if_none_ran", []), "run_if_none_ran"),
-        ("is_attack", raw.get("is_attack", False), "is_attack"),
+        (
+            "is_attack",
+            bool(raw["is_attack"])
+            if "is_attack" in raw
+            else any(
+                isinstance(a, dict) and a.get("action_type") == "damage"
+                for a in raw.get("actions", [])
+            ),
+            "is_attack",
+        ),
     )
     return _compare_attrs(branch, checks, prefix=f"branch {b_idx}")
 

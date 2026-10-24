@@ -22,28 +22,71 @@ class Entity:
         self.effects = {}
         self.stats = {}
 
-    def apply_effect(self, action: dict, source_name: str, current_time): #can be improved on the refresh
-        """Applies or refreshes an active effect, calculates expiration, and triggers stat updates if needed."""
-        extracted_stat = self._get_stat_name(action.get("id"), source_name)
-        effect_key = action.get("effect_name", extracted_stat)
-        duration = self.scale_time_modifier(action["duration"]) if action.get("affected_by_cdr") else action["duration"]
-        expiration_timestamp = self._determine_duration(self.effects.get(effect_key),duration,current_time)
+    def apply_effect(self, sim, ability, effect, caster=None): #can be improved on the refresh
+        """Applies or refreshes an extracted ActiveEffect, calculates expiration, and triggers stat updates if needed."""
+        current_time = sim.current_time if sim is not None else 0.0
+        base_duration = float(getattr(effect, "duration", 0.0) or 0.0)
+        ignore_alacrity = bool(getattr(effect, "eff_ignore_alacrity", True))
 
+        if base_duration > 0.0 and not ignore_alacrity and caster is not None:
+            duration = caster.scale_time_modifier(base_duration)
+        else:
+            duration = base_duration
 
-        current_charges = self._determine_charges(self.effects.get(effect_key), action.get("charges", 1))
+        is_passive = bool(getattr(effect, "is_passive", False))
+        expires_at = (current_time + duration) if (duration > 0.0 and not is_passive) else None
 
-        effect_instance = ActiveEffect.from_action(
-            action=action,
-            stat_name=extracted_stat,
-            effect_key=effect_key,
-            charges=current_charges,
-            expires_at=expiration_timestamp,
-            source_name=source_name
+        effect_instance = ActiveEffect.from_effect(
+            ability=ability,
+            effect=effect,
+            current_time=current_time,
+            expires_at=expires_at,
+        )
+        raw_effect_name = getattr(effect, "name", None)
+        effect_key = (
+            raw_effect_name
+            if raw_effect_name
+            else f"{effect_instance.name or effect_instance.fqn}:{effect_instance.number}"
         )
 
-        self.effects[effect_key] = effect_instance
+        base_tick = float(getattr(effect, "tick_interval", 0.0) or 0.0)
+        if base_tick > 0.0 and base_duration > 0.0:
+            total_ticks = max(1, int(round(base_duration / base_tick)))
+            scaled_tick = duration / total_ticks
+        else:
+            total_ticks = 0
+            scaled_tick = None
 
+        effect_instance.caster_ref = caster
+        effect_instance.tick_interval = scaled_tick
+        effect_instance.total_ticks = total_ticks
+        effect_instance.ticks_remaining = total_ticks
+
+        existing = self.effects.get(effect_key)
+        if existing is not None and not getattr(existing, "is_expired", False):
+            effect_instance.stacks = min(
+                effect_instance.max_stacks,
+                getattr(existing, "stacks", 1) + 1,
+            )
+            if existing.expires_at is not None and expires_at is not None:
+                effect_instance.expires_at = max(existing.expires_at, expires_at)
+
+        self.effects[effect_key] = effect_instance
         self.consider_recalculation(effect_instance)
+
+        if sim is not None:
+            if total_ticks > 0 and scaled_tick is not None:
+                from src.swtorsim.events import DotTick
+                sim.schedule_absolute(
+                    current_time + scaled_tick,
+                    DotTick(caster, self, effect_instance, effect_key=effect_key),
+                )
+            elif effect_instance.expires_at is not None:
+                from src.swtorsim.events import EffectExpire
+                sim.schedule_absolute(
+                    effect_instance.expires_at,
+                    EffectExpire(self, effect_key, effect_instance),
+                )
 
         return effect_key, effect_instance, duration
 
@@ -78,7 +121,10 @@ class Entity:
 
     def consider_recalculation(self, effect_instance):
         """Triggers recalculate_stats() only if the applied effect modifies a relevant stat."""
-        effect_id = effect_instance.id
+        if getattr(effect_instance, "modifiers", None):
+            self.recalculate_stats()
+            return
+        effect_id = getattr(effect_instance, "id", None)
         if effect_id in EFFECTS:
             stat_name = EFFECTS[effect_id]["stat_name"]
             if stat_name in self.RECALCULATE_STATS:
@@ -95,7 +141,13 @@ class Entity:
         needs_stat_recalc = False
         for r_id in expired_keys:
             popped_effect = self.effects.pop(r_id, None)
-            if popped_effect and popped_effect.id in EFFECTS:
+            if popped_effect is None:
+                continue
+            if hasattr(popped_effect, "is_expired"):
+                popped_effect.is_expired = True
+            if getattr(popped_effect, "modifiers", None):
+                needs_stat_recalc = True
+            elif getattr(popped_effect, "id", None) in EFFECTS:
                 if EFFECTS[popped_effect.id]["stat_name"] in self.RECALCULATE_STATS:
                     needs_stat_recalc = True
         if needs_stat_recalc:
@@ -104,7 +156,12 @@ class Entity:
 
     def has_effect(self, effect_name):
         """Returns bool on whether effect is present in entity"""
-        return effect_name in self.effects
+        if effect_name in self.effects:
+            return True
+        return any(
+            getattr(eff, "name", None) == effect_name and not getattr(eff, "is_expired", False)
+            for eff in self.effects.values()
+        )
 
 
 class Player(Entity):
@@ -120,6 +177,7 @@ class Player(Entity):
         self.ability_db = self.build_ability_db(abilities or {})
         self.level = 85
         self.rotation = None
+        self.toughness = 1
         self.resource = create_resource_pool(
             pool_type=resource
         )
@@ -184,7 +242,7 @@ class Player(Entity):
 
         bonuses = defaultdict(float)
         for effect in self.effects.values():
-            effect_id = effect.id
+            effect_id = getattr(effect, "id", None)
             if effect_id in EFFECTS:
                 multiplier = effect.charges if effect.max_charges is not None else 1
                 stat_name = EFFECTS[effect_id]["stat_name"]
@@ -250,7 +308,10 @@ class Player(Entity):
         target_ability = ability_name.lower().replace(" ", "_")
 
         for effect in self.effects.values():
-            meta = EFFECTS[effect.id]
+            effect_id = getattr(effect, "id", None)
+            if effect_id not in EFFECTS:
+                continue
+            meta = EFFECTS[effect_id]
             stat_name = meta['stat_name']
 
             if stat_name not in ("cost_reduction_pct", "cost_reduction_flat"):
@@ -289,6 +350,7 @@ class Dummy(Entity):
         super().__init__(name)
         self.max_hp = hp
         self.hp = hp
+        self.toughness = 5
         self.dots = {}
         self.base_stats = {
             "Armor" : 17225
@@ -328,4 +390,3 @@ class Dummy(Entity):
     def hp_ratio(self) -> float:
         """Calculates the meaning of life. Evidently."""
         return self.hp / self.max_hp if self.max_hp > 0 else 1.0
-

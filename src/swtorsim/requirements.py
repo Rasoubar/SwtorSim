@@ -1,3 +1,4 @@
+import random
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from entities import Player, Dummy
@@ -84,14 +85,206 @@ CONDITION_REGISTRY = {
     "ability_cooldown_under": check_ability_cooldown_under
 }
 
+
+def compare_values(actual: float, comparison: str, expected: float) -> bool:
+    """Evaluates comparison operators used in extracted game data."""
+    if comparison == "lte":
+        return actual <= expected
+    elif comparison == "gte":
+        return actual >= expected
+    elif comparison == "lt":
+        return actual < expected
+    elif comparison == "gt":
+        return actual > expected
+    elif comparison == "eq":
+        return actual == expected
+    return True
+
+
+def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str | None = None, count: int = 1) -> bool:
+    """Checks whether an entity has an active effect or dot matching tags or an ability spec."""
+    if not entity:
+        return False
+
+    effects = getattr(entity, "effects", {})
+    tags_set = set(tags) if tags else set()
+
+    for eff in effects.values():
+        eff_tags = set(getattr(eff, "tags", []) or getattr(eff, "required_tags", []) or [])
+        eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "")
+        eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")
+        stacks = getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1
+
+        matches = False
+        if tags_set and (tags_set & eff_tags):
+            matches = True
+        if ability_spec and ability_spec in (eff_fqn, eff_name):
+            matches = True
+
+        if matches and stacks >= count:
+            return True
+
+    # Also check active dots on dummy targets
+    dots = getattr(entity, "dots", {})
+    for dot_name, dot in dots.items():
+        if ability_spec and ability_spec == dot_name:
+            return True
+        dot_tags = set(getattr(dot, "tags", []) or [])
+        if tags_set and (tags_set & dot_tags):
+            return True
+
+    return False
+
+
+def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
+    """Evaluates an individual atomic condition record from an extracted condition list."""
+    cond_type = item.get("type")
+    actor_str = item.get("actor", "caster")
+
+    if actor_str == "target":
+        actor = target
+    elif actor_str == "trigger_target" and context and "target" in context:
+        actor = context["target"]
+    elif actor_str == "trigger_caster" and context and "caster" in context:
+        actor = context["caster"]
+    else:
+        actor = caster
+
+    res = True
+
+    if cond_type == "has_ability":
+        spec = item.get("ability_spec")
+        comparison = item.get("comparison", "gte")
+        expected_rank = item.get("ints", {}).get("rank", 1)
+        has_it = False
+        if hasattr(caster, "passive_blueprints") and spec in caster.passive_blueprints:
+            has_it = True
+        elif hasattr(caster, "ability_db"):
+            if spec in caster.ability_db or (isinstance(spec, str) and spec.lower().replace(" ", "_") in caster.ability_db):
+                has_it = True
+        actual_rank = 1 if has_it else 0
+        res = compare_values(actual_rank, comparison, expected_rank)
+
+    elif cond_type == "has_effect":
+        tags = item.get("tags")
+        spec = item.get("ability_spec")
+        count = item.get("count", 1)
+        res = entity_has_effect(actor, tags=tags, ability_spec=spec, count=count)
+
+    elif cond_type == "if_toughness":
+        expected = item.get("ints", {}).get("toughness", 3)
+        comparison = item.get("comparison", "lte")
+        actual = getattr(actor, "toughness", 5 if getattr(actor, "max_hp", 0) > 0 else 1)
+        res = compare_values(actual, comparison, expected)
+
+    elif cond_type == "if_health":
+        floats = item.get("floats", {})
+        threshold = floats.get("health_percent", 0.0)
+        comparison = item.get("comparison", "lte")
+        actual_hp_pct = getattr(actor, "hp_ratio", 1.0) * 100.0
+        res = compare_values(actual_hp_pct, comparison, threshold)
+
+    elif cond_type == "has_specified_resource_amount":
+        floats = item.get("floats", {})
+        threshold = floats.get("resource_amount", 0.0)
+        comparison = item.get("comparison", "gte")
+        actual = getattr(getattr(actor, "resource", None), "current_value", 0.0)
+        res = compare_values(actual, comparison, threshold)
+
+    elif cond_type == "has_ability_stack_charge":
+        spec = item.get("ability_spec")
+        comparison = item.get("comparison", "gte")
+        amount = item.get("floats", {}).get("amount", 1.0)
+        actual = 0
+        if hasattr(caster, "ability_db") and spec in caster.ability_db:
+            actual = getattr(caster.ability_db[spec], "charges", 0)
+        res = compare_values(actual, comparison, amount)
+
+    elif cond_type == "is_player":
+        res = not hasattr(actor, "max_hp") and hasattr(actor, "ability_db")
+
+    elif cond_type == "is_not_player":
+        res = hasattr(actor, "max_hp") or not hasattr(actor, "ability_db")
+
+    elif cond_type == "if_primary_target":
+        res = True
+
+    elif cond_type == "random_chance":
+        chance = item.get("floats", {}).get("chance", 1.0)
+        res = random.random() <= chance
+
+    elif cond_type == "immune_by_resolve":
+        # Target dummies/bosses have resolve immunity
+        res = hasattr(actor, "max_hp")
+
+    elif cond_type == "if_spell_hit":
+        res = True
+
+    elif cond_type in ("is_party_member", "is_friend"):
+        res = (actor is caster)
+
+    elif cond_type in ("passes_conditional", "is_discipline", "has_melee_weapon", "is_not_dual_wielding", "is_in_combat", "is_not_in_cover"):
+        res = True
+
+    elif cond_type in ("is_dual_wielding", "is_not_in_combat", "is_in_cover", "is_companion"):
+        res = False
+
+    else:
+        # Fallback for unmodeled visual/flavor conditions
+        res = True
+
+    if item.get("negated", False):
+        res = not res
+
+    return res
+
+
+def evaluate_logic(logic_node: dict, results_by_id: dict[str, bool]) -> bool:
+    """Recursively evaluates boolean logic trees (and/or/condition reference)."""
+    if not logic_node:
+        return True
+    if "condition" in logic_node:
+        return results_by_id.get(logic_node["condition"], True)
+
+    op = logic_node.get("op")
+    operands = logic_node.get("operands", [])
+    if op == "and":
+        return all(evaluate_logic(child, results_by_id) for child in operands)
+    elif op == "or":
+        return any(evaluate_logic(child, results_by_id) for child in operands)
+    return True
+
+
+def evaluate_extracted_conditions(conditions: dict[str, Any], caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
+    """Evaluates an extracted condition structure containing a 'list' and 'logic' tree."""
+    cond_list = conditions.get("list") or []
+    logic_tree = conditions.get("logic") or {}
+
+    results_by_id = {}
+    for item in cond_list:
+        cond_id = item.get("id")
+        if cond_id:
+            results_by_id[cond_id] = evaluate_single_extracted_condition(
+                item, caster, target, sim=sim, context=context
+            )
+
+    return evaluate_logic(logic_tree, results_by_id)
+
+
 def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy", sim = None, context = None) -> bool:
-    """applies the condition_registry so that the correct functions for the requirement is run"""
+    """Validates conditions, supporting both extracted AST structures and legacy rotation rules."""
     if not requirements:
         return True
+
+    # 1. Extracted AST condition schema: {"list": [...], "logic": {...}}
+    if isinstance(requirements, dict) and "list" in requirements and "logic" in requirements:
+        return evaluate_extracted_conditions(requirements, caster, target, sim=sim, context=context)
+
+    # 2. Legacy flat dictionary format (used by rotation.py priority rules)
     for key, value in requirements.items():
         validator_func = CONDITION_REGISTRY.get(key)
         if validator_func:
-            if not validator_func(value, caster, target,sim=sim):
+            if not validator_func(value, caster, target, sim=sim):
                 return False
         else:
             raise KeyError(
@@ -100,4 +293,3 @@ def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy"
                 f"Implemented requirements are: {list(CONDITION_REGISTRY.keys())}\n"
                 f"Contact me if you think yours should be here too")
     return True
-

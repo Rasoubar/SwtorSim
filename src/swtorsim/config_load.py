@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List, NamedTuple
 from src.swtorsim.abilities import AbilityBlueprint
 from src.swtorsim.effects import ActiveEffect
-from src.swtorsim.effects_temp import ActiveEffect as ParsedEffect
+from src.swtorsim.effects import ActiveEffect as ParsedEffect
 from src.swtorsim.run_config import (
     TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
     TRAINING_DUMMY_ARMOR_DEBUFF_PATH,
@@ -97,13 +97,13 @@ def load_complete_loadout(
         full_path = base_parsed_path / rel_path
 
         if not full_path.is_file():
-            print(f"⚠️ [WARN] Blueprint file not found for FQN '{fqn}': {full_path}")
+            print(f"[WARN] Blueprint file not found for FQN '{fqn}': {full_path}")
             continue
 
         blueprint = AbilityBlueprint.from_file(full_path)
         blueprints[blueprint.fqn] = blueprint
 
-    print(f"✅ Loaded {len(blueprints)} total blueprints into unified loadout database.")
+    print(f"[OK] Loaded {len(blueprints)} total blueprints into unified loadout database.")
     return blueprints
 
 

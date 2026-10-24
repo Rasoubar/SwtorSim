@@ -32,7 +32,14 @@ class Branch:
             actions=data.get("actions", []),
             target_overrides=data.get("target_overrides", []),
             run_if_none_ran=data.get("run_if_none_ran", []),
-            is_attack=data.get("is_attack", False),
+            is_attack=(
+                bool(data["is_attack"])
+                if "is_attack" in data
+                else any(
+                    isinstance(a, dict) and a.get("action_type") == "damage"
+                    for a in data.get("actions", [])
+                )
+            ),
         )
 
     def execute(self, sim, caster, target, context=None, ability=None) -> tuple[bool, bool]:
@@ -46,7 +53,10 @@ class Branch:
 
         # 1. Target overrides
         for override in self.target_overrides:
-            if override.get("type") == "trigger_target" and context and "target" in context:
+            o_type = override.get("type") if isinstance(override, dict) else None
+            if o_type == "caster":
+                actual_target = caster
+            elif o_type == "trigger_target" and context and "target" in context:
                 actual_target = context["target"]
 
         # 2. Branch conditions (failing conditions skips the branch, not an attack miss)
@@ -123,18 +133,37 @@ class Effect:
         """True if the effect evaluates immediately and does not live on an actor."""
         return not self.is_persistent
 
-    def execute(self, sim, caster, target, context=None, ability=None):
-        """Resolves an effect: routes persistent effects to actor, or resolves instant branches."""
-        if self.is_persistent:
-            target.apply_effect(sim, ability, self, caster)
-            return
-
+    def execute_triggered_branches(
+        self,
+        trigger_name: str,
+        sim,
+        caster,
+        target,
+        context=None,
+        ability=None,
+        include_untriggered: bool = False,
+        tick_number: Optional[int] = None,
+    ):
+        """Executes branches matching trigger_name (and optionally untriggered branches)."""
         executed_branches = set()
         for branch in self.branches:
             triggers = getattr(branch, "triggers", [])
-            is_immediate = not triggers or any(t.get("trigger") == "on_apply" for t in triggers)
-            if not is_immediate:
-                continue
+            if not triggers:
+                if not include_untriggered:
+                    continue
+            else:
+                matched = False
+                for t in triggers:
+                    if t.get("trigger") != trigger_name:
+                        continue
+                    if trigger_name == "on_tick" and tick_number is not None:
+                        t_num = t.get("tick_number") or 0
+                        if t_num not in (0, tick_number):
+                            continue
+                    matched = True
+                    break
+                if not matched:
+                    continue
 
             if branch.run_if_none_ran and any(b in executed_branches for b in branch.run_if_none_ran):
                 continue
@@ -144,6 +173,42 @@ class Effect:
                 executed_branches.add(branch.index)
             if not success and getattr(branch, "is_attack", False):
                 break
+
+    def execute(self, sim, caster, target, context=None, ability=None):
+        """Resolves an effect: routes persistent effects to actor, or resolves instant branches."""
+        if self.is_persistent:
+            recipient = (
+                caster
+                if any(isinstance(o, dict) and o.get("type") == "caster" for o in self.target_overrides)
+                else target
+            )
+            effect_key = (
+                self.name
+                or f"{getattr(ability, 'name', None) or getattr(ability, 'fqn', '')}:{self.number}"
+            )
+            existing = recipient.effects.get(effect_key)
+            was_refreshed = existing is not None and not getattr(existing, "is_expired", False)
+            recipient.apply_effect(sim, ability, self, caster)
+            self.execute_triggered_branches(
+                "on_refresh" if was_refreshed else "on_apply",
+                sim,
+                caster,
+                target,
+                context=context,
+                ability=ability,
+                include_untriggered=False,
+            )
+            return
+
+        self.execute_triggered_branches(
+            "on_apply",
+            sim,
+            caster,
+            target,
+            context=context,
+            ability=ability,
+            include_untriggered=True,
+        )
 
 
 @dataclass(slots=True)
@@ -222,6 +287,56 @@ class AbilityBlueprint:
             return cls.from_dict(json.load(f), file_path=filepath)
 # --- Action Handlers ---
 
+NOOP_ACTION_TYPES = frozenset(
+    {
+        "ballistic_impulse",
+        "ballistic_to_caster",
+        "teleport_to_target",
+        "dive_to_point",
+        "swap_caster_position_with_target",
+        "stun",
+        "mark_as_neutralized",
+        "grant_immunity",
+        "taunt",
+        "taunt_damage_reduce",
+        "ability_interrupt",
+        "ability_activate",
+        "ability_deactivate",
+        "ability_cancel",
+        "become_stealthed",
+        "set_posture",
+        "take_cover",
+        "leave_cover",
+        "take_portable_cover",
+        "enter_combat",
+        "exit_combat",
+        "revive",
+        "summon_pet",
+        "execute_hydra_hook",
+        "custom",
+        "invoke_projectile",
+        "modify_stat",
+        "modify_meta_stat",
+        "apply_conditional_stat_mod",
+        "apply_conditional_meta_stat_mod",
+        "heal",
+        "regen_health",
+        "spend_health",
+        "absorb_damage",
+        "reflect_damage",
+        "redirect_damage",
+        "cooldown",
+        "global_cooldown",
+        "reset_timer",
+        "modify_active_duration",
+        "set_effect_stack_charge",
+        "grant_temporary_ability_package",
+        "god_damage",
+        "insta_kill",
+        "modify_stack_charge",
+    }
+)
+
 
 def execute_single_action(sim, caster, target, action, source_name, ability=None):
     """Calls the appropriate function for the action type."""
@@ -235,18 +350,29 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
 
     if action_type == "damage":
         return handle_damage_action(sim, caster, target, action, source_name, delay)
-    elif action_type == "resource_gain":
+    elif action_type in (
+        "resource_gain",
+        "energy_recovery",
+        "regen_force",
+        "regen_energy",
+        "restore_action_points",
+    ):
         handle_resource_gain_action(sim, caster, action, delay)
-    elif action_type == "cooldown_mod":
+    elif action_type in ("spend_energy", "spend_force"):
+        handle_resource_spend_action(caster, action)
+    elif action_type in ("cooldown_mod", "modify_cooldown", "modify_recharge_time"):
         handle_cooldown_modification(sim, caster, action)
-    elif action_type == "grant_charge":
+    elif action_type in ("grant_charge", "modify_ability_stack_charge"):
         handle_restore_charge(sim, caster, action)
-    elif action_type == "buff_remove":
-        handle_buff_remove_action(sim, caster, action)
+    elif action_type in ("buff_remove", "remove_effect", "dispel"):
+        handle_buff_remove_action(sim, caster, target, action, ability=ability)
+    elif action_type == "execute_ability":
+        handle_execute_ability(sim, caster, target, action)
     elif action_type == "call_effect":
         if ability and "effect" in action:
-            ability.execute_effect(action["effect"], caster, target, sim)
-    elif action_type == "modify_stack_charge":
+            call_target = caster if action.get("to_actor") in ("caster", "actor_1") else target
+            ability.execute_effect(action["effect"], caster, call_target, sim)
+    elif action_type in NOOP_ACTION_TYPES:
         pass
     else:
         raise ValueError(
@@ -254,6 +380,36 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
             f"triggered by '{source_name}'. Please check your JSON blueprints."
         )
     return True
+
+
+def _find_target_abilities(caster, action):
+    """Resolves target Ability instances from caster.ability_db using legacy or extracted action keys."""
+    ability_db = getattr(caster, "ability_db", {})
+    if not ability_db:
+        return []
+
+    ints = action.get("ints") or {}
+    strings = action.get("strings") or {}
+    spec = action.get("target_ability") or action.get("ability_spec") or ints.get("ability_spec")
+
+    tag_set = set(action.get("target_tags") or []) | set(action.get("tags") or [])
+    for k in ("tag", "tags"):
+        val = strings.get(k)
+        if val:
+            tag_set.update(t.strip() for t in val.split(",") if t.strip())
+
+    matched = []
+    for key, abl in ability_db.items():
+        if spec and spec != 0:
+            if key == spec or getattr(abl, "fqn", None) == spec or getattr(abl, "name", None) == spec:
+                matched.append(abl)
+                continue
+            if getattr(abl, "name", "").lower().replace(" ", "_") == str(spec).lower().replace(" ", "_"):
+                matched.append(abl)
+                continue
+        if tag_set and (tag_set & set(getattr(abl, "tags", ()))):
+            matched.append(abl)
+    return matched
 
 
 def handle_damage_action(sim, caster, target, action, source_name, delay):
@@ -269,8 +425,27 @@ def handle_damage_action(sim, caster, target, action, source_name, delay):
 
 
 def handle_resource_gain_action(sim, caster, action, delay):
-    """Schedules or executes the resource gain event."""
-    regen = action.get("value", 0.0)
+    """Schedules or executes the resource gain event (legacy & extracted schemas)."""
+    floats = action.get("floats") or {}
+    flat = (
+        action.get("value")
+        or action.get("max")
+        or action.get("min")
+        or floats.get("amount")
+        or floats.get("amount_max")
+        or floats.get("amount_min")
+        or 0.0
+    )
+    pct = (
+        action.get("percent")
+        or floats.get("amount_percent")
+        or floats.get("amount_percent_of_max")
+        or 0.0
+    )
+    max_res = getattr(getattr(caster, "resource", None), "max_value", 0.0) or 0.0
+    regen = float(flat) + float(pct) * float(max_res)
+    if regen <= 0.0:
+        return
     gain_event = ResourceGainEvent(caster, regen)
     if delay > 0.0:
         sim.schedule_relative(delay, gain_event)
@@ -278,46 +453,135 @@ def handle_resource_gain_action(sim, caster, action, delay):
         gain_event.resolve(sim)
 
 
-def handle_cooldown_modification(sim, caster, action):
-    """Applies cooldown reductions or resets to targeted abilities."""
-    cooldown_dict = getattr(caster, "cooldowns", {})
-    ability_db = caster.ability_db
-    if not (cooldown_dict and ability_db and "target_tags" in action):
+def handle_resource_spend_action(caster, action):
+    """Spends resources for extracted spend_energy / spend_force actions."""
+    resource = getattr(caster, "resource", None)
+    if resource is None:
         return
-    reset_tags = frozenset(action["target_tags"])
-    is_reset = action.get("reset", False)
-    for cd_key in list(cooldown_dict.keys()):
-        if cooldown_dict[cd_key] <= sim.current_time:
-            del cooldown_dict[cd_key]
+    floats = action.get("floats") or {}
+    flat = floats.get("amount", 0.0)
+    pct_max = floats.get("amount_percent_of_max", 0.0)
+    pct_cur = floats.get("amount_percent_of_current", 0.0)
+    spend = (
+        float(flat)
+        + float(pct_max) * float(getattr(resource, "max_value", 0.0))
+        + float(pct_cur) * float(getattr(resource, "current_value", 0.0))
+    )
+    if spend > 0.0:
+        resource.spend(spend)
+
+
+def handle_cooldown_modification(sim, caster, action):
+    """Applies cooldown or recharge reductions/resets to targeted abilities."""
+    cooldown_dict = getattr(caster, "cooldowns", {})
+    floats = action.get("floats") or {}
+    bools = action.get("bools") or {}
+    action_type = action.get("action_type")
+    is_pct = bool(bools.get("is_percentage", False))
+    amount = float(action.get("value", floats.get("amount", 0.0)))
+    is_reset = bool(action.get("reset", False)) or (is_pct and amount <= -1.0)
+
+    for abl in _find_target_abilities(caster, action):
+        if action_type == "modify_recharge_time":
+            if is_pct:
+                abl.recharge_time = max(0.0, abl.recharge_time * (1.0 + amount))
+            else:
+                abl.recharge_time = max(0.0, abl.recharge_time + amount)
             continue
-        ability_data = ability_db.get(cd_key.lower().replace(" ", "_"))
-        ability_tags = getattr(ability_data, "tags", frozenset()) if ability_data else frozenset()
-        if reset_tags & ability_tags:
+
+        for cd_key in (abl.name, abl.fqn):
+            if cd_key not in cooldown_dict:
+                continue
+            if cooldown_dict[cd_key] <= sim.current_time:
+                del cooldown_dict[cd_key]
+                continue
             if is_reset:
                 del cooldown_dict[cd_key]
             else:
-                reduction = action.get("value", 0.0)
-                new_cd = max(sim.current_time, cooldown_dict[cd_key] + reduction)
-                cooldown_dict[cd_key] = new_cd
-                if cooldown_dict[cd_key] <= sim.current_time:
+                delta = (amount * abl.cooldown) if is_pct else amount
+                new_cd = max(sim.current_time, cooldown_dict[cd_key] + delta)
+                if new_cd <= sim.current_time:
                     del cooldown_dict[cd_key]
+                else:
+                    cooldown_dict[cd_key] = new_cd
 
 
 def handle_restore_charge(sim, caster, action):
-    """Restores a charge to the target ability."""
-    target_ability_name = action.get("target_ability")
-    amount = action.get("amount", 1)
-    if target_ability_name in caster.ability_db:
-        ability = caster.ability_db[target_ability_name]
-        ability.restore_charge(caster, sim, amount=amount, from_timer=False)
+    """Modifies charges on the target ability (legacy grant_charge & extracted modify_ability_stack_charge)."""
+    floats = action.get("floats") or {}
+    raw_amount = action.get(
+        "amount",
+        floats.get("amount_min", floats.get("amount_max", 1)),
+    )
+    amount = int(round(float(raw_amount)))
+    if amount == 0:
+        return
+
+    for ability in _find_target_abilities(caster, action):
+        if amount > 0:
+            ability.restore_charge(caster, sim, amount=amount, from_timer=False)
+        else:
+            for _ in range(abs(amount)):
+                ability.consume_charge(caster, sim)
 
 
-def handle_buff_remove_action(sim, caster, action):
-    """Removes a buff from the caster."""
+def handle_buff_remove_action(sim, caster, target, action, ability=None):
+    """Removes active effects from caster/target (buff_remove, remove_effect, dispel)."""
+    action_type = action.get("action_type")
     effect_name = action.get("effect_name")
     if effect_name and caster.has_effect(effect_name):
         caster.cleanup_expired_effects([effect_name])
         print(f"[{sim.current_time:.3f}] {caster.name} consumed/removed buff: {effect_name}")
+        return
+
+    if action_type == "remove_effect" and ability is not None:
+        for actor in (caster, target):
+            effects_dict = getattr(actor, "effects", {})
+            to_remove = [
+                k for k, eff in effects_dict.items()
+                if getattr(eff, "ability_fqn", None) == ability.fqn or k == ability.name
+            ]
+            if to_remove:
+                actor.cleanup_expired_effects(to_remove)
+        return
+
+    if action_type == "dispel":
+        ints = action.get("ints") or {}
+        strings = action.get("strings") or {}
+        spec = ints.get("ability_spec")
+        dispel_tags = set(action.get("tags") or [])
+        if strings.get("tag"):
+            dispel_tags.add(strings["tag"])
+
+        for actor in (caster, target):
+            effects_dict = getattr(actor, "effects", {})
+            to_remove = []
+            for k, eff in effects_dict.items():
+                if spec and spec != 0 and getattr(eff, "ability_fqn", None) == spec:
+                    to_remove.append(k)
+                elif dispel_tags and (dispel_tags & set(getattr(eff, "tags", ()))):
+                    to_remove.append(k)
+            if to_remove:
+                actor.cleanup_expired_effects(to_remove)
+
+
+def handle_execute_ability(sim, caster, target, action):
+    """Executes entry effects of a sub-ability referenced by execute_ability."""
+    ints = action.get("ints") or {}
+    spec = ints.get("ability_spec") or action.get("ability_spec")
+    if not spec or spec == 0:
+        return
+    sub_ability = (
+        getattr(caster, "ability_db", {}).get(spec)
+        or getattr(caster, "passive_db", {}).get(spec)
+    )
+    if sub_ability is None:
+        return
+    for entry_id in getattr(sub_ability, "entry_effect_ids", ()):
+        if hasattr(sub_ability, "execute_effect"):
+            sub_ability.execute_effect(entry_id, caster, target, sim)
+        elif entry_id in getattr(sub_ability, "effects", {}):
+            sub_ability.effects[entry_id].execute(sim, caster, target, ability=sub_ability)
 
 
 # --- Ability Container ---

@@ -1,3 +1,9 @@
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+from src.swtorsim.modifiers import Modifier
+
+
 class ActiveDot:
     """Tracks tick timing and state for active Damage-over-Time (DoT) effects."""
     __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
@@ -19,75 +25,215 @@ class ActiveChannel:
         self.tick_cost = tick_cost
 
 
+@dataclass
 class ActiveEffect:
-    """Represents an active buff or debuff instance applied to an entity."""
-    __slots__ = [
-        'id', 'effect_name', 'stat_name', 'value', 'expires_at', 'source_ability', 'required_tags', 'charges', 'consumable_charges',
-        'max_charges','target_hp_threshold',"stack_values", "required_damage_type"]
+    """A live effect instance running on an actor."""
 
-    def __init__(self, id_num, effect_name, stat_name, value, expires_at, source_ability,
-                 required_tags=None, charges=None, consumable_charges=None, max_charges = None, target_hp_threshold = None,
-                 stack_values = None, required_damage_type = None):
-        self.id = id_num
-        self.effect_name = effect_name
-        self.stat_name = stat_name
-        self.value = value
-        self.expires_at = expires_at
-        self.source_ability = source_ability
-        self.required_tags = required_tags
-        self.charges = charges
-        self.consumable_charges = consumable_charges
-        self.max_charges = max_charges
-        self.target_hp_threshold = target_hp_threshold
-        self.stack_values = stack_values
-        self.required_damage_type = required_damage_type
+    # Identity
+    fqn: str
+    name: str
+    number: int = 1
+    tags: frozenset = frozenset()
 
-    def consume_charge(self, count: int = 1) -> bool:
-        """ Consumes N charges/consumable charges from the effect. Returns bool on if it has reached 0 charges."""
-        if self.consumable_charges is None:
-            return False
-        self.consumable_charges = max(0, self.consumable_charges - count)
-        return self.consumable_charges == 0
+    # Timers
+    expires_at: Optional[float] = None
+    tick_interval: Optional[float] = None
 
+    # Stacks / Charges
+    stacks: int = 1
+    max_stacks: int = 1
+    scales_with_stacks: bool = False
+
+    # Payloads
+    modifiers: List[Modifier] = field(default_factory=list)
+    branches: List[Dict[str, Any]] = field(default_factory=list)
+
+    # State
+    is_expired: bool = False
+    total_ticks: int = 0
+    ticks_remaining: int = 0
+    effect_blueprint: Any = field(default=None, repr=False, compare=False)
+    ability_ref: Any = field(default=None, repr=False, compare=False)
+    caster_ref: Any = field(default=None, repr=False, compare=False)
+
+    def time_remaining(self, current_time: float) -> float:
+        if self.expires_at is None:
+            return float("inf")
+        return max(0.0, self.expires_at - current_time)
+
+    def modify_stacks(self, amount: int) -> None:
+        self.stacks = max(0, min(self.stacks + amount, self.max_stacks))
+        if self.stacks == 0 and self.max_stacks > 0:
+            self.is_expired = True
+
+    def get_effective_modifiers(self) -> List[Modifier]:
+        """Returns modifiers, scaled by stack count if scales_with_stacks is enabled."""
+        if not self.scales_with_stacks or self.stacks == 1:
+            return self.modifiers
+        return [
+            Modifier(stat=m.stat, value=m.value * self.stacks, targets=m.targets)
+            for m in self.modifiers
+        ]
 
     @classmethod
-    def from_action(cls, action: dict, stat_name: str, effect_key: str,
-                    charges: int, expires_at: float, source_name: str):
-        """Constructs an Effect from an action configuration dict."""
+    def from_stat_changes(cls, data: Dict[str, Any]) -> "ActiveEffect":
+        """Constructs a permanent passive from a blueprint containing stat_changes."""
+        stat_changes = data.get("stat_changes") or []
+        modifiers = [
+            Modifier.from_stat_change(sc)
+            for sc in stat_changes
+            if isinstance(sc, dict)
+        ]
 
         return cls(
-            id_num=action.get("id"),
-            effect_name=effect_key,
-            stat_name=stat_name,
-            value=action["value"],
-            expires_at=expires_at,
-            source_ability=source_name,
-            required_tags=parse_tags(action.get("required_tags")),
-            charges=charges,
-            consumable_charges=action.get("consumable_charges"),
-            max_charges=action.get("max_charges"),
-            target_hp_threshold=action.get("target_hp_threshold"),
-            stack_values=action.get("stack_values"),
-            required_damage_type=action.get("required_damage_type", None)
+            fqn=data["fqn"],
+            name=data.get("name", data["fqn"]),
+            number=1,
+            tags=frozenset(data.get("tags", [])),
+            expires_at=None,
+            tick_interval=None,
+            modifiers=modifiers,
+            branches=[],
         )
 
     @classmethod
-    def from_dict(cls, data: dict, source_key: str) -> "ActiveEffect":
-        """Constructs a Permanent Effect from a dict config"""
-        name = data.get("effect_name") or source_key
+    def from_effect_node(
+        cls,
+        parent_fqn: str,
+        parent_name: str,
+        effect_node: Dict[str, Any],
+        current_time: Optional[float] = None,
+        expires_at: Optional[float] = None,
+    ) -> "ActiveEffect":
+        """Constructs an active or passive effect from a blueprint effect node dict."""
+        is_passive = any(
+            init.get("initializer_type") == "eff_initializer__set_passive"
+            and init.get("bools", {}).get("is_passive", False)
+            for init in effect_node.get("initializers", [])
+        )
+
+        if is_passive:
+            computed_expires_at = None
+        elif expires_at is not None:
+            computed_expires_at = expires_at
+        elif "duration" in effect_node and current_time is not None:
+            computed_expires_at = current_time + effect_node["duration"]
+        else:
+            computed_expires_at = None
+
+        stack_charge = effect_node.get("stack_charge") or {}
+        max_stacks = stack_charge.get("nr_occurances", 1)
+
+        # Collect modifiers directly from action nodes
+        branches = effect_node.get("branches") or []
+        parsed_modifiers: List[Modifier] = []
+
+        for branch in branches:
+            if not isinstance(branch, dict):
+                continue
+            for action in branch.get("actions", []):
+                if not isinstance(action, dict):
+                    continue
+                action_type = action.get("action_type")
+                if action_type == "modify_stat":
+                    parsed_modifiers.append(Modifier.from_modify_stat(action))
+                elif action_type == "modify_meta_stat":
+                    parsed_modifiers.append(
+                        Modifier.from_modify_meta_stat(action)
+                    )
+
         return cls(
-            id_num=data.get("id"),
-            effect_name=name,
-            stat_name=None,
-            value=data.get("value"),
-            expires_at=float('inf'),
-            source_ability=source_key,
-            required_tags=data.get("required_tags"),
-            charges=1,
-            consumable_charges=None,
-            max_charges=1,
-            target_hp_threshold=data.get("target_hp_threshold"),
-            required_damage_type=data.get("required_damage_type", None)
+            fqn=parent_fqn,
+            name=effect_node.get("name") or parent_name,
+            number=effect_node.get("number", 1),
+            tags=frozenset(effect_node.get("tags", [])),
+            expires_at=computed_expires_at,
+            tick_interval=effect_node.get("tick_interval"),
+            stacks=1,
+            max_stacks=max_stacks,
+            scales_with_stacks=effect_node.get("scales_with_stacks", False),
+            modifiers=parsed_modifiers,
+            branches=branches,
+        )
+
+    @classmethod
+    def from_effect(
+        cls,
+        ability: Any,
+        effect: Any,
+        current_time: Optional[float] = None,
+        expires_at: Optional[float] = None,
+    ) -> "ActiveEffect":
+        """Constructs an ActiveEffect from a runtime Ability and abilities.Effect instance."""
+        blueprint = getattr(ability, "blueprint", None)
+        parent_fqn = getattr(blueprint, "fqn", "") or getattr(ability, "name", "")
+        parent_name = getattr(ability, "name", parent_fqn)
+
+        is_passive = bool(getattr(effect, "is_passive", False))
+        duration = float(getattr(effect, "duration", 0.0) or 0.0)
+
+        if is_passive:
+            computed_expires_at = None
+        elif expires_at is not None:
+            computed_expires_at = expires_at
+        elif duration > 0.0 and current_time is not None:
+            computed_expires_at = current_time + duration
+        else:
+            computed_expires_at = None
+
+        stack_charge = getattr(effect, "stack_charge", None) or {}
+        max_stacks = stack_charge.get("nr_occurances", 1)
+
+        raw_branches = getattr(effect, "branches", None) or []
+        parsed_modifiers: List[Modifier] = []
+        serialized_branches: List[Dict[str, Any]] = []
+
+        for branch in raw_branches:
+            if isinstance(branch, dict):
+                actions = branch.get("actions", [])
+                serialized_branches.append(branch)
+            else:
+                actions = getattr(branch, "actions", []) or []
+                serialized_branches.append(
+                    {
+                        "index": getattr(branch, "index", 0),
+                        "triggers": getattr(branch, "triggers", []),
+                        "conditions": getattr(branch, "conditions", None),
+                        "actions": actions,
+                        "target_overrides": getattr(branch, "target_overrides", []),
+                        "run_if_none_ran": getattr(branch, "run_if_none_ran", []),
+                        "is_attack": getattr(branch, "is_attack", False),
+                    }
+                )
+            for action in actions:
+                if not isinstance(action, dict):
+                    continue
+                action_type = action.get("action_type")
+                if action_type == "modify_stat":
+                    parsed_modifiers.append(Modifier.from_modify_stat(action))
+                elif action_type == "modify_meta_stat":
+                    parsed_modifiers.append(
+                        Modifier.from_modify_meta_stat(action)
+                    )
+
+        tick_interval = getattr(effect, "tick_interval", None)
+        if tick_interval is not None and float(tick_interval) <= 0.0:
+            tick_interval = None
+
+        return cls(
+            fqn=parent_fqn,
+            name=getattr(effect, "name", None) or parent_name,
+            number=getattr(effect, "number", 1),
+            tags=frozenset(getattr(effect, "tags", None) or []),
+            expires_at=computed_expires_at,
+            tick_interval=tick_interval,
+            stacks=1,
+            max_stacks=max_stacks,
+            scales_with_stacks=False,
+            modifiers=parsed_modifiers,
+            branches=serialized_branches,
+            effect_blueprint=effect,
+            ability_ref=ability,
         )
 
 
@@ -106,7 +252,7 @@ class ProcData:
         self.actions = actions
         self.next_possible_proc = 0.0
         self.affected_by_cdr = affected_by_cdr
-        self.conditions = conditions if conditions is not None else {} #I went with this to not make conditions mandatory in the JSON file. No idea what it implies for performance
+        self.conditions = conditions if conditions is not None else {}
 
     @classmethod
     def from_dict(cls, data: dict, fallback_name: str) -> "ProcData":
@@ -122,12 +268,14 @@ class ProcData:
             affected_by_cdr=data.get("affected_by_cdr", False),
             conditions=data.get("conditions")
         )
+
+
 def parse_tags(raw_tags) -> frozenset | None:
     """Normalizes tags to a frozenset, or None if empty."""
     if not raw_tags:
         return None
     if isinstance(raw_tags, frozenset):
-        return raw_tags  # Instant pass-through
+        return raw_tags
     if isinstance(raw_tags, str):
         return frozenset([raw_tags])
     return frozenset(raw_tags)

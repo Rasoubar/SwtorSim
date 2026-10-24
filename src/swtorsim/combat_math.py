@@ -84,7 +84,7 @@ def handle_modifiers(caster, target, action_data):
 def handle_caster_buffs(caster, target, action_tags, damage_type, buckets, modifiers):
     """ Alters modifiers dict according to buffs on caster."""
     for buff in caster.effects.values():
-        if buff.id not in EFFECTS:
+        if getattr(buff, "id", None) not in EFFECTS:
             continue
         if buff.consumable_charges is not None and buff.consumable_charges <= 0:
             continue
@@ -138,7 +138,7 @@ def consume_charges(caster, target, action_tags):
 
     # Consume Caster Buffs
     for effect_id, buff in list(caster.effects.items()):
-        if buff.id not in EFFECTS:
+        if getattr(buff, "id", None) not in EFFECTS:
             continue
         if buff.required_tags is not None and not any(tag in action_tags for tag in buff.required_tags):
             continue
