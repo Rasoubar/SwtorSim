@@ -193,9 +193,45 @@ class Effect:
             if not success and getattr(branch, "is_attack", False):
                 break
 
+    def schedule_timer_branches(self, sim, caster, target, context=None, ability=None):
+        """Schedules any branches triggered on on_timer_expired at sim.current_time + delay."""
+        if sim is None:
+            return
+        branch_context = dict(context) if context else {}
+        existing_tags = set(branch_context.get("effect_tags") or ())
+        branch_context["effect_tags"] = existing_tags | set(self.tags or ())
+
+        for branch in self.branches:
+            triggers = getattr(branch, "triggers", [])
+            for t in triggers:
+                if t.get("trigger") == "on_timer_expired":
+                    delay = float(t.get("delay", 0.0) or 0.0)
+                    if delay > 0.0:
+                        from src.swtorsim.events import DelayedBranchEvent
+
+                        sim.schedule_relative(
+                            delay,
+                            DelayedBranchEvent(
+                                branch,
+                                caster,
+                                target,
+                                ability=ability,
+                                context=branch_context,
+                            ),
+                        )
+                    break
+
     def execute(self, sim, caster, target, context=None, ability=None):
         """Resolves an effect: routes persistent effects to actor, or resolves instant branches."""
         effect_target = _resolve_target_overrides(self.target_overrides, target, caster, context)
+        if not self.target_overrides:
+            has_caster_trigger = any(
+                t.get("trigger") in ("on_damage_dealt", "on_ability_activated")
+                for b in self.branches
+                for t in getattr(b, "triggers", [])
+            )
+            if has_caster_trigger:
+                effect_target = caster
 
         if self.conditions:
             if not validate_all(self.conditions, caster, effect_target, sim=sim, context=context):
@@ -208,16 +244,47 @@ class Effect:
             )
             existing = effect_target.effects.get(effect_key)
             was_refreshed = existing is not None and not getattr(existing, "is_expired", False)
-            effect_target.apply_effect(sim, ability, self, caster)
+            old_stacks = getattr(existing, "stacks", 0) if was_refreshed else 0
+            effect_key, effect_instance, duration = effect_target.apply_effect(sim, ability, self, caster)
+            cur_stacks = getattr(effect_instance, "stacks", 1)
+            stack_increased = was_refreshed and (cur_stacks > old_stacks)
+
+            branch_ctx = dict(context) if context else {}
+            if getattr(effect_instance, "scales_with_stacks", False):
+                branch_ctx["stack_multiplier"] = cur_stacks
+            branch_ctx["owner_effect_key"] = effect_key
+            branch_ctx["owner_entity"] = effect_target
+
             self.execute_triggered_branches(
                 "on_refresh" if was_refreshed else "on_apply",
                 sim,
                 caster,
                 effect_target,
-                context=context,
+                context=branch_ctx,
                 ability=ability,
                 include_untriggered=False,
             )
+            if stack_increased:
+                self.execute_triggered_branches(
+                    "on_stack_charge_increased",
+                    sim,
+                    caster,
+                    effect_target,
+                    context=branch_ctx,
+                    ability=ability,
+                    include_untriggered=False,
+                )
+                if sim is not None and hasattr(sim, "triggers"):
+                    sim.triggers.dispatch(
+                        "on_stack_charge_increased",
+                        sim,
+                        {
+                            **branch_ctx,
+                            "caster": caster,
+                            "target": effect_target,
+                        },
+                    )
+            self.schedule_timer_branches(sim, caster, effect_target, context=branch_ctx, ability=ability)
             return
 
         self.execute_triggered_branches(
@@ -229,6 +296,7 @@ class Effect:
             ability=ability,
             include_untriggered=True,
         )
+        self.schedule_timer_branches(sim, caster, effect_target, context=context, ability=ability)
 
 
 @dataclass(slots=True)
@@ -447,35 +515,62 @@ def _find_target_abilities(caster, action):
 
 
 def handle_damage_action(sim, caster, target, action, source_name, delay, ability=None, context=None):
-    """Rolls accuracy then schedules or executes the hit."""
+    """Rolls accuracy then schedules or executes the hit (accounting for flurry multi-blow actions)."""
     hand = action.get("hand", "main")
     if hand == "off" and getattr(caster, "stats", {}).get("Off_hand_max", 0) <= 0:
         return True
     is_periodic = bool((context or {}).get("is_periodic", False)) or any(
         "periodic_damage" in str(t) for t in (context or {}).get("effect_tags", ())
     )
-    if not is_periodic and not accuracy_roll(caster, hand):
-        return False
+
+    flurry_count = int(action.get("flurry_max") or action.get("flurry_min") or 1)
+    if flurry_count < 1:
+        flurry_count = 1
+
     combined_tags = (
         set(action.get("tags") or ())
         | set(getattr(ability, "tags", ()) or ())
         | set((context or {}).get("effect_tags") or ())
     )
     from_proc = getattr(ability, "type", "active") == "passive"
-    hit_event = DamageHit(
-        caster,
-        target,
-        action,
-        source_name,
-        tags=combined_tags,
-        from_proc=from_proc,
-        ability_fqn=getattr(ability, "fqn", None),
-    )
-    if delay > 0.0:
-        sim.schedule_relative(delay, hit_event)
+    action_data = dict(action)
+    stack_mult = (context or {}).get("stack_multiplier", 1)
+
+    base_coeff = float(action.get("coeff", 0.0) or 0.0) * stack_mult
+    base_shp_min = float(action.get("shp_min", 0.0) or 0.0) * stack_mult
+    base_shp_max = float(action.get("shp_max", 0.0) or 0.0) * stack_mult
+    raw_amp = float(action.get("amp", 0.0) or 0.0)
+
+    if flurry_count > 1:
+        action_data["coeff"] = base_coeff / flurry_count
+        action_data["shp_min"] = base_shp_min / flurry_count
+        action_data["shp_max"] = base_shp_max / flurry_count
+        action_data["amp"] = ((1.0 + raw_amp) / flurry_count) - 1.0
     else:
-        hit_event.resolve(sim)
-    return True
+        action_data["coeff"] = base_coeff
+        action_data["shp_min"] = base_shp_min
+        action_data["shp_max"] = base_shp_max
+
+    hit_any = False
+    for i in range(flurry_count):
+        if not is_periodic and not accuracy_roll(caster, hand):
+            continue
+        hit_any = True
+        hit_event = DamageHit(
+            caster,
+            target,
+            action_data,
+            source_name,
+            tags=combined_tags,
+            from_proc=from_proc,
+            ability_fqn=getattr(ability, "fqn", None),
+        )
+        if delay > 0.0:
+            sim.schedule_relative(delay, hit_event)
+        else:
+            hit_event.resolve(sim)
+
+    return hit_any
 
 
 def handle_resource_gain_action(sim, caster, action, delay):
@@ -580,7 +675,7 @@ def handle_restore_charge(sim, caster, action):
 
 
 def handle_modify_stack_charge(sim, caster, target, action, context=None):
-    """Modifies stacks on an active effect (e.g. Deathmark consuming a stack on DoT tick)."""
+    """Modifies stacks on an active effect (e.g. Deathmark consuming a stack, Deadly Saber charges)."""
     floats = action.get("floats") or {}
     delta = int(round(float(floats.get("amount_min", floats.get("amount_max", 0.0)))))
     if delta == 0:
@@ -589,11 +684,64 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
     owner_entity = (context or {}).get("owner_entity") or target
     owner_key = (context or {}).get("owner_effect_key")
     eff = getattr(owner_entity, "effects", {}).get(owner_key) if owner_key else None
+
+    # Search by tag if owner_key not resolved or if action specifies tags
+    search_tags = set(action.get("tags") or [])
+    tag_str = (action.get("strings") or {}).get("tag")
+    if tag_str:
+        search_tags.add(tag_str)
+
+    if (eff is None or getattr(eff, "is_expired", False)) and search_tags:
+        for k, e in getattr(owner_entity, "effects", {}).items():
+            if not getattr(e, "is_expired", False) and (set(getattr(e, "tags", ())) & search_tags):
+                eff = e
+                owner_key = k
+                break
+        if eff is None and caster is not None and caster is not owner_entity:
+            for k, e in getattr(caster, "effects", {}).items():
+                if not getattr(e, "is_expired", False) and (set(getattr(e, "tags", ())) & search_tags):
+                    eff = e
+                    owner_key = k
+                    owner_entity = caster
+                    break
+
     if eff is None or getattr(eff, "is_expired", False):
         return
 
+    old_stacks = eff.stacks
     eff.modify_stacks(delta)
-    if delta < 0 and sim is not None and hasattr(sim, "triggers") and not (context or {}).get("from_stack_event"):
+    cur_stacks = eff.stacks
+
+    if delta > 0 and cur_stacks > old_stacks:
+        blueprint = getattr(eff, "effect_blueprint", None)
+        if blueprint and hasattr(blueprint, "execute_triggered_branches"):
+            ctx = {
+                **(context or {}),
+                "stack_multiplier": cur_stacks,
+                "owner_effect_key": owner_key,
+                "owner_entity": owner_entity,
+            }
+            blueprint.execute_triggered_branches(
+                "on_stack_charge_increased",
+                sim,
+                getattr(eff, "caster_ref", caster),
+                owner_entity,
+                context=ctx,
+                ability=getattr(eff, "ability_ref", None),
+                include_untriggered=False,
+            )
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch(
+                "on_stack_charge_increased",
+                sim,
+                {
+                    **(context or {}),
+                    "caster": caster,
+                    "target": owner_entity,
+                    "stack_multiplier": cur_stacks,
+                },
+            )
+    elif delta < 0 and sim is not None and hasattr(sim, "triggers") and not (context or {}).get("from_stack_event"):
         sim.triggers.dispatch(
             "on_stack_charge_decreased",
             sim,
@@ -721,7 +869,7 @@ class Ability:
 
     def schedule_recharge(self, caster, sim):
         """Snapshots CDR, creates a new event reference, and schedules it."""
-        actual_recharge = caster.calculate_cooldown(self.recharge_time)
+        actual_recharge = caster.calculate_cooldown(self.recharge_time, ability=self)
         event = ChargeRestoreEvent(caster, self)
         self.active_charge_event = event
         sim.schedule_relative(actual_recharge, event)
@@ -781,7 +929,7 @@ class Ability:
         if self.has_charges:
             self.consume_charge(caster, sim)
         elif self.cooldown > 0.0:
-            caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown), 4)
+            caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown, ability=self), 4)
 
     def cast(self, caster, target, sim):
         """Executes the ability: spends resources, locks cooldowns, and triggers entry effects."""

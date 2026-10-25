@@ -87,6 +87,7 @@ class Modifier:
     stat: str
     value: float
     targets: frozenset = frozenset()
+    conditional_tag: Optional[str] = None
 
     def applies_to(
             self,
@@ -137,4 +138,24 @@ class Modifier:
             stat=resolve_stat(raw_stat),
             value=float(floats.get("amount", 0.0)),
             targets=extract_targets(action),
+        )
+
+    @classmethod
+    def from_conditional_stat_mod(cls, action: Dict[str, Any]) -> "Modifier":
+        """Builds a Modifier from apply_conditional_meta_stat_mod or apply_conditional_stat_mod."""
+        floats = action.get("floats") or {}
+        ints = action.get("ints") or {}
+        strings = action.get("strings") or {}
+        raw_stat = ints.get("stat", action.get("stat", ""))
+        amount = float(
+            floats.get("amount")
+            if floats.get("amount") is not None
+            else (floats.get("amount_percent") or floats.get("amount_min") or 0.0)
+        )
+        cond_tag = strings.get("conditional_tag") or action.get("conditional_tag")
+        return cls(
+            stat=resolve_stat(raw_stat),
+            value=amount,
+            targets=extract_targets(action),
+            conditional_tag=cond_tag if cond_tag else None,
         )

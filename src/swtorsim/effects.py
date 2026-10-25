@@ -42,7 +42,20 @@ class ActiveEffect:
     # Stacks / Charges
     stacks: int = 1
     max_stacks: int = 1
+    initial_stacks: int = 1
     scales_with_stacks: bool = False
+
+    @property
+    def charges(self) -> int:
+        return self.stacks
+
+    @charges.setter
+    def charges(self, value: int):
+        self.stacks = value
+
+    @property
+    def max_charges(self) -> int:
+        return self.max_stacks
 
     # Payloads
     modifiers: List[Modifier] = field(default_factory=list)
@@ -73,7 +86,7 @@ class ActiveEffect:
         if not self.scales_with_stacks or self.stacks == 1:
             return self.modifiers
         return [
-            Modifier(stat=m.stat, value=m.value * self.stacks, targets=m.targets)
+            Modifier(stat=m.stat, value=m.value * self.stacks, targets=m.targets, conditional_tag=m.conditional_tag)
             for m in self.modifiers
         ]
 
@@ -124,7 +137,14 @@ class ActiveEffect:
             computed_expires_at = None
 
         stack_charge = effect_node.get("stack_charge") or {}
-        max_stacks = stack_charge.get("nr_occurances", 1)
+        max_stacks = int(stack_charge.get("max", stack_charge.get("nr_occurances", 1)) or 1)
+        initial_stacks = int(stack_charge.get("initial", 1) or 1)
+        if initial_stacks > max_stacks:
+            max_stacks = initial_stacks
+        scales_with_stacks = bool(
+            stack_charge.get("scales_with_stack_charge", False)
+            or effect_node.get("scales_with_stacks", False)
+        )
 
         # Collect modifiers directly from action nodes
         branches = effect_node.get("branches") or []
@@ -143,6 +163,13 @@ class ActiveEffect:
                     parsed_modifiers.append(
                         Modifier.from_modify_meta_stat(action)
                     )
+                elif action_type in (
+                    "apply_conditional_meta_stat_mod",
+                    "apply_conditional_stat_mod",
+                ):
+                    parsed_modifiers.append(
+                        Modifier.from_conditional_stat_mod(action)
+                    )
 
         return cls(
             fqn=parent_fqn,
@@ -151,9 +178,10 @@ class ActiveEffect:
             tags=frozenset(effect_node.get("tags", [])),
             expires_at=computed_expires_at,
             tick_interval=effect_node.get("tick_interval"),
-            stacks=1,
+            stacks=initial_stacks,
             max_stacks=max_stacks,
-            scales_with_stacks=effect_node.get("scales_with_stacks", False),
+            initial_stacks=initial_stacks,
+            scales_with_stacks=scales_with_stacks,
             modifiers=parsed_modifiers,
             branches=branches,
         )
@@ -185,6 +213,9 @@ class ActiveEffect:
 
         stack_charge = getattr(effect, "stack_charge", None) or {}
         max_stacks = int(stack_charge.get("max", stack_charge.get("nr_occurances", 1)) or 1)
+        initial_stacks = int(stack_charge.get("initial", 1) or 1)
+        if initial_stacks > max_stacks:
+            max_stacks = initial_stacks
         scales_with_stacks = bool(
             stack_charge.get("scales_with_stack_charge", False)
             or getattr(effect, "scales_with_stacks", False)
@@ -221,6 +252,13 @@ class ActiveEffect:
                     parsed_modifiers.append(
                         Modifier.from_modify_meta_stat(action)
                     )
+                elif action_type in (
+                    "apply_conditional_meta_stat_mod",
+                    "apply_conditional_stat_mod",
+                ):
+                    parsed_modifiers.append(
+                        Modifier.from_conditional_stat_mod(action)
+                    )
 
         tick_interval = getattr(effect, "tick_interval", None)
         if tick_interval is not None and float(tick_interval) <= 0.0:
@@ -233,8 +271,9 @@ class ActiveEffect:
             tags=frozenset(getattr(effect, "tags", None) or []),
             expires_at=computed_expires_at,
             tick_interval=tick_interval,
-            stacks=1,
+            stacks=initial_stacks,
             max_stacks=max_stacks,
+            initial_stacks=initial_stacks,
             scales_with_stacks=scales_with_stacks,
             modifiers=parsed_modifiers,
             branches=serialized_branches,

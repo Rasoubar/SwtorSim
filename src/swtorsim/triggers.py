@@ -2,7 +2,13 @@
 import random
 
 
-_LIFECYCLE_TRIGGERS = frozenset({"on_apply", "on_refresh", "on_tick"})
+_LIFECYCLE_TRIGGERS = frozenset({
+    "on_apply",
+    "on_refresh",
+    "on_tick",
+    "on_stack_charge_increased",
+    "on_stack_charge_decreased",
+})
 
 
 class TriggerManager:
@@ -10,7 +16,7 @@ class TriggerManager:
         # Maps event_name -> list of compiled trigger dicts
         self._listeners = {}
 
-    def subscribe(self, owner_id, ability, branch, caster, target, effect_key=None):
+    def subscribe(self, owner_id, ability, branch, caster, target, effect_key=None, effect_tags=None):
         """Registers every event-bus trigger rule defined on a branch independently."""
         for raw_trigger in getattr(branch, "triggers", []):
             event = raw_trigger.get("trigger")
@@ -35,6 +41,7 @@ class TriggerManager:
                 "proc_chance": (raw_trigger.get("floats") or {}).get("proc_chance_percent"),
                 "min_interval": min_interval,
                 "next_allowed_time": 0.0,
+                "effect_tags": frozenset(effect_tags or ()),
             }
             self._listeners.setdefault(event, []).append(entry)
 
@@ -50,14 +57,9 @@ class TriggerManager:
             return
 
         event_tags = frozenset(context.get("tags") or [])
-        fired_branches = set()
 
         # Snapshot the list to allow cascading actions/triggers during iteration
         for sub in list(entries):
-            branch_key = (sub["owner_id"], getattr(sub["branch"], "index", 0))
-            if branch_key in fired_branches:
-                continue
-
             # 0. Internal cooldown / rate limit on trigger
             if sub["min_interval"] > 0.0 and sim.current_time < sub["next_allowed_time"]:
                 continue
@@ -95,6 +97,11 @@ class TriggerManager:
                     if ctx_spell_type is not None and ctx_spell_type != req_spell_type:
                         continue
 
+                req_weapon_mode = ints.get("weapon_mode")
+                if req_weapon_mode and req_weapon_mode != 1:
+                    if context.get("weapon_mode") != req_weapon_mode:
+                        continue
+
             # 5. Proc chance check
             proc_chance = sub["proc_chance"]
             if proc_chance is not None and proc_chance < 100.0:
@@ -106,6 +113,7 @@ class TriggerManager:
                 "owner_id": sub["owner_id"],
                 "owner_effect_key": sub["effect_key"],
                 "owner_entity": sub["target"],
+                "effect_tags": set(context.get("effect_tags") or ()) | set(sub.get("effect_tags") or ()),
             }
             ran = sub["ability"].execute_branch(
                 sim,
@@ -115,6 +123,5 @@ class TriggerManager:
                 context=branch_ctx,
             )
             if ran:
-                fired_branches.add(branch_key)
                 if sub["min_interval"] > 0.0:
                     sub["next_allowed_time"] = sim.current_time + sub["min_interval"]

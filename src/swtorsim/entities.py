@@ -1,4 +1,5 @@
 import math
+from typing import Any, Optional
 from src.swtorsim.resources import create_resource_pool
 from collections import defaultdict #performance choice
 from src.swtorsim.combat_curves import (
@@ -64,10 +65,16 @@ class Entity:
 
         existing = self.effects.get(effect_key)
         if existing is not None and not getattr(existing, "is_expired", False):
-            effect_instance.stacks = min(
-                effect_instance.max_stacks,
-                getattr(existing, "stacks", 1) + 1,
-            )
+            if effect_instance.scales_with_stacks:
+                effect_instance.stacks = min(
+                    effect_instance.max_stacks,
+                    getattr(existing, "stacks", 1) + 1,
+                )
+            else:
+                effect_instance.stacks = max(
+                    getattr(existing, "stacks", 1),
+                    getattr(effect_instance, "initial_stacks", 1),
+                )
             if existing.expires_at is not None and expires_at is not None:
                 effect_instance.expires_at = max(existing.expires_at, expires_at)
 
@@ -80,6 +87,11 @@ class Entity:
             self._sim_ref = sim
             if hasattr(sim, "triggers") and ability is not None:
                 sim.triggers.unsubscribe(owner_id)
+                effect_tags = (
+                    effect.get("tags", ())
+                    if isinstance(effect, dict)
+                    else getattr(effect, "tags", ())
+                )
                 for branch in getattr(effect, "branches", ()) or ():
                     sim.triggers.subscribe(
                         owner_id,
@@ -88,6 +100,7 @@ class Entity:
                         caster or self,
                         self,
                         effect_key=effect_key,
+                        effect_tags=effect_tags,
                     )
 
             if total_ticks > 0 and scaled_tick is not None:
@@ -248,10 +261,34 @@ class Player(Entity):
         scaled_gcd = math.ceil(gcd * 10) / 10
         return scaled_gcd
 
-    def calculate_cooldown(self, base_cooldown: float) -> float:
-        """Calculates ability cooldown scaled by current Alacrity CDR."""
+    def calculate_cooldown(self, base_cooldown: float, ability: Any = None) -> float:
+        """Calculates ability cooldown after flat/percentage modifiers and scaled by current Alacrity CDR."""
+        flat_mod = 0.0
+        pct_mod = 1.0
+
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+
+            for effect in self.effects.values():
+                if getattr(effect, "is_expired", False):
+                    continue
+                for mod in _effect_modifiers(effect):
+                    if str(mod.stat) in ("64", "STAT_abl_time_cooldown"):
+                        if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            if abs(mod.value) <= 1.0:
+                                pct_mod += mod.value
+                            else:
+                                flat_mod += mod.value
+
+        adjusted_base = max(0.0, (base_cooldown * pct_mod) + flat_mod)
         cdr = self.stats.get("Alacrity", 0.0)
-        cooldown = base_cooldown / (1.0 + cdr)
+        cooldown = adjusted_base / (1.0 + cdr)
         scaled_cooldown = math.ceil(cooldown * 10) / 10
         return round(scaled_cooldown, 2)
 

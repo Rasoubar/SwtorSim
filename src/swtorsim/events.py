@@ -76,7 +76,16 @@ class DamageHit(Event):
 
         if not self.from_proc and sim is not None and hasattr(sim, "triggers"):
             attack_type = self.action_data.get("attack_type", 1)
-            spell_type = 1 if attack_type in (1, 2) else 3
+            spell_type = self.action_data.get("spell_type", 1)
+            tags_set = set(self.tags or [])
+            is_periodic = bool(
+                self.action_data.get("is_periodic")
+                or "tag.abl.sith_inquisitor.periodic_damage" in tags_set
+                or "tag.abl.debuff.damage_over_time" in tags_set
+                or "periodic_damage" in str(self.tags)
+            )
+            is_weapon_attack = attack_type in (1, 2) and not is_periodic
+            weapon_mode = 2 if is_weapon_attack else 0
             ctx = {
                 "caster": self.source,
                 "target": self.target,
@@ -86,7 +95,9 @@ class DamageHit(Event):
                 "damage_type": self.action_data.get("damage_type", 1),
                 "attack_type": attack_type,
                 "spell_type": spell_type,
-                "is_weapon_attack": attack_type in (1, 2),
+                "is_weapon_attack": is_weapon_attack,
+                "is_periodic": is_periodic,
+                "weapon_mode": weapon_mode,
             }
             sim.triggers.dispatch("on_damage_dealt", sim, ctx)
             sim.triggers.dispatch("on_damage_taken", sim, ctx)
@@ -141,6 +152,18 @@ class EffectExpire(Event):
         if active_buff is not self.instance_ref:
             return
 
+        blueprint = getattr(self.instance_ref, "effect_blueprint", None)
+        ability = getattr(self.instance_ref, "ability_ref", None)
+        caster = getattr(self.instance_ref, "caster_ref", self.entity)
+        if blueprint and hasattr(blueprint, "execute_triggered_branches"):
+            blueprint.execute_triggered_branches(
+                "on_pre_remove",
+                sim,
+                caster,
+                self.entity,
+                ability=ability,
+            )
+
         self.entity.cleanup_expired_effects([self.effect_name])
 
         print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.effect_name}")
@@ -172,6 +195,17 @@ class DotTick(Event):
             current_tick = (total_ticks - self.instance_ref.ticks_remaining + 1) if total_ticks > 0 else 1
             eff_tags = set(getattr(self.instance_ref, "tags", frozenset()))
             eff_tags.add("tag.abl.sith_inquisitor.periodic_damage")
+            stack_mult = (
+                self.instance_ref.stacks
+                if getattr(self.instance_ref, "scales_with_stacks", False)
+                else 1
+            )
+            context = {
+                "effect_tags": frozenset(eff_tags),
+                "stack_multiplier": stack_mult,
+                "owner_effect_key": dot_name,
+                "owner_entity": self.target,
+            }
             effect_blueprint.execute_triggered_branches(
                 "on_tick",
                 sim,
@@ -180,7 +214,7 @@ class DotTick(Event):
                 ability=getattr(self.instance_ref, "ability_ref", None),
                 include_untriggered=False,
                 tick_number=current_tick,
-                context={"effect_tags": frozenset(eff_tags)},
+                context=context,
             )
             self.instance_ref.ticks_remaining -= 1
             if self.instance_ref.ticks_remaining > 0 and self.instance_ref.tick_interval:
@@ -280,3 +314,27 @@ class ChargeRestoreEvent(Event):
             return
 
         self.ability.restore_charge(self.caster, sim, amount=1, from_timer=True)
+
+
+class DelayedBranchEvent(Event):
+    """Executes an ability branch after a delay (e.g. on_timer_expired secondary strikes)."""
+
+    def __init__(self, branch, caster, target, ability=None, context=None):
+        super().__init__(f"Delayed Branch: {getattr(ability, 'name', 'Ability')}")
+        self.branch = branch
+        self.caster = caster
+        self.target = target
+        self.ability = ability
+        self.context = context or {}
+
+    def resolve(self, sim):
+        if getattr(self.target, "is_dead", False) or getattr(self.caster, "is_dead", False):
+            return
+        self.branch.execute(
+            sim,
+            self.caster,
+            self.target,
+            context=self.context,
+            ability=self.ability,
+        )
+

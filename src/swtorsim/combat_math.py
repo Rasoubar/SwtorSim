@@ -131,6 +131,21 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
             ):
                 continue
 
+            # Check conditional tag requirement on target or caster
+            cond_tag = getattr(mod, "conditional_tag", None)
+            if cond_tag:
+                has_tag = any(
+                    cond_tag in getattr(e, "tags", ())
+                    for e in getattr(target, "effects", {}).values()
+                    if not getattr(e, "is_expired", False)
+                ) or any(
+                    cond_tag in getattr(e, "tags", ())
+                    for e in getattr(caster, "effects", {}).values()
+                    if not getattr(e, "is_expired", False)
+                )
+                if not has_tag:
+                    continue
+
             # Check ability FQN / tags matching
             if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
                 continue
@@ -204,6 +219,8 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
         if not eff_mods:
             continue
 
+        is_weapon = attack_type in (1, 2)
+        is_force = attack_type in (3, 4)
         for mod in eff_mods:
             if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
                 continue
@@ -211,6 +228,14 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
             val = float(mod.value)
             if stat == "STAT_cbt_damage_received_modifier_percentage":
                 buckets["target_vuln"] = buckets.get("target_vuln", 0.0) + val
+            elif stat in ("STAT_cbt_force_critical_chance", "133"):
+                if is_force or any("force" in str(t).lower() for t in action_tags):
+                    modifiers['bonus_crit_chance'] += val
+            elif stat in ("STAT_cbt_melee_critical_chance", "116"):
+                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                    modifiers['bonus_crit_chance'] += val
+            elif stat == "Critical Chance":
+                modifiers['bonus_crit_chance'] += val
 
 def alter_modifier(effect, modifiers, buckets):
     """Handles the individual modifier modification fors both buffs and debuffs"""

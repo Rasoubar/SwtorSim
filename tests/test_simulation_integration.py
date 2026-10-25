@@ -196,11 +196,10 @@ class SimulationIntegrationTests(unittest.TestCase):
         total_damage = ss_metrics.get("total_damage", 0)
 
         with self.subTest("mutually_exclusive_entry_effects_do_not_both_fire"):
-            self.assertLessEqual(
+            self.assertEqual(
                 hit_count,
-                2,
-                f"Saber Strike has two mutually exclusive entry effects (has_melee_weapon True vs False); "
-                f"expected at most 2 sub-hits, got {hit_count}",
+                3,
+                f"Saber Strike armed entry effect should deal exactly 3 flurry sub-hits (1 from branch 2 + 2 from branch 3); got {hit_count}",
             )
 
         with self.subTest("no_zero_damage_hits"):
