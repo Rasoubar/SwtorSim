@@ -1,0 +1,38 @@
+{
+  "game_version": "8.0",
+  "author": "Sinrai",
+  "gear_label": "BiS",
+  "level": 85,
+  "duration": 1000,
+  "dummy_hp": 6000000,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": true,
+  "seed": 42,
+  "expected_mastery_multiplier": 1.05,
+  "sweep": {"stat": "Critical Rating", "min": 0, "max": 8000},
+  "jitter": {"Mastery": 2000, "Power": 2000},
+  "samples_per_variant": 33000,
+  "relics": {
+    "Mastery": "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "Power": "abl.itm.relic.onhit.dps_power.scales_with_item_rating",
+    "Critical Rating": "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
+  },
+  "specs": [
+    {
+      "name": "Hatred/Serenity",
+      "spec_path": "data/extractor/disciplines/assassin/hatred.json",
+      "stats_path": "data/builds/RedStimBuild.json",
+      "rotation_path": "data/rotations/assassin/hatred/BasicMaliPS.json",
+      "choices_path": "data/choices/assassin/mali.json",
+      "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
+      "legendary_fqns": [
+        "abl.itm.legendary.generic.dps.berserkers",
+        "abl.itm.legendary.inq_con.sin_shad.force_training"
+      ],
+      "relic_fqns": [
+        "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+        "abl.itm.relic.onhit.dps_power.scales_with_item_rating"
+      ]
+    }
+  ]
+}

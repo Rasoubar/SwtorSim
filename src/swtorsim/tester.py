@@ -242,7 +242,8 @@ class Tester:
         plt.legend(loc='upper right')
         plt.tight_layout()
 
-        output_filename = "dps_distribution_histogram.png"
+        os.makedirs("figures", exist_ok=True)
+        output_filename = os.path.join("figures", "dps_distribution_histogram.png")
         plt.savefig(output_filename, dpi=300)
         print(f"Histogram successfully generated and saved to: {output_filename}")
         plt.close()
