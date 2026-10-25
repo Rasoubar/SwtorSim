@@ -7,25 +7,6 @@ from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.combat_curves import player_standard_health
 from src.swtorsim.rotation import Rotation
 
-def pre_sim_effects(player):
-    """Applies effects that alter abilities at the core and therefore need to be applied before running"""
-    cooldown_effects = [e for e in player.effects.values() if e.id == 64 and e.required_tags]  #temporary fixes
-    charge_effects = [e for e in player.effects.values() if e.id == 422 and e.required_tags]
-
-    if not cooldown_effects and not charge_effects:
-        return
-
-    for ability in player.ability_db.values():
-        if not hasattr(ability, "tags") or not ability.tags:
-            continue
-        for effect in cooldown_effects:
-            if any(tag in ability.tags for tag in effect.required_tags):
-                ability.cooldown -= effect.value
-        for effect in charge_effects:
-            if any(tag in ability.tags for tag in effect.required_tags):
-                ability.max_charges += effect.value
-                ability.charges += effect.value
-
 def schedule_periodic(player, target, sim):
     """Schedules 1st even of periodic effects, like pt extra regen"""
     for proc in player.procs.values():

@@ -232,9 +232,12 @@ class Player(Entity):
             "Mastery": 0.0,
             "Power": 0.0,
             "Force Power": 0.0,
+            "Tech Power": 0.0,
             "M_Bonus_Damage": 0.0,
-            "Alacrity Rating": 0.0,
+            "R_Bonus_Damage": 0.0,
             "F_Bonus_Damage": 0.0,
+            "T_Bonus_Damage": 0.0,
+            "Alacrity Rating": 0.0,
             "Main_hand_min": 0.0,
             "Main_hand_max": 0.0,
             "Off_hand_min": 0.0,
@@ -284,7 +287,7 @@ class Player(Entity):
                 for mod in _effect_modifiers(effect):
                     if str(mod.stat) in ("64", "STAT_abl_time_cooldown"):
                         if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
-                            if abs(mod.value) <= 1.0:
+                            if mod.is_percent:
                                 pct_mod += mod.value
                             else:
                                 flat_mod += mod.value
@@ -319,7 +322,7 @@ class Player(Entity):
                 stat = str(modifier.stat)
                 val = float(modifier.value)
                 if stat in ("STAT_att_mastery", "414", "4140"):
-                    if abs(val) <= 1.0:
+                    if modifier.is_percent:
                         bonuses["Mastery PCT"] += val
                     else:
                         bonuses["Mastery Stat"] += val
@@ -333,10 +336,14 @@ class Player(Entity):
                     bonuses["Accuracy"] += val
                 elif stat in ("STAT_cbt_armor_penetration", "166"):
                     bonuses["Armor Penetration"] += val
-                elif stat == "STAT_cbt_melee_damage_bonus":
+                elif stat in ("STAT_cbt_melee_damage_bonus", "115"):
                     bonuses["M_Bonus_Damage_PCT"] += val
-                elif stat == "STAT_cbt_force_damage_bonus":
+                elif stat in ("STAT_cbt_ranged_damage_bonus", "128"):
+                    bonuses["R_Bonus_Damage_PCT"] += val
+                elif stat in ("STAT_cbt_force_damage_bonus", "132"):
                     bonuses["F_Bonus_Damage_PCT"] += val
+                elif stat in ("STAT_cbt_tech_damage_bonus", "130"):
+                    bonuses["T_Bonus_Damage_PCT"] += val
                 elif stat in ("STAT_cbt_damage_bonus", "26"):
                     bonuses["Bonus Damage"] += val
 
@@ -350,9 +357,15 @@ class Player(Entity):
         #bonus damage
         base_bonus_damage = (temp_stats["Mastery"] * 0.20) + (temp_stats["Power"] * 0.23)
         m_damage_bonus_multiplier = 1 + bonuses["Bonus Damage"] + bonuses["M_Bonus_Damage_PCT"]
+        r_damage_bonus_multiplier = 1 + bonuses["Bonus Damage"] + bonuses["R_Bonus_Damage_PCT"]
         f_damage_bonus_multiplier = 1 + bonuses["Bonus Damage"] + bonuses["F_Bonus_Damage_PCT"]
+        t_damage_bonus_multiplier = 1 + bonuses["Bonus Damage"] + bonuses["T_Bonus_Damage_PCT"]
         temp_stats["M_Bonus_Damage"] = base_bonus_damage * m_damage_bonus_multiplier
-        temp_stats["F_Bonus_Damage"] = (base_bonus_damage + (temp_stats["Force Power"] * 0.23)) * f_damage_bonus_multiplier
+        temp_stats["R_Bonus_Damage"] = base_bonus_damage * r_damage_bonus_multiplier
+        force_pwr = temp_stats.get("Force Power", 0.0)
+        tech_pwr = temp_stats.get("Tech Power", 0.0)
+        temp_stats["F_Bonus_Damage"] = (base_bonus_damage + (force_pwr * 0.23)) * f_damage_bonus_multiplier
+        temp_stats["T_Bonus_Damage"] = (base_bonus_damage + (tech_pwr * 0.23)) * t_damage_bonus_multiplier
 
         #diminishing returns
         alacrity_divisor, alacrity_cap = derived_stat(ALACRITY_RATING, self.level)
@@ -410,7 +423,7 @@ class Player(Entity):
                 if mod.stat in ("68", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
                     matched = mod.applies_to(abl_fqn, abl_tags)
                     if matched:
-                        if abs(mod.value) <= 1.0:
+                        if mod.is_percent:
                             pct_modifiers += mod.value
                         else:
                             flat_reductions += mod.value
@@ -458,7 +471,6 @@ class Dummy(Entity):
         self.max_hp = hp
         self.hp = hp
         self.toughness = 5
-        self.dots = {}
         self.base_stats = {
             "Armor" : 17225
         }
@@ -480,18 +492,6 @@ class Dummy(Entity):
                     armor_rating_change += modifier.value
         temp_stats["Armor"] *= (1+armor_rating_change)
         self.stats = temp_stats
-
-
-    def has_dot(self, dot_name: str) -> bool:
-        """Returns whether a dot is present in the dummy or not."""
-        return dot_name in self.dots
-
-    @property
-    def count_active_dots(self): #fuck you leeching strike
-        """Returns the number of active dots present in the dummy. Likely useless in the near future."""
-        if self.dots is None:
-            return 0
-        return len(self.dots)
 
     @property
     def hp_ratio(self) -> float:

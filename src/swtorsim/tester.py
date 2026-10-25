@@ -6,6 +6,7 @@ import statistics
 import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
 from src.swtorsim.setup import prepare_simulation
+from src.swtorsim.metrics import format_type_descriptor
 
 
 class Tester:
@@ -81,6 +82,8 @@ class Tester:
                     "total_damage": data["total_damage"],
                     "hit_count": data["hit_count"],
                     "crit_count": data.get("crit_count", 0),
+                    "attack_types": list(data.get("attack_types", ())),
+                    "damage_types": list(data.get("damage_types", ())),
                 }
                 for name, data in sim.tracker.breakdown.items()
             }
@@ -90,6 +93,8 @@ class Tester:
                     "total_damage": data["total_damage"],
                     "hit_count": data["hit_count"],
                     "crit_count": data.get("crit_count", 0),
+                    "attack_types": list(data.get("attack_types", ())),
+                    "damage_types": list(data.get("damage_types", ())),
                 }
                 for name, data in getattr(sim.tracker, 'execute_breakdown', {}).items()
             }
@@ -125,17 +130,33 @@ class Tester:
 
             for name, data in result["abilities"].items():
                 if name not in macro_breakdown:
-                    macro_breakdown[name] = {"total_damage": 0.0, "hit_count": 0, "crit_count": 0}
+                    macro_breakdown[name] = {
+                        "total_damage": 0.0,
+                        "hit_count": 0,
+                        "crit_count": 0,
+                        "attack_types": set(),
+                        "damage_types": set(),
+                    }
                 macro_breakdown[name]["total_damage"] += data["total_damage"]
                 macro_breakdown[name]["hit_count"] += data["hit_count"]
                 macro_breakdown[name]["crit_count"] += data.get("crit_count", 0)
+                macro_breakdown[name]["attack_types"].update(data.get("attack_types", ()))
+                macro_breakdown[name]["damage_types"].update(data.get("damage_types", ()))
 
             for name, data in result.get("execute_abilities", {}).items():
                 if name not in macro_exec_breakdown:
-                    macro_exec_breakdown[name] = {"total_damage": 0.0, "hit_count": 0, "crit_count": 0}
+                    macro_exec_breakdown[name] = {
+                        "total_damage": 0.0,
+                        "hit_count": 0,
+                        "crit_count": 0,
+                        "attack_types": set(),
+                        "damage_types": set(),
+                    }
                 macro_exec_breakdown[name]["total_damage"] += data["total_damage"]
                 macro_exec_breakdown[name]["hit_count"] += data["hit_count"]
                 macro_exec_breakdown[name]["crit_count"] += data.get("crit_count", 0)
+                macro_exec_breakdown[name]["attack_types"].update(data.get("attack_types", ()))
+                macro_exec_breakdown[name]["damage_types"].update(data.get("damage_types", ()))
 
         avg_dps = sum(all_dps) / len(all_dps)
         summary = {
@@ -228,13 +249,14 @@ class Tester:
 
     @staticmethod
     def print_macro_phase_table(breakdown_data, total_duration, total_dps, iterations):
-        print(f"{'Ability Name':<25} | {'Phase DPS':<12} | {'Phase %':<8} | {'Avg Hits':<9} | {'Crit %':<7}")
-        print("-" * 75)
+        print(f"{'Ability Name':<25} | {'Type':<18} | {'Phase DPS':<12} | {'Phase %':<8} | {'Avg Hits':<9} | {'Crit %':<7}")
+        print("-" * 95)
         sorted_abilities = sorted(breakdown_data.items(), key=lambda item: item[1]["total_damage"], reverse=True)
         for name, global_data in sorted_abilities:
             avg_ability_dps = global_data["total_damage"] / total_duration
             share_pct = (avg_ability_dps / total_dps) * 100 if total_dps > 0 else 0.0
             avg_hits = global_data["hit_count"] / iterations
             crit_pct = (global_data.get("crit_count", 0) / global_data["hit_count"] * 100) if global_data["hit_count"] > 0 else 0.0
-            print(f"{name:<25} | {avg_ability_dps:<12,.1f} | {share_pct:>6.1f}% | {avg_hits:>9.1f} | {crit_pct:>6.1f}%")
-        print("=" * 75 + "\n")
+            type_desc = format_type_descriptor(global_data.get("attack_types", ()), global_data.get("damage_types", ()))
+            print(f"{name:<25} | {type_desc:<18} | {avg_ability_dps:<12,.1f} | {share_pct:>6.1f}% | {avg_hits:>9.1f} | {crit_pct:>6.1f}%")
+        print("=" * 95 + "\n")

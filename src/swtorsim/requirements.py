@@ -26,23 +26,11 @@ def check_caster_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kw
 def check_target_debuff(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
     return any(target.has_effect(d) for d in _to_list(conditions))
 
-def check_exact_dot_amount(conditions: int, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return target.count_active_dots == conditions
-
-def check_has_any_dot(conditions: bool, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return (target.count_active_dots > 0) is conditions
-
 def inverse_check_target_debuff(conditions: Any, caster: "Player", target: "Dummy", **kwargs) -> bool:
     return not check_target_debuff(conditions, caster, target, **kwargs)
 
-def has_specific_dot(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return any(target.has_dot(d) for d in _to_list(conditions))
-
 def check_caster_energy_above(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     return caster.resource.current_value >= threshold
-
-def check_dot_absent(dot_name: str, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return dot_name not in target.dots
 
 def check_caster_energy_below(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     return caster.resource.current_value < threshold
@@ -86,13 +74,9 @@ CONDITION_REGISTRY = {
     "target_hp_below_pct": check_target_hp,
     "target_has_debuff": check_target_debuff,
     "caster_has_buff": check_caster_buff,
-    "exact_dot_amount": check_exact_dot_amount,
-    "has_dot": check_has_any_dot,
     "target_doesnt_have_debuff": inverse_check_target_debuff,
-    "has_specific_dot": has_specific_dot,
     "caster_energy_above": check_caster_energy_above,
     "caster_energy_below": check_caster_energy_below,
-    "dot_absent": check_dot_absent,
     "target_hp_above_pct": check_target_hp_above,
     "proc_cooldown_above": check_proc_cooldown_above,
     "caster_does_not_have_buff": check_caster_does_not_have_buff,

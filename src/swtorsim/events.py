@@ -34,18 +34,37 @@ class AbilityCast(Event):
 class ApplyDamageLand(Event):
     """Applies pre-calculated damage to the target. Needed because of impact_delay, when damage is calculated earlier
     than it is applied."""
-    def __init__(self, source, target, final_damage, is_crit, ability_name):
+    def __init__(self, source, target, final_damage, is_crit, ability_name, attack_type=None, damage_type=None):
         super().__init__()
         self.source = source
         self.target = target
         self.final_damage = final_damage
         self.is_crit = is_crit
         self.ability_name = ability_name
+        self.attack_type = attack_type
+        self.damage_type = damage_type
 
     def resolve(self, sim):
         """Applies pre-calculated damage to the target, logs it into metrics."""
         crit_string = " (CRITICAL!)" if self.is_crit else ""
-        sim.tracker.log_damage(self.ability_name, self.final_damage, self.is_crit, self.target, sim.current_time)
+        try:
+            sim.tracker.log_damage(
+                self.ability_name,
+                self.final_damage,
+                self.is_crit,
+                self.target,
+                sim.current_time,
+                attack_type=self.attack_type,
+                damage_type=self.damage_type,
+            )
+        except TypeError:
+            sim.tracker.log_damage(
+                self.ability_name,
+                self.final_damage,
+                self.is_crit,
+                self.target,
+                sim.current_time,
+            )
         self.target.hp -= self.final_damage
         print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
 
@@ -70,8 +89,18 @@ class DamageHit(Event):
         action_with_ctx["ability_name"] = self.ability_name
 
         final_damage, is_crit = calculate_hit(self.source, self.target, action_with_ctx)
+        resolved_at = action_with_ctx.get("resolved_attack_type", self.action_data.get("attack_type", 1))
+        resolved_dt = action_with_ctx.get("resolved_damage_type", self.action_data.get("damage_type", 1))
 
-        instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
+        instant_land = ApplyDamageLand(
+            self.source,
+            self.target,
+            final_damage,
+            is_crit,
+            self.ability_name,
+            attack_type=resolved_at,
+            damage_type=resolved_dt,
+        )
         instant_land.resolve(sim)
 
         if sim is not None and hasattr(sim, "triggers"):
@@ -226,19 +255,20 @@ class DotTick(Event):
                 print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
             return
 
-        if getattr(self.target, "dots", {}).get(dot_name) is not self.instance_ref:
+        # Legacy fallback without blueprint
+        if getattr(self.target, "effects", {}).get(dot_name) is not self.instance_ref:
             return
 
-        actions = self.instance_ref.action_data.get('actions')
+        actions = self.instance_ref.action_data.get('actions') or []
         from src.swtorsim.abilities import execute_single_action
         for action in actions:
             execute_single_action(sim, self.source, self.target, action, dot_name)
         self.instance_ref.ticks_remaining -= 1
         if self.instance_ref.ticks_remaining > 0:
-            next_tick_time = sim.current_time + self.instance_ref.interval
+            next_tick_time = sim.current_time + getattr(self.instance_ref, "interval", 1.0)
             sim.schedule_absolute(next_tick_time, self)
         else:
-            del self.target.dots[dot_name]
+            self.target.cleanup_expired_effects([dot_name])
             print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
 
 class ChannelTickEvent(Event):

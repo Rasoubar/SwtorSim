@@ -31,17 +31,22 @@ def calculate_hit(caster, target, action_data):
     """Calculates the hit value of an action from a caster to a targe. Returns value and whether it was a crit"""
 
     #pre-extract damage_type, attack_type and action_tags to not be doing same thing multiple times
-    attack_type = action_data["attack_type"]
-    if attack_type in (1, 2):
-        damage_type = 1
-    else:
-        damage_type = action_data["damage_type"]
+    attack_type = action_data.get("attack_type", 1)
+    damage_type = action_data.get("damage_type")
+    if damage_type is None:
+        # Fallback when blueprint omits damage_type:
+        # Lightsabers and blasters deal Energy (2); other attacks default to Kinetic (1).
+        # Both Kinetic (1) and Energy (2) are mitigated by armor in handle_mitigation.
+        damage_type = 2 if attack_type in (1, 2) else 1
+
+    action_data["resolved_attack_type"] = attack_type
+    action_data["resolved_damage_type"] = damage_type
 
     #calculate damage calculation modifiers
-    modifiers = handle_modifiers(caster, target, action_data)
+    modifiers = handle_modifiers(caster, target, action_data, damage_type=damage_type)
 
     #calculate base damage from caster stats and action_data
-    base_damage = calculate_base_damage(caster,action_data, attack_type)
+    base_damage = calculate_base_damage(caster, action_data, attack_type)
 
     post_mit_damage = handle_mitigation(caster, target, base_damage, damage_type, modifiers)
 
@@ -53,7 +58,7 @@ def calculate_hit(caster, target, action_data):
 
     return int(post_crit_damage), is_crit
 
-def handle_modifiers(caster, target, action_data):
+def handle_modifiers(caster, target, action_data, damage_type=None):
     """Determines numeric modifiers to the hit. Both direct and that affect mitigation. Returns Modifiers dict"""
 
     """buckets are needed to handle buffs/debuffs that will affect total_multiplier in different ways.
@@ -71,7 +76,8 @@ def handle_modifiers(caster, target, action_data):
     action_tags = frozenset(action_data.get("tags") or ())
     ability_fqn = action_data.get("ability_fqn")
     attack_type = action_data.get("attack_type", 1)
-    damage_type = action_data.get("damage_type", 1)
+    if damage_type is None:
+        damage_type = action_data.get("resolved_damage_type") or action_data.get("damage_type", 1)
 
     handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers)
     handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers)
@@ -125,8 +131,10 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 "STAT_rtg_crit", "156",
                 "STAT_rtg_alacrity", "Alacrity Rating",
                 "STAT_rtg_accuracy", "154", "Accuracy",
-                "STAT_cbt_melee_damage_bonus",
-                "STAT_cbt_force_damage_bonus",
+                "STAT_cbt_melee_damage_bonus", "115",
+                "STAT_cbt_ranged_damage_bonus", "128",
+                "STAT_cbt_force_damage_bonus", "132",
+                "STAT_cbt_tech_damage_bonus", "130",
                 "STAT_cbt_damage_bonus",
                 "STAT_att_endurance",
                 "STAT_cbtStealthEffectiveLevel",
@@ -160,12 +168,20 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 if getattr(target, "hp_ratio", 1.0) <= 0.30:
                     buckets["sub_30"] = buckets.get("sub_30", 0.0) + val
 
-            elif stat == "stat_cbt_damage_dealt_scale_channel_melee_modifier_percentage":
+            elif stat in ("stat_cbt_damage_dealt_scale_channel_melee_modifier_percentage", "stat_cbt_damage_dealt_scale_channel_melee"):
                 if is_melee:
                     buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
 
-            elif stat == "stat_cbt_damage_dealt_scale_channel_force_modifier_percentage":
+            elif stat in ("stat_cbt_damage_dealt_scale_channel_ranged_modifier_percentage", "stat_cbt_damage_dealt_scale_channel_ranged"):
+                if is_ranged:
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat in ("stat_cbt_damage_dealt_scale_channel_force_modifier_percentage", "stat_cbt_damage_dealt_scale_channel_force"):
                 if is_force:
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat in ("stat_cbt_damage_dealt_scale_channel_tech_modifier_percentage", "stat_cbt_damage_dealt_scale_channel_tech"):
+                if is_tech:
                     buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
 
             # 2. Critical Chance Modifiers
@@ -371,13 +387,20 @@ def calculate_base_damage(caster, action_data, attack_type):
     shp_max = action_data["shp_max"]
     coeff = action_data["coeff"]
     standard_health = caster.stats["Standard_health"]
-    if attack_type in (3, 4): # for when damage is force/tech
-        damage_bonus = caster.stats["F_Bonus_Damage"]
+    if attack_type == 3:  # Force
+        damage_bonus = caster.stats.get("F_Bonus_Damage", 0.0)
         ability_damage_min = (coeff * damage_bonus) + (shp_min * standard_health)
         ability_damage_max = (coeff * damage_bonus) + (shp_max * standard_health)
-    elif attack_type in (1, 2): # for when damage is melee/ranged
+    elif attack_type == 4:  # Tech
+        damage_bonus = caster.stats.get("T_Bonus_Damage", 0.0) or caster.stats.get("F_Bonus_Damage", 0.0)
+        ability_damage_min = (coeff * damage_bonus) + (shp_min * standard_health)
+        ability_damage_max = (coeff * damage_bonus) + (shp_max * standard_health)
+    elif attack_type in (1, 2):  # Melee (1) / Ranged (2)
         amp = action_data["amp"]
-        damage_bonus = caster.stats["M_Bonus_Damage"]
+        if attack_type == 2:
+            damage_bonus = caster.stats.get("R_Bonus_Damage", 0.0) or caster.stats.get("M_Bonus_Damage", 0.0)
+        else:
+            damage_bonus = caster.stats.get("M_Bonus_Damage", 0.0)
         if action_data["hand"] == "off":
             off_hand_min = caster.stats["Off_hand_min"]
             off_hand_max = caster.stats["Off_hand_max"]

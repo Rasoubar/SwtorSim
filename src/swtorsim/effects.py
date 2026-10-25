@@ -86,7 +86,13 @@ class ActiveEffect:
         if not self.scales_with_stacks or self.stacks == 1:
             return self.modifiers
         return [
-            Modifier(stat=m.stat, value=m.value * self.stacks, targets=m.targets, conditional_tag=m.conditional_tag)
+            Modifier(
+                stat=m.stat,
+                value=m.value * self.stacks,
+                targets=m.targets,
+                conditional_tag=m.conditional_tag,
+                is_percent=m.is_percent,
+            )
             for m in self.modifiers
         ]
 

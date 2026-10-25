@@ -88,6 +88,7 @@ class Modifier:
     value: float
     targets: frozenset = frozenset()
     conditional_tag: Optional[str] = None
+    is_percent: bool = False
 
     def applies_to(
             self,
@@ -114,20 +115,50 @@ class Modifier:
     def from_stat_change(cls, data: Dict[str, Any]) -> "Modifier":
         """Builds a Modifier from a root-level talent stat_changes entry."""
         raw_stat = data.get("name") or data.get("stat", "")
+        resolved = resolve_stat(raw_stat)
+        raw_val = data.get("value", 0.0)
+        try:
+            val = float(raw_val)
+        except (ValueError, TypeError):
+            val = 0.0
+
+        if "percentage" in resolved.lower() or "_pct" in resolved.lower():
+            is_pct = True
+        elif resolved in ("64", "STAT_abl_time_cooldown"):
+            is_pct = False
+        elif resolved in ("68", "STAT_abl_cost_force"):
+            # Bioware overloaded STAT_abl_cost_force: -0.10 is -10%, while -3.0 to -25.0 are flat Force
+            is_pct = (-1.0 < val < 1.0 and val != 0.0)
+        else:
+            is_pct = False
         return cls(
-            stat=resolve_stat(raw_stat),
-            value=float(data.get("value", 0.0)),
+            stat=resolved,
+            value=val,
             targets=extract_targets(data),
+            is_percent=is_pct,
         )
 
     @classmethod
     def from_modify_stat(cls, action: Dict[str, Any]) -> "Modifier":
         """Builds a Modifier from a flat modify_stat action node."""
         raw_stat = action.get("stat") or action.get("name", "")
+        resolved = resolve_stat(raw_stat)
+        percent = float(action.get("amount_percent") or 0.0)
+        min_amt = float(action.get("amount_min") or 0.0)
+        if percent != 0.0:
+            is_pct = True
+            val = percent
+        elif "percentage" in resolved.lower() or "_pct" in resolved.lower():
+            is_pct = True
+            val = min_amt
+        else:
+            is_pct = False
+            val = min_amt
         return cls(
-            stat=resolve_stat(raw_stat),
-            value=_modify_stat_amount(action),
+            stat=resolved,
+            value=val,
             targets=extract_targets(action),
+            is_percent=is_pct,
         )
 
     @classmethod
@@ -135,11 +166,17 @@ class Modifier:
         """Builds a Modifier from a nested modify_meta_stat action node."""
         floats = action.get("floats") or {}
         ints = action.get("ints") or {}
+        bools = action.get("bools") or {}
         raw_stat = ints.get("stat", action.get("stat", ""))
+        resolved = resolve_stat(raw_stat)
+        stat_mod_type = ints.get("stat_mod_type")
+        # In SWTOR GOM: stat_mod_type 1 = flat, 2 = percentage
+        is_pct = (stat_mod_type == 2) or bool(bools.get("is_percentage", False)) or "percentage" in resolved.lower()
         return cls(
-            stat=resolve_stat(raw_stat),
+            stat=resolved,
             value=float(floats.get("amount", 0.0)),
             targets=extract_targets(action),
+            is_percent=is_pct,
         )
 
     @classmethod
@@ -147,17 +184,31 @@ class Modifier:
         """Builds a Modifier from apply_conditional_meta_stat_mod or apply_conditional_stat_mod."""
         floats = action.get("floats") or {}
         ints = action.get("ints") or {}
+        bools = action.get("bools") or {}
         strings = action.get("strings") or {}
         raw_stat = ints.get("stat", action.get("stat", ""))
-        amount = float(
-            floats.get("amount")
-            if floats.get("amount") is not None
-            else (floats.get("amount_percent") or floats.get("amount_min") or 0.0)
-        )
+        resolved = resolve_stat(raw_stat)
+        percent = float(floats.get("amount_percent") or 0.0)
+        min_amt = float(floats.get("amount_min") or 0.0)
+        amt = floats.get("amount")
+        stat_mod_type = ints.get("stat_mod_type")
+        if percent != 0.0:
+            is_pct = True
+            val = percent
+        elif stat_mod_type == 2:
+            is_pct = True
+            val = float(amt) if amt is not None else min_amt
+        elif amt is not None:
+            val = float(amt)
+            is_pct = bool(bools.get("is_percentage", False)) or "percentage" in resolved.lower()
+        else:
+            val = min_amt
+            is_pct = bool(bools.get("is_percentage", False)) or "percentage" in resolved.lower()
         cond_tag = strings.get("conditional_tag") or action.get("conditional_tag")
         return cls(
-            stat=resolve_stat(raw_stat),
-            value=amount,
+            stat=resolved,
+            value=val,
             targets=extract_targets(action),
             conditional_tag=cond_tag if cond_tag else None,
+            is_percent=is_pct,
         )
