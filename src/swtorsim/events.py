@@ -167,6 +167,8 @@ class PlayerReady(Event):
     def resolve(self, sim):
         """Evaluates the rotation. If successful, evaluate again on next possible gcd (can be same one). If not,
          tries again 0.1seconds later."""
+        if getattr(self.player, "rotation", None) is None:
+            return
         acted = self.player.rotation.evaluate(self.player, self.target, sim)
         if acted:
             target_time = max(sim.current_time, self.player.next_gcd) #to prevent any accidental past scheduling
@@ -279,40 +281,73 @@ class DotTick(Event):
             print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
 
 class ChannelTickEvent(Event):
-    """ Represents a single tick of a channeled ability.
-        Validates resources, executes the action, and schedules the next tick/ cleans up.
-        """
-    def __init__(self, player, target, channel_instance):
-        super().__init__(f"Channel Tick: {channel_instance.name}")
-        self.source = player
-        self.target = target
-        self.channel = channel_instance
+    """Represents a single tick of a channeled ability.
+    Executes branch actions, validates per-tick resource cost, and schedules subsequent ticks.
+    """
+
+    def __init__(self, *args, **kwargs):
+        if len(args) == 1 and hasattr(args[0], "remaining_ticks"):
+            self.channel = args[0]
+            self.source = getattr(self.channel, "caster", None)
+            self.target = getattr(self.channel, "target", None)
+        elif len(args) >= 3:
+            self.source = args[0]
+            self.target = args[1]
+            self.channel = args[2]
+        else:
+            self.channel = kwargs.get("channel") or kwargs.get("channel_instance")
+            self.source = kwargs.get("player") or getattr(self.channel, "caster", None)
+            self.target = kwargs.get("target") or getattr(self.channel, "target", None)
+        super().__init__(f"Channel Tick: {getattr(self.channel, 'name', 'Channel')}")
 
     def resolve(self, sim):
         """Executes tick actions, consumes resources, and schedules the next tick or ends the channel."""
-        if self.source.active_channel is not self.channel: #safeguard for clipping
+        if getattr(self.source, "active_channel", None) is not self.channel:  # safeguard for clipping
             return
 
-        acted = False
-        from src.swtorsim.abilities import execute_single_action
-
-        if self.source.resource.current_value >= self.channel.tick_cost:
-            acted = True
-            actions =  self.channel.action_data.get('actions')
-            for action in actions:
-                execute_single_action(sim, self.source, self.target, action, self.channel.name)
+        if getattr(self.channel, "tick_cost", 0.0) > 0.0:
+            if not self.source.resource.can_afford(self.channel.tick_cost):
+                self.source.active_channel = None
+                self.source.is_channeling = False
+                target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
+                sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
+                return
             self.source.resource.spend(self.channel.tick_cost)
+
+        self.channel.current_tick = getattr(self.channel, "current_tick", 0) + 1
         self.channel.remaining_ticks -= 1
 
-        if self.channel.remaining_ticks > 0 and acted == True: #channel next if channel still going
+        # 1. Execute on_tick triggered branches across all ability effects
+        ability = getattr(self.channel, "ability", None)
+        if ability is not None:
+            for eff in getattr(ability, "effects", {}).values():
+                if hasattr(eff, "execute_triggered_branches"):
+                    eff.execute_triggered_branches(
+                        "on_tick",
+                        sim,
+                        self.source,
+                        self.target,
+                        ability=ability,
+                        tick_number=self.channel.current_tick,
+                    )
+
+        # 2. Legacy action_data fallback if present
+        actions = getattr(self.channel, "action_data", {}).get("actions") or []
+        if actions:
+            from src.swtorsim.abilities import execute_single_action
+            for action in actions:
+                execute_single_action(sim, self.source, self.target, action, self.channel.name)
+
+        if self.channel.remaining_ticks > 0:
             next_tick_time = sim.current_time + self.channel.tick_interval
-            sim.schedule_absolute(next_tick_time, ChannelTickEvent(self.source, self.target, self.channel))
-        else: #if for any reason didn't act/channel is over, end channel and player is ready to act now
+            sim.schedule_absolute(next_tick_time, ChannelTickEvent(self.channel))
+        else:
+            self.channel.is_finished = True
             self.source.active_channel = None
             self.source.is_channeling = False
             print(f"[{sim.current_time:.3f}] {self.channel.name} channel over.")
-            sim.schedule_absolute(sim.current_time, PlayerReady(self.source, self.target))
-            #if gcd not ready yet, gcd abilities won't happen from PlayerReady, no worries there
+            target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
+            sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
 
 class ResourceTick(Event):
     """Represents the passive energy regen events"""

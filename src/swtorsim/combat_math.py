@@ -2,31 +2,6 @@ import random
 
 from src.swtorsim.combat_curves import armor_constants
 
-EFFECTS = {
-    0: {"stat_name": "PlaceHolder"},
-    79: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
-    386: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
-    384: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
-    370: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
-    376: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
-    220: {"stat_name": "Damage Modifier", "modifier_bucket": "sub_30"},
-    116: {"stat_name": "Critical Chance"},
-    117: {"stat_name": "Critical Damage"},
-    134: {"stat_name": "Critical Damage"},
-    133: {"stat_name": "Critical Chance"},
-    46: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
-    68: {"stat_name": "cost_reduction_flat"},
-    166: {"stat_name": "Armor Penetration"},
-    26: {"stat_name": "Bonus Damage"},
-    414: {"stat_name": "Mastery PCT"},
-    4140: {"stat_name": "Mastery Stat"},  # I blame the devs, I made up my own id for this one
-    155: {"stat_name": "Power Stat"},
-    156: {"stat_name": "Critical Stat"},
-    64:{ "stat_name": "Base Cooldown Modifier"},
-    154:{"stat_name": "Accuracy"},
-    422:{"stat_name": "Ability Base Charges"},
-    48:{"stat_name": "Armor Rating"}
-}
 def calculate_hit(caster, target, action_data):
     """Calculates the hit value of an action from a caster to a targe. Returns value and whether it was a crit"""
 
@@ -94,20 +69,6 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
 
     for buff in caster.effects.values():
         if getattr(buff, "is_expired", False):
-            continue
-
-        # Legacy effect compatibility
-        effect_id = getattr(buff, "id", None)
-        if effect_id in EFFECTS:
-            if getattr(buff, "consumable_charges", None) is not None and buff.consumable_charges <= 0:
-                continue
-            if getattr(buff, "required_tags", None) is not None and not any(tag in action_tags for tag in buff.required_tags):
-                continue
-            if getattr(buff, "target_hp_threshold", None) is not None and getattr(target, "hp_ratio", 1.0) > buff.target_hp_threshold:
-                continue
-            if getattr(buff, "required_damage_type", None) is not None and buff.required_damage_type != damage_type:
-                continue
-            alter_modifier(buff, modifiers, buckets)
             continue
 
         getter = getattr(buff, "get_effective_modifiers", None)
@@ -260,16 +221,6 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
         if getattr(debuff, "is_expired", False):
             continue
 
-        # Legacy debuff compatibility
-        effect_id = getattr(debuff, "id", None)
-        if effect_id in EFFECTS:
-            if getattr(debuff, "required_tags", None) is not None and not any(tag in action_tags for tag in debuff.required_tags):
-                continue
-            if getattr(debuff, "required_damage_type", None) is not None and debuff.required_damage_type != damage_type:
-                continue
-            alter_modifier(debuff, modifiers, buckets)
-            continue
-
         getter = getattr(debuff, "get_effective_modifiers", None)
         eff_mods = getter() if getter is not None else getattr(debuff, "modifiers", [])
         if not eff_mods:
@@ -403,29 +354,6 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
                     modifiers['bonus_crit_chance'] += val
             elif stat == "Critical Chance":
                 modifiers['bonus_crit_chance'] += val
-
-def alter_modifier(effect, modifiers, buckets):
-    """Handles the individual modifier modification fors both buffs and debuffs"""
-    meta = EFFECTS[effect.id]
-
-    """get the buff value when different number of stacks on the buff give different values,
-       is needed because it's not implemented so that it is always linear.
-       Works for now but might need changes for other classes, JSONs too."""
-    if effect.stack_values:
-        stack_index = max(0, min(effect.charges - 1, len(effect.stack_values) - 1))
-        total_buff_value = effect.stack_values[stack_index]
-    else:
-        multiplier = effect.charges if effect.max_charges is not None else 1
-        total_buff_value = effect.value * multiplier
-
-    stat_name = meta["stat_name"]
-    if stat_name == "Damage Modifier":
-        bucket = meta["modifier_bucket"]
-        buckets[bucket] = buckets.get(bucket, 0.0) + total_buff_value
-    elif stat_name == "Critical Chance":
-        modifiers['bonus_crit_chance'] += total_buff_value
-    elif stat_name == "Critical Damage":
-        modifiers['bonus_crit_modifier'] += total_buff_value
 
 def damage_taken_multiplier(target, tags, attack_type, damage_type) -> float:
     """Legacy helper for target vulnerability scaling (now handled in handle_target_debuffs)."""

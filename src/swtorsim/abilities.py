@@ -871,6 +871,7 @@ class Ability:
         self.energy_cost = blueprint.energy_cost
         self.triggers_gcd = blueprint.triggers_gcd #this is stupid and you should be ashamed
         self.abl_ignore_alacrity = getattr(blueprint, "abl_ignore_alacrity", False)
+        self.activation = getattr(blueprint, "activation", None)
         self.tags = frozenset(blueprint.tags or [])
         self.conditions = {}
 
@@ -935,7 +936,7 @@ class Ability:
         if self.triggers_gcd and sim.current_time < caster.next_gcd:
             return False
 
-        if getattr(caster, "active_channel", None) is not None:
+        if getattr(caster, "active_channel", None) is not None and self.triggers_gcd:
             return False
 
         if self.has_charges and self.charges < 1:
@@ -994,8 +995,16 @@ class Ability:
         )
         ability_target = target if is_aggressive else caster
 
-        for entry_id in self.entry_effect_ids:
-            self.execute_effect(entry_id, caster, ability_target, sim)
+        # Check if ability has channel activation
+        activation = self.activation or getattr(self.blueprint, "activation", None) or {}
+        act_type = activation.get("type") if isinstance(activation, dict) else None
+        channel_dur = float(activation.get("duration", 0.0)) if isinstance(activation, dict) else 0.0
+
+        if act_type == "channel" and channel_dur > 0.0:
+            self._start_channel(caster, ability_target, sim, channel_dur)
+        else:
+            for entry_id in self.entry_effect_ids:
+                self.execute_effect(entry_id, caster, ability_target, sim)
 
         if sim is not None and hasattr(sim, "triggers"):
             sim.triggers.dispatch(
@@ -1012,3 +1021,60 @@ class Ability:
             )
 
         return True
+
+    def _start_channel(self, caster, ability_target, sim, channel_duration: float):
+        """Initializes ActiveChannel, executes on_apply initial tick, and schedules periodic channel ticks."""
+        from src.swtorsim.effects import ActiveChannel
+        from src.swtorsim.events import ChannelTickEvent
+
+        ignore_alacrity = self.abl_ignore_alacrity or getattr(self.blueprint, "abl_ignore_alacrity", False)
+        scaled_duration = caster.scale_time_modifier(channel_duration) if not ignore_alacrity else channel_duration
+
+        # Determine tick interval and tick count
+        base_interval = None
+        for eff in self.effects.values():
+            t_int = getattr(eff, "tick_interval", None)
+            if t_int and t_int > 0.0:
+                base_interval = float(t_int)
+                break
+
+        if base_interval is None:
+            delays = []
+            for eff in self.effects.values():
+                for b in getattr(eff, "branches", ()):
+                    for t in getattr(b, "triggers", ()):
+                        if t.get("trigger") == "on_tick" and t.get("delay") is not None:
+                            d = float(t["delay"])
+                            if d > 0.0:
+                                delays.append(d)
+            if delays:
+                delays.sort()
+                base_interval = delays[0]
+
+        if base_interval is None or base_interval <= 0.0:
+            base_interval = min(1.0, channel_duration / 3.0) if channel_duration >= 1.0 else channel_duration
+
+        scaled_interval = caster.scale_time_modifier(base_interval) if not ignore_alacrity else base_interval
+        total_ticks = max(1, int(round(channel_duration / base_interval)))
+
+        channel = ActiveChannel(
+            name=self.name,
+            total_ticks=total_ticks,
+            tick_interval=scaled_interval,
+            tick_cost=0.0,
+            ability=self,
+            duration=scaled_duration,
+            caster=caster,
+            target=ability_target,
+        )
+        caster.active_channel = channel
+        caster.is_channeling = True
+
+        # Execute on_apply / entry effects immediately for initial impact
+        for entry_id in self.entry_effect_ids:
+            self.execute_effect(entry_id, caster, ability_target, sim)
+
+        # Schedule the first periodic tick event
+        if sim is not None:
+            sim.schedule_relative(scaled_interval, ChannelTickEvent(channel))
+

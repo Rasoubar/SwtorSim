@@ -16,13 +16,32 @@ class ActiveDot:
 
 
 class ActiveChannel:
-    """Tracks progress, tick intervals, and resource costs for channeled abilities. Can use more testing."""
-    def __init__(self, name, action_data, total_ticks, tick_interval, tick_cost):
+    """Tracks progress, tick intervals, and resource costs for channeled abilities."""
+
+    def __init__(
+        self,
+        name: str,
+        action_data: Optional[dict] = None,
+        total_ticks: int = 0,
+        tick_interval: float = 1.0,
+        tick_cost: float = 0.0,
+        ability: Any = None,
+        duration: float = 0.0,
+        caster: Any = None,
+        target: Any = None,
+    ):
         self.name = name
-        self.action_data = action_data
+        self.action_data = action_data or {}
+        self.total_ticks = total_ticks
         self.remaining_ticks = total_ticks
+        self.current_tick = 0
         self.tick_interval = tick_interval
         self.tick_cost = tick_cost
+        self.ability = ability
+        self.duration = duration
+        self.caster = caster
+        self.target = target
+        self.is_finished = False
 
 
 @dataclass

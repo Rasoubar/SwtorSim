@@ -11,7 +11,7 @@ from src.swtorsim.combat_curves import (
     MASTERY,
     derived_stat,
 )
-from src.swtorsim.combat_math import EFFECTS, calc_dr
+from src.swtorsim.combat_math import calc_dr
 from src.swtorsim.effects import ActiveEffect
 
 
@@ -136,15 +136,6 @@ class Entity:
             return max(existing_effect.expires_at, new_expires_at)
         return new_expires_at
 
-    @staticmethod
-    def _get_stat_name(action_id, source_name: str) -> str:
-        """Looks up target stat in EFFECTS database, crashing explicitly if config is missing."""
-        try:
-            return EFFECTS[action_id]["stat_name"]
-        except (KeyError, TypeError) as e:
-            print(f" CONFIGURATION CRASH in apply_effect via [{source_name}]")
-            print(f" Action ID {action_id} is completely missing from the EFFECTS database!")
-            raise e
 
     def scale_time_modifier(self, base_time: float) -> float:
         """Scales time durations (override in Player for Alacrity)."""
@@ -154,12 +145,6 @@ class Entity:
         """Triggers recalculate_stats() only if the applied effect modifies a relevant stat."""
         if getattr(effect_instance, "modifiers", None):
             self.recalculate_stats()
-            return
-        effect_id = getattr(effect_instance, "id", None)
-        if effect_id in EFFECTS:
-            stat_name = EFFECTS[effect_id]["stat_name"]
-            if stat_name in self.RECALCULATE_STATS:
-                self.recalculate_stats()
 
     def recalculate_stats(self):
         """Override in subclasses to perform entity-specific stat math."""
@@ -182,9 +167,6 @@ class Entity:
                 sim_ref.triggers.unsubscribe(owner_id)
             if getattr(popped_effect, "modifiers", None):
                 needs_stat_recalc = True
-            elif getattr(popped_effect, "id", None) in EFFECTS:
-                if EFFECTS[popped_effect.id]["stat_name"] in self.RECALCULATE_STATS:
-                    needs_stat_recalc = True
         if needs_stat_recalc:
             self.recalculate_stats()
 
@@ -311,11 +293,6 @@ class Player(Entity):
         for effect in self.effects.values():
             if getattr(effect, "is_expired", False):
                 continue
-            effect_id = getattr(effect, "id", None)
-            if effect_id in EFFECTS:
-                multiplier = effect.charges if getattr(effect, "max_charges", None) is not None else 1
-                stat_name = EFFECTS[effect_id]["stat_name"]
-                bonuses[stat_name] += effect.value * multiplier
             for modifier in _effect_modifiers(effect):
                 if modifier.targets:
                     continue  # Ability-specific modifiers are evaluated during calculate_hit
@@ -428,27 +405,6 @@ class Player(Entity):
                         else:
                             flat_reductions += mod.value
 
-            effect_id = getattr(effect, "id", None)
-            if effect_id not in EFFECTS:
-                continue
-            meta = EFFECTS[effect_id]
-            stat_name = meta['stat_name']
-
-            if stat_name not in ("cost_reduction_pct", "cost_reduction_flat"):
-                continue
-
-            effect_tags = getattr(effect, "required_tags", [])
-            if effect_tags and not (abl_tags & set(effect_tags)):
-                continue
-
-            if stat_name == "cost_reduction_pct":
-                pct_modifiers -= effect.value
-            elif stat_name == "cost_reduction_flat":
-                flat_reductions += effect.value
-
-            if apply and effect.consume_charge():
-                effects_to_clear.append(effect.effect_name)
-
         if effects_to_clear:
             self.cleanup_expired_effects(effects_to_clear)
 
@@ -481,12 +437,6 @@ class Dummy(Entity):
         temp_stats = self.base_stats.copy()
         armor_rating_change = 0
         for effect in self.effects.values():
-            effect_id = getattr(effect, "id", None)
-            if effect_id in EFFECTS:
-                multiplier = effect.charges if effect.max_charges is not None else 1
-                stat_name = EFFECTS[effect_id]["stat_name"]
-                if stat_name == "Armor Rating":
-                    armor_rating_change += effect.value * multiplier
             for modifier in _effect_modifiers(effect):
                 if modifier.stat == "STAT_rtg_armor":
                     armor_rating_change += modifier.value
