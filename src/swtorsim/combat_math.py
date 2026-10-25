@@ -310,14 +310,12 @@ def consume_charges(caster, target, action_tags):
 
     target.cleanup_expired_effects(target_expired_debuffs)
 
-_CHANNEL_TAG_SUFFIXES = (
-    ("melee_ability", "melee"),
-    ("ranged_ability", "ranged"),
-    ("tech_attack", "tech"),
-    ("tech_ability", "tech"),
-    ("force_attack", "force"),
-    ("force_ability", "force"),
-)
+_ATTACK_TYPE_CHANNELS = {
+    1: "melee",
+    2: "ranged",
+    3: "force",
+    4: "tech",
+}
 
 _DAMAGE_TYPE_NAMES = {
     1: "kinetic",
@@ -328,15 +326,7 @@ _DAMAGE_TYPE_NAMES = {
 
 
 def _channel_for_hit(tags, attack_type):
-    for tag in tags:
-        for suffix, channel in _CHANNEL_TAG_SUFFIXES:
-            if str(tag).endswith(suffix):
-                return channel
-    if attack_type in (1, 2):
-        return "melee"
-    if attack_type in (3, 4):
-        return "force"
-    return None
+    return _ATTACK_TYPE_CHANNELS.get(attack_type)
 
 
 def _hit_is_aoe(tags) -> bool:

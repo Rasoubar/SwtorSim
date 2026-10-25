@@ -505,10 +505,6 @@ def _find_target_abilities(caster, action):
                 matched.append(abl)
                 seen_ids.add(id(abl))
                 continue
-            if getattr(abl, "name", "").lower().replace(" ", "_") == str(spec).lower().replace(" ", "_"):
-                matched.append(abl)
-                seen_ids.add(id(abl))
-                continue
         if tag_set and (tag_set & set(getattr(abl, "tags", ()))):
             matched.append(abl)
             seen_ids.add(id(abl))
@@ -521,7 +517,8 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
     if hand == "off" and getattr(caster, "stats", {}).get("Off_hand_max", 0) <= 0:
         return True
     is_periodic = bool((context or {}).get("is_periodic", False)) or any(
-        "periodic_damage" in str(t) for t in (context or {}).get("effect_tags", ())
+        t.endswith(".periodic_damage") or t == "tag.abl.debuff.damage_over_time"
+        for t in (context or {}).get("effect_tags", ())
     )
 
     flurry_count = int(action.get("flurry_max") or action.get("flurry_min") or 1)
@@ -535,6 +532,7 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
     )
     from_proc = getattr(ability, "type", "active") == "passive"
     action_data = dict(action)
+    action_data["is_periodic"] = is_periodic
     stack_mult = (context or {}).get("stack_multiplier", 1)
 
     base_coeff = float(action.get("coeff", 0.0) or 0.0) * stack_mult
@@ -554,7 +552,7 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
 
     hit_any = False
     for i in range(flurry_count):
-        if not is_periodic and not accuracy_roll(caster, hand):
+        if not accuracy_roll(caster, hand):
             continue
         hit_any = True
         hit_event = DamageHit(

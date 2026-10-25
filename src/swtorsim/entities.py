@@ -425,7 +425,7 @@ class Player(Entity):
                 continue
 
             effect_tags = getattr(effect, "required_tags", [])
-            if effect_tags and target_ability not in effect_tags:
+            if effect_tags and not (abl_tags & set(effect_tags)):
                 continue
 
             if stat_name == "cost_reduction_pct":

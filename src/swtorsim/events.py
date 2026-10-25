@@ -80,9 +80,10 @@ class DamageHit(Event):
             tags_set = set(self.tags or [])
             is_periodic = bool(
                 self.action_data.get("is_periodic")
-                or "tag.abl.sith_inquisitor.periodic_damage" in tags_set
-                or "tag.abl.debuff.damage_over_time" in tags_set
-                or "periodic_damage" in str(self.tags)
+                or any(
+                    t.endswith(".periodic_damage") or t == "tag.abl.debuff.damage_over_time"
+                    for t in tags_set
+                )
             )
             is_weapon_attack = attack_type in (1, 2) and not is_periodic
             weapon_mode = 2 if is_weapon_attack else 0
@@ -194,13 +195,13 @@ class DotTick(Event):
             total_ticks = getattr(self.instance_ref, "total_ticks", 0)
             current_tick = (total_ticks - self.instance_ref.ticks_remaining + 1) if total_ticks > 0 else 1
             eff_tags = set(getattr(self.instance_ref, "tags", frozenset()))
-            eff_tags.add("tag.abl.sith_inquisitor.periodic_damage")
             stack_mult = (
                 self.instance_ref.stacks
                 if getattr(self.instance_ref, "scales_with_stacks", False)
                 else 1
             )
             context = {
+                "is_periodic": True,
                 "effect_tags": frozenset(eff_tags),
                 "stack_multiplier": stack_mult,
                 "owner_effect_key": dot_name,
