@@ -193,6 +193,9 @@ class ActiveEffect:
         effect: Any,
         current_time: Optional[float] = None,
         expires_at: Optional[float] = None,
+        caster: Any = None,
+        target: Any = None,
+        sim: Any = None,
     ) -> "ActiveEffect":
         """Constructs an ActiveEffect from a runtime Ability and abilities.Effect instance."""
         blueprint = getattr(ability, "blueprint", None)
@@ -226,6 +229,12 @@ class ActiveEffect:
         serialized_branches: List[Dict[str, Any]] = []
 
         for branch in raw_branches:
+            branch_conditions = getattr(branch, "conditions", None) if not isinstance(branch, dict) else branch.get("conditions")
+            if branch_conditions and caster is not None:
+                from src.swtorsim.requirements import validate_all
+                if not validate_all(branch_conditions, caster, target or caster, sim=sim):
+                    continue
+
             if isinstance(branch, dict):
                 actions = branch.get("actions", [])
                 serialized_branches.append(branch)

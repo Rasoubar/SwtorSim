@@ -86,8 +86,10 @@ def handle_modifiers(caster, target, action_data):
 
 def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers):
     """ Alters modifiers dict according to active effects and buffs on caster."""
-    is_weapon = attack_type in (1, 2)
-    is_force = attack_type in (3, 4)
+    is_melee = attack_type == 1
+    is_ranged = attack_type == 2
+    is_force = attack_type == 3
+    is_tech = attack_type == 4
 
     for buff in caster.effects.values():
         if getattr(buff, "is_expired", False):
@@ -159,24 +161,28 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                     buckets["sub_30"] = buckets.get("sub_30", 0.0) + val
 
             elif stat == "stat_cbt_damage_dealt_scale_channel_melee_modifier_percentage":
-                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                if is_melee:
                     buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
 
             elif stat == "stat_cbt_damage_dealt_scale_channel_force_modifier_percentage":
-                if is_force or any("force" in str(t).lower() for t in action_tags):
+                if is_force:
                     buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
 
             # 2. Critical Chance Modifiers
             elif stat in ("STAT_cbt_force_critical_chance", "133"):
-                if is_force or any("force" in str(t).lower() for t in action_tags):
+                if is_force:
                     modifiers['bonus_crit_chance'] += val
 
             elif stat in ("STAT_cbt_melee_critical_chance", "116"):
-                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                if is_melee:
                     modifiers['bonus_crit_chance'] += val
 
-            elif stat in ("STAT_cbt_tech_critical_chance", "STAT_cbt_ranged_critical_chance"):
-                if not is_weapon and not is_force:
+            elif stat in ("STAT_cbt_ranged_critical_chance", "118"):
+                if is_ranged:
+                    modifiers['bonus_crit_chance'] += val
+
+            elif stat in ("STAT_cbt_tech_critical_chance", "135"):
+                if is_tech:
                     modifiers['bonus_crit_chance'] += val
 
             elif stat == "Critical Chance":
@@ -184,11 +190,19 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
 
             # 3. Critical Damage Modifiers
             elif stat in ("STAT_cbt_force_critical_damage", "134"):
-                if is_force or any("force" in str(t).lower() for t in action_tags):
+                if is_force:
                     modifiers['bonus_crit_modifier'] += val
 
             elif stat in ("STAT_cbt_melee_critical_damage", "117"):
-                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                if is_melee:
+                    modifiers['bonus_crit_modifier'] += val
+
+            elif stat in ("STAT_cbt_ranged_critical_damage",):
+                if is_ranged:
+                    modifiers['bonus_crit_modifier'] += val
+
+            elif stat in ("STAT_cbt_tech_critical_damage",):
+                if is_tech:
                     modifiers['bonus_crit_modifier'] += val
 
             elif stat == "Critical Damage":
@@ -219,8 +233,10 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
         if not eff_mods:
             continue
 
-        is_weapon = attack_type in (1, 2)
-        is_force = attack_type in (3, 4)
+        is_melee = attack_type == 1
+        is_ranged = attack_type == 2
+        is_force = attack_type == 3
+        is_tech = attack_type == 4
         for mod in eff_mods:
             if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
                 continue
@@ -229,10 +245,16 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
             if stat == "STAT_cbt_damage_received_modifier_percentage":
                 buckets["target_vuln"] = buckets.get("target_vuln", 0.0) + val
             elif stat in ("STAT_cbt_force_critical_chance", "133"):
-                if is_force or any("force" in str(t).lower() for t in action_tags):
+                if is_force:
                     modifiers['bonus_crit_chance'] += val
             elif stat in ("STAT_cbt_melee_critical_chance", "116"):
-                if is_weapon or any("melee" in str(t).lower() for t in action_tags):
+                if is_melee:
+                    modifiers['bonus_crit_chance'] += val
+            elif stat in ("STAT_cbt_ranged_critical_chance", "118"):
+                if is_ranged:
+                    modifiers['bonus_crit_chance'] += val
+            elif stat in ("STAT_cbt_tech_critical_chance", "135"):
+                if is_tech:
                     modifiers['bonus_crit_chance'] += val
             elif stat == "Critical Chance":
                 modifiers['bonus_crit_chance'] += val

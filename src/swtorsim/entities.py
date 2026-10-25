@@ -42,6 +42,9 @@ class Entity:
             effect=effect,
             current_time=current_time,
             expires_at=expires_at,
+            caster=caster or self,
+            target=self,
+            sim=sim,
         )
         raw_effect_name = getattr(effect, "name", None)
         effect_key = (
