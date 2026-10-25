@@ -4,3 +4,6 @@ __pycache__/
 *.pyc
 .vscode/
 data/extractor/
+
+# Generated plots
+figures/
