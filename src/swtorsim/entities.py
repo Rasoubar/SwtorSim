@@ -305,7 +305,7 @@ class Player(Entity):
                         bonuses["Mastery Stat"] += val
                 elif stat in ("STAT_rtg_attack_power", "155", "STAT_att_power"):
                     bonuses["Power Stat"] += val
-                elif stat in ("STAT_rtg_crit", "156"):
+                elif stat in ("STAT_rtg_critical_chance", "STAT_rtg_crit", "156", "Critical Rating"):
                     bonuses["Critical Stat"] += val
                 elif stat in ("STAT_rtg_alacrity", "Alacrity Rating"):
                     bonuses["Alacrity Rating"] += val
