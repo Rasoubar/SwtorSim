@@ -96,7 +96,7 @@ class TriggerManager:
                         continue
 
                 req_spell_type = ints.get("spell_type")
-                if req_spell_type:
+                if req_spell_type and req_spell_type != 1:
                     ctx_spell_type = context.get("spell_type")
                     if ctx_spell_type is not None and ctx_spell_type != req_spell_type:
                         continue

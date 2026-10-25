@@ -186,7 +186,7 @@ class Tester:
         print(f"Median Performance  : {summary['median_dps']:,.1f} DPS")
         print(f"Worst Performance   : {summary['min_dps']:,.1f} DPS")
         print(f"Best Performance    : {summary['max_dps']:,.1f} DPS")
-        print(f"Standard Deviation  : ±{summary['std_dev']:,.1f} DPS")
+        print(f"Standard Deviation  : +/-{summary['std_dev']:,.1f} DPS")
         print("=" * 65)
 
         Tester.print_macro_phase_table(
@@ -233,7 +233,7 @@ class Tester:
         plt.axvline(avg_dps, color='red', linestyle='dashed', linewidth=1.5,
                     label=f'Avg DPS: {avg_dps:,.1f}')
         plt.axvspan(avg_dps - std_dev, avg_dps + std_dev, color='gray', alpha=0.15,
-                    label=f'±1 Std Dev ({std_dev:,.1f} DPS)')
+                    label=f'+/-1 Std Dev ({std_dev:,.1f} DPS)')
 
         plt.title(f'SWTOR Sim: Monte Carlo DPS Distribution ({iterations} Fights)', fontsize=14, fontweight='bold', pad=15)
         plt.xlabel('Damage Per Second (DPS)', fontsize=12)

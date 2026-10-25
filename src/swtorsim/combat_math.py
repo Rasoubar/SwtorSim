@@ -14,7 +14,7 @@ EFFECTS = {
     117: {"stat_name": "Critical Damage"},
     134: {"stat_name": "Critical Damage"},
     133: {"stat_name": "Critical Chance"},
-    46: {"stat_name": "Damage Modifier", "modifier_bucket": "unknown_percentage"},
+    46: {"stat_name": "Damage Modifier", "modifier_bucket": "normal_percentage"},
     68: {"stat_name": "cost_reduction_flat"},
     166: {"stat_name": "Armor Penetration"},
     26: {"stat_name": "Bonus Damage"},
@@ -50,9 +50,7 @@ def calculate_hit(caster, target, action_data):
 
     post_mit_damage = handle_mitigation(caster, target, base_damage, damage_type, modifiers)
 
-    tags = action_data.get("tags") or []
-    taken = damage_taken_multiplier(target, tags, attack_type, damage_type)
-    post_mod_damage = post_mit_damage * modifiers['total_multiplier'] * taken
+    post_mod_damage = post_mit_damage * modifiers['total_multiplier']
 
     post_crit_damage, is_crit = calculate_crit(caster, post_mod_damage, modifiers)
 
@@ -80,10 +78,7 @@ def handle_modifiers(caster, target, action_data, damage_type=None):
         damage_type = action_data.get("resolved_damage_type") or action_data.get("damage_type", 1)
 
     handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers)
-    handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers)
-
-    #consume relevant charges. (this will be changed as it doesn't reflect the actual mechanism in the game)
-    consume_charges(caster, target, action_tags)
+    handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, caster=caster)
 
     for bucket_value in buckets.values():
         modifiers['total_multiplier'] *= (1.0 + bucket_value)
@@ -228,8 +223,39 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
             elif stat in ("STAT_cbt_armor_penetration", "166"):
                 modifiers['bonus_armor_pen'] += val
 
-def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers):
+_ATTACK_TYPE_CHANNELS = {
+    1: "melee",
+    2: "ranged",
+    3: "force",
+    4: "tech",
+}
+
+_DAMAGE_TYPE_NAMES = {
+    1: "kinetic",
+    2: "energy",
+    3: "elemental",
+    4: "internal",
+}
+
+
+def _channel_for_hit(tags, attack_type):
+    return _ATTACK_TYPE_CHANNELS.get(attack_type)
+
+
+def _hit_is_aoe(tags) -> bool:
+    return any(str(tag).endswith("is_aoe") or str(tag).endswith("aoe_ability") for tag in tags)
+
+
+def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, caster=None):
     """ Alters modifiers dict according to active debuffs on target."""
+    channel = _channel_for_hit(action_tags, attack_type)
+    type_name = _DAMAGE_TYPE_NAMES.get(damage_type)
+    aoe = _hit_is_aoe(action_tags)
+    is_melee = attack_type == 1
+    is_ranged = attack_type == 2
+    is_force = attack_type == 3
+    is_tech = attack_type == 4
+
     for debuff in target.effects.values():
         if getattr(debuff, "is_expired", False):
             continue
@@ -249,18 +275,121 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
         if not eff_mods:
             continue
 
-        is_melee = attack_type == 1
-        is_ranged = attack_type == 2
-        is_force = attack_type == 3
-        is_tech = attack_type == 4
         for mod in eff_mods:
-            if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
-                continue
             stat = str(mod.stat)
             val = float(mod.value)
-            if stat == "STAT_cbt_damage_received_modifier_percentage":
-                buckets["target_vuln"] = buckets.get("target_vuln", 0.0) + val
-            elif stat in ("STAT_cbt_force_critical_chance", "133"):
+
+            # Skip target armor debuffs (handled by Dummy/entity armor recalculation)
+            if stat == "STAT_rtg_armor":
+                continue
+
+            # Conditional tag check
+            cond_tag = getattr(mod, "conditional_tag", None)
+            if cond_tag:
+                has_tag = any(
+                    cond_tag in getattr(e, "tags", ())
+                    for e in getattr(target, "effects", {}).values()
+                    if not getattr(e, "is_expired", False)
+                ) or (caster is not None and any(
+                    cond_tag in getattr(e, "tags", ())
+                    for e in getattr(caster, "effects", {}).values()
+                    if not getattr(e, "is_expired", False)
+                ))
+                if not has_tag:
+                    continue
+
+            stat_lower = stat.lower()
+
+            # 1. Channel vulnerabilities (Melee, Ranged, Force, Tech, Weapon)
+            if "damage_taken_scale_channel_" in stat_lower or stat in (
+                "381", "382", "383", "384", "385", "386", "387", "388", "463"
+            ):
+                matched = False
+                if channel and f"channel_{channel}_" in stat_lower:
+                    matched = True
+                elif is_melee and (
+                    stat in ("stat_cbt_damage_taken_scale_channel_melee_modifier_percentage", "384")
+                    or "channel_melee_" in stat_lower
+                    or stat in ("stat_cbt_damage_taken_scale_channel_weapon_modifier", "463")
+                    or "channel_weapon_" in stat_lower
+                ):
+                    matched = True
+                elif is_ranged and (
+                    stat in ("stat_cbt_damage_taken_scale_channel_ranged_modifier_percentage", "382")
+                    or "channel_ranged_" in stat_lower
+                    or stat in ("stat_cbt_damage_taken_scale_channel_weapon_modifier", "463")
+                    or "channel_weapon_" in stat_lower
+                ):
+                    matched = True
+                elif is_force and (
+                    stat in ("stat_cbt_damage_taken_scale_channel_force_modifier_percentage", "386")
+                    or "channel_force_" in stat_lower
+                ):
+                    matched = True
+                elif is_tech and (
+                    stat in ("stat_cbt_damage_taken_scale_channel_tech_modifier_percentage", "388")
+                    or "channel_tech_" in stat_lower
+                ):
+                    matched = True
+
+                if matched:
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+                continue
+
+            # 2. Damage type vulnerabilities (Kinetic, Energy, Elemental, Internal)
+            if "damage_taken_scale_type_" in stat_lower or stat in (
+                "369", "370", "371", "372", "373", "374", "375", "376"
+            ):
+                matched = False
+                if type_name and f"type_{type_name}_" in stat_lower:
+                    matched = True
+                elif damage_type == 1 and (
+                    stat in ("stat_cbt_damage_taken_scale_type_kinetic_modifier_percentage", "374")
+                    or "type_kinetic_" in stat_lower
+                ):
+                    matched = True
+                elif damage_type == 2 and (
+                    stat in ("stat_cbt_damage_taken_scale_type_energy_modifier_percentage", "372")
+                    or "type_energy_" in stat_lower
+                ):
+                    matched = True
+                elif damage_type == 3 and (
+                    stat in ("stat_cbt_damage_taken_scale_type_elemental_modifier_percentage", "370")
+                    or "type_elemental_" in stat_lower
+                ):
+                    matched = True
+                elif damage_type == 4 and (
+                    stat in ("stat_cbt_damage_taken_scale_type_internal_modifier_percentage", "376")
+                    or "type_internal_" in stat_lower
+                ):
+                    matched = True
+
+                if matched:
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+                continue
+
+            # 3. Tag-specific vulnerabilities (AoE, DoT)
+            if stat in ("stat_cbt_damage_taken_scale_tag_aoe_modifier", "465") or "tag_aoe_" in stat_lower:
+                if aoe:
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+                continue
+
+            if stat in ("stat_cbt_damage_taken_scale_tag_dot_modifier", "467") or "tag_dot_" in stat_lower:
+                if any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in action_tags):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+                continue
+
+            # 4. General damage received percentage
+            if stat in ("STAT_cbt_damage_received_modifier_percentage", "46"):
+                if not mod.targets or mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags) or (aoe and any(str(tt).endswith("is_aoe") for tt in mod.targets)):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+                continue
+
+            # 5. Critical Chance on Target
+            if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
+                continue
+
+            if stat in ("STAT_cbt_force_critical_chance", "133"):
                 if is_force:
                     modifiers['bonus_crit_chance'] += val
             elif stat in ("STAT_cbt_melee_critical_chance", "116"):
@@ -298,59 +427,8 @@ def alter_modifier(effect, modifiers, buckets):
     elif stat_name == "Critical Damage":
         modifiers['bonus_crit_modifier'] += total_buff_value
 
-def consume_charges(caster, target, action_tags):
-    """Alters charge value according to use. Will be gone on next version as doesn't follow game logic."""
-    caster_expired_buffs = []
-    target_expired_debuffs = []
-
-    # Consume Caster Buffs
-    for effect_id, buff in list(caster.effects.items()):
-        if getattr(buff, "id", None) not in EFFECTS:
-            continue
-        if buff.required_tags is not None and not any(tag in action_tags for tag in buff.required_tags):
-            continue
-        if buff.target_hp_threshold is not None and target.hp_ratio > buff.target_hp_threshold:
-            continue
-        if buff.id != 68 and buff.consume_charge(): #this will be changed once proper expiration is implemented
-            caster_expired_buffs.append(effect_id)
-    caster.cleanup_expired_effects(caster_expired_buffs)
-
-    # Consume Target Debuffs
-    for effect_key, buff in list(target.effects.items()):
-        if getattr(buff, "id", None) not in EFFECTS:
-            continue
-        if buff.required_tags and not any(tag in action_tags for tag in buff.required_tags):
-            continue
-        if buff.consume_charge():
-            target_expired_debuffs.append(effect_key)
-
-    target.cleanup_expired_effects(target_expired_debuffs)
-
-_ATTACK_TYPE_CHANNELS = {
-    1: "melee",
-    2: "ranged",
-    3: "force",
-    4: "tech",
-}
-
-_DAMAGE_TYPE_NAMES = {
-    1: "kinetic",
-    2: "energy",
-    3: "elemental",
-    4: "internal",
-}
-
-
-def _channel_for_hit(tags, attack_type):
-    return _ATTACK_TYPE_CHANNELS.get(attack_type)
-
-
-def _hit_is_aoe(tags) -> bool:
-    return any(str(tag).endswith("is_aoe") or str(tag).endswith("aoe_ability") for tag in tags)
-
-
 def damage_taken_multiplier(target, tags, attack_type, damage_type) -> float:
-    """Scales damage by parsed target modifiers such as the training dummy armor debuff."""
+    """Legacy helper for target vulnerability scaling (now handled in handle_target_debuffs)."""
     channel = _channel_for_hit(tags, attack_type)
     type_name = _DAMAGE_TYPE_NAMES.get(damage_type)
     tag_set = frozenset(tags)
@@ -363,12 +441,13 @@ def damage_taken_multiplier(target, tags, attack_type, damage_type) -> float:
             continue
         for modifier in getter():
             stat = modifier.stat
-            if "damage_taken_scale_channel_" in stat:
-                if channel and f"channel_{channel}_" in stat:
+            stat_lower = stat.lower()
+            if "damage_taken_scale_channel_" in stat_lower:
+                if channel and f"channel_{channel}_" in stat_lower:
                     bonus += modifier.value
                 continue
-            if "damage_taken_scale_type_" in stat:
-                if type_name and f"type_{type_name}_" in stat:
+            if "damage_taken_scale_type_" in stat_lower:
+                if type_name and f"type_{type_name}_" in stat_lower:
                     bonus += modifier.value
                 continue
             if stat == "STAT_rtg_armor" or not modifier.targets:
@@ -388,7 +467,7 @@ def calculate_base_damage(caster, action_data, attack_type):
     coeff = action_data["coeff"]
     standard_health = caster.stats["Standard_health"]
     if attack_type == 3:  # Force
-        damage_bonus = caster.stats.get("F_Bonus_Damage", 0.0)
+        damage_bonus = caster.stats.get("F_Bonus_Damage", 0.0) or caster.stats.get("T_Bonus_Damage", 0.0)
         ability_damage_min = (coeff * damage_bonus) + (shp_min * standard_health)
         ability_damage_max = (coeff * damage_bonus) + (shp_max * standard_health)
     elif attack_type == 4:  # Tech
@@ -401,16 +480,14 @@ def calculate_base_damage(caster, action_data, attack_type):
             damage_bonus = caster.stats.get("R_Bonus_Damage", 0.0) or caster.stats.get("M_Bonus_Damage", 0.0)
         else:
             damage_bonus = caster.stats.get("M_Bonus_Damage", 0.0)
-        if action_data["hand"] == "off":
-            off_hand_min = caster.stats["Off_hand_min"]
-            off_hand_max = caster.stats["Off_hand_max"]
-            ability_damage_min = ((amp + 1) * off_hand_min * 0.3)
-            ability_damage_max = ((amp + 1) * off_hand_max * 0.3)
+        if action_data.get("hand") == "off":
+            weapon_min = caster.stats.get("Off_hand_min", 0.0) * 0.3
+            weapon_max = caster.stats.get("Off_hand_max", 0.0) * 0.3
         else:
-            main_hand_min = caster.stats["Main_hand_min"]
-            main_hand_max = caster.stats["Main_hand_max"]
-            ability_damage_min = ((amp + 1) * main_hand_min) + (coeff * damage_bonus) + (shp_min * standard_health)
-            ability_damage_max = ((amp + 1) * main_hand_max) + (coeff * damage_bonus) + (shp_max * standard_health)
+            weapon_min = caster.stats.get("Main_hand_min", 0.0)
+            weapon_max = caster.stats.get("Main_hand_max", 0.0)
+        ability_damage_min = ((amp + 1) * weapon_min) + (coeff * damage_bonus) + (shp_min * standard_health)
+        ability_damage_max = ((amp + 1) * weapon_max) + (coeff * damage_bonus) + (shp_max * standard_health)
 
     else:
         raise ValueError(f'Action had no valid attack_type')

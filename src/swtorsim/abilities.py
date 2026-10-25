@@ -533,6 +533,39 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
     from_proc = getattr(ability, "type", "active") == "passive"
     action_data = dict(action)
     action_data["is_periodic"] = is_periodic
+
+    # Resolve canonical attack_type (1 Melee, 2 Ranged, 3 Force, 4 Tech) and spell_type (1 Weapon, 2 Tech, 3 Force)
+    ability_fqn = getattr(ability, "fqn", "") or ""
+    tags_str = " ".join(str(t).lower() for t in combined_tags)
+    is_tech = (
+        "tech_attack" in tags_str
+        or "tech_ability" in tags_str
+        or any(cls in ability_fqn.lower() for cls in (".agent.", ".smuggler.", ".bounty_hunter.", ".trooper."))
+        or (getattr(caster, "stats", {}).get("Tech Power", 0.0) > 0 and getattr(caster, "stats", {}).get("Force Power", 0.0) <= 0)
+    )
+
+    if "hand" in action:
+        action_data.setdefault("spell_type", 1)
+        slots = set(str(s) for s in (action.get("slots") or ()))
+        if slots & {"2", "4"}:
+            action_data["attack_type"] = 2
+        elif slots & {"3", "5"}:
+            action_data["attack_type"] = 1
+        elif "attack_type" not in action_data or action_data["attack_type"] == 1:
+            is_ranged = (
+                "ranged_attack" in tags_str
+                or "ranged_ability" in tags_str
+                or any(cls in ability_fqn.lower() for cls in (".agent.", ".smuggler.", ".bounty_hunter.", ".trooper."))
+            )
+            action_data["attack_type"] = 2 if is_ranged else 1
+    else:
+        if is_tech:
+            action_data["attack_type"] = 4
+            action_data.setdefault("spell_type", 2)
+        else:
+            action_data["attack_type"] = 3
+            action_data.setdefault("spell_type", 3)
+
     stack_mult = (context or {}).get("stack_multiplier", 1)
 
     base_coeff = float(action.get("coeff", 0.0) or 0.0) * stack_mult

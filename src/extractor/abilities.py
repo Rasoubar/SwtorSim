@@ -1128,9 +1128,20 @@ def _decode_action(
 
     if action_name == "effAction_WeaponDamage":
         slots = set(_int_list_items(params["int_list"].get("effParam_Slots")))
-        if slots & {"3", "4"}:
+        # In SWTOR GOM equipment slots:
+        # 5 = Melee Mainhand, 3 = Melee Offhand
+        # 2 = Ranged Mainhand, 4 = Ranged Offhand
+        if slots & {"2", "4"}:
+            attack_type = 2  # Ranged
+            hand = "off" if "4" in slots else "main"
+        elif slots & {"3", "5"}:
+            attack_type = 1  # Melee
+            hand = "off" if "3" in slots else "main"
+        elif slots & {"3", "4"}:
+            attack_type = 2 if "4" in slots else 1
             hand = "off"
         elif slots & {"2", "5"}:
+            attack_type = 2 if "2" in slots else 1
             hand = "main"
         else:
             hand = (
@@ -1138,15 +1149,20 @@ def _decode_action(
                 if bool_params.get("effParam_IgnoreDualWieldModifier")
                 else "off"
             )
+            attack_type = 1
+
         decoded: dict[str, Any] = {
             "action_type": "damage",
-            "attack_type": 1,
+            "attack_type": attack_type,
+            "spell_type": 1,
             "hand": hand,
             "coeff": _float_param(float_params, "effParam_Coefficient"),
             "amp": _float_param(float_params, "effParam_AmountModifierPercent"),
             "shp_min": _float_param(float_params, "effParam_StandardHealthPercentMin"),
             "shp_max": _float_param(float_params, "effParam_StandardHealthPercentMax"),
         }
+        if slots:
+            decoded["slots"] = sorted(slots)
         if "effParam_FlurryBlowsMin" in int_params:
             decoded["flurry_min"] = _int_param(int_params, "effParam_FlurryBlowsMin")
         if "effParam_FlurryBlowsMax" in int_params:
@@ -1161,6 +1177,7 @@ def _decode_action(
         decoded = {
             "action_type": "damage",
             "attack_type": 3,
+            "spell_type": 3,
             "damage_type": _int_param(int_params, "effParam_DamageType"),
             "coeff": _float_param(float_params, "effParam_Coefficient"),
             "amp": _float_param(float_params, "effParam_AmountModifierPercent"),

@@ -105,7 +105,14 @@ class DamageHit(Event):
 
         if sim is not None and hasattr(sim, "triggers"):
             attack_type = self.action_data.get("attack_type", 1)
-            spell_type = self.action_data.get("spell_type", 1)
+            spell_type = self.action_data.get("spell_type")
+            if spell_type is None:
+                if attack_type == 4:
+                    spell_type = 2  # Tech
+                elif attack_type == 3:
+                    spell_type = 3  # Force
+                else:
+                    spell_type = 1  # Weapon (Melee/Ranged)
             tags_set = set(self.tags or [])
             is_periodic = bool(
                 self.action_data.get("is_periodic")
