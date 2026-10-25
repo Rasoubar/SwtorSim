@@ -931,12 +931,17 @@ class Ability:
         elif from_timer:
             self.schedule_recharge(caster, sim)
 
-    def can_cast(self, caster: "Player", target: "Dummy", sim) -> bool:
+    def can_cast(self, caster: "Player", target: "Dummy", sim, allow_clip: bool = False) -> bool:
         """Checks if the ability is ready to cast based on GCD, cooldown, cost, and conditions."""
         if self.triggers_gcd and sim.current_time < caster.next_gcd:
             return False
 
-        if getattr(caster, "active_channel", None) is not None and self.triggers_gcd:
+        # Protect active channels by default: neither GCD nor off-GCD abilities can interrupt
+        # unless explicit clipping is permitted
+        if getattr(caster, "active_channel", None) is not None and not allow_clip:
+            return False
+
+        if getattr(caster, "active_cast", None) is not None and not allow_clip:
             return False
 
         if self.has_charges and self.charges < 1:
@@ -964,15 +969,20 @@ class Ability:
         elif self.cooldown > 0.0:
             caster.cooldowns[self.name] = round(sim.current_time + caster.calculate_cooldown(self.cooldown, ability=self), 4)
 
-    def cast(self, caster, target, sim):
+    def cast(self, caster, target, sim, allow_clip: bool = False):
         """Executes the ability: spends resources, locks cooldowns, and triggers entry effects."""
-        if not self.can_cast(caster, target, sim):
+        if not self.can_cast(caster, target, sim, allow_clip=allow_clip):
             return False
 
         if getattr(caster, "active_channel", None) is not None:
             print(f"[{sim.current_time:.3f}] {caster.name} interrupted channel to cast {self.name}!")
             caster.active_channel = None
             caster.is_channeling = False
+
+        if getattr(caster, "active_cast", None) is not None:
+            print(f"[{sim.current_time:.3f}] {caster.name} interrupted cast to cast {self.name}!")
+            caster.active_cast = None
+            caster.is_casting = False
 
         final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply=True)
         caster.resource.spend(final_spend)
