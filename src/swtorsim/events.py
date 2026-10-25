@@ -74,7 +74,7 @@ class DamageHit(Event):
         instant_land = ApplyDamageLand(self.source, self.target, final_damage, is_crit, self.ability_name)
         instant_land.resolve(sim)
 
-        if not self.from_proc and sim is not None and hasattr(sim, "triggers"):
+        if sim is not None and hasattr(sim, "triggers"):
             attack_type = self.action_data.get("attack_type", 1)
             spell_type = self.action_data.get("spell_type", 1)
             tags_set = set(self.tags or [])

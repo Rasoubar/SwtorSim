@@ -64,6 +64,7 @@ class RunConfig:
     duration: int = 1000
     dummy_hp: int = 10_000_000
     training_dummy_armor_debuff: bool = False
+    enable_stem_matching: bool = False
     level: int = 85
     seed: int = 42
 
@@ -101,9 +102,14 @@ def load_run_config(path: str) -> RunConfig:
         training_dummy_armor_debuff=_optional_config_bool(
             raw, "training_dummy_armor_debuff", False
         ),
+        enable_stem_matching=_optional_config_bool(
+            raw, "enable_stem_matching", False
+        ),
         level=_optional_config_int(raw, "level", 85),
         seed=_optional_config_int(raw, "seed", 42),
     )
+    from src.swtorsim.settings import set_stem_matching
+    set_stem_matching(config.enable_stem_matching)
     validate_run_config(config)
     return config
 

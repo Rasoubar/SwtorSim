@@ -495,11 +495,12 @@ def _find_target_abilities(caster, action):
             continue
         if spec and spec != 0:
             abl_fqn = getattr(abl, "fqn", "") or ""
+            from src.swtorsim.settings import is_stem_matching_enabled
             if (
                 key == spec
                 or abl_fqn == spec
                 or getattr(abl, "name", None) == spec
-                or (base_stem and abl_fqn.endswith(f".{base_stem}_plus"))
+                or (is_stem_matching_enabled() and base_stem and abl_fqn.endswith(f".{base_stem}_plus"))
             ):
                 matched.append(abl)
                 seen_ids.add(id(abl))

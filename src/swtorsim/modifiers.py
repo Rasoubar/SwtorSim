@@ -102,10 +102,12 @@ class Modifier:
         if ability_tags and not self.targets.isdisjoint(set(ability_tags)):
             return True
         if ability_fqn:
-            for t in self.targets:
-                stem = str(t).split(".")[-1]
-                if stem and ability_fqn.endswith(f".{stem}_plus"):
-                    return True
+            from src.swtorsim.settings import is_stem_matching_enabled
+            if is_stem_matching_enabled():
+                for t in self.targets:
+                    stem = str(t).split(".")[-1]
+                    if stem and ability_fqn.endswith(f".{stem}_plus"):
+                        return True
         return False
 
     @classmethod

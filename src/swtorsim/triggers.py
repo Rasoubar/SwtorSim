@@ -83,7 +83,11 @@ class TriggerManager:
                 if spec_val and spec_val != 0 and spec_val != "0":
                     ctx_spec = str(context.get("ability_spec") or "")
                     base_stem = str(spec_val).split(".")[-1]
-                    if ctx_spec != str(spec_val) and not ctx_spec.endswith(f".{base_stem}_plus"):
+                    from src.swtorsim.settings import is_stem_matching_enabled
+                    matches_spec = (ctx_spec == str(spec_val))
+                    if not matches_spec and is_stem_matching_enabled() and ctx_spec.endswith(f".{base_stem}_plus"):
+                        matches_spec = True
+                    if not matches_spec:
                         continue
 
                 dmg_type = ints.get("damage_type")

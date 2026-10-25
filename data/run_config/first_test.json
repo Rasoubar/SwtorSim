@@ -5,7 +5,7 @@
   "choices_path": "data/choices/assassin/mali.json",
   "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
   "legendary_fqns": [
-    "abl.itm.legendary.inq_con.dynamic_force",
+    "abl.itm.legendary.generic.dps.berserkers",
     "abl.itm.legendary.inq_con.sin_shad.force_training"
   ],
   "relic_fqns": [
@@ -15,5 +15,6 @@
   "mode": "TEST",
   "level": 85,
   "dummy_hp": 6000000,
-  "training_dummy_armor_debuff": true
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false
 }

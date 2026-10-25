@@ -18,6 +18,7 @@ def run(config):
         duration=config.duration,
         dummy_hp=config.dummy_hp,
         debuff_module=inputs.debuff_module,
+        enable_stem_matching=getattr(config, "enable_stem_matching", False),
     )
 
     if config.mode == "TEST":

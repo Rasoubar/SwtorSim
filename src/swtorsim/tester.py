@@ -9,13 +9,14 @@ from src.swtorsim.setup import prepare_simulation
 
 
 class Tester:
-    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module):
+    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False):
         self.rotation_config = rotation_config
         self.stats_config = stats_config
         self.loadout_blueprints = loadout_blueprints
         self.duration = duration
         self.dummy_hp = dummy_hp
         self.debuff_module = debuff_module
+        self.enable_stem_matching = enable_stem_matching
 
     def run_test(self):
         """Orchestrates a single simulation."""
@@ -44,7 +45,7 @@ class Tester:
 
         task_payloads = [
             (i, self.duration, self.dummy_hp, self.rotation_config, self.stats_config,
-             self.loadout_blueprints, self.debuff_module)
+             self.loadout_blueprints, self.debuff_module, self.enable_stem_matching)
             for i in range(iterations)
         ]
 
@@ -59,7 +60,10 @@ class Tester:
     @staticmethod
     def execute_single_worker_task(args):
         """Single simulation worker for monte carlo."""
-        run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module = args
+        run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module, enable_stem_matching = args
+        from src.swtorsim.settings import set_stem_matching
+        set_stem_matching(enable_stem_matching)
+
         old_stdout = sys.stdout
         sys.stdout = open(os.devnull, 'w')
 
@@ -75,7 +79,8 @@ class Tester:
             ability_data_summary = {
                 name: {
                     "total_damage": data["total_damage"],
-                    "hit_count": data["hit_count"]
+                    "hit_count": data["hit_count"],
+                    "crit_count": data.get("crit_count", 0),
                 }
                 for name, data in sim.tracker.breakdown.items()
             }
@@ -83,7 +88,8 @@ class Tester:
             execute_data_summary = {
                 name: {
                     "total_damage": data["total_damage"],
-                    "hit_count": data["hit_count"]
+                    "hit_count": data["hit_count"],
+                    "crit_count": data.get("crit_count", 0),
                 }
                 for name, data in getattr(sim.tracker, 'execute_breakdown', {}).items()
             }
@@ -119,15 +125,17 @@ class Tester:
 
             for name, data in result["abilities"].items():
                 if name not in macro_breakdown:
-                    macro_breakdown[name] = {"total_damage": 0.0, "hit_count": 0}
+                    macro_breakdown[name] = {"total_damage": 0.0, "hit_count": 0, "crit_count": 0}
                 macro_breakdown[name]["total_damage"] += data["total_damage"]
                 macro_breakdown[name]["hit_count"] += data["hit_count"]
+                macro_breakdown[name]["crit_count"] += data.get("crit_count", 0)
 
             for name, data in result.get("execute_abilities", {}).items():
                 if name not in macro_exec_breakdown:
-                    macro_exec_breakdown[name] = {"total_damage": 0.0, "hit_count": 0}
+                    macro_exec_breakdown[name] = {"total_damage": 0.0, "hit_count": 0, "crit_count": 0}
                 macro_exec_breakdown[name]["total_damage"] += data["total_damage"]
                 macro_exec_breakdown[name]["hit_count"] += data["hit_count"]
+                macro_exec_breakdown[name]["crit_count"] += data.get("crit_count", 0)
 
         avg_dps = sum(all_dps) / len(all_dps)
         summary = {
@@ -216,17 +224,17 @@ class Tester:
         output_filename = "dps_distribution_histogram.png"
         plt.savefig(output_filename, dpi=300)
         print(f"Histogram successfully generated and saved to: {output_filename}")
-        plt.show()
         plt.close()
 
     @staticmethod
     def print_macro_phase_table(breakdown_data, total_duration, total_dps, iterations):
-        print(f"{'Ability Name':<25} | {'Phase DPS':<12} | {'Phase %':<8} | {'Avg Hits':<8}")
-        print("-" * 65)
+        print(f"{'Ability Name':<25} | {'Phase DPS':<12} | {'Phase %':<8} | {'Avg Hits':<9} | {'Crit %':<7}")
+        print("-" * 75)
         sorted_abilities = sorted(breakdown_data.items(), key=lambda item: item[1]["total_damage"], reverse=True)
         for name, global_data in sorted_abilities:
             avg_ability_dps = global_data["total_damage"] / total_duration
             share_pct = (avg_ability_dps / total_dps) * 100 if total_dps > 0 else 0.0
             avg_hits = global_data["hit_count"] / iterations
-            print(f"{name:<25} | {avg_ability_dps:<12,.1f} | {share_pct:>6.1f}% | {avg_hits:>8.1f}")
-        print("=" * 65 + "\n")
+            crit_pct = (global_data.get("crit_count", 0) / global_data["hit_count"] * 100) if global_data["hit_count"] > 0 else 0.0
+            print(f"{name:<25} | {avg_ability_dps:<12,.1f} | {share_pct:>6.1f}% | {avg_hits:>9.1f} | {crit_pct:>6.1f}%")
+        print("=" * 75 + "\n")

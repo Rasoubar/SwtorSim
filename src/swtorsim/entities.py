@@ -409,12 +409,6 @@ class Player(Entity):
             for mod in _effect_modifiers(effect):
                 if mod.stat in ("68", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
                     matched = mod.applies_to(abl_fqn, abl_tags)
-                    if not matched and abl_fqn:
-                        for t in mod.targets:
-                            stem = str(t).split(".")[-1]
-                            if stem and abl_fqn.endswith(f".{stem}_plus"):
-                                matched = True
-                                break
                     if matched:
                         if abs(mod.value) <= 1.0:
                             pct_modifiers += mod.value
