@@ -108,6 +108,16 @@ def _float_field(record: NodeRecord, name: str) -> float | None:
     return None
 
 
+def _int_field(record: NodeRecord, name: str) -> int | None:
+    value = _field_value(record, name)
+    if value is None:
+        return None
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def _icon_png_name(spec: Any) -> str | None:
     if not isinstance(spec, str):
         return None
@@ -120,6 +130,14 @@ def _icon_png_name(spec: Any) -> str | None:
         if not spec:
             return None
     return f"{spec}.png"
+
+
+def _clean_effect_name(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    stripped = re.sub(r"<[^>]+>", "", raw)
+    cleaned = " ".join(stripped.split())
+    return cleaned or None
 
 
 def icon_stems_from_payload(payload: dict[str, Any]) -> set[str]:
@@ -271,6 +289,17 @@ def _decode_generic_ints(
                 continue
             ints[_snake_case(key)] = int_value
     return ints
+
+
+def _resolved_conditional_tag(int_params: dict[str, Any]) -> str | None:
+    """Return a resolved tag string stored in the int-param ConditionalTag slot."""
+    raw = int_params.get("effParam_ConditionalTag")
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value or value.isdigit():
+        return None
+    return value
 
 
 def _should_drop_condition(condition_name: Any) -> bool:
@@ -860,13 +889,7 @@ def _effect_field_interval_seconds(record: NodeRecord, name: str) -> float | Non
 
 
 def _effect_int_field(effect_record: NodeRecord, name: str) -> int | None:
-    value = _field_value(effect_record, name)
-    if value is None:
-        return None
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return None
+    return _int_field(effect_record, name)
 
 
 def _effect_stack_charge(effect_record: NodeRecord) -> dict[str, Any] | None:
@@ -1104,17 +1127,42 @@ def _decode_action(
     float_params = params["float"]
 
     if action_name == "effAction_WeaponDamage":
+        slots = set(_int_list_items(params["int_list"].get("effParam_Slots")))
+        # In SWTOR GOM equipment slots:
+        # 5 = Melee Mainhand, 3 = Melee Offhand
+        # 2 = Ranged Mainhand, 4 = Ranged Offhand
+        if slots & {"2", "4"}:
+            attack_type = 2  # Ranged
+            hand = "off" if "4" in slots else "main"
+        elif slots & {"3", "5"}:
+            attack_type = 1  # Melee
+            hand = "off" if "3" in slots else "main"
+        elif slots & {"3", "4"}:
+            attack_type = 2 if "4" in slots else 1
+            hand = "off"
+        elif slots & {"2", "5"}:
+            attack_type = 2 if "2" in slots else 1
+            hand = "main"
+        else:
+            hand = (
+                "main"
+                if bool_params.get("effParam_IgnoreDualWieldModifier")
+                else "off"
+            )
+            attack_type = 1
+
         decoded: dict[str, Any] = {
             "action_type": "damage",
-            "attack_type": 1,
-            "hand": "main"
-            if bool_params.get("effParam_IgnoreDualWieldModifier")
-            else "off",
+            "attack_type": attack_type,
+            "spell_type": 1,
+            "hand": hand,
             "coeff": _float_param(float_params, "effParam_Coefficient"),
             "amp": _float_param(float_params, "effParam_AmountModifierPercent"),
             "shp_min": _float_param(float_params, "effParam_StandardHealthPercentMin"),
             "shp_max": _float_param(float_params, "effParam_StandardHealthPercentMax"),
         }
+        if slots:
+            decoded["slots"] = sorted(slots)
         if "effParam_FlurryBlowsMin" in int_params:
             decoded["flurry_min"] = _int_param(int_params, "effParam_FlurryBlowsMin")
         if "effParam_FlurryBlowsMax" in int_params:
@@ -1129,6 +1177,7 @@ def _decode_action(
         decoded = {
             "action_type": "damage",
             "attack_type": 3,
+            "spell_type": 3,
             "damage_type": _int_param(int_params, "effParam_DamageType"),
             "coeff": _float_param(float_params, "effParam_Coefficient"),
             "amp": _float_param(float_params, "effParam_AmountModifierPercent"),
@@ -1210,6 +1259,9 @@ def _decode_action(
         for key, value in params["string"].items()
         if key not in DROPPED_ACTION_PARAMS and isinstance(value, str)
     }
+    resolved_tag = _resolved_conditional_tag(int_params)
+    if resolved_tag and not strings.get("conditional_tag"):
+        strings["conditional_tag"] = resolved_tag
     if strings:
         generic["strings"] = strings
 
@@ -1230,6 +1282,11 @@ def _decode_trigger(
     tag_keys = [key for key, enabled in params["tags"].items() if enabled is True]
     if tag_keys:
         decoded["tags"] = tag_keys
+
+    exclusion_map = _lookup_list_to_dict(fields.get("effTagExclusions"))
+    excluded_tags = [key for key, enabled in exclusion_map.items() if enabled is True]
+    if excluded_tags:
+        decoded["excluded_tags"] = excluded_tags
 
     if "effParam_TickNumber" in params["int"]:
         decoded["tick_number"] = _int_param(params["int"], "effParam_TickNumber")
@@ -1462,6 +1519,32 @@ def _effect_icon_png(effect_record: NodeRecord) -> str | None:
     if png is not None:
         return png
     return _icon_png_name(_set_icon_spec_from_initializers(effect_record))
+
+
+def _set_name_from_initializers(effect_record: NodeRecord) -> str | None:
+    for branch in _sub_effects(effect_record):
+        initializers_raw = _sub_effect_field(branch, "effInitializers")
+        if not isinstance(initializers_raw, dict):
+            continue
+        initializer_list = initializers_raw.get("list")
+        if not isinstance(initializer_list, list):
+            continue
+        for entry in initializer_list:
+            if not isinstance(entry, list):
+                continue
+            fields = _entry_fields(entry)
+            if fields.get("effInitializerName") != "effInitializer_SetName":
+                continue
+            string_params = _action_param_dicts(entry)["string"]
+            name = string_params.get("effParam_Name")
+            if not isinstance(name, str) or not name.strip():
+                raw = fields.get("effStringParams")
+                entries = raw.get("list") if isinstance(raw, dict) else raw
+                name = _lookup_list_to_dict(entries).get("effParam_Name")
+            cleaned = _clean_effect_name(name)
+            if cleaned:
+                return cleaned
+    return None
 
 
 def _decode_initializer(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -1745,9 +1828,8 @@ def _decode_branch(
     if triggers:
         _enrich_trigger_timing(triggers, effect_duration, effect_tick_interval)
         decoded["triggers"] = triggers
-        decoded["timing"] = "triggered"
     else:
-        decoded["timing"] = "immediate"
+        decoded["triggers"] = [{"trigger": "on_apply"}]
     return decoded
 
 
@@ -1830,6 +1912,9 @@ def _decode_effect(
         "number": number,
         "entry": not _effect_has_if_called_by_effect(effect_record),
     }
+    name = _set_name_from_initializers(effect_record)
+    if name:
+        decoded["name"] = name
     icon = _effect_icon_png(effect_record)
     if icon:
         decoded["icon"] = icon
@@ -1907,6 +1992,9 @@ def _build_ability_payload(
         payload["icon"] = icon
     payload["type"] = ability_type
     payload["cooldown"] = _cooldown(record)
+    max_charges = _int_field(record, "ablMaxCharges")
+    if max_charges is not None:
+        payload["max_charges"] = max_charges
     payload["ablIgnoreAlacrity"] = _ignore_alacrity(
         record, "ablIgnoreAlacrity", default=False
     )

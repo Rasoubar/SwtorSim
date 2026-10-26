@@ -9,10 +9,10 @@ FNV1A64_JS_URL = (
     "https://swtor.jedipedia.net/static/js/reader/lib/fnv1a64.js"
 )
 
-DATA_DIR = Path("data")
-WORK_DIR = Path("data/extract_work")
-OUTPUT_DIR = Path("data/extracted")
-ICONS_DIR = Path("data/icons")
+DATA_DIR = Path("data/extractor")
+WORK_DIR = Path("data/extractor/extract_work")
+OUTPUT_DIR = Path("data/extractor/extracted")
+ICONS_DIR = Path("data/extractor/icons")
 
 # FQN prefixes whose nodes are followed during combat graph traversal.
 COMBAT_FQN_PREFIXES = (
@@ -24,6 +24,14 @@ COMBAT_FQN_PREFIXES = (
 
 ABILITY_REPLACEMENT_NODE_ID = "16141053964861013368"
 STANDARD_RATING_INFO_NODE_ID = "16140953577088069180"
+
+# Combat curve tables. FQNs differ from the names used in the parsed JSON.
+DERIVED_STAT_MODIFIERS_FQN = "modDerivedStatModifiersList"
+DERIVED_STAT_MAPPING_FQN = "modDerivedStatMappingList"
+COMBAT_SYSTEMS_PER_LEVEL_FQN = "dcvCombatSystemsPerLevelPrototype"
+STANDARD_DAMAGE_FQN = "cbtStandardDamageInfo"
+STANDARD_HEALING_FQN = "cbtStandardHealingInfo"
+
 DEFAULT_ITEM_RATING = 344
 
 ORIGIN_STORIES = (

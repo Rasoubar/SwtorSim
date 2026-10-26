@@ -1,3 +1,4 @@
+import random
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
     from entities import Player, Dummy
@@ -25,30 +26,32 @@ def check_caster_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kw
 def check_target_debuff(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
     return any(target.has_effect(d) for d in _to_list(conditions))
 
-def check_exact_dot_amount(conditions: int, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return target.count_active_dots == conditions
-
-def check_has_any_dot(conditions: bool, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return (target.count_active_dots > 0) is conditions
-
 def inverse_check_target_debuff(conditions: Any, caster: "Player", target: "Dummy", **kwargs) -> bool:
     return not check_target_debuff(conditions, caster, target, **kwargs)
 
-def has_specific_dot(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return any(target.has_dot(d) for d in _to_list(conditions))
-
 def check_caster_energy_above(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     return caster.resource.current_value >= threshold
-
-def check_dot_absent(dot_name: str, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    return dot_name not in target.dots
 
 def check_caster_energy_below(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     return caster.resource.current_value < threshold
 
 def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
-    proc = caster.procs.get(data["name"])
-    remaining_cooldown = proc.next_possible_proc - sim.current_time
+    name = data["name"]
+    if caster.has_effect(name):
+        return False
+
+    current_time = sim.current_time if sim is not None else 0.0
+    remaining_cooldown = 0.0
+    proc = getattr(caster, "procs", {}).get(name)
+    if proc is not None and hasattr(proc, "next_possible_proc"):
+        remaining_cooldown = max(0.0, proc.next_possible_proc - current_time)
+    else:
+        for eff in getattr(caster, "effects", {}).values():
+            if getattr(eff, "is_expired", False):
+                continue
+            if getattr(eff, "name", None) == name and any("lockout" in t for t in getattr(eff, "tags", ())):
+                if getattr(eff, "expires_at", None) is not None:
+                    remaining_cooldown = max(remaining_cooldown, eff.expires_at - current_time)
 
     return remaining_cooldown > data["value"]
 
@@ -71,27 +74,308 @@ CONDITION_REGISTRY = {
     "target_hp_below_pct": check_target_hp,
     "target_has_debuff": check_target_debuff,
     "caster_has_buff": check_caster_buff,
-    "exact_dot_amount": check_exact_dot_amount,
-    "has_dot": check_has_any_dot,
     "target_doesnt_have_debuff": inverse_check_target_debuff,
-    "has_specific_dot": has_specific_dot,
     "caster_energy_above": check_caster_energy_above,
     "caster_energy_below": check_caster_energy_below,
-    "dot_absent": check_dot_absent,
     "target_hp_above_pct": check_target_hp_above,
     "proc_cooldown_above": check_proc_cooldown_above,
     "caster_does_not_have_buff": check_caster_does_not_have_buff,
     "ability_cooldown_under": check_ability_cooldown_under
 }
 
-def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy", sim = None) -> bool:
-    """applies the condition_registry so that the correct functions for the requirement is run"""
+
+def compare_values(actual: float, comparison: str, expected: float) -> bool:
+    """Evaluates comparison operators used in extracted game data."""
+    if comparison == "lte":
+        return actual <= expected
+    elif comparison == "gte":
+        return actual >= expected
+    elif comparison == "lt":
+        return actual < expected
+    elif comparison == "gt":
+        return actual > expected
+    elif comparison == "eq":
+        return actual == expected
+    return True
+
+
+def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str | None = None, count: int = 1) -> bool:
+    """Checks whether an entity has an active effect or dot matching tags or an ability spec."""
+    if not entity:
+        return False
+
+    effects = getattr(entity, "effects", {})
+    tags_set = set(tags) if tags else set()
+
+    for eff in effects.values():
+        eff_tags = set(getattr(eff, "tags", []) or getattr(eff, "required_tags", []) or [])
+        eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "")
+        eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")
+        stacks = getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1
+
+        matches = False
+        if tags_set and (tags_set & eff_tags):
+            matches = True
+        if ability_spec and ability_spec in (eff_fqn, eff_name):
+            matches = True
+
+        if matches and stacks >= count:
+            return True
+
+    # Also check active dots on dummy targets
+    dots = getattr(entity, "dots", {})
+    for dot_name, dot in dots.items():
+        if ability_spec and ability_spec == dot_name:
+            return True
+        dot_tags = set(getattr(dot, "tags", []) or [])
+        if tags_set and (tags_set & dot_tags):
+            return True
+
+    return False
+
+
+def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec: str | None = None) -> int:
+    """Returns the current stack/charge count of an active effect or dot matching tags or ability spec."""
+    if not entity:
+        return 0
+
+    effects = getattr(entity, "effects", {})
+    tags_set = set(tags) if tags else set()
+
+    for eff in effects.values():
+        if getattr(eff, "is_expired", False):
+            continue
+        eff_tags = set(getattr(eff, "tags", []) or getattr(eff, "required_tags", []) or [])
+        eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "")
+        eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")
+
+        matches = False
+        if tags_set and (tags_set & eff_tags):
+            matches = True
+        if ability_spec and ability_spec in (eff_fqn, eff_name):
+            matches = True
+
+        if matches:
+            return int(getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1)
+
+    dots = getattr(entity, "dots", {})
+    for dot_name, dot in dots.items():
+        if getattr(dot, "is_expired", False):
+            continue
+        if ability_spec and ability_spec == dot_name:
+            return int(getattr(dot, "stacks", 1) or 1)
+        dot_tags = set(getattr(dot, "tags", []) or [])
+        if tags_set and (tags_set & dot_tags):
+            return int(getattr(dot, "stacks", 1) or 1)
+
+    return 0
+
+
+def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
+    """Evaluates an individual atomic condition record from an extracted condition list."""
+    cond_type = item.get("type")
+    actor_str = item.get("actor", "caster")
+
+    if actor_str == "target":
+        actor = target
+    elif actor_str == "trigger_target" and context and "target" in context:
+        actor = context["target"]
+    elif actor_str == "trigger_caster" and context and "caster" in context:
+        actor = context["caster"]
+    else:
+        actor = caster
+
+    res = True
+
+    if cond_type == "has_ability":
+        spec = item.get("ability_spec")
+        comparison = item.get("comparison", "gte")
+        expected_rank = item.get("ints", {}).get("rank", 1)
+        has_it = False
+        if hasattr(caster, "passive_blueprints") and spec in caster.passive_blueprints:
+            has_it = True
+        elif hasattr(caster, "ability_db"):
+            if spec in caster.ability_db or (isinstance(spec, str) and spec.lower().replace(" ", "_") in caster.ability_db):
+                has_it = True
+        actual_rank = 1 if has_it else 0
+        res = compare_values(actual_rank, comparison, expected_rank)
+
+    elif cond_type == "has_effect":
+        tags = item.get("tags")
+        spec = item.get("ability_spec")
+        count = item.get("count", 1)
+        res = entity_has_effect(actor, tags=tags, ability_spec=spec, count=count)
+
+    elif cond_type == "if_toughness":
+        expected = item.get("ints", {}).get("toughness", 3)
+        comparison = item.get("comparison", "lte")
+        actual = getattr(actor, "toughness", 5 if getattr(actor, "max_hp", 0) > 0 else 1)
+        res = compare_values(actual, comparison, expected)
+
+    elif cond_type == "if_health":
+        floats = item.get("floats", {})
+        threshold = floats.get("health_percent", 0.0)
+        comparison = item.get("comparison", "lte")
+        actual_hp_pct = getattr(actor, "hp_ratio", 1.0) * 100.0
+        res = compare_values(actual_hp_pct, comparison, threshold)
+
+    elif cond_type == "has_specified_resource_amount":
+        floats = item.get("floats", {})
+        threshold = floats.get("resource_amount", 0.0)
+        comparison = item.get("comparison", "gte")
+        actual = getattr(getattr(actor, "resource", None), "current_value", 0.0)
+        res = compare_values(actual, comparison, threshold)
+
+    elif cond_type == "has_ability_stack_charge":
+        spec = item.get("ability_spec")
+        comparison = item.get("comparison", "gte")
+        amount = item.get("floats", {}).get("amount", 1.0)
+        actual = 0
+        if hasattr(caster, "ability_db") and spec in caster.ability_db:
+            actual = getattr(caster.ability_db[spec], "charges", 0)
+        res = compare_values(actual, comparison, amount)
+
+    elif cond_type == "is_player":
+        res = not hasattr(actor, "max_hp") and hasattr(actor, "ability_db")
+
+    elif cond_type == "is_not_player":
+        res = hasattr(actor, "max_hp") or not hasattr(actor, "ability_db")
+
+    elif cond_type == "if_primary_target":
+        res = True
+
+    elif cond_type == "random_chance":
+        chance = item.get("floats", {}).get("chance", 1.0)
+        res = random.random() <= chance
+
+    elif cond_type == "immune_by_resolve":
+        # Target dummies/bosses have resolve immunity
+        res = hasattr(actor, "max_hp")
+
+    elif cond_type == "if_spell_hit":
+        res = True
+
+    elif cond_type in ("is_party_member", "is_friend"):
+        res = (actor is caster)
+
+    elif cond_type == "has_melee_weapon":
+        res = getattr(actor, "stats", {}).get("Main_hand_max", 0) > 0
+
+    elif cond_type == "is_dual_wielding":
+        res = getattr(actor, "stats", {}).get("Off_hand_max", 0) > 0
+
+    elif cond_type == "is_not_dual_wielding":
+        res = getattr(actor, "stats", {}).get("Off_hand_max", 0) <= 0
+
+    elif cond_type == "has_effect_at_stack_charge_count":
+        tags = item.get("tags")
+        spec = item.get("ability_spec")
+        comparison = item.get("comparison", "eq")
+        expected_count = int(item.get("count", 1))
+        actual_stacks = get_entity_effect_stacks(actor, tags=tags, ability_spec=spec)
+        res = compare_values(actual_stacks, comparison, expected_count)
+
+    elif cond_type == "if_stack_charge":
+        expected_count = int(item.get("count", 1))
+        actual_stacks = 1
+        if context:
+            if "stack_multiplier" in context:
+                actual_stacks = int(context["stack_multiplier"])
+            elif "current_stacks" in context:
+                actual_stacks = int(context["current_stacks"])
+            elif "stacks" in context:
+                actual_stacks = int(context["stacks"])
+            elif "charges" in context:
+                actual_stacks = int(context["charges"])
+            elif "active_effect" in context and hasattr(context["active_effect"], "stacks"):
+                actual_stacks = int(getattr(context["active_effect"], "stacks", 1))
+        res = (actual_stacks == expected_count)
+
+    elif cond_type == "is_target_caster":
+        effective_target = context.get("target") if context and "target" in context else target
+        res = (effective_target is caster)
+
+    elif cond_type == "is_casting":
+        active_channel = getattr(actor, "active_channel", None)
+        active_cast = getattr(actor, "active_cast", None)
+        is_busy = (active_channel is not None) or (active_cast is not None) or getattr(actor, "is_channeling", False)
+        
+        spec = item.get("ability_spec")
+        if spec and is_busy:
+            active_bp = getattr(active_channel, "ability", None) or getattr(active_cast, "ability", None)
+            active_fqn = getattr(active_bp, "fqn", "")
+            res = (spec == active_fqn)
+        else:
+            res = is_busy
+
+    elif cond_type == "is_in_combat":
+        res = getattr(actor, "in_combat", True)
+
+    elif cond_type == "is_not_in_combat":
+        res = not getattr(actor, "in_combat", False)
+
+    elif cond_type in ("passes_conditional", "is_discipline", "is_not_in_cover"):
+        res = True
+
+    elif cond_type in ("is_in_cover", "is_companion"):
+        res = False
+
+    else:
+        # Fallback for unmodeled visual/flavor conditions
+        res = True
+
+    if item.get("negated", False):
+        res = not res
+
+    return res
+
+
+def evaluate_logic(logic_node: dict, results_by_id: dict[str, bool]) -> bool:
+    """Recursively evaluates boolean logic trees (and/or/condition reference)."""
+    if not logic_node:
+        return True
+    if "condition" in logic_node:
+        return results_by_id.get(logic_node["condition"], True)
+
+    op = logic_node.get("op")
+    operands = logic_node.get("operands", [])
+    if op == "and":
+        return all(evaluate_logic(child, results_by_id) for child in operands)
+    elif op == "or":
+        return any(evaluate_logic(child, results_by_id) for child in operands)
+    return True
+
+
+def evaluate_extracted_conditions(conditions: dict[str, Any], caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
+    """Evaluates an extracted condition structure containing a 'list' and 'logic' tree."""
+    cond_list = conditions.get("list") or []
+    logic_tree = conditions.get("logic") or {}
+
+    results_by_id = {}
+    for item in cond_list:
+        cond_id = item.get("id")
+        if cond_id:
+            results_by_id[cond_id] = evaluate_single_extracted_condition(
+                item, caster, target, sim=sim, context=context
+            )
+
+    return evaluate_logic(logic_tree, results_by_id)
+
+
+def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy", sim = None, context = None) -> bool:
+    """Validates conditions, supporting both extracted AST structures and legacy rotation rules."""
     if not requirements:
         return True
+
+    # 1. Extracted AST condition schema: {"list": [...], "logic": {...}}
+    if isinstance(requirements, dict) and "list" in requirements and "logic" in requirements:
+        return evaluate_extracted_conditions(requirements, caster, target, sim=sim, context=context)
+
+    # 2. Legacy flat dictionary format (used by rotation.py priority rules)
     for key, value in requirements.items():
         validator_func = CONDITION_REGISTRY.get(key)
         if validator_func:
-            if not validator_func(value, caster, target,sim=sim):
+            if not validator_func(value, caster, target, sim=sim):
                 return False
         else:
             raise KeyError(
@@ -100,4 +384,3 @@ def validate_all(requirements: dict[str, Any], caster: "Player", target: "Dummy"
                 f"Implemented requirements are: {list(CONDITION_REGISTRY.keys())}\n"
                 f"Contact me if you think yours should be here too")
     return True
-

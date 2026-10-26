@@ -1,0 +1,21 @@
+{
+  "spec_path": "data/extractor/disciplines/assassin/hatred.json",
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
+  "rotation_path": "data/rotations/assassin/hatred/BasicMaliPS.json",
+  "choices_path": "data/choices/assassin/hatred/mali.json",
+  "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
+  "legendary_fqns": [
+    "abl.itm.legendary.generic.dps.berserkers",
+    "abl.itm.legendary.inq_con.sin_shad.force_training"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
+  ],
+  "mode": "BATCH",
+  "iterations": 50,
+  "level": 85,
+  "dummy_hp": 6000000,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": true
+}

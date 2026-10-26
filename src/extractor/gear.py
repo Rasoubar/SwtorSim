@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +11,6 @@ from extractor.node import ParsedField
 from extractor.strings import StringResolver
 
 ITM_EQUIP_ABILITY_FIELD = "itmEquipAbility"
-ILVL_SEGMENT = re.compile(r"^ilvl_\d+$")
 
 
 def _field_value(fields: list[dict[str, Any]], name: str) -> Any:
@@ -29,18 +27,14 @@ def _item_name(strings: StringResolver, fields: list[ParsedField]) -> str | None
     return None
 
 
-def _ability_fqn_from_item_fqn(item_fqn: str) -> str:
-    parts = [part for part in item_fqn.split(".") if not ILVL_SEGMENT.match(part)]
-    return "abl." + ".".join(parts)
-
-
-def _equip_ability_fqn(fields: list[dict[str, Any]], item_fqn: str) -> str | None:
+def _equip_ability_fqn(fields: list[dict[str, Any]]) -> str | None:
+    """Returns the equip ability FQN, or None when the item field does not resolve."""
     value = _field_value(fields, ITM_EQUIP_ABILITY_FIELD)
     if isinstance(value, str) and (
         value.startswith("abl.") or value.startswith("tal.")
     ):
         return value
-    return _ability_fqn_from_item_fqn(item_fqn)
+    return None
 
 
 def build_gear_abilities_talents(
@@ -64,7 +58,7 @@ def build_gear_abilities_talents(
         parsed = store.parse_node(node_id, gom)
         resolved = resolve_fields(parsed.fields, store, strings, gom)
 
-        ability_fqn = _equip_ability_fqn(resolved, fqn)
+        ability_fqn = _equip_ability_fqn(resolved)
         if ability_fqn is None or ability_fqn in seen_abilities:
             continue
 

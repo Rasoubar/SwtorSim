@@ -1,5 +1,6 @@
 import heapq
 from src.swtorsim.metrics import Metrics
+from src.swtorsim.triggers import TriggerManager
 
 class Simulation:
     """Manages the event queue and core combat timeline."""
@@ -8,6 +9,7 @@ class Simulation:
         self.current_time = 0.0
         self.event_counter = 0
         self.tracker = Metrics()
+        self.triggers = TriggerManager()
 
     def schedule_relative(self, delay, event):
         self.event_counter += 1
@@ -19,11 +21,11 @@ class Simulation:
 
     def run_timed(self, duration=300.0, target=None):
         while self.queue:
-            timestamp, seq, event = heapq.heappop(self.queue)
-            if timestamp > duration:
+            if self.queue[0][0] > duration:
                 break
+            timestamp, seq, event = heapq.heappop(self.queue)
             self.current_time = timestamp
             event.resolve(self)
-            if target.hp <= 0:
+            if target is not None and getattr(target, "hp", 1) <= 0:
                 print(f"\n[{timestamp:.2f}s] Rip dummy.")
                 break
