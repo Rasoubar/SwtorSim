@@ -15,23 +15,19 @@ from src.diminishing_returns.config import (
     VARIANT_ORDER,
     DrConfig,
     SpecEntry,
+    build_stat_name,
+    relic_line,
     with_relics,
 )
-from src.diminishing_returns.fit import CritCurves, fit_surface
+from src.diminishing_returns.fit import fit_sqrt_polynomial
 from src.diminishing_returns.raw import RawRun, load_raw, raw_results_path, save_raw
-from src.swtorsim.combat_curves import (
-    CRITICAL_CHANCE_TARGET,
-    CRITICAL_DAMAGE_TARGET,
-    CRITICAL_RATING,
-    derived_stat,
-)
 from src.swtorsim.config_load import load_from_run_config
 from src.swtorsim.settings import set_stem_matching
 from src.swtorsim.setup import prepare_simulation
 
-MASTERY_STEP = 1000.0
-MASTERY_TOLERANCE = 1e-3
 GRID_POINTS = 201
+# Fights continue past the plotted max so the 1σ band is not estimated on the edge.
+FIT_MARGIN = 1000.0
 
 _STATE: dict = {}
 
@@ -52,6 +48,7 @@ class SpecResult:
     xlabel: str
     relic_gains: list[tuple[str, str, np.ndarray]]
     gear_label: str
+    relic_label: str
     game_version: str
     author: str
     build_dps: float | None
@@ -69,19 +66,15 @@ def run_spec(dr: DrConfig, spec: SpecEntry, spec_index: int, debug: bool = False
     """Samples one spec under four relic setups, then fits the slopes."""
     started = time.perf_counter()
     print(f"\n{spec.name}: {dr.samples_per_variant} samples x {len(VARIANT_ORDER)} relic variants")
+    print(f"Sampling through {dr.sweep_max + FIT_MARGIN:g}; plots end at {dr.sweep_max:g}")
     reference = _load_quietly(spec.run_config)
-    ratio = _assert_mastery_multiplier(
-        reference, spec.run_config.dummy_hp, dr.expected_mastery_multiplier
-    )
-    print(f"Mastery bonus: {ratio:.4f} per base point (expected {dr.expected_mastery_multiplier:g})")
-
     build_stats = reference.stats_config["stats"]
     crit, mastery, power, seeds = _sample_design(dr, build_stats, spec_index)
     dps = _run_variants(dr, spec, crit, mastery, power, seeds)
 
     mastery0 = float(build_stats["Mastery"])
     power0 = float(build_stats["Power"])
-    build_crit = float(build_stats[dr.sweep_stat])
+    build_crit = float(build_stats[build_stat_name(dr.sweep_stat)])
     if debug:
         path = save_raw(RawRun(
             spec_name=spec.name,
@@ -140,14 +133,13 @@ def _fit_result(
     started: float,
 ) -> SpecResult:
     """Fits each relic variant and packages the curves for plotting."""
-    curves = _crit_curves(dr.level)
     fits = {
-        key: fit_surface(crit, mastery, power, dps[key], mastery0, power0, curves)
+        key: fit_sqrt_polynomial(crit, mastery, power, dps[key], mastery0, power0)
         for key in VARIANT_ORDER
     }
     for key in VARIANT_ORDER:
         fit = fits[key]
-        print(f"  {key}: game crit curves, residual std {fit.residual_std:,.0f} DPS")
+        print(f"  {key}: residual std {fit.residual_std:,.0f} DPS")
 
     grid = np.linspace(sweep_min, sweep_max, GRID_POINTS)
     chosen = fits[pair_key].evaluate(grid)
@@ -157,8 +149,8 @@ def _fit_result(
             continue
         # The four variants share seeds, so the relic gain is fit on the paired
         # DPS difference. Its standard error then leaves out noise that cancels.
-        gain = fit_surface(
-            crit, mastery, power, dps[key] - dps["none"], mastery0, power0, curves
+        gain = fit_sqrt_polynomial(
+            crit, mastery, power, dps[key] - dps["none"], mastery0, power0
         ).evaluate(grid)
         relic_gains.append((PAIR_LABELS[key], PAIR_COLORS[key], gain.dps, gain.dps_sigma))
 
@@ -180,8 +172,8 @@ def _fit_result(
         )
     print(f"Finished {spec_name} in {time.perf_counter() - started:.1f}s")
 
-    xlabel = "Crit Rating" if sweep_stat == "Critical Rating" else sweep_stat
-    sweep_label = "Crit" if sweep_stat == "Critical Rating" else sweep_stat
+    xlabel = "Crit Rating" if sweep_stat in ("Crit Rating", "Critical Rating") else sweep_stat
+    sweep_label = "Crit" if sweep_stat in ("Crit Rating", "Critical Rating") else sweep_stat
     return SpecResult(
         name=spec_name,
         crit=chosen.crit,
@@ -195,28 +187,17 @@ def _fit_result(
         xlabel=xlabel,
         relic_gains=relic_gains,
         gear_label=dr.gear_label,
+        relic_label=relic_line(pair_key),
         game_version=dr.game_version,
         author=dr.author,
         build_dps=build_dps,
     )
 
 
-def _crit_curves(level: int) -> CritCurves:
-    chance_divisor, chance_cap = derived_stat(CRITICAL_RATING, level, CRITICAL_CHANCE_TARGET)
-    damage_divisor, damage_cap = derived_stat(CRITICAL_RATING, level, CRITICAL_DAMAGE_TARGET)
-    return CritCurves(
-        level=level,
-        chance_cap=chance_cap,
-        chance_divisor=chance_divisor,
-        damage_cap=damage_cap,
-        damage_divisor=damage_divisor,
-    )
-
-
 def _sample_design(dr: DrConfig, build_stats: dict, spec_index: int):
     rng = np.random.default_rng([dr.seed, spec_index])
     n = dr.samples_per_variant
-    crit = np.linspace(dr.sweep_min, dr.sweep_max, n)
+    crit = np.linspace(dr.sweep_min, dr.sweep_max + FIT_MARGIN, n)
     mastery = float(build_stats["Mastery"]) + rng.uniform(-dr.jitter_mastery, dr.jitter_mastery, n)
     power = float(build_stats["Power"]) + rng.uniform(-dr.jitter_power, dr.jitter_power, n)
     seeds = rng.integers(0, 2**31, size=n)
@@ -291,7 +272,7 @@ def _worker(task) -> float:
             "level": base["level"],
             "stats": {
                 **base["stats"],
-                _STATE["sweep_stat"]: sweep_value,
+                build_stat_name(_STATE["sweep_stat"]): sweep_value,
                 "Mastery": mastery,
                 "Power": power,
             },
@@ -311,43 +292,6 @@ def _worker(task) -> float:
     finally:
         sys.stdout.close()
         sys.stdout = old
-
-
-def _assert_mastery_multiplier(inputs, dummy_hp: int, expected: float) -> float:
-    base_mastery = float(inputs.stats_config["stats"]["Mastery"])
-    low = _effective_mastery(inputs, dummy_hp, base_mastery)
-    high = _effective_mastery(inputs, dummy_hp, base_mastery + MASTERY_STEP)
-    ratio = (high - low) / MASTERY_STEP
-    if abs(ratio - expected) > MASTERY_TOLERANCE:
-        raise RuntimeError(
-            "Mastery bonus check failed: raising base Mastery by "
-            f"{MASTERY_STEP:g} changed effective Mastery by {ratio:.4f} per point, "
-            f"expected {expected:g}. The class buff passive should apply this."
-        )
-    return ratio
-
-
-def _effective_mastery(inputs, dummy_hp: int, mastery: float) -> float:
-    base = inputs.stats_config
-    stats_config = {
-        "class_name": base["class_name"],
-        "level": base["level"],
-        "stats": {**base["stats"], "Mastery": mastery},
-    }
-    old = sys.stdout
-    sys.stdout = open(os.devnull, "w")
-    try:
-        _sim, player, _target = prepare_simulation(
-            inputs.rotation_config,
-            stats_config,
-            inputs.loadout_blueprints,
-            dummy_hp,
-            inputs.debuff_module,
-        )
-    finally:
-        sys.stdout.close()
-        sys.stdout = old
-    return float(player.stats["Mastery"])
 
 
 def _load_quietly(run_config):
