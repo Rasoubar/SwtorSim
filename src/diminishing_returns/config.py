@@ -5,15 +5,17 @@ from dataclasses import dataclass, replace
 from src.swtorsim.config_load import load_json_file
 from src.swtorsim.run_config import RunConfig, discipline_names, validate_run_config
 
-RELIC_STATS = ("Mastery", "Power", "Critical Rating")
+RELIC_STATS = ("Mastery", "Power", "Crit")
 JITTER_STATS = ("Mastery", "Power")
+# Config labels that differ from the stat key stored on a build and in the sim.
+BUILD_STAT_NAMES = {"Crit Rating": "Critical Rating"}
 
 VARIANT_ORDER = ("none", "mastery_power", "mastery_crit", "power_crit")
 VARIANT_STATS = {
     "none": (),
     "mastery_power": ("Mastery", "Power"),
-    "mastery_crit": ("Mastery", "Critical Rating"),
-    "power_crit": ("Power", "Critical Rating"),
+    "mastery_crit": ("Mastery", "Crit"),
+    "power_crit": ("Power", "Crit"),
 }
 PAIR_LABELS = {
     "mastery_power": "Mastery & Power",
@@ -25,6 +27,16 @@ PAIR_COLORS = {
     "mastery_crit": "orange",
     "power_crit": "red",
 }
+
+
+def build_stat_name(name: str) -> str:
+    """The key used in build files and the sim for a config stat label."""
+    return BUILD_STAT_NAMES.get(name, name)
+
+
+def relic_line(pair_key: str) -> str:
+    """The equipped pair, as a plot subtitle such as 'Mastery + Power Relics'."""
+    return " + ".join(VARIANT_STATS[pair_key]) + " Relics"
 
 _SPEC_KEYS = (
     "name",
@@ -54,7 +66,6 @@ class DrConfig:
     game_version: str
     author: str
     gear_label: str
-    expected_mastery_multiplier: float
     sweep_stat: str
     sweep_min: float
     sweep_max: float
@@ -91,7 +102,6 @@ def load_dr_config(path: str) -> DrConfig:
     training_dummy = _require_bool(raw, "training_dummy_armor_debuff", errors)
     stem_matching = _require_bool(raw, "enable_stem_matching", errors)
     seed = _require_int(raw, "seed", errors)
-    mastery_multiplier = _require_positive_float(raw, "expected_mastery_multiplier", errors)
     sweep_stat, sweep_min, sweep_max = _require_sweep(raw.get("sweep"), errors)
     jitter_mastery, jitter_power = _require_jitter(raw.get("jitter"), errors)
     samples = _require_positive_int(raw, "samples_per_variant", errors)
@@ -124,7 +134,6 @@ def load_dr_config(path: str) -> DrConfig:
         game_version=game_version,
         author=author,
         gear_label=gear_label,
-        expected_mastery_multiplier=mastery_multiplier,
         sweep_stat=sweep_stat,
         sweep_min=sweep_min,
         sweep_max=sweep_max,
@@ -189,11 +198,12 @@ def _load_spec(
     if not isinstance(stats, dict):
         raise ValueError(f"Invalid DR config '{path}':\n- {label} build '{stats_path}' must be a JSON object.")
     for stat in (sweep_stat, *JITTER_STATS):
-        value = stats.get(stat)
+        build_stat = build_stat_name(stat)
+        value = stats.get(build_stat)
         if isinstance(value, bool) or not isinstance(value, (int, float)):
             raise ValueError(
                 f"Invalid DR config '{path}':\n"
-                f"- {label} build '{stats_path}' must contain a numeric '{stat}' to overwrite."
+                f"- {label} build '{stats_path}' must contain a numeric '{build_stat}' to overwrite."
             )
 
     spec_data = load_json_file(spec_path)
@@ -242,11 +252,11 @@ def _pair_key(relic_fqns: list[str], relics: dict[str, str]) -> str:
 def _require_sweep(value, errors: list[str]) -> tuple[str, float, float]:
     if not isinstance(value, dict):
         errors.append("'sweep' must be an object with stat, min, and max.")
-        return "Critical Rating", 0.0, 1.0
+        return "Crit Rating", 0.0, 1.0
     stat = value.get("stat")
     if not isinstance(stat, str) or not stat.strip():
         errors.append("'sweep.stat' must be a non-empty string.")
-        stat = "Critical Rating"
+        stat = "Crit Rating"
     elif stat in JITTER_STATS:
         errors.append(f"'sweep.stat' cannot be '{stat}', because that stat is jittered.")
     low = _optional_float(value, "min", errors, "sweep")
@@ -277,7 +287,7 @@ def _require_jitter(value, errors: list[str]) -> tuple[float, float]:
 
 def _require_relics(value, errors: list[str]) -> dict[str, str]:
     if not isinstance(value, dict):
-        errors.append("'relics' must map Mastery, Power, and Critical Rating to relic FQNs.")
+        errors.append("'relics' must map Mastery, Power, and Crit to relic FQNs.")
         return {}
     missing = [stat for stat in RELIC_STATS if stat not in value]
     if missing:
@@ -335,14 +345,6 @@ def _require_positive_int(raw: dict, key: str, errors: list[str]) -> int:
     if value <= 0:
         errors.append(f"'{key}' must be a positive integer.")
     return value
-
-
-def _require_positive_float(raw: dict, key: str, errors: list[str]) -> float:
-    value = raw.get(key)
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
-        errors.append(f"'{key}' must be a positive number.")
-        return 1.0
-    return float(value)
 
 
 def _optional_float(raw: dict, key: str, errors: list[str], label: str) -> float | None:

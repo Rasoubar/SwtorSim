@@ -27,8 +27,9 @@ def write_plots(result, out_dir: str = FIGURES_DIR) -> tuple[str, str]:
 def _save_derivatives(path: str, result) -> None:
     fig, ax = _setup_figure(
         f"Diminishing returns: Mastery vs Power vs Crit - {result.name}",
+        f"{result.gear_label}\n{result.relic_label}",
         result.xlabel,
-        r"$\partial\,\mathrm{DPS}\;/\;\partial\,\mathrm{Rating}$  (DPS per rating point)",
+        r"$\partial\,\mathrm{DPS}\;/\;\partial\,\mathrm{Rating}$",
     )
     _plot_bands(ax, result.crit, (
         ("Mastery", "blue", result.mastery_slope, result.mastery_sigma),
@@ -42,24 +43,41 @@ def _save_derivatives(path: str, result) -> None:
 def _save_relics(path: str, result) -> None:
     fig, ax = _setup_figure(
         f"Relics: Mastery vs Power vs Crit - {result.name}",
+        result.gear_label,
         result.xlabel,
         r"$\partial\,\mathrm{DPS}$ vs. no relics",
     )
-    ax.set_title(result.gear_label, fontsize="small")
     _plot_bands(ax, result.crit, result.relic_gains)
     _add_footer(fig, result.game_version, result.author)
     _finish(fig, path)
 
 
-def _setup_figure(title: str, xlabel: str, ylabel: str):
+def _setup_figure(title: str, subtitle: str, xlabel: str, ylabel: str):
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot()
-    fig.suptitle(title)
+    _add_heading(fig, title, subtitle)
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.grid()
     ax.set_axisbelow(True)
     return fig, ax
+
+
+def _add_heading(fig, title: str, subtitle: str) -> None:
+    """Places the title and subtitle as one block at the top of the figure."""
+    title_text = fig.text(0.5, 0.99, title, ha="center", va="top")
+    fig.canvas.draw()
+    title_bottom = title_text.get_window_extent().transformed(fig.transFigure.inverted()).y0
+    subtitle_text = fig.text(
+        0.5,
+        title_bottom,
+        subtitle,
+        ha="center",
+        va="top",
+        fontsize="small",
+        linespacing=1.15,
+    )
+    fig._dr_heading = (title_text, subtitle_text)
 
 
 def _plot_bands(ax, crit, series) -> None:
@@ -79,6 +97,7 @@ def _plot_bands(ax, crit, series) -> None:
         handles.append(line)
     handles.append(Patch(facecolor="0.45", alpha=_BAND_ALPHA, label="1σ"))
     ax.legend(handles=handles)
+    ax.set_xlim(crit[0], crit[-1])
 
 
 def _add_footer(fig, version: str, author: str) -> None:
@@ -93,6 +112,11 @@ def _add_footer(fig, version: str, author: str) -> None:
 
 
 def _finish(fig, path: str) -> None:
-    fig.tight_layout(rect=(0.0, 0.04, 1.0, 0.95))
+    fig.canvas.draw()
+    heading_bottom = min(
+        text.get_window_extent().transformed(fig.transFigure.inverted()).y0
+        for text in fig._dr_heading
+    )
+    fig.tight_layout(rect=(0.0, 0.04, 1.0, heading_bottom - 0.012))
     fig.savefig(path, dpi=300)
     plt.close(fig)
