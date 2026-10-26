@@ -406,7 +406,7 @@ class ResourceTick(Event):
         """Applies alacrity, generates the resource, and schedules the next tick."""
         alacrity_pct = self.player.stats.get("Alacrity", 0.0)
         alacrity_mod = 1.0 + alacrity_pct
-        self.player.resource.tick_passive_regen(self.interval, alacrity_mod) #generate
+        self.player.resource.tick_passive_regen(self.interval, alacrity_mod, player=self.player) #generate
         sim.schedule_relative(self.interval, self) #schedule next
 
 class ResourceGainEvent(Event):

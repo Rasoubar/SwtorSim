@@ -30,7 +30,11 @@ class Entity:
     def apply_effect(self, sim, ability, effect, caster=None): #can be improved on the refresh
         """Applies or refreshes an extracted ActiveEffect, calculates expiration, and triggers stat updates if needed."""
         current_time = sim.current_time if sim is not None else 0.0
-        base_duration = float(getattr(effect, "duration", 0.0) or 0.0)
+        raw_duration = float(getattr(effect, "duration", 0.0) or 0.0)
+        if caster is not None and hasattr(caster, "calculate_effect_duration"):
+            base_duration = caster.calculate_effect_duration(raw_duration, ability=ability, effect=effect)
+        else:
+            base_duration = raw_duration
         ignore_alacrity = bool(getattr(effect, "eff_ignore_alacrity", True))
 
         if base_duration > 0.0 and not ignore_alacrity and caster is not None:
@@ -57,7 +61,11 @@ class Entity:
             else f"{effect_instance.name or effect_instance.fqn}:{effect_instance.number}"
         )
 
-        base_tick = float(getattr(effect, "tick_interval", 0.0) or 0.0)
+        raw_tick = float(getattr(effect, "tick_interval", 0.0) or 0.0)
+        if raw_tick > 0.0 and caster is not None and hasattr(caster, "calculate_effect_tick"):
+            base_tick = caster.calculate_effect_tick(raw_tick, ability=ability, effect=effect)
+        else:
+            base_tick = raw_tick
         if base_tick > 0.0 and base_duration > 0.0:
             total_ticks = max(1, int(round(base_duration / base_tick)))
             scaled_tick = duration / total_ticks
@@ -204,6 +212,13 @@ class Player(Entity):
         self.level = 85
         self.rotation = None
         self.toughness = 1
+        self.creature_type = 1
+        self.is_droid = False
+        self.is_stealthed = False
+        self.is_mounted = False
+        self.is_behind_target = True
+        self.character_class = "assassin"
+        self.faction = "empire"
         self.resource = create_resource_pool(
             pool_type=resource
         )
@@ -215,6 +230,10 @@ class Player(Entity):
             "Accuracy Rating": 0.0,
             "Main Accuracy": 0.0,
             "Off Accuracy": 0.0,
+            "Melee Accuracy": 0.0,
+            "Ranged Accuracy": 0.0,
+            "Force Accuracy": 0.0,
+            "Tech Accuracy": 0.0,
             "Mastery": 0.0,
             "Power": 0.0,
             "Force Power": 0.0,
@@ -271,12 +290,17 @@ class Player(Entity):
             if getattr(effect, "is_expired", False):
                 continue
             for mod in _effect_modifiers(effect):
-                if str(mod.stat) in ("66", "STAT_abl_time_global_cooldown"):
+                stat = str(mod.stat)
+                val = float(mod.value)
+                if stat in ("66", "STAT_abl_time_global_cooldown"):
                     if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
                         if mod.is_percent:
                             pct_mod += mod.value
                         else:
                             flat_mod += mod.value
+                elif stat in ("274", "stat_cbt_instant_reduction_percentage", "STAT_cbt_instant_reduction_percentage"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                        pct_mod -= val
 
         adjusted_base = max(0.0, (base_gcd * pct_mod) + flat_mod)
         if adjusted_base <= 0.0:
@@ -287,7 +311,7 @@ class Player(Entity):
             ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
 
         gcd = adjusted_base if ignore_alacrity else self.scale_time_modifier(adjusted_base)
-        scaled_gcd = math.ceil(gcd * 10) / 10
+        scaled_gcd = math.ceil(round(gcd * 10, 6)) / 10
         return round(scaled_gcd, 2)
 
     def calculate_cast_time(self, base_cast_time: float, ability: Any = None) -> float:
@@ -314,12 +338,17 @@ class Player(Entity):
             if getattr(effect, "is_expired", False):
                 continue
             for mod in _effect_modifiers(effect):
-                if str(mod.stat) in ("62", "STAT_abl_time_casting"):
+                stat = str(mod.stat)
+                val = float(mod.value)
+                if stat in ("62", "STAT_abl_time_casting"):
                     if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
                         if mod.is_percent:
                             pct_mod += mod.value
                         else:
                             flat_mod += mod.value
+                elif stat in ("256", "STAT_cbt_spell_casting_reduction_percentage"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                        pct_mod -= val
 
         adjusted_base = max(0.0, (base_cast_time * pct_mod) + flat_mod)
         if adjusted_base <= 0.0:
@@ -357,12 +386,17 @@ class Player(Entity):
             if getattr(effect, "is_expired", False):
                 continue
             for mod in _effect_modifiers(effect):
-                if str(mod.stat) in ("63", "STAT_abl_time_channeling"):
+                stat = str(mod.stat)
+                val = float(mod.value)
+                if stat in ("63", "STAT_abl_time_channeling"):
                     if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
                         if mod.is_percent:
                             pct_mod += mod.value
                         else:
                             flat_mod += mod.value
+                elif stat in ("257", "STAT_cbt_spell_channeling_reduction_percentage"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                        pct_mod -= val
 
         adjusted_base = max(0.0, (base_duration * pct_mod) + flat_mod)
         if adjusted_base <= 0.0:
@@ -407,6 +441,84 @@ class Player(Entity):
         scaled_cooldown = math.ceil(cooldown * 10) / 10
         return round(scaled_cooldown, 2)
 
+    def calculate_ability_max_charges(self, base_charges: Optional[int], ability: Any = None) -> Optional[int]:
+        """Calculates maximum ability charges after passive/talent modifications."""
+        if base_charges is None and ability is None:
+            return None
+
+        flat_mod = 0.0
+        pct_mod = 1.0
+        matched_any = False
+
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+
+            for effect in self.effects.values():
+                if getattr(effect, "is_expired", False):
+                    continue
+                for mod in _effect_modifiers(effect):
+                    if str(mod.stat) in ("422", "stat_abl_charges_max", "STAT_abl_charges_max"):
+                        if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            matched_any = True
+                            if mod.is_percent:
+                                pct_mod += mod.value
+                            else:
+                                flat_mod += mod.value
+
+        if not matched_any and base_charges is None:
+            return None
+
+        current_base = base_charges if base_charges is not None else 1
+        return max(1, int(round((current_base * pct_mod) + flat_mod)))
+
+    def calculate_recharge_time(self, base_recharge: float, ability: Any = None) -> float:
+        """Calculates charge recharge cooldown after stat_abl_charges_recharge_time (423), cooldown (64) and Alacrity."""
+        if base_recharge <= 0.0:
+            return 0.0
+
+        flat_mod = 0.0
+        pct_mod = 1.0
+        ignore_alacrity = False
+
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
+                ignore_alacrity = getattr(abl_obj, "abl_ignore_alacrity", False) or getattr(getattr(abl_obj, "blueprint", None), "abl_ignore_alacrity", False)
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+                ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
+
+            for effect in self.effects.values():
+                if getattr(effect, "is_expired", False):
+                    continue
+                for mod in _effect_modifiers(effect):
+                    if str(mod.stat) in (
+                        "423", "stat_abl_charges_recharge_time", "STAT_abl_charges_recharge_time",
+                        "64", "STAT_abl_time_cooldown",
+                    ):
+                        if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            if mod.is_percent:
+                                pct_mod += mod.value
+                            else:
+                                flat_mod += mod.value
+
+        adjusted_base = max(0.0, (base_recharge * pct_mod) + flat_mod)
+        if ignore_alacrity:
+            return round(adjusted_base, 2)
+        cdr = self.stats.get("Alacrity", 0.0)
+        recharge = adjusted_base / (1.0 + cdr)
+        scaled_recharge = math.ceil(recharge * 10) / 10
+        return round(scaled_recharge, 2)
+
     def scale_time_modifier(self, base_time: float) -> float:
         """Scales a base time duration using current Alacrity CDR."""
         cdr = self.stats.get("Alacrity",0.0)
@@ -434,10 +546,20 @@ class Player(Entity):
                     bonuses["Power Stat"] += val
                 elif stat in ("STAT_rtg_critical_chance", "STAT_rtg_crit", "156", "Critical Rating"):
                     bonuses["Critical Stat"] += val
-                elif stat in ("STAT_rtg_alacrity", "Alacrity Rating"):
+                elif stat in ("STAT_rtg_alacrity", "Alacrity Rating", "STAT_rtg_spell_haste", "255"):
                     bonuses["Alacrity Rating"] += val
                 elif stat in ("STAT_rtg_accuracy", "154", "Accuracy"):
                     bonuses["Accuracy"] += val
+                elif stat in ("STAT_cbtAccuracy", "11"):
+                    bonuses["Accuracy"] += val
+                elif stat in ("STAT_cbt_melee_accuracy", "114"):
+                    bonuses["Melee Accuracy"] += val
+                elif stat in ("STAT_cbt_ranged_accuracy", "120"):
+                    bonuses["Ranged Accuracy"] += val
+                elif stat in ("STAT_cbt_force_accuracy", "232"):
+                    bonuses["Force Accuracy"] += val
+                elif stat in ("STAT_cbt_tech_accuracy", "233"):
+                    bonuses["Tech Accuracy"] += val
                 elif stat in ("STAT_cbt_armor_penetration", "166"):
                     bonuses["Armor Penetration"] += val
                 elif stat in ("STAT_cbt_melee_damage_bonus", "26"):
@@ -504,6 +626,10 @@ class Player(Entity):
         temp_stats["Critical Modifier"] = 0.5 + critical_damage
         temp_stats["Main Accuracy"] = 1 + acc_base + bonuses["Accuracy"]
         temp_stats["Off Accuracy"] = 0.67 + acc_base + bonuses["Accuracy"]
+        temp_stats["Melee Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Melee Accuracy"]
+        temp_stats["Ranged Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Ranged Accuracy"]
+        temp_stats["Force Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Force Accuracy"]
+        temp_stats["Tech Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Tech Accuracy"]
 
         self.stats = temp_stats
 
@@ -541,6 +667,125 @@ class Player(Entity):
         final_cost = (base_cost * pct_modifiers) + flat_reductions
         return max(0.0, final_cost) #safeguard tbh
 
+    def calculate_resource_regen(self, base_rate: float, pool_type: Optional[str] = None) -> float:
+        """Calculates resource regen rate after flat bonuses and percentage modifiers."""
+        if pool_type is None:
+            pool_type = getattr(getattr(self, "resource", None), "pool_type", "Force")
+
+        is_force = pool_type.lower() in ("force", "focus", "rage")
+        is_tech = pool_type.lower() in ("energy", "heat", "ammo")
+
+        flat_bonus = 0.0
+        pct_bonus = 0.0
+
+        for effect in self.effects.values():
+            if getattr(effect, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(effect):
+                stat = str(mod.stat)
+                val = float(mod.value)
+
+                # Force regen
+                if is_force:
+                    if stat in ("140", "STAT_cbt_force_force_regen_rate"):
+                        flat_bonus += val
+                    elif stat in ("275", "STAT_cbt_force_force_regen_rate_modifier_percentage"):
+                        pct_bonus += val
+
+                # Tech / Energy regen
+                if is_tech:
+                    if stat in ("142", "STAT_cbt_tech_energy_regen_rate"):
+                        flat_bonus += val
+                    elif stat in ("276", "STAT_cbt_tech_energy_regen_rate_modifier_percentage"):
+                        pct_bonus += val
+
+        final_rate = max(0.0, (base_rate * (1.0 + pct_bonus)) + flat_bonus)
+        return final_rate
+
+    def calculate_effect_duration(self, base_duration: float, ability: Any = None, effect: Any = None) -> float:
+        """Calculates effect duration after flat and percentage modifiers (STAT_eff_time_duration, 44)."""
+        if base_duration <= 0.0:
+            return 0.0
+
+        flat_mod = 0.0
+        pct_mod = 1.0
+
+        all_tags = set()
+        abl_fqn = None
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                all_tags.update(getattr(abl_obj, "tags", ()) or ())
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                all_tags.update(getattr(ability, "tags", ()) or ())
+
+        if effect is not None:
+            eff_tags = effect.get("tags", ()) if isinstance(effect, dict) else getattr(effect, "tags", ())
+            all_tags.update(eff_tags or ())
+            eff_name = effect.get("name") if isinstance(effect, dict) else getattr(effect, "name", None)
+            if eff_name:
+                all_tags.add(eff_name)
+
+        eff_tags_frozen = frozenset(all_tags)
+
+        for active_eff in self.effects.values():
+            if getattr(active_eff, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(active_eff):
+                if str(mod.stat) in ("44", "STAT_eff_time_duration"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=eff_tags_frozen):
+                        if mod.is_percent:
+                            pct_mod += mod.value
+                        else:
+                            flat_mod += mod.value
+
+        adjusted = max(0.0, (base_duration * pct_mod) + flat_mod)
+        return adjusted
+
+    def calculate_effect_tick(self, base_tick: float, ability: Any = None, effect: Any = None) -> float:
+        """Calculates effect tick interval after flat and percentage modifiers (STAT_eff_time_tick, 45)."""
+        if base_tick <= 0.0:
+            return 0.0
+
+        flat_mod = 0.0
+        pct_mod = 1.0
+
+        all_tags = set()
+        abl_fqn = None
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                all_tags.update(getattr(abl_obj, "tags", ()) or ())
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                all_tags.update(getattr(ability, "tags", ()) or ())
+
+        if effect is not None:
+            eff_tags = effect.get("tags", ()) if isinstance(effect, dict) else getattr(effect, "tags", ())
+            all_tags.update(eff_tags or ())
+            eff_name = effect.get("name") if isinstance(effect, dict) else getattr(effect, "name", None)
+            if eff_name:
+                all_tags.add(eff_name)
+
+        eff_tags_frozen = frozenset(all_tags)
+
+        for active_eff in self.effects.values():
+            if getattr(active_eff, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(active_eff):
+                if str(mod.stat) in ("45", "STAT_eff_time_tick"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=eff_tags_frozen):
+                        if mod.is_percent:
+                            pct_mod += mod.value
+                        else:
+                            flat_mod += mod.value
+
+        adjusted = max(0.01, (base_tick * pct_mod) + flat_mod)
+        return adjusted
+
 
 def _effect_modifiers(effect):
     getter = getattr(effect, "get_effective_modifiers", None)
@@ -557,6 +802,10 @@ class Dummy(Entity):
         self.max_hp = hp
         self.hp = hp
         self.toughness = 5
+        self.creature_type = 1
+        self.is_droid = False
+        self.is_stealthed = False
+        self.is_mounted = False
         self.base_stats = {
             "Armor" : 17225
         }

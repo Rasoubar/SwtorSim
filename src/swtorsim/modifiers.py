@@ -89,6 +89,8 @@ class Modifier:
     targets: frozenset = frozenset()
     conditional_tag: Optional[str] = None
     is_percent: bool = False
+    actor: Optional[int] = None
+    require_owner: bool = False
 
     def applies_to(
             self,
@@ -100,7 +102,8 @@ class Modifier:
             return True
         if ability_fqn and ability_fqn in self.targets:
             return True
-        if ability_tags and not self.targets.isdisjoint(set(ability_tags)):
+        targets_set = self.targets if isinstance(self.targets, (set, frozenset)) else set(self.targets)
+        if ability_tags and not targets_set.isdisjoint(set(ability_tags)):
             return True
         if ability_fqn:
             from src.swtorsim.settings import is_stem_matching_enabled
@@ -179,6 +182,7 @@ class Modifier:
         resolved = resolve_stat(raw_stat)
         percent = float(floats.get("amount_percent") or 0.0)
         min_amt = float(floats.get("amount_min") or 0.0)
+        max_amt = float(floats.get("amount_max") or 0.0)
         amt = floats.get("amount")
         stat_mod_type = ints.get("stat_mod_type")
         is_pct = (percent != 0.0) or (stat_mod_type == 2) or bool(bools.get("is_percentage", False)) or bool(action.get("is_percent", False))
@@ -186,13 +190,19 @@ class Modifier:
             val = percent
         elif amt is not None:
             val = float(amt)
-        else:
+        elif min_amt != 0.0:
             val = min_amt
+        else:
+            val = max_amt
         cond_tag = strings.get("conditional_tag") or action.get("conditional_tag")
+        actor = ints.get("actor")
+        require_owner = bool(bools.get("require_conditional_tag_applied_by_owner", False))
         return cls(
             stat=resolved,
             value=val,
             targets=extract_targets(action),
             conditional_tag=cond_tag if cond_tag else None,
             is_percent=is_pct,
+            actor=actor,
+            require_owner=require_owner,
         )

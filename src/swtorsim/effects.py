@@ -111,6 +111,8 @@ class ActiveEffect:
                 targets=m.targets,
                 conditional_tag=m.conditional_tag,
                 is_percent=m.is_percent,
+                actor=getattr(m, "actor", None),
+                require_owner=getattr(m, "require_owner", False),
             )
             for m in self.modifiers
         ]
@@ -242,8 +244,35 @@ class ActiveEffect:
         stack_charge = getattr(effect, "stack_charge", None) or {}
         max_stacks = int(stack_charge.get("max", stack_charge.get("nr_occurances", 1)) or 1)
         initial_stacks = int(stack_charge.get("initial", 1) or 1)
-        if initial_stacks > max_stacks:
-            max_stacks = initial_stacks
+
+        # Apply STAT_eff_charges_max (61) and STAT_eff_charges_initial (60)
+        eff_tags = frozenset(getattr(effect, "tags", None) or [])
+        eff_name = getattr(effect, "name", "") or parent_name
+
+        if caster is not None:
+            caster_effects = getattr(caster, "effects", {}) or {}
+            for c_eff in caster_effects.values():
+                if getattr(c_eff, "is_expired", False):
+                    continue
+                getter = getattr(c_eff, "get_effective_modifiers", None)
+                c_mods = getter() if getter is not None else getattr(c_eff, "modifiers", [])
+                for mod in c_mods or ():
+                    st = str(mod.stat)
+                    if st in ("61", "STAT_eff_charges_max"):
+                        if mod.applies_to(ability_tags=eff_tags) or (eff_name and mod.applies_to(ability_fqn=eff_name)):
+                            if mod.is_percent:
+                                max_stacks = int(round(max_stacks * (1.0 + mod.value)))
+                            else:
+                                max_stacks += int(mod.value)
+                    elif st in ("60", "STAT_eff_charges_initial"):
+                        if mod.applies_to(ability_tags=eff_tags) or (eff_name and mod.applies_to(ability_fqn=eff_name)):
+                            if mod.is_percent:
+                                initial_stacks = int(round(initial_stacks * (1.0 + mod.value)))
+                            else:
+                                initial_stacks += int(mod.value)
+
+        max_stacks = max(1, max_stacks)
+        initial_stacks = max(0, min(initial_stacks, max_stacks))
         scales_with_stacks = bool(
             stack_charge.get("scales_with_stack_charge", False)
             or getattr(effect, "scales_with_stacks", False)

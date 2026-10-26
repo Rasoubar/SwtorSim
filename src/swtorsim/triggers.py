@@ -60,8 +60,28 @@ class TriggerManager:
 
         # Snapshot the list to allow cascading actions/triggers during iteration
         for sub in list(entries):
-            # 0. Internal cooldown / rate limit on trigger
-            if sub["min_interval"] > 0.0 and sim.current_time < sub["next_allowed_time"]:
+            caster = sub["caster"]
+            abl = sub["ability"]
+            abl_fqn = getattr(abl, "fqn", None)
+            all_sub_tags = set(sub["tags"]) | set(sub.get("effect_tags") or ())
+            frozen_sub_tags = frozenset(all_sub_tags)
+
+            # 0. Internal cooldown / rate limit on trigger (STAT_eff_trigger_rate_limit_modifier_fixed / 229)
+            base_min_interval = sub["min_interval"]
+            rate_limit_mod = 0.0
+            if hasattr(caster, "effects"):
+                for eff in caster.effects.values():
+                    if getattr(eff, "is_expired", False):
+                        continue
+                    getter = getattr(eff, "get_effective_modifiers", None)
+                    eff_mods = getter() if getter is not None else getattr(eff, "modifiers", [])
+                    for mod in eff_mods:
+                        if str(mod.stat) in ("229", "STAT_eff_trigger_rate_limit_modifier_fixed"):
+                            if mod.applies_to(ability_fqn=abl_fqn, ability_tags=frozen_sub_tags):
+                                rate_limit_mod += float(mod.value)
+
+            effective_interval = max(0.0, base_min_interval + rate_limit_mod)
+            if effective_interval > 0.0 and sim.current_time < sub["next_allowed_time"]:
                 continue
 
             # 1. Fast reject on excluded tags
@@ -106,11 +126,29 @@ class TriggerManager:
                     if context.get("weapon_mode") != req_weapon_mode:
                         continue
 
-            # 5. Proc chance check
+            # 5. Proc chance check (STAT_eff_trigger_proc_chance_percent_modifier_fixed / 228)
             proc_chance = sub["proc_chance"]
-            if proc_chance is not None and proc_chance < 100.0:
-                if random.random() * 100.0 > proc_chance:
-                    continue
+            if proc_chance is not None:
+                bonus_proc = 0.0
+                if hasattr(caster, "effects"):
+                    for eff in caster.effects.values():
+                        if getattr(eff, "is_expired", False):
+                            continue
+                        getter = getattr(eff, "get_effective_modifiers", None)
+                        eff_mods = getter() if getter is not None else getattr(eff, "modifiers", [])
+                        for mod in eff_mods:
+                            if str(mod.stat) in ("228", "STAT_eff_trigger_proc_chance_percent_modifier_fixed"):
+                                if mod.applies_to(ability_fqn=abl_fqn, ability_tags=frozen_sub_tags):
+                                    val = float(mod.value)
+                                    if abs(val) <= 1.0:
+                                        bonus_proc += val * 100.0
+                                    else:
+                                        bonus_proc += val
+
+                effective_proc = min(100.0, max(0.0, proc_chance + bonus_proc))
+                if effective_proc < 100.0:
+                    if random.random() * 100.0 > effective_proc:
+                        continue
 
             branch_ctx = {
                 **context,
@@ -127,5 +165,5 @@ class TriggerManager:
                 context=branch_ctx,
             )
             if ran:
-                if sub["min_interval"] > 0.0:
-                    sub["next_allowed_time"] = sim.current_time + sub["min_interval"]
+                if effective_interval > 0.0:
+                    sub["next_allowed_time"] = sim.current_time + effective_interval

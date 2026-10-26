@@ -75,6 +75,11 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
             passive_abl.execute_effect(entry_id, player, player, sim)
     player.recalculate_stats()
 
+    # Apply charge modifiers to active abilities
+    for abl in player.ability_db.values():
+        if hasattr(abl, "apply_charge_modifiers"):
+            abl.apply_charge_modifiers(player)
+
     # Assign rotation
     player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
 

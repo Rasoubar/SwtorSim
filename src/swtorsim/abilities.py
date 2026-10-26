@@ -445,7 +445,7 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
         "regen_energy",
         "restore_action_points",
     ):
-        handle_resource_gain_action(sim, caster, action, delay)
+        handle_resource_gain_action(sim, caster, action, delay, ability=ability)
     elif action_type in ("spend_energy", "spend_force"):
         handle_resource_spend_action(caster, action)
     elif action_type in ("cooldown_mod", "modify_cooldown", "modify_recharge_time"):
@@ -586,7 +586,14 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
 
     hit_any = False
     for i in range(flurry_count):
-        if not accuracy_roll(caster, hand):
+        if not accuracy_roll(
+            caster,
+            hand=hand,
+            attack_type=action_data.get("attack_type", 1),
+            ability_fqn=getattr(ability, "fqn", None),
+            action_tags=combined_tags,
+            target=target,
+        ):
             continue
         hit_any = True
         hit_event = DamageHit(
@@ -606,7 +613,7 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
     return hit_any
 
 
-def handle_resource_gain_action(sim, caster, action, delay):
+def handle_resource_gain_action(sim, caster, action, delay: float = 0.0, ability: Any = None):
     """Schedules or executes the resource gain event (legacy & extracted schemas)."""
     floats = action.get("floats") or {}
     flat = (
@@ -628,6 +635,57 @@ def handle_resource_gain_action(sim, caster, action, delay):
     regen = float(flat) + float(pct) * float(max_res)
     if regen <= 0.0:
         return
+    # Evaluate action resource restore modifiers
+    pct_bonus = 0.0
+    flat_bonus = 0.0
+    if hasattr(caster, "effects"):
+        pool_type = getattr(getattr(caster, "resource", None), "pool_type", "").lower()
+        is_ap = pool_type in ("rage", "focus")
+        is_force = pool_type in ("force",)
+        is_tech = pool_type in ("energy", "heat", "ammo")
+
+        abl_fqn = getattr(ability, "fqn", None)
+        abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+        if not isinstance(abl_tags, frozenset):
+            abl_tags = frozenset(abl_tags)
+
+        for eff in caster.effects.values():
+            if getattr(eff, "is_expired", False):
+                continue
+            getter = getattr(eff, "get_effective_modifiers", None)
+            eff_mods = getter() if getter is not None else getattr(eff, "modifiers", [])
+            for mod in eff_mods:
+                stat = str(mod.stat)
+                val = float(mod.value)
+
+                if is_ap:
+                    if stat in ("91", "STAT_eff_action_restore_action_points_modifier_percentage"):
+                        if not mod.targets or mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            pct_bonus += val
+                    elif stat in ("90", "STAT_eff_action_restore_action_points_modifier_fixed"):
+                        if not mod.targets or mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            flat_bonus += val
+
+                elif is_force:
+                    if stat in ("93", "STAT_eff_action_restore_force_modifier_percentage"):
+                        if not mod.targets or mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            pct_bonus += val
+                    elif stat in ("92", "STAT_eff_action_restore_force_modifier_fixed"):
+                        if not mod.targets or mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            flat_bonus += val
+
+                elif is_tech:
+                    if stat in ("95", "STAT_eff_action_restore_energy_modifier_percentage"):
+                        if not mod.targets or mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            pct_bonus += val
+                    elif stat in ("94", "STAT_eff_action_restore_energy_modifier_fixed"):
+                        if not mod.targets or mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            flat_bonus += val
+
+    regen = max(0.0, (regen * (1.0 + pct_bonus)) + flat_bonus)
+    if regen <= 0.0:
+        return
+
     gain_event = ResourceGainEvent(caster, regen)
     if delay > 0.0:
         sim.schedule_relative(delay, gain_event)
@@ -901,9 +959,22 @@ class Ability:
         ran, _success = branch.execute(sim, caster, target, context=context, ability=self)
         return ran
 
+    def apply_charge_modifiers(self, caster):
+        """Updates max_charges and current charges if player passives/talents grant extra charges."""
+        if hasattr(caster, "calculate_ability_max_charges"):
+            base_max = getattr(self.blueprint, "max_charges", None)
+            new_max = caster.calculate_ability_max_charges(base_max, ability=self)
+            if new_max is not None and new_max != self.max_charges:
+                diff = new_max - (self.max_charges or 1)
+                self.max_charges = new_max
+                self.charges = new_max if self.charges is None else max(1, self.charges + diff)
+
     def schedule_recharge(self, caster, sim):
         """Snapshots CDR, creates a new event reference, and schedules it."""
-        actual_recharge = caster.calculate_cooldown(self.recharge_time, ability=self)
+        if hasattr(caster, "calculate_recharge_time"):
+            actual_recharge = caster.calculate_recharge_time(self.recharge_time, ability=self)
+        else:
+            actual_recharge = caster.calculate_cooldown(self.recharge_time, ability=self)
         event = ChargeRestoreEvent(caster, self)
         self.active_charge_event = event
         sim.schedule_relative(actual_recharge, event)
@@ -934,6 +1005,8 @@ class Ability:
 
     def can_cast(self, caster: "Player", target: "Dummy", sim, allow_clip: bool = False) -> bool:
         """Checks if the ability is ready to cast based on GCD, cooldown, cost, and conditions."""
+        if hasattr(self, "apply_charge_modifiers") and caster is not None:
+            self.apply_charge_modifiers(caster)
         if self.triggers_gcd and sim.current_time < caster.next_gcd:
             return False
 
@@ -1093,8 +1166,11 @@ class Ability:
         if base_interval is None or base_interval <= 0.0:
             base_interval = min(1.0, channel_duration / 3.0) if channel_duration >= 1.0 else channel_duration
 
+        if hasattr(caster, "calculate_effect_tick"):
+            base_interval = caster.calculate_effect_tick(base_interval, ability=self)
+
         scaled_interval = caster.scale_time_modifier(base_interval) if not ignore_alacrity else base_interval
-        total_ticks = max(1, int(round(channel_duration / base_interval)))
+        total_ticks = max(1, int(round(scaled_duration / scaled_interval)))
 
         channel = ActiveChannel(
             name=self.name,

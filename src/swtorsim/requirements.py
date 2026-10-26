@@ -174,16 +174,21 @@ def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec
 def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
     """Evaluates an individual atomic condition record from an extracted condition list."""
     cond_type = item.get("type")
-    actor_str = item.get("actor", "caster")
+    actor_str = item.get("actor")
 
     if actor_str == "target":
         actor = target
+    elif actor_str == "caster":
+        actor = caster
     elif actor_str == "trigger_target" and context and "target" in context:
         actor = context["target"]
     elif actor_str == "trigger_caster" and context and "caster" in context:
         actor = context["caster"]
     else:
-        actor = caster
+        if cond_type == "is_creature_type" and target is not None:
+            actor = target
+        else:
+            actor = caster
 
     res = True
 
@@ -319,6 +324,108 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
 
     elif cond_type in ("is_in_cover", "is_companion"):
         res = False
+
+    elif cond_type == "if_caster_positioning":
+        # In SWTOR, requires the caster to be positioned behind the target (rear 180-degree arc).
+        # In simulation / parsing, default to True unless explicitly disabled on caster or context.
+        if context and "is_behind_target" in context:
+            res = bool(context["is_behind_target"])
+        elif hasattr(caster, "is_behind_target"):
+            res = bool(getattr(caster, "is_behind_target"))
+        elif hasattr(caster, "behind_target"):
+            res = bool(getattr(caster, "behind_target"))
+        elif getattr(caster, "position", None) is not None:
+            res = (getattr(caster, "position") == "behind")
+        else:
+            res = True
+
+    elif cond_type == "is_class":
+        # Character base class validation.
+        # Checks whether the actor is a player character with a class, or matches a specific class if provided.
+        expected_class = (
+            item.get("class_name")
+            or item.get("strings", {}).get("class")
+            or item.get("ints", {}).get("class_id")
+            or item.get("ints", {}).get("class")
+        )
+        if expected_class:
+            actual_class = (
+                getattr(actor, "character_class", None)
+                or getattr(actor, "class_name", None)
+                or getattr(actor, "base_class", None)
+            )
+            res = (str(actual_class).lower() == str(expected_class).lower())
+        else:
+            res = hasattr(actor, "ability_db") or bool(getattr(actor, "character_class", None))
+
+    elif cond_type == "is_creature_type":
+        # Target creature type check (e.g. droid = 3 vs organic = 1 / humanoid).
+        expected_type = item.get("ints", {}).get("creature_type")
+        if getattr(actor, "is_droid", False):
+            actual_type = 3
+        else:
+            actual_type = getattr(actor, "creature_type", 1)
+        if expected_type is not None:
+            res = (actual_type == int(expected_type))
+        else:
+            res = True
+
+    elif cond_type == "if_weapon_mode":
+        # Evaluates weapon attack mode (1 = single/primary, 2 = dual-wield/secondary).
+        expected_mode = item.get("ints", {}).get("mode", 1)
+        if context and "weapon_mode" in context:
+            actual_mode = context["weapon_mode"]
+        elif hasattr(actor, "weapon_mode"):
+            actual_mode = getattr(actor, "weapon_mode")
+        elif getattr(actor, "stats", {}).get("Off_hand_max", 0) > 0:
+            actual_mode = 2
+        elif getattr(actor, "stats", {}).get("Main_hand_max", 0) > 0:
+            actual_mode = 1
+        else:
+            actual_mode = 0
+        res = (actual_mode == int(expected_mode))
+
+    elif cond_type == "if_faction":
+        # Evaluates character faction (e.g. 'empire'/'imperial' vs 'republic').
+        expected_faction = (
+            item.get("strings", {}).get("factions")
+            or item.get("faction")
+            or item.get("strings", {}).get("faction")
+        )
+        actual_faction = (
+            context.get("faction") if (context and "faction" in context)
+            else getattr(actor, "faction", "empire")
+        )
+        if expected_faction:
+            res = str(expected_faction).lower() in str(actual_faction).lower()
+        else:
+            res = bool(actual_faction)
+
+    elif cond_type in ("is_stealthed", "is_not_stealthed"):
+        # Evaluates whether the actor is stealthed or not.
+        is_stealthed = (
+            getattr(actor, "is_stealthed", False)
+            or entity_has_effect(actor, tags=["tag.abl.stealth", "tag.abl.utility.stealth"], ability_spec="stealth")
+        )
+        res = bool(is_stealthed) if cond_type == "is_stealthed" else not is_stealthed
+
+    elif cond_type == "is_mounted":
+        # Evaluates whether the actor is currently mounted on a vehicle.
+        if context and "is_mounted" in context:
+            res = bool(context["is_mounted"])
+        else:
+            res = bool(getattr(actor, "is_mounted", False))
+
+    elif cond_type == "if_result":
+        # Evaluates combat hit/action result (e.g. previous action succeeded and did not miss).
+        if context and "result" in context:
+            res = bool(context["result"])
+        elif context and "is_hit" in context:
+            res = bool(context["is_hit"])
+        elif context and "missed" in context:
+            res = not bool(context["missed"])
+        else:
+            res = True
 
     else:
         # Fallback for unmodeled visual/flavor conditions
