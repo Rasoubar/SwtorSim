@@ -62,10 +62,10 @@ def handle_modifiers(caster, target, action_data, damage_type=None):
 
 def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers):
     """ Alters modifiers dict according to active effects and buffs on caster."""
-    is_melee = attack_type == 1
-    is_ranged = attack_type == 2
-    is_force = attack_type == 3
-    is_tech = attack_type == 4
+    is_melee = attack_type in (1, "melee", "Melee")
+    is_ranged = attack_type in (2, "ranged", "Ranged")
+    is_force = attack_type in (3, "force", "Force")
+    is_tech = attack_type in (4, "tech", "Tech")
 
     for buff in caster.effects.values():
         if getattr(buff, "is_expired", False):
@@ -87,9 +87,9 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 "STAT_rtg_crit", "156",
                 "STAT_rtg_alacrity", "Alacrity Rating",
                 "STAT_rtg_accuracy", "154", "Accuracy",
-                "STAT_cbt_melee_damage_bonus", "115",
-                "STAT_cbt_ranged_damage_bonus", "128",
-                "STAT_cbt_force_damage_bonus", "132",
+                "STAT_cbt_melee_damage_bonus", "26",
+                "STAT_cbt_ranged_damage_bonus", "25",
+                "STAT_cbt_force_damage_bonus", "129",
                 "STAT_cbt_tech_damage_bonus", "130",
                 "STAT_cbt_damage_bonus",
                 "STAT_att_endurance",
@@ -149,7 +149,7 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 if is_melee:
                     modifiers['bonus_crit_chance'] += val
 
-            elif stat in ("STAT_cbt_ranged_critical_chance", "118"):
+            elif stat in ("STAT_cbt_ranged_critical_chance", "122"):
                 if is_ranged:
                     modifiers['bonus_crit_chance'] += val
 
@@ -169,11 +169,11 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 if is_melee:
                     modifiers['bonus_crit_modifier'] += val
 
-            elif stat in ("STAT_cbt_ranged_critical_damage",):
+            elif stat in ("STAT_cbt_ranged_critical_damage", "123"):
                 if is_ranged:
                     modifiers['bonus_crit_modifier'] += val
 
-            elif stat in ("STAT_cbt_tech_critical_damage",):
+            elif stat in ("STAT_cbt_tech_critical_damage", "136"):
                 if is_tech:
                     modifiers['bonus_crit_modifier'] += val
 
@@ -212,10 +212,10 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
     channel = _channel_for_hit(action_tags, attack_type)
     type_name = _DAMAGE_TYPE_NAMES.get(damage_type)
     aoe = _hit_is_aoe(action_tags)
-    is_melee = attack_type == 1
-    is_ranged = attack_type == 2
-    is_force = attack_type == 3
-    is_tech = attack_type == 4
+    is_melee = attack_type in (1, "melee", "Melee")
+    is_ranged = attack_type in (2, "ranged", "Ranged")
+    is_force = attack_type in (3, "force", "Force")
+    is_tech = attack_type in (4, "tech", "Tech")
 
     for debuff in target.effects.values():
         if getattr(debuff, "is_expired", False):
@@ -252,39 +252,24 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
             stat_lower = stat.lower()
 
             # 1. Channel vulnerabilities (Melee, Ranged, Force, Tech, Weapon)
-            if "damage_taken_scale_channel_" in stat_lower or stat in (
-                "381", "382", "383", "384", "385", "386", "387", "388", "463"
+            matched = False
+            if is_force and stat in ("stat_cbt_damage_taken_scale_channel_force_modifier_percentage", "386"):
+                matched = True
+            elif is_tech and stat in ("stat_cbt_damage_taken_scale_channel_tech_modifier_percentage", "388"):
+                matched = True
+            elif is_melee and stat in (
+                "stat_cbt_damage_taken_scale_channel_melee_modifier_percentage", "384",
+                "stat_cbt_damage_taken_scale_channel_weapon_modifier", "463",
             ):
-                matched = False
-                if channel and f"channel_{channel}_" in stat_lower:
-                    matched = True
-                elif is_melee and (
-                    stat in ("stat_cbt_damage_taken_scale_channel_melee_modifier_percentage", "384")
-                    or "channel_melee_" in stat_lower
-                    or stat in ("stat_cbt_damage_taken_scale_channel_weapon_modifier", "463")
-                    or "channel_weapon_" in stat_lower
-                ):
-                    matched = True
-                elif is_ranged and (
-                    stat in ("stat_cbt_damage_taken_scale_channel_ranged_modifier_percentage", "382")
-                    or "channel_ranged_" in stat_lower
-                    or stat in ("stat_cbt_damage_taken_scale_channel_weapon_modifier", "463")
-                    or "channel_weapon_" in stat_lower
-                ):
-                    matched = True
-                elif is_force and (
-                    stat in ("stat_cbt_damage_taken_scale_channel_force_modifier_percentage", "386")
-                    or "channel_force_" in stat_lower
-                ):
-                    matched = True
-                elif is_tech and (
-                    stat in ("stat_cbt_damage_taken_scale_channel_tech_modifier_percentage", "388")
-                    or "channel_tech_" in stat_lower
-                ):
-                    matched = True
+                matched = True
+            elif is_ranged and stat in (
+                "stat_cbt_damage_taken_scale_channel_ranged_modifier_percentage", "382",
+                "stat_cbt_damage_taken_scale_channel_weapon_modifier", "463",
+            ):
+                matched = True
 
-                if matched:
-                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+            if matched:
+                buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
                 continue
 
             # 2. Damage type vulnerabilities (Kinetic, Energy, Elemental, Internal)
@@ -346,7 +331,7 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
             elif stat in ("STAT_cbt_melee_critical_chance", "116"):
                 if is_melee:
                     modifiers['bonus_crit_chance'] += val
-            elif stat in ("STAT_cbt_ranged_critical_chance", "118"):
+            elif stat in ("STAT_cbt_ranged_critical_chance", "122"):
                 if is_ranged:
                     modifiers['bonus_crit_chance'] += val
             elif stat in ("STAT_cbt_tech_critical_chance", "135"):

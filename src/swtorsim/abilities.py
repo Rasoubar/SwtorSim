@@ -250,8 +250,9 @@ class Effect:
             stack_increased = was_refreshed and (cur_stacks > old_stacks)
 
             branch_ctx = dict(context) if context else {}
-            if getattr(effect_instance, "scales_with_stacks", False):
-                branch_ctx["stack_multiplier"] = cur_stacks
+            branch_ctx["stack_multiplier"] = cur_stacks
+            branch_ctx["current_stacks"] = cur_stacks
+            branch_ctx["active_effect"] = effect_instance
             branch_ctx["owner_effect_key"] = effect_key
             branch_ctx["owner_entity"] = effect_target
 

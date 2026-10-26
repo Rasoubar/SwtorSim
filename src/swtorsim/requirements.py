@@ -134,6 +134,43 @@ def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str |
     return False
 
 
+def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec: str | None = None) -> int:
+    """Returns the current stack/charge count of an active effect or dot matching tags or ability spec."""
+    if not entity:
+        return 0
+
+    effects = getattr(entity, "effects", {})
+    tags_set = set(tags) if tags else set()
+
+    for eff in effects.values():
+        if getattr(eff, "is_expired", False):
+            continue
+        eff_tags = set(getattr(eff, "tags", []) or getattr(eff, "required_tags", []) or [])
+        eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "")
+        eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")
+
+        matches = False
+        if tags_set and (tags_set & eff_tags):
+            matches = True
+        if ability_spec and ability_spec in (eff_fqn, eff_name):
+            matches = True
+
+        if matches:
+            return int(getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1)
+
+    dots = getattr(entity, "dots", {})
+    for dot_name, dot in dots.items():
+        if getattr(dot, "is_expired", False):
+            continue
+        if ability_spec and ability_spec == dot_name:
+            return int(getattr(dot, "stacks", 1) or 1)
+        dot_tags = set(getattr(dot, "tags", []) or [])
+        if tags_set and (tags_set & dot_tags):
+            return int(getattr(dot, "stacks", 1) or 1)
+
+    return 0
+
+
 def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
     """Evaluates an individual atomic condition record from an extracted condition list."""
     cond_type = item.get("type")
@@ -230,10 +267,57 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
     elif cond_type == "is_not_dual_wielding":
         res = getattr(actor, "stats", {}).get("Off_hand_max", 0) <= 0
 
-    elif cond_type in ("passes_conditional", "is_discipline", "is_in_combat", "is_not_in_cover"):
+    elif cond_type == "has_effect_at_stack_charge_count":
+        tags = item.get("tags")
+        spec = item.get("ability_spec")
+        comparison = item.get("comparison", "eq")
+        expected_count = int(item.get("count", 1))
+        actual_stacks = get_entity_effect_stacks(actor, tags=tags, ability_spec=spec)
+        res = compare_values(actual_stacks, comparison, expected_count)
+
+    elif cond_type == "if_stack_charge":
+        expected_count = int(item.get("count", 1))
+        actual_stacks = 1
+        if context:
+            if "stack_multiplier" in context:
+                actual_stacks = int(context["stack_multiplier"])
+            elif "current_stacks" in context:
+                actual_stacks = int(context["current_stacks"])
+            elif "stacks" in context:
+                actual_stacks = int(context["stacks"])
+            elif "charges" in context:
+                actual_stacks = int(context["charges"])
+            elif "active_effect" in context and hasattr(context["active_effect"], "stacks"):
+                actual_stacks = int(getattr(context["active_effect"], "stacks", 1))
+        res = (actual_stacks == expected_count)
+
+    elif cond_type == "is_target_caster":
+        effective_target = context.get("target") if context and "target" in context else target
+        res = (effective_target is caster)
+
+    elif cond_type == "is_casting":
+        active_channel = getattr(actor, "active_channel", None)
+        active_cast = getattr(actor, "active_cast", None)
+        is_busy = (active_channel is not None) or (active_cast is not None) or getattr(actor, "is_channeling", False)
+        
+        spec = item.get("ability_spec")
+        if spec and is_busy:
+            active_bp = getattr(active_channel, "ability", None) or getattr(active_cast, "ability", None)
+            active_fqn = getattr(active_bp, "fqn", "")
+            res = (spec == active_fqn)
+        else:
+            res = is_busy
+
+    elif cond_type == "is_in_combat":
+        res = getattr(actor, "in_combat", True)
+
+    elif cond_type == "is_not_in_combat":
+        res = not getattr(actor, "in_combat", False)
+
+    elif cond_type in ("passes_conditional", "is_discipline", "is_not_in_cover"):
         res = True
 
-    elif cond_type in ("is_not_in_combat", "is_in_cover", "is_companion"):
+    elif cond_type in ("is_in_cover", "is_companion"):
         res = False
 
     else:

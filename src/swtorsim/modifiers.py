@@ -126,8 +126,8 @@ class Modifier:
             is_pct = True
         elif resolved in ("64", "STAT_abl_time_cooldown"):
             is_pct = False
-        elif resolved in ("68", "STAT_abl_cost_force"):
-            # Bioware overloaded STAT_abl_cost_force: -0.10 is -10%, while -3.0 to -25.0 are flat Force
+        elif resolved in ("68", "69", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
+            # Bioware overloaded cost stats: -0.10 is -10%, while -3.0 to -25.0 are flat amounts
             is_pct = (-1.0 < val < 1.0 and val != 0.0)
         else:
             is_pct = False

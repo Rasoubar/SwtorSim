@@ -195,11 +195,18 @@ class EffectExpire(Event):
         ability = getattr(self.instance_ref, "ability_ref", None)
         caster = getattr(self.instance_ref, "caster_ref", self.entity)
         if blueprint and hasattr(blueprint, "execute_triggered_branches"):
+            expire_ctx = {
+                "stack_multiplier": getattr(self.instance_ref, "stacks", 1),
+                "current_stacks": getattr(self.instance_ref, "stacks", 1),
+                "active_effect": self.instance_ref,
+                "owner_entity": self.entity,
+            }
             blueprint.execute_triggered_branches(
                 "on_pre_remove",
                 sim,
                 caster,
                 self.entity,
+                context=expire_ctx,
                 ability=ability,
             )
 

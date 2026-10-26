@@ -313,15 +313,15 @@ class Player(Entity):
                     bonuses["Accuracy"] += val
                 elif stat in ("STAT_cbt_armor_penetration", "166"):
                     bonuses["Armor Penetration"] += val
-                elif stat in ("STAT_cbt_melee_damage_bonus", "115"):
+                elif stat in ("STAT_cbt_melee_damage_bonus", "26"):
                     bonuses["M_Bonus_Damage_PCT"] += val
-                elif stat in ("STAT_cbt_ranged_damage_bonus", "128"):
+                elif stat in ("STAT_cbt_ranged_damage_bonus", "25"):
                     bonuses["R_Bonus_Damage_PCT"] += val
-                elif stat in ("STAT_cbt_force_damage_bonus", "132"):
+                elif stat in ("STAT_cbt_force_damage_bonus", "129"):
                     bonuses["F_Bonus_Damage_PCT"] += val
                 elif stat in ("STAT_cbt_tech_damage_bonus", "130"):
                     bonuses["T_Bonus_Damage_PCT"] += val
-                elif stat in ("STAT_cbt_damage_bonus", "26"):
+                elif stat in ("STAT_cbt_damage_bonus",):
                     bonuses["Bonus Damage"] += val
 
         #independent stats
@@ -397,7 +397,7 @@ class Player(Entity):
             if getattr(effect, "is_expired", False):
                 continue
             for mod in _effect_modifiers(effect):
-                if mod.stat in ("68", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
+                if mod.stat in ("68", "69", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
                     matched = mod.applies_to(abl_fqn, abl_tags)
                     if matched:
                         if mod.is_percent:
