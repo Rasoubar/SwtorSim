@@ -25,7 +25,7 @@ def calculate_hit(caster, target, action_data):
 
     post_mit_damage = handle_mitigation(caster, target, base_damage, damage_type, modifiers)
 
-    post_mod_damage = post_mit_damage * modifiers['total_multiplier']
+    post_mod_damage = (post_mit_damage + modifiers.get('flat_damage', 0.0)) * modifiers['total_multiplier']
 
     post_crit_damage, is_crit = calculate_crit(caster, post_mod_damage, modifiers)
 
@@ -42,6 +42,7 @@ def handle_modifiers(caster, target, action_data, damage_type=None):
         'bonus_crit_chance': 0.0,
         'bonus_crit_modifier': 0.0,
         'bonus_armor_pen': 0.0,
+        'flat_damage': 0.0,
         'total_multiplier': 1.0
     }
 
@@ -140,6 +141,26 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 if is_tech:
                     buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
 
+            # Target-State Conditional Damage Modifiers
+            elif stat in ("STAT_cbt_damage_done_if_target_bleeding_modifier_percentage", "221"):
+                if _entity_has_tag(target, "bleed"):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat in ("STAT_cbt_damage_done_if_target_on_fire_modifier_percentage", "250"):
+                if _entity_has_tag(target, "burn") or _entity_has_tag(target, "fire"):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat in ("STAT_cbt_damage_done_if_target_accuracy_reduced_modifier_percentage", "389"):
+                if _entity_has_tag(target, "accuracy_reduced"):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat in ("STAT_cbt_dual_wield_damage_done_modifier_percentage", "127"):
+                if getattr(caster, "stats", {}).get("Off_hand_max", 0.0) > 0:
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+
+            elif stat == "STAT_cbt_damage_done_modifier_fixed":
+                modifiers['flat_damage'] = modifiers.get('flat_damage', 0.0) + val
+
             # 2. Critical Chance Modifiers
             elif stat in ("STAT_cbt_force_critical_chance", "133"):
                 if is_force:
@@ -205,6 +226,23 @@ def _channel_for_hit(tags, attack_type):
 
 def _hit_is_aoe(tags) -> bool:
     return any(str(tag).endswith("is_aoe") or str(tag).endswith("aoe_ability") for tag in tags)
+
+
+def _entity_has_tag(entity, tag_substr: str) -> bool:
+    """Checks if entity has any active, unexpired effect containing tag_substr in its tags."""
+    if entity is None:
+        return False
+    effects = getattr(entity, "effects", None)
+    if not effects:
+        return False
+    substr = tag_substr.lower()
+    for eff in effects.values():
+        if getattr(eff, "is_expired", False):
+            continue
+        for t in getattr(eff, "tags", ()) or ():
+            if substr in str(t).lower():
+                return True
+    return False
 
 
 def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, caster=None):
@@ -318,6 +356,11 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
             # 4. General damage received percentage
             if stat in ("STAT_cbt_damage_received_modifier_percentage", "46"):
                 if not mod.targets or mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags) or (aoe and any(str(tt).endswith("is_aoe") for tt in mod.targets)):
+                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+                continue
+
+            elif stat in ("STAT_cbt_damage_received_if_target_stunned_modifier_percentage", "223"):
+                if _entity_has_tag(target, "stun") or _entity_has_tag(target, "incapacitate"):
                     buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
                 continue
 

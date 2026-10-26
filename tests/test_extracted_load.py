@@ -21,7 +21,11 @@ from src.swtorsim.setup import prepare_simulation
 
 PARSED_DIR = ROOT / "data" / "extractor" / "parsed"
 ADRENALS_PATH = ROOT / "data" / "extractor" / "adrenals.json"
-RUN_CONFIG_PATH = ROOT / "data" / "run_config" / "first_test.json"
+RUN_CONFIG_PATH = (
+    ROOT / "data" / "run_config" / "hatred_14gcd.json"
+    if (ROOT / "data" / "run_config" / "hatred_14gcd.json").exists()
+    else ROOT / "data" / "run_config" / "first_test.json"
+)
 
 _SENTINEL = object()
 

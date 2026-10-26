@@ -13,7 +13,11 @@ from src.swtorsim.requirements import validate_all
 from src.swtorsim.run_config import load_run_config
 from src.swtorsim.setup import prepare_simulation
 
-RUN_CONFIG_PATH = ROOT / "data" / "run_config" / "first_test.json"
+RUN_CONFIG_PATH = (
+    ROOT / "data" / "run_config" / "hatred_14gcd.json"
+    if (ROOT / "data" / "run_config" / "hatred_14gcd.json").exists()
+    else ROOT / "data" / "run_config" / "first_test.json"
+)
 
 
 class SimulationIntegrationTests(unittest.TestCase):

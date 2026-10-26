@@ -963,7 +963,7 @@ class Ability:
         """Deducts charges or sets cooldown, and sets GCD lockouts."""
         caster.next_gcd = round(sim.current_time, 4)
         if self.triggers_gcd:
-            caster.next_gcd = round(sim.current_time + caster.calculate_gcd(self.base_gcd), 4)
+            caster.next_gcd = round(sim.current_time + caster.calculate_gcd(self.base_gcd, ability=self), 4)
 
         if self.has_charges:
             self.consume_charge(caster, sim)
@@ -1006,18 +1006,42 @@ class Ability:
         )
         ability_target = target if is_aggressive else caster
 
-        # Check if ability has channel activation
+        # Check if ability has channel or cast activation
         activation = self.activation or getattr(self.blueprint, "activation", None) or {}
         act_type = activation.get("type") if isinstance(activation, dict) else None
-        channel_dur = float(activation.get("duration", 0.0)) if isinstance(activation, dict) else 0.0
+        act_dur = float(activation.get("duration", 0.0)) if isinstance(activation, dict) else 0.0
 
-        if act_type == "channel" and channel_dur > 0.0:
-            self._start_channel(caster, ability_target, sim, channel_dur)
+        dispatch_post_activate = True
+        if act_type == "channel" and act_dur > 0.0:
+            self._start_channel(caster, ability_target, sim, act_dur)
+        elif act_type == "cast" and act_dur > 0.0:
+            scaled_cast_time = (
+                caster.calculate_cast_time(act_dur, ability=self)
+                if hasattr(caster, "calculate_cast_time")
+                else act_dur
+            )
+            if scaled_cast_time > 0.0 and sim is not None:
+                caster.active_cast = self
+                caster.is_casting = True
+                from src.swtorsim.events import CastFinishEvent
+                sim.schedule_absolute(
+                    sim.current_time + scaled_cast_time,
+                    CastFinishEvent(
+                        caster=caster,
+                        target=ability_target,
+                        ability=self,
+                        entry_effect_ids=list(self.entry_effect_ids),
+                    ),
+                )
+                dispatch_post_activate = False
+            else:
+                for entry_id in self.entry_effect_ids:
+                    self.execute_effect(entry_id, caster, ability_target, sim)
         else:
             for entry_id in self.entry_effect_ids:
                 self.execute_effect(entry_id, caster, ability_target, sim)
 
-        if sim is not None and hasattr(sim, "triggers"):
+        if dispatch_post_activate and sim is not None and hasattr(sim, "triggers"):
             sim.triggers.dispatch(
                 "on_ability_post_activate",
                 sim,
@@ -1039,7 +1063,11 @@ class Ability:
         from src.swtorsim.events import ChannelTickEvent
 
         ignore_alacrity = self.abl_ignore_alacrity or getattr(self.blueprint, "abl_ignore_alacrity", False)
-        scaled_duration = caster.scale_time_modifier(channel_duration) if not ignore_alacrity else channel_duration
+        scaled_duration = (
+            caster.calculate_channel_duration(channel_duration, ability=self)
+            if hasattr(caster, "calculate_channel_duration")
+            else (caster.scale_time_modifier(channel_duration) if not ignore_alacrity else channel_duration)
+        )
 
         # Determine tick interval and tick count
         base_interval = None

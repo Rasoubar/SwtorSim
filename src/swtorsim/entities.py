@@ -22,6 +22,10 @@ class Entity:
         self.name = name
         self.effects = {}
         self.stats = {}
+        self.active_channel = None
+        self.is_channeling = False
+        self.active_cast = None
+        self.is_casting = False
 
     def apply_effect(self, sim, ability, effect, caster=None): #can be improved on the refresh
         """Applies or refreshes an extracted ActiveEffect, calculates expiration, and triggers stat updates if needed."""
@@ -243,11 +247,134 @@ class Player(Entity):
                 ability_db[abl.name.lower().replace(" ", "_")] = abl
         return ability_db
 
-    def calculate_gcd(self, base_gcd: float = 1.5) -> float:
+    def calculate_gcd(self, base_gcd: float = 1.5, ability: Any = None) -> float:
         """Calculates GCD duration scaled by Alacrity, rounded up to the nearest tenth of a second as ingame"""
-        gcd = self.scale_time_modifier(base_gcd)
+        if base_gcd <= 0.0:
+            return 0.0
+
+        flat_mod = 0.0
+        pct_mod = 1.0
+
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+        else:
+            abl_fqn = None
+            abl_tags = frozenset()
+
+        for effect in self.effects.values():
+            if getattr(effect, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(effect):
+                if str(mod.stat) in ("66", "STAT_abl_time_global_cooldown"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                        if mod.is_percent:
+                            pct_mod += mod.value
+                        else:
+                            flat_mod += mod.value
+
+        adjusted_base = max(0.0, (base_gcd * pct_mod) + flat_mod)
+        if adjusted_base <= 0.0:
+            return 0.0
+
+        ignore_alacrity = False
+        if ability is not None:
+            ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
+
+        gcd = adjusted_base if ignore_alacrity else self.scale_time_modifier(adjusted_base)
         scaled_gcd = math.ceil(gcd * 10) / 10
-        return scaled_gcd
+        return round(scaled_gcd, 2)
+
+    def calculate_cast_time(self, base_cast_time: float, ability: Any = None) -> float:
+        """Calculates ability cast time after flat/percentage modifiers (STAT_abl_time_casting, 62) and Alacrity scaling."""
+        if base_cast_time <= 0.0:
+            return 0.0
+
+        flat_mod = 0.0
+        pct_mod = 1.0
+
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+        else:
+            abl_fqn = None
+            abl_tags = frozenset()
+
+        for effect in self.effects.values():
+            if getattr(effect, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(effect):
+                if str(mod.stat) in ("62", "STAT_abl_time_casting"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                        if mod.is_percent:
+                            pct_mod += mod.value
+                        else:
+                            flat_mod += mod.value
+
+        adjusted_base = max(0.0, (base_cast_time * pct_mod) + flat_mod)
+        if adjusted_base <= 0.0:
+            return 0.0
+
+        ignore_alacrity = False
+        if ability is not None:
+            ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
+
+        if ignore_alacrity:
+            return round(adjusted_base, 4)
+        return round(self.scale_time_modifier(adjusted_base), 4)
+
+    def calculate_channel_duration(self, base_duration: float, ability: Any = None) -> float:
+        """Calculates channel duration after flat/percentage modifiers (STAT_abl_time_channeling, 63) and Alacrity scaling."""
+        if base_duration <= 0.0:
+            return 0.0
+
+        flat_mod = 0.0
+        pct_mod = 1.0
+
+        if ability is not None:
+            if isinstance(ability, str):
+                abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
+                abl_fqn = getattr(abl_obj, "fqn", ability)
+                abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
+            else:
+                abl_fqn = getattr(ability, "fqn", None)
+                abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+        else:
+            abl_fqn = None
+            abl_tags = frozenset()
+
+        for effect in self.effects.values():
+            if getattr(effect, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(effect):
+                if str(mod.stat) in ("63", "STAT_abl_time_channeling"):
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                        if mod.is_percent:
+                            pct_mod += mod.value
+                        else:
+                            flat_mod += mod.value
+
+        adjusted_base = max(0.0, (base_duration * pct_mod) + flat_mod)
+        if adjusted_base <= 0.0:
+            return 0.0
+
+        ignore_alacrity = False
+        if ability is not None:
+            ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
+
+        if ignore_alacrity:
+            return round(adjusted_base, 4)
+        return round(self.scale_time_modifier(adjusted_base), 4)
 
     def calculate_cooldown(self, base_cooldown: float, ability: Any = None) -> float:
         """Calculates ability cooldown after flat/percentage modifiers and scaled by current Alacrity CDR."""
@@ -397,7 +524,10 @@ class Player(Entity):
             if getattr(effect, "is_expired", False):
                 continue
             for mod in _effect_modifiers(effect):
-                if mod.stat in ("68", "69", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
+                if mod.stat in (
+                    "68", "69", "70",
+                    "STAT_abl_cost_force", "STAT_abl_cost_energy", "STAT_abl_cost_action_points",
+                ):
                     matched = mod.applies_to(abl_fqn, abl_tags)
                     if matched:
                         if mod.is_percent:

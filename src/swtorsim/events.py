@@ -356,6 +356,45 @@ class ChannelTickEvent(Event):
             target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
             sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
 
+class CastFinishEvent(Event):
+    """Fired when an ability with a cast time finishes casting."""
+
+    def __init__(self, caster, target, ability, entry_effect_ids):
+        super().__init__(f"Cast Finish {getattr(ability, 'name', 'Ability')}")
+        self.caster = caster
+        self.target = target
+        self.ability = ability
+        self.entry_effect_ids = entry_effect_ids
+
+    def resolve(self, sim):
+        # Safeguard: if cast was interrupted or cancelled, abort
+        if getattr(self.caster, "active_cast", None) is not self.ability:
+            return
+
+        self.caster.active_cast = None
+        self.caster.is_casting = False
+        print(f"[{sim.current_time:.3f}s] {self.caster.name} finished casting {self.ability.name}")
+
+        for entry_id in self.entry_effect_ids:
+            self.ability.execute_effect(entry_id, self.caster, self.target, sim)
+
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch(
+                "on_ability_post_activate",
+                sim,
+                {
+                    "caster": self.caster,
+                    "target": self.target,
+                    "enemy_target": self.target,
+                    "ability_spec": getattr(self.ability, "fqn", None),
+                    "tags": getattr(self.ability, "tags", ()),
+                    "from_actor": 2,
+                },
+            )
+
+        target_time = max(sim.current_time, getattr(self.caster, "next_gcd", sim.current_time))
+        sim.schedule_absolute(target_time, PlayerReady(self.caster, getattr(self.caster, "current_target", self.target)))
+
 class ResourceTick(Event):
     """Represents the passive energy regen events"""
     def __init__(self, player: "Player", interval: float = 1.0): #keeping interval because I don't know how shit is, don't want to assume it's every second

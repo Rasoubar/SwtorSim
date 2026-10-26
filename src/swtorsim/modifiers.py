@@ -122,15 +122,11 @@ class Modifier:
         except (ValueError, TypeError):
             val = 0.0
 
-        if "percentage" in resolved.lower() or "_pct" in resolved.lower():
-            is_pct = True
-        elif resolved in ("64", "STAT_abl_time_cooldown"):
-            is_pct = False
-        elif resolved in ("68", "69", "STAT_abl_cost_force", "STAT_abl_cost_energy"):
-            # Bioware overloaded cost stats: -0.10 is -10%, while -3.0 to -25.0 are flat amounts
-            is_pct = (-1.0 < val < 1.0 and val != 0.0)
-        else:
-            is_pct = False
+        enum_type = data.get("enum_type")
+        is_pct = bool(data.get("is_percent", False)) or enum_type in (
+            "modStatType_PercentOfBase",
+            "modStatType_PercentOfCurrent",
+        )
         return cls(
             stat=resolved,
             value=val,
@@ -145,15 +141,8 @@ class Modifier:
         resolved = resolve_stat(raw_stat)
         percent = float(action.get("amount_percent") or 0.0)
         min_amt = float(action.get("amount_min") or 0.0)
-        if percent != 0.0:
-            is_pct = True
-            val = percent
-        elif "percentage" in resolved.lower() or "_pct" in resolved.lower():
-            is_pct = True
-            val = min_amt
-        else:
-            is_pct = False
-            val = min_amt
+        is_pct = bool(action.get("is_percent", False)) or (percent != 0.0)
+        val = percent if is_pct else min_amt
         return cls(
             stat=resolved,
             value=val,
@@ -171,7 +160,7 @@ class Modifier:
         resolved = resolve_stat(raw_stat)
         stat_mod_type = ints.get("stat_mod_type")
         # In SWTOR GOM: stat_mod_type 1 = flat, 2 = percentage
-        is_pct = (stat_mod_type == 2) or bool(bools.get("is_percentage", False)) or "percentage" in resolved.lower()
+        is_pct = (stat_mod_type == 2) or bool(bools.get("is_percentage", False)) or bool(action.get("is_percent", False))
         return cls(
             stat=resolved,
             value=float(floats.get("amount", 0.0)),
@@ -192,18 +181,13 @@ class Modifier:
         min_amt = float(floats.get("amount_min") or 0.0)
         amt = floats.get("amount")
         stat_mod_type = ints.get("stat_mod_type")
+        is_pct = (percent != 0.0) or (stat_mod_type == 2) or bool(bools.get("is_percentage", False)) or bool(action.get("is_percent", False))
         if percent != 0.0:
-            is_pct = True
             val = percent
-        elif stat_mod_type == 2:
-            is_pct = True
-            val = float(amt) if amt is not None else min_amt
         elif amt is not None:
             val = float(amt)
-            is_pct = bool(bools.get("is_percentage", False)) or "percentage" in resolved.lower()
         else:
             val = min_amt
-            is_pct = bool(bools.get("is_percentage", False)) or "percentage" in resolved.lower()
         cond_tag = strings.get("conditional_tag") or action.get("conditional_tag")
         return cls(
             stat=resolved,
