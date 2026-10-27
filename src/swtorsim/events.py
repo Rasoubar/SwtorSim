@@ -123,6 +123,8 @@ class DamageHit(Event):
             )
             is_weapon_attack = attack_type in (1, 2) and not is_periodic
             weapon_mode = 2 if is_weapon_attack else 0
+            if not is_periodic and hasattr(self.source, "break_stealth"):
+                self.source.break_stealth(sim)
             ctx = {
                 "caster": self.source,
                 "target": self.target,

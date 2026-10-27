@@ -266,6 +266,21 @@ class Player(Entity):
                 ability_db[abl.name.lower().replace(" ", "_")] = abl
         return ability_db
 
+    def break_stealth(self, sim=None) -> None:
+        """Breaks active stealth upon performing an aggressive combat action."""
+        if not self.is_stealthed and not any(any("stealth" in str(t).lower() for t in getattr(e, "tags", ())) for e in self.effects.values()):
+            return
+        self.is_stealthed = False
+        # Clean up general stealth buffs, preserving combat stealth windows (Force Camouflage / Cloaking Screen)
+        stealth_keys = [
+            key for key, eff in self.effects.items()
+            if not getattr(eff, "is_expired", False)
+            and any("stealth" in str(t).lower() for t in getattr(eff, "tags", ()))
+            and "combat_stealth" not in getattr(eff, "tags", ())
+        ]
+        if stealth_keys:
+            self.cleanup_expired_effects(stealth_keys)
+
     def calculate_gcd(self, base_gcd: float = 1.5, ability: Any = None) -> float:
         """Calculates GCD duration scaled by Alacrity, rounded up to the nearest tenth of a second as ingame"""
         if base_gcd <= 0.0:

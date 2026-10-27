@@ -179,6 +179,13 @@ class Effect:
                         t_num = t.get("tick_number") or 0
                         if t_num not in (0, tick_number):
                             continue
+                    if trigger_name in ("on_stack_charge_increased", "on_stack_charge_decreased"):
+                        ints = t.get("ints") or {}
+                        req_count = ints.get("count") if "count" in ints else t.get("count")
+                        if req_count is not None and int(req_count) > 0:
+                            current_stacks = branch_context.get("current_stacks")
+                            if current_stacks is not None and int(current_stacks) < int(req_count):
+                                continue
                     matched = True
                     break
                 if not matched:
@@ -1029,8 +1036,21 @@ class Ability:
         if not caster.resource.can_afford(modified_cost):
             return False
 
+        is_aggressive = (
+            "tag.abl.utility.aggressive_action" in self.tags
+            or "tag.abl.utility.is_basic_attack" in self.tags
+            or (
+                not self.tags
+                and any(
+                    getattr(b, "is_attack", False)
+                    for eff in self.effects.values()
+                    for b in getattr(eff, "branches", ())
+                )
+            )
+        )
+        ability_target = target if is_aggressive else caster
         conds = self.conditions or getattr(self.blueprint, "conditions", None) or {}
-        return validate_all(conds, caster, target, sim=sim)
+        return validate_all(conds, caster, ability_target, sim=sim)
 
     def apply_cooldown_locks(self, caster, sim):
         """Deducts charges or sets cooldown, and sets GCD lockouts."""
@@ -1077,6 +1097,8 @@ class Ability:
                 )
             )
         )
+        if is_aggressive and hasattr(caster, "break_stealth"):
+            caster.break_stealth(sim)
         ability_target = target if is_aggressive else caster
 
         # Check if ability has channel or cast activation

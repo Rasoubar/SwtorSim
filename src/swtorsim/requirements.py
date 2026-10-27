@@ -185,7 +185,7 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
     elif actor_str == "trigger_caster" and context and "caster" in context:
         actor = context["caster"]
     else:
-        if cond_type == "is_creature_type" and target is not None:
+        if cond_type == "is_creature_type" and target is not None and target is not caster:
             actor = target
         else:
             actor = caster

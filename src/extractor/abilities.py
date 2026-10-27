@@ -1738,6 +1738,12 @@ def _is_redundant_self_aoe_branch(
     branch: list[dict[str, Any]],
     effect_tags: set[str],
 ) -> bool:
+    actions_raw = _sub_effect_field(branch, "effActions")
+    if isinstance(actions_raw, dict):
+        raw_list = actions_raw.get("list")
+        if isinstance(raw_list, list) and len(raw_list) > 0:
+            return False
+
     conditions_raw = _sub_effect_field(branch, "effConditions")
     if not isinstance(conditions_raw, list):
         return False
@@ -1760,6 +1766,14 @@ def _is_redundant_self_aoe_branch(
             continue
         if int_params.get("effParam_Actor") != "3":
             continue
+
+        raw_count = int_params.get("effParam_Count")
+        if raw_count is not None:
+            try:
+                if int(raw_count) > 1:
+                    continue
+            except (ValueError, TypeError):
+                pass
 
         tag_keys = [key for key, enabled in function_tags.items() if enabled is True]
         if any(tag in effect_tags for tag in tag_keys):
