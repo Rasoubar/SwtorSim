@@ -263,6 +263,11 @@ class Effect:
             was_refreshed = existing is not None and not getattr(existing, "is_expired", False)
             old_stacks = getattr(existing, "stacks", 0) if was_refreshed else 0
             effect_key, effect_instance, duration = effect_target.apply_effect(sim, ability, self, caster)
+            if caster is not None and getattr(caster, "active_channel", None) is not None:
+                active_chan = caster.active_channel
+                if getattr(active_chan, "ability", None) is ability or getattr(ability, "fqn", None) == getattr(getattr(active_chan, "ability", None), "fqn", None):
+                    if hasattr(active_chan, "attached_effects"):
+                        active_chan.attached_effects.append((effect_target, effect_key, effect_instance))
             cur_stacks = getattr(effect_instance, "stacks", 1)
             stack_increased = was_refreshed and (cur_stacks > old_stacks)
 
@@ -1179,6 +1184,7 @@ class Ability:
             old_channel.is_finished = True
             caster.active_channel = None
             caster.is_channeling = False
+            cleanup_channel_effects(old_channel, sim)
             if sim is not None and hasattr(sim, "triggers"):
                 sim.triggers.dispatch(
                     "on_channeling_ended",
@@ -1347,6 +1353,7 @@ class Ability:
 
         # If on_apply triggered ability_cancel, do not schedule ticks and return actor to ready
         if getattr(channel, "is_finished", False):
+            cleanup_channel_effects(channel, sim)
             if sim is not None:
                 from src.swtorsim.events import PlayerReady
                 target_time = max(sim.current_time, getattr(caster, "next_gcd", sim.current_time))
@@ -1541,6 +1548,42 @@ def handle_grant_immunity(sim, caster, target, action, context=None):
         actor._base_immunities.update(tags)
     return True
 
+def cleanup_channel_effects(channel, sim):
+    """Cleans up channel-bound active effects applied during the channel, executing their on_pre_remove triggers."""
+    if channel is None:
+        return
+    attached = getattr(channel, "attached_effects", [])
+    if not attached:
+        return
+    for actor, effect_key, eff_inst in list(attached):
+        # Do not clean up effects that have their own independent timer (e.g. duration > 0 with expires_at)
+        if getattr(eff_inst, "duration", 0.0) > 0.0 and getattr(eff_inst, "expires_at", None) is not None:
+            continue
+        effects_dict = getattr(actor, "effects", {})
+        if effect_key in effects_dict and effects_dict[effect_key] is eff_inst:
+            bp = getattr(eff_inst, "effect_blueprint", None)
+            ability = getattr(eff_inst, "ability_ref", None) or getattr(channel, "ability", None)
+            caster = getattr(eff_inst, "caster_ref", None) or getattr(channel, "caster", None)
+            if bp and hasattr(bp, "execute_triggered_branches"):
+                expire_ctx = {
+                    "stack_multiplier": getattr(eff_inst, "stacks", 1),
+                    "current_stacks": getattr(eff_inst, "stacks", 1),
+                    "active_effect": eff_inst,
+                    "owner_effect_key": effect_key,
+                    "owner_entity": actor,
+                    "effect": bp,
+                }
+                bp.execute_triggered_branches(
+                    "on_pre_remove",
+                    sim,
+                    caster,
+                    actor,
+                    context=expire_ctx,
+                    ability=ability,
+                )
+            actor.cleanup_expired_effects([effect_key])
+
+
 def handle_ability_cancel(caster, target, action):
     """Cancels active channel or cast on the actor."""
     actor = _resolve_state_actor(caster, target, action)
@@ -1551,6 +1594,7 @@ def handle_ability_cancel(caster, target, action):
         active_channel.is_finished = True
         actor.active_channel = None
         actor.is_channeling = False
+        cleanup_channel_effects(active_channel, getattr(actor, "_sim_ref", None))
         sim_ref = getattr(actor, "_sim_ref", None)
         if sim_ref is not None and hasattr(sim_ref, "triggers"):
             sim_ref.triggers.dispatch(

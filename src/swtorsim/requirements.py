@@ -64,37 +64,23 @@ def check_caster_does_not_have_buff(conditions: Any, caster: "Player", _target: 
     return not has_any_buff
 
 def check_ability_cooldown_under(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
-    print(caster.cooldowns)
-    cooldown = caster.cooldowns.get(data["name"],0)
+    cooldown = caster.cooldowns.get(data["name"], 0)
     remaining_cooldown = cooldown - sim.current_time
 
     return remaining_cooldown < data["value"]
 
-CONDITION_REGISTRY = {
-    "target_hp_below_pct": check_target_hp,
-    "target_has_debuff": check_target_debuff,
-    "caster_has_buff": check_caster_buff,
-    "target_doesnt_have_debuff": inverse_check_target_debuff,
-    "caster_energy_above": check_caster_energy_above,
-    "caster_energy_below": check_caster_energy_below,
-    "target_hp_above_pct": check_target_hp_above,
-    "proc_cooldown_above": check_proc_cooldown_above,
-    "caster_does_not_have_buff": check_caster_does_not_have_buff,
-    "ability_cooldown_under": check_ability_cooldown_under
-}
-
 
 def compare_values(actual: float, comparison: str, expected: float) -> bool:
-    """Evaluates comparison operators used in extracted game data."""
-    if comparison == "lte":
+    """Evaluates comparison operators used in extracted game data and rotation rules."""
+    if comparison in ("lte", "<="):
         return actual <= expected
-    elif comparison == "gte":
+    elif comparison in ("gte", ">="):
         return actual >= expected
-    elif comparison == "lt":
+    elif comparison in ("lt", "<"):
         return actual < expected
-    elif comparison == "gt":
+    elif comparison in ("gt", ">"):
         return actual > expected
-    elif comparison == "eq":
+    elif comparison in ("eq", "==", "="):
         return actual == expected
     return True
 
@@ -142,6 +128,9 @@ def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec
     effects = getattr(entity, "effects", {})
     tags_set = set(tags) if tags else set()
 
+    best_stacks = 0
+    found = False
+
     for eff in effects.values():
         if getattr(eff, "is_expired", False):
             continue
@@ -156,19 +145,143 @@ def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec
             matches = True
 
         if matches:
-            return int(getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1)
+            st = int(getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1)
+            best_stacks = max(best_stacks, st)
+            found = True
 
+    # Also check active dots on dummy targets
     dots = getattr(entity, "dots", {})
     for dot_name, dot in dots.items():
         if getattr(dot, "is_expired", False):
             continue
         if ability_spec and ability_spec == dot_name:
-            return int(getattr(dot, "stacks", 1) or 1)
+            st = int(getattr(dot, "stacks", 1) or 1)
+            best_stacks = max(best_stacks, st)
+            found = True
         dot_tags = set(getattr(dot, "tags", []) or [])
         if tags_set and (tags_set & dot_tags):
-            return int(getattr(dot, "stacks", 1) or 1)
+            st = int(getattr(dot, "stacks", 1) or 1)
+            best_stacks = max(best_stacks, st)
+            found = True
 
+    if found:
+        return best_stacks
     return 0
+
+
+def get_caster_buff_stacks(caster: "Player", buff_name: str | None = None, tags: list[str] | None = None) -> int:
+    """Returns the current stack count of an active buff on the caster.
+
+    Resolution order:
+      1. Tag or ability specification match via get_entity_effect_stacks (takes highest stack across active instances).
+      2. Direct lookup by key in caster.effects.
+      3. Case-insensitive / normalized name or FQN match across active effects.
+    Returns 0 if the effect is not active or expired.
+    """
+    if not caster or not hasattr(caster, "effects"):
+        return 0
+
+    best_stacks = 0
+    found = False
+
+    stacks = get_entity_effect_stacks(caster, tags=tags, ability_spec=buff_name)
+    if stacks > 0:
+        best_stacks = max(best_stacks, stacks)
+        found = True
+
+    if buff_name and buff_name in caster.effects:
+        eff = caster.effects[buff_name]
+        if not getattr(eff, "is_expired", False):
+            st = int(getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1)
+            best_stacks = max(best_stacks, st)
+            found = True
+
+    if buff_name:
+        target_norm = buff_name.strip().lower().replace("_", " ")
+        for eff_key, eff in caster.effects.items():
+            if getattr(eff, "is_expired", False):
+                continue
+            eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "") or eff_key
+            eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")
+            if (
+                target_norm == str(eff_name).strip().lower().replace("_", " ")
+                or target_norm == str(eff_fqn).strip().lower().replace("_", " ")
+                or target_norm == str(eff_key).strip().lower().replace("_", " ")
+            ):
+                st = int(getattr(eff, "stacks", None) or getattr(eff, "charges", 1) or 1)
+                best_stacks = max(best_stacks, st)
+                found = True
+
+    return best_stacks if found else 0
+
+
+def check_caster_buff_stacks(data: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
+    """Validator for rotation rules checking a buff's stack count on the caster.
+
+    Supported rule shapes in rotation configs:
+      - dict:
+          {"name": "Recklessness", "stacks": 2}
+          {"name": "Recklessness", "count": 2, "comparison": "gte"}
+          {"buff": "Recklessness", "stacks": 1, "comparison": "eq"}
+          {"name": "Static Charge", "value": 3, "operator": ">="}
+          {"tags": ["tag.abl.charges"], "stacks": 3}
+      - list/tuple:
+          ["Recklessness", 2]          (defaults to comparison >= 2)
+          ["Recklessness", 2, "gte"]   (or 'eq', '==', '<=', etc.)
+    """
+    if isinstance(data, (list, tuple)):
+        name = data[0] if len(data) > 0 else None
+        expected_stacks = float(data[1]) if len(data) > 1 else 1.0
+        comparison = data[2] if len(data) > 2 else "gte"
+        tags = None
+    elif isinstance(data, dict):
+        name = data.get("name") or data.get("buff") or data.get("ability_spec")
+        expected_stacks = float(data.get("stacks", data.get("count", data.get("value", data.get("charges", 1)))))
+        comparison = data.get("comparison", data.get("operator", "gte"))
+        tags = data.get("tags")
+    else:
+        return False
+
+    actual_stacks = get_caster_buff_stacks(caster, buff_name=name, tags=tags)
+    return compare_values(actual_stacks, comparison, expected_stacks)
+
+
+def check_target_debuff_stacks(data: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
+    """Validator for rotation rules checking a debuff or DoT stack count on the target."""
+    if isinstance(data, (list, tuple)):
+        name = data[0] if len(data) > 0 else None
+        expected_stacks = float(data[1]) if len(data) > 1 else 1.0
+        comparison = data[2] if len(data) > 2 else "gte"
+        tags = None
+    elif isinstance(data, dict):
+        name = data.get("name") or data.get("debuff") or data.get("ability_spec")
+        expected_stacks = float(data.get("stacks", data.get("count", data.get("value", 1))))
+        comparison = data.get("comparison", data.get("operator", "gte"))
+        tags = data.get("tags")
+    else:
+        return False
+
+    actual_stacks = get_entity_effect_stacks(target, tags=tags, ability_spec=name)
+    return compare_values(actual_stacks, comparison, expected_stacks)
+
+
+CONDITION_REGISTRY = {
+    "target_hp_below_pct": check_target_hp,
+    "target_has_debuff": check_target_debuff,
+    "caster_has_buff": check_caster_buff,
+    "target_doesnt_have_debuff": inverse_check_target_debuff,
+    "caster_energy_above": check_caster_energy_above,
+    "caster_energy_below": check_caster_energy_below,
+    "target_hp_above_pct": check_target_hp_above,
+    "proc_cooldown_above": check_proc_cooldown_above,
+    "caster_does_not_have_buff": check_caster_does_not_have_buff,
+    "ability_cooldown_under": check_ability_cooldown_under,
+    "caster_buff_stacks": check_caster_buff_stacks,
+    "caster_has_buff_stacks": check_caster_buff_stacks,
+    "caster_buff_charges": check_caster_buff_stacks,
+    "target_debuff_stacks": check_target_debuff_stacks,
+    "target_has_debuff_stacks": check_target_debuff_stacks,
+}
 
 
 def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "Dummy", sim=None, context=None) -> bool:

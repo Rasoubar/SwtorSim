@@ -363,6 +363,8 @@ class ChannelTickEvent(Event):
             if getattr(self.source, "active_channel", None) is self.channel:
                 self.source.active_channel = None
                 self.source.is_channeling = False
+            from src.swtorsim.abilities import cleanup_channel_effects
+            cleanup_channel_effects(self.channel, sim)
             target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
             sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
             return
@@ -400,6 +402,8 @@ class ChannelTickEvent(Event):
                         "is_successful": True,
                     },
                 )
+            from src.swtorsim.abilities import cleanup_channel_effects
+            cleanup_channel_effects(self.channel, sim)
             target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
             sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
 

@@ -42,6 +42,7 @@ class ActiveChannel:
         self.caster = caster
         self.target = target
         self.is_finished = False
+        self.attached_effects: list = []
 
 
 @dataclass

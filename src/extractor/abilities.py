@@ -1565,6 +1565,27 @@ def _set_name_from_initializers(effect_record: NodeRecord) -> str | None:
     return None
 
 
+def _is_effect_hidden(effect_record: NodeRecord) -> bool:
+    for branch in _sub_effects(effect_record):
+        initializers_raw = _sub_effect_field(branch, "effInitializers")
+        if not isinstance(initializers_raw, dict):
+            continue
+        initializer_list = initializers_raw.get("list")
+        if not isinstance(initializer_list, list):
+            continue
+        for entry in initializer_list:
+            if not isinstance(entry, list):
+                continue
+            fields = _entry_fields(entry)
+            init_name = fields.get("effInitializerName")
+            if init_name == "effInitializer_SetHidden":
+                return True
+            bool_params = _action_param_dicts(entry)["bool"]
+            if bool_params.get("effParam_IsHidden") is True:
+                return True
+    return False
+
+
 def _decode_initializer(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
     fields = _entry_fields(entry)
     initializer_name = fields.get("effInitializerName")
@@ -1870,6 +1891,7 @@ def _decode_effect(
     *,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
+    parent_name: str | None = None,
 ) -> dict[str, Any] | None:
     number = _effect_number(effect_record.entry.fqn)
     if number is None or number == 0:
@@ -1944,9 +1966,17 @@ def _decode_effect(
         "number": number,
         "entry": not _effect_has_if_called_by_effect(effect_record),
     }
-    name = _set_name_from_initializers(effect_record)
-    if name:
-        decoded["name"] = name
+    init_name = _set_name_from_initializers(effect_record)
+    is_hidden = _is_effect_hidden(effect_record)
+    if is_hidden:
+        decoded["is_hidden"] = True
+
+    if init_name:
+        decoded["name"] = init_name
+    elif not is_hidden and parent_name:
+        decoded["name"] = parent_name
+    elif parent_name:
+        decoded["name"] = f"{parent_name}_{number}"
     icon = _effect_icon_png(effect_record)
     if icon:
         decoded["icon"] = icon
@@ -1980,6 +2010,7 @@ def _build_effects(
     *,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
+    parent_name: str | None = None,
 ) -> list[dict[str, Any]]:
     effect_records = _effect_records(record, records_by_fqn)
     dropped_effect_numbers: set[int] = set()
@@ -1999,6 +2030,7 @@ def _build_effects(
             effect_record,
             id_to_fqn=id_to_fqn,
             standard_rating=standard_rating,
+            parent_name=parent_name,
         )
         if decoded is not None:
             effects.append(decoded)
@@ -2015,9 +2047,10 @@ def _build_ability_payload(
     standard_rating: float | None = None,
 ) -> dict[str, Any]:
     ability_type = _ability_type(record)
+    parent_name = _ability_name(record)
     payload: dict[str, Any] = {
         "fqn": record.entry.fqn,
-        "name": _ability_name(record),
+        "name": parent_name,
     }
     icon = _icon_png_name(_field_value(record, "ablIconSpec"))
     if icon:
@@ -2051,6 +2084,7 @@ def _build_ability_payload(
         records_by_fqn,
         id_to_fqn=id_to_fqn,
         standard_rating=standard_rating,
+        parent_name=parent_name,
     )
 
     return payload
