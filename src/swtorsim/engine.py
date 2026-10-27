@@ -4,12 +4,18 @@ from src.swtorsim.triggers import TriggerManager
 
 class Simulation:
     """Manages the event queue and core combat timeline."""
-    def __init__(self):
+    def __init__(self, in_flashpoint_operation: bool | None = None):
         self.queue = []
         self.current_time = 0.0
         self.event_counter = 0
         self.tracker = Metrics()
         self.triggers = TriggerManager()
+        from src.swtorsim.settings import is_in_flashpoint_operation
+        self.in_flashpoint_operation = (
+            bool(in_flashpoint_operation)
+            if in_flashpoint_operation is not None
+            else is_in_flashpoint_operation()
+        )
 
     def schedule_relative(self, delay, event):
         self.event_counter += 1

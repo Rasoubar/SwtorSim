@@ -66,6 +66,18 @@ class ApplyDamageLand(Event):
                 sim.current_time,
             )
         self.target.hp -= self.final_damage
+        if self.target.hp <= 0 and not getattr(self.target, "is_dead", False):
+            self.target.is_dead = True
+            if sim is not None and hasattr(sim, "triggers"):
+                death_ctx = {
+                    "caster": self.source,
+                    "target": self.target,
+                    "enemy_target": self.target,
+                    "tags": getattr(self, "tags", ()),
+                }
+                sim.triggers.dispatch("on_pre_death", sim, death_ctx)
+                sim.triggers.dispatch("on_death", sim, death_ctx)
+                sim.triggers.dispatch("on_kill", sim, death_ctx)
         print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
 
 class DamageHit(Event):
@@ -92,6 +104,44 @@ class DamageHit(Event):
         resolved_at = action_with_ctx.get("resolved_attack_type", self.action_data.get("attack_type", 1))
         resolved_dt = action_with_ctx.get("resolved_damage_type", self.action_data.get("damage_type", 1))
 
+        attack_type = self.action_data.get("attack_type", 1)
+        spell_type = self.action_data.get("spell_type")
+        if spell_type is None:
+            if attack_type == 4:
+                spell_type = 2  # Tech
+            elif attack_type == 3:
+                spell_type = 3  # Force
+            else:
+                spell_type = 1  # Weapon (Melee/Ranged)
+        tags_set = set(self.tags or [])
+        is_periodic = bool(
+            self.action_data.get("is_periodic")
+            or any(
+                t.endswith(".periodic_damage") or t == "tag.abl.debuff.damage_over_time"
+                for t in tags_set
+            )
+        )
+        is_weapon_attack = attack_type in (1, 2) and not is_periodic
+        weapon_mode = 2 if is_weapon_attack else 0
+        ctx = {
+            "caster": self.source,
+            "target": self.target,
+            "enemy_target": self.target,
+            "tags": self.tags,
+            "is_crit": is_crit,
+            "damage_type": self.action_data.get("damage_type", 1),
+            "attack_type": attack_type,
+            "spell_type": spell_type,
+            "is_weapon_attack": is_weapon_attack,
+            "is_periodic": is_periodic,
+            "weapon_mode": weapon_mode,
+            "final_damage": final_damage,
+        }
+
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch("on_pre_damage_dealt", sim, ctx)
+            sim.triggers.dispatch("on_pre_damage_taken", sim, ctx)
+
         instant_land = ApplyDamageLand(
             self.source,
             self.target,
@@ -103,41 +153,10 @@ class DamageHit(Event):
         )
         instant_land.resolve(sim)
 
+        if not is_periodic and hasattr(self.source, "break_stealth"):
+            self.source.break_stealth(sim)
+
         if sim is not None and hasattr(sim, "triggers"):
-            attack_type = self.action_data.get("attack_type", 1)
-            spell_type = self.action_data.get("spell_type")
-            if spell_type is None:
-                if attack_type == 4:
-                    spell_type = 2  # Tech
-                elif attack_type == 3:
-                    spell_type = 3  # Force
-                else:
-                    spell_type = 1  # Weapon (Melee/Ranged)
-            tags_set = set(self.tags or [])
-            is_periodic = bool(
-                self.action_data.get("is_periodic")
-                or any(
-                    t.endswith(".periodic_damage") or t == "tag.abl.debuff.damage_over_time"
-                    for t in tags_set
-                )
-            )
-            is_weapon_attack = attack_type in (1, 2) and not is_periodic
-            weapon_mode = 2 if is_weapon_attack else 0
-            if not is_periodic and hasattr(self.source, "break_stealth"):
-                self.source.break_stealth(sim)
-            ctx = {
-                "caster": self.source,
-                "target": self.target,
-                "enemy_target": self.target,
-                "tags": self.tags,
-                "is_crit": is_crit,
-                "damage_type": self.action_data.get("damage_type", 1),
-                "attack_type": attack_type,
-                "spell_type": spell_type,
-                "is_weapon_attack": is_weapon_attack,
-                "is_periodic": is_periodic,
-                "weapon_mode": weapon_mode,
-            }
             sim.triggers.dispatch("on_damage_dealt", sim, ctx)
             sim.triggers.dispatch("on_damage_taken", sim, ctx)
 
@@ -314,15 +333,6 @@ class ChannelTickEvent(Event):
         if getattr(self.source, "active_channel", None) is not self.channel:  # safeguard for clipping
             return
 
-        if getattr(self.channel, "tick_cost", 0.0) > 0.0:
-            if not self.source.resource.can_afford(self.channel.tick_cost):
-                self.source.active_channel = None
-                self.source.is_channeling = False
-                target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
-                sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
-                return
-            self.source.resource.spend(self.channel.tick_cost)
-
         self.channel.current_tick = getattr(self.channel, "current_tick", 0) + 1
         self.channel.remaining_ticks -= 1
 
@@ -347,6 +357,16 @@ class ChannelTickEvent(Event):
             for action in actions:
                 execute_single_action(sim, self.source, self.target, action, self.channel.name)
 
+        # Check if ability_cancel terminated the channel during tick execution
+        if getattr(self.channel, "is_finished", False) or getattr(self.source, "active_channel", None) is not self.channel:
+            self.channel.is_finished = True
+            if getattr(self.source, "active_channel", None) is self.channel:
+                self.source.active_channel = None
+                self.source.is_channeling = False
+            target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
+            sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
+            return
+
         if self.channel.remaining_ticks > 0:
             next_tick_time = sim.current_time + self.channel.tick_interval
             sim.schedule_absolute(next_tick_time, ChannelTickEvent(self.channel))
@@ -355,6 +375,31 @@ class ChannelTickEvent(Event):
             self.source.active_channel = None
             self.source.is_channeling = False
             print(f"[{sim.current_time:.3f}] {self.channel.name} channel over.")
+            ability = getattr(self.channel, "ability", None)
+            if ability is not None:
+                for eff in getattr(ability, "effects", {}).values():
+                    if hasattr(eff, "execute_triggered_branches"):
+                        eff.execute_triggered_branches(
+                            "on_channeling_ended",
+                            sim,
+                            self.source,
+                            self.target,
+                            ability=ability,
+                            context={"is_successful": True, "caster": self.source, "target": self.target},
+                        )
+            if sim is not None and hasattr(sim, "triggers"):
+                sim.triggers.dispatch(
+                    "on_channeling_ended",
+                    sim,
+                    {
+                        "caster": self.source,
+                        "target": self.target,
+                        "enemy_target": self.target,
+                        "ability_spec": getattr(ability, "fqn", None),
+                        "tags": getattr(ability, "tags", ()),
+                        "is_successful": True,
+                    },
+                )
             target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
             sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
 
@@ -458,4 +503,29 @@ class DelayedBranchEvent(Event):
             context=self.context,
             ability=self.ability,
         )
+
+class ProjectileImpactEvent(Event):
+    """Fired when an in-flight projectile arrives at its target, triggering on_travel_complete branches."""
+
+    def __init__(self, effect, caster, target, ability=None, context=None):
+        abl_name = getattr(ability, "name", "Ability")
+        super().__init__(f"Projectile Impact: {abl_name}")
+        self.effect = effect
+        self.caster = caster
+        self.target = target
+        self.ability = ability
+        self.context = context or {}
+
+    def resolve(self, sim):
+        if getattr(self.target, "is_dead", False) or getattr(self.caster, "is_dead", False):
+            return
+        if self.effect:
+            self.effect.execute_triggered_branches(
+                "on_travel_complete",
+                sim,
+                self.caster,
+                self.target,
+                context=self.context,
+                ability=self.ability,
+            )
 

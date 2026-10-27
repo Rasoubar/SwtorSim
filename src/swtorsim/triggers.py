@@ -37,6 +37,7 @@ class TriggerManager:
                 "tags": frozenset(raw_trigger.get("tags") or []),
                 "excluded_tags": frozenset(raw_trigger.get("excluded_tags") or []),
                 "ints": raw_trigger.get("ints") or {},
+                "bools": raw_trigger.get("bools") or {},
                 "eff_results": frozenset(raw_trigger.get("effResults") or []),
                 "proc_chance": (raw_trigger.get("floats") or {}).get("proc_chance_percent"),
                 "min_interval": min_interval,
@@ -87,6 +88,15 @@ class TriggerManager:
             # 1. Fast reject on excluded tags
             if sub["excluded_tags"] and (event_tags & sub["excluded_tags"]):
                 continue
+
+            # 1b. Fast reject on boolean flags (e.g. is_successful on channel completion)
+            bools = sub.get("bools") or {}
+            if "is_successful" in bools and "is_successful" in context:
+                if bools["is_successful"] != context["is_successful"]:
+                    continue
+            if "include_effect_refreshes" in bools and not bools["include_effect_refreshes"]:
+                if context.get("include_effect_refreshes", False):
+                    continue
 
             # 2. Required tags check (OR match)
             if sub["tags"] and not (event_tags & sub["tags"]):

@@ -241,10 +241,10 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         res = compare_values(actual, comparison, amount)
 
     elif cond_type == "is_player":
-        res = not hasattr(actor, "max_hp") and hasattr(actor, "ability_db")
+        res = bool(getattr(actor, "is_player", False))
 
     elif cond_type == "is_not_player":
-        res = hasattr(actor, "max_hp") or not hasattr(actor, "ability_db")
+        res = not bool(getattr(actor, "is_player", False))
 
     elif cond_type == "if_primary_target":
         res = True
@@ -255,7 +255,7 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
 
     elif cond_type == "immune_by_resolve":
         # Target dummies/bosses have resolve immunity
-        res = hasattr(actor, "max_hp")
+        res = bool(getattr(actor, "immune_by_resolve", False))
 
     elif cond_type == "if_spell_hit":
         res = True
@@ -319,11 +319,32 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
     elif cond_type == "is_not_in_combat":
         res = not getattr(actor, "in_combat", False)
 
-    elif cond_type in ("passes_conditional", "is_discipline", "is_not_in_cover"):
+    elif cond_type == "is_discipline":
         res = True
 
-    elif cond_type in ("is_in_cover", "is_companion"):
+    elif cond_type == "passes_conditional":
+        # In SWTOR, this evaluates world/encounter rules (e.g. cnd.global.is_in_flashpoint_operation).
+        # Resolution order: execution context -> sim instance -> actor/caster instance -> global setting.
+        if context and "in_flashpoint_operation" in context:
+            res = bool(context["in_flashpoint_operation"])
+        elif sim is not None and hasattr(sim, "in_flashpoint_operation"):
+            res = bool(getattr(sim, "in_flashpoint_operation"))
+        elif actor is not None and hasattr(actor, "in_flashpoint_operation"):
+            res = bool(getattr(actor, "in_flashpoint_operation"))
+        elif caster is not None and hasattr(caster, "in_flashpoint_operation"):
+            res = bool(getattr(caster, "in_flashpoint_operation"))
+        else:
+            from src.swtorsim.settings import is_in_flashpoint_operation
+            res = is_in_flashpoint_operation()
+
+    elif cond_type == "is_companion":
         res = False
+
+    elif cond_type == "is_in_cover":
+        res = bool(getattr(actor, "is_in_cover", False))
+
+    elif cond_type == "is_not_in_cover":
+        res = not bool(getattr(actor, "is_in_cover", False))
 
     elif cond_type == "if_caster_positioning":
         # In SWTOR, requires the caster to be positioned behind the target (rear 180-degree arc).
@@ -359,10 +380,12 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
             res = hasattr(actor, "ability_db") or bool(getattr(actor, "character_class", None))
 
     elif cond_type == "is_creature_type":
-        # Target creature type check (e.g. droid = 3 vs organic = 1 / humanoid).
+        # Target creature type check (e.g. droid = 3 vs organic = 1 / humanoid, player character = 4).
         expected_type = item.get("ints", {}).get("creature_type")
         if getattr(actor, "is_droid", False):
             actual_type = 3
+        elif getattr(actor, "is_player", False):
+            actual_type = 4
         else:
             actual_type = getattr(actor, "creature_type", 1)
         if expected_type is not None:

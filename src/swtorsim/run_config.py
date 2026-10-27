@@ -65,6 +65,9 @@ class RunConfig:
     dummy_hp: int = 10_000_000
     training_dummy_armor_debuff: bool = False
     enable_stem_matching: bool = False
+    enable_projectile_flight_time: bool = False
+    in_flashpoint_operation: bool = True
+    combat_distance: float = 30.0
     level: int = 85
     seed: int = 42
 
@@ -105,11 +108,28 @@ def load_run_config(path: str) -> RunConfig:
         enable_stem_matching=_optional_config_bool(
             raw, "enable_stem_matching", False
         ),
+        enable_projectile_flight_time=_optional_config_bool(
+            raw, "enable_projectile_flight_time", False
+        ),
+        in_flashpoint_operation=_optional_config_bool(
+            raw, "in_flashpoint_operation", True
+        ),
+        combat_distance=_optional_config_float(
+            raw, "combat_distance", 30.0
+        ),
         level=_optional_config_int(raw, "level", 85),
         seed=_optional_config_int(raw, "seed", 42),
     )
-    from src.swtorsim.settings import set_stem_matching
+    from src.swtorsim.settings import (
+        set_stem_matching,
+        set_projectile_flight_time,
+        set_default_combat_distance,
+        set_in_flashpoint_operation,
+    )
     set_stem_matching(config.enable_stem_matching)
+    set_projectile_flight_time(config.enable_projectile_flight_time)
+    set_default_combat_distance(config.combat_distance)
+    set_in_flashpoint_operation(config.in_flashpoint_operation)
     validate_run_config(config)
     return config
 
@@ -456,3 +476,13 @@ def _load_json(path: str) -> Any:
 
 def _raise_errors(errors: list[str]) -> None:
     raise ValueError("Invalid run config:\n" + "\n".join(f"- {error}" for error in errors))
+
+def _optional_config_float(raw: dict, key: str, default: float) -> float:
+    val = raw.get(key)
+    if val is None:
+        return default
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        raise ValueError(f"Run config value for '{key}' must be a float.")
+

@@ -164,6 +164,7 @@ class Effect:
         branch_context = dict(context) if context else {}
         existing_tags = set(branch_context.get("effect_tags") or ())
         branch_context["effect_tags"] = existing_tags | set(self.tags or ())
+        branch_context["effect"] = self
         executed_branches = set()
         for branch in self.branches:
             triggers = getattr(branch, "triggers", [])
@@ -186,6 +187,11 @@ class Effect:
                             current_stacks = branch_context.get("current_stacks")
                             if current_stacks is not None and int(current_stacks) < int(req_count):
                                 continue
+                    if trigger_name == "on_channeling_ended":
+                        bools = t.get("bools") or {}
+                        if "is_successful" in bools and "is_successful" in branch_context:
+                            if bools["is_successful"] != branch_context["is_successful"]:
+                                continue
                     matched = True
                     break
                 if not matched:
@@ -207,6 +213,7 @@ class Effect:
         branch_context = dict(context) if context else {}
         existing_tags = set(branch_context.get("effect_tags") or ())
         branch_context["effect_tags"] = existing_tags | set(self.tags or ())
+        branch_context["effect"] = self
 
         for branch in self.branches:
             triggers = getattr(branch, "triggers", [])
@@ -244,6 +251,9 @@ class Effect:
             if not validate_all(self.conditions, caster, effect_target, sim=sim, context=context):
                 return
 
+        if hasattr(effect_target, "is_immune_to_effect") and effect_target.is_immune_to_effect(self):
+            return
+
         if self.is_persistent:
             effect_key = (
                 self.name
@@ -262,6 +272,7 @@ class Effect:
             branch_ctx["active_effect"] = effect_instance
             branch_ctx["owner_effect_key"] = effect_key
             branch_ctx["owner_entity"] = effect_target
+            branch_ctx["effect"] = self
 
             self.execute_triggered_branches(
                 "on_refresh" if was_refreshed else "on_apply",
@@ -392,25 +403,16 @@ NOOP_ACTION_TYPES = frozenset(
         "swap_caster_position_with_target",
         "stun",
         "mark_as_neutralized",
-        "grant_immunity",
         "taunt",
         "taunt_damage_reduce",
         "ability_interrupt",
         "ability_activate",
         "ability_deactivate",
-        "ability_cancel",
-        "become_stealthed",
         "set_posture",
-        "take_cover",
-        "leave_cover",
-        "take_portable_cover",
-        "enter_combat",
-        "exit_combat",
         "revive",
         "summon_pet",
         "execute_hydra_hook",
         "custom",
-        "invoke_projectile",
         "modify_stat",
         "modify_meta_stat",
         "apply_conditional_stat_mod",
@@ -421,11 +423,6 @@ NOOP_ACTION_TYPES = frozenset(
         "absorb_damage",
         "reflect_damage",
         "redirect_damage",
-        "cooldown",
-        "global_cooldown",
-        "reset_timer",
-        "modify_active_duration",
-        "set_effect_stack_charge",
         "grant_temporary_ability_package",
         "god_damage",
         "insta_kill",
@@ -461,10 +458,40 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
         handle_restore_charge(sim, caster, action)
     elif action_type == "modify_stack_charge":
         handle_modify_stack_charge(sim, caster, target, action, context=context)
+    elif action_type == "set_effect_stack_charge":
+        handle_set_effect_stack_charge(sim, caster, target, action, ability=ability, context=context)
     elif action_type in ("buff_remove", "remove_effect", "dispel"):
         handle_buff_remove_action(sim, caster, target, action, ability=ability, context=context)
     elif action_type == "execute_ability":
         handle_execute_ability(sim, caster, target, action)
+    elif action_type == "invoke_projectile":
+        handle_invoke_projectile(sim, caster, target, action, ability=ability, context=context)
+    elif action_type == "reset_timer":
+        handle_reset_timer(sim, caster, target, action, ability=ability, context=context)
+    elif action_type == "modify_active_duration":
+        handle_modify_active_duration(sim, caster, target, action, ability=ability, context=context)
+    elif action_type == "take_cover":
+        handle_take_cover(caster, target, action, is_portable=False)
+    elif action_type == "take_portable_cover":
+        handle_take_cover(caster, target, action, is_portable=True)
+    elif action_type == "leave_cover":
+        handle_leave_cover(caster, target, action)
+    elif action_type == "become_stealthed":
+        handle_become_stealthed(caster, target, action)
+    elif action_type == "enter_combat":
+        handle_enter_combat(caster, target, action, sim=sim)
+    elif action_type == "exit_combat":
+        handle_exit_combat(caster, target, action, sim=sim)
+    elif action_type == "ability_cancel":
+        handle_ability_cancel(caster, target, action)
+    elif action_type == "cooldown":
+        handle_cooldown_action(sim, caster, action, ability=ability, context=context)
+    elif action_type == "global_cooldown":
+        handle_global_cooldown(sim, caster, action)
+    elif action_type == "custom":
+        handle_custom_action(sim, caster, target, action, context=context)
+    elif action_type == "grant_immunity":
+        handle_grant_immunity(sim, caster, target, action, context=context)
     elif action_type == "call_effect":
         if ability and "effect" in action:
             call_target = caster if action.get("to_actor") == "caster" else target
@@ -854,6 +881,69 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
         owner_entity.cleanup_expired_effects([owner_key])
 
 
+def handle_set_effect_stack_charge(sim, caster, target, action, ability=None, context=None):
+    """Sets stacks on an active effect to a fixed value (e.g. Ward of the Continuum capping Dark Ward at 10 charges)."""
+    floats = action.get("floats") or {}
+    amount_raw = floats.get(
+        "amount",
+        floats.get(
+            "amount_min",
+            floats.get(
+                "amount_max",
+                action.get("amount", action.get("value", action.get("count", 0.0))),
+            ),
+        ),
+    )
+    target_stacks = int(round(float(amount_raw)))
+
+    owner_entity = (context or {}).get("owner_entity") or target
+    owner_key = (context or {}).get("owner_effect_key")
+    eff = getattr(owner_entity, "effects", {}).get(owner_key) if owner_key else None
+
+    # Search by tag or ability_spec if owner_key not resolved or if action specifies tags/spec
+    search_tags = set(action.get("tags") or [])
+    tag_str = (action.get("strings") or {}).get("tag")
+    if tag_str:
+        search_tags.add(tag_str)
+    spec = (action.get("ints") or {}).get("ability_spec") or action.get("ability_spec")
+    if spec == 0:
+        spec = None
+
+    if (eff is None or getattr(eff, "is_expired", False)) and (search_tags or spec):
+        for k, e in getattr(owner_entity, "effects", {}).items():
+            if getattr(e, "is_expired", False):
+                continue
+            eff_tags = set(getattr(e, "tags", ()))
+            eff_spec = getattr(e, "fqn", "") or getattr(getattr(e, "ability_ref", None), "fqn", "")
+            if (search_tags and eff_tags & search_tags) or (spec and spec == eff_spec):
+                eff = e
+                owner_key = k
+                break
+        if eff is None and caster is not None and caster is not owner_entity:
+            for k, e in getattr(caster, "effects", {}).items():
+                if getattr(e, "is_expired", False):
+                    continue
+                eff_tags = set(getattr(e, "tags", ()))
+                eff_spec = getattr(e, "fqn", "") or getattr(getattr(e, "ability_ref", None), "fqn", "")
+                if (search_tags and eff_tags & search_tags) or (spec and spec == eff_spec):
+                    eff = e
+                    owner_key = k
+                    owner_entity = caster
+                    break
+
+    if eff is None or getattr(eff, "is_expired", False):
+        return
+
+    eff.set_stacks(target_stacks)
+
+    if getattr(eff, "scales_with_stacks", False) and getattr(eff, "modifiers", None):
+        if hasattr(owner_entity, "recalculate_stats"):
+            owner_entity.recalculate_stats()
+
+    if getattr(eff, "stacks", 1) <= 0:
+        owner_entity.cleanup_expired_effects([owner_key])
+
+
 def handle_buff_remove_action(sim, caster, target, action, ability=None, context=None):
     """Removes active effects from caster/target (buff_remove, remove_effect, dispel)."""
     action_type = action.get("action_type")
@@ -899,6 +989,21 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
                 elif dispel_tags and (dispel_tags & set(getattr(eff, "tags", ()))):
                     to_remove.append(k)
             if to_remove:
+                if sim is not None and hasattr(sim, "triggers"):
+                    for k in to_remove:
+                        eff_inst = effects_dict.get(k)
+                        if eff_inst:
+                            sim.triggers.dispatch(
+                                "on_effect_dispelled",
+                                sim,
+                                {
+                                    "caster": caster,
+                                    "target": actor,
+                                    "enemy_target": actor,
+                                    "tags": frozenset(getattr(eff_inst, "tags", ())),
+                                    "ability_spec": getattr(eff_inst, "ability_fqn", None),
+                                },
+                            )
                 actor.cleanup_expired_effects(to_remove)
 
 
@@ -1069,9 +1174,24 @@ class Ability:
             return False
 
         if getattr(caster, "active_channel", None) is not None:
+            old_channel = caster.active_channel
             print(f"[{sim.current_time:.3f}] {caster.name} interrupted channel to cast {self.name}!")
+            old_channel.is_finished = True
             caster.active_channel = None
             caster.is_channeling = False
+            if sim is not None and hasattr(sim, "triggers"):
+                sim.triggers.dispatch(
+                    "on_channeling_ended",
+                    sim,
+                    {
+                        "caster": caster,
+                        "target": getattr(old_channel, "target", None),
+                        "enemy_target": getattr(old_channel, "target", None),
+                        "ability_spec": getattr(getattr(old_channel, "ability", None), "fqn", None),
+                        "tags": getattr(getattr(old_channel, "ability", None), "tags", ()),
+                        "is_successful": False,
+                    },
+                )
 
         if getattr(caster, "active_cast", None) is not None:
             print(f"[{sim.current_time:.3f}] {caster.name} interrupted cast to cast {self.name}!")
@@ -1083,6 +1203,20 @@ class Ability:
         print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
 
         self.apply_cooldown_locks(caster, sim)
+
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch(
+                "on_ability_activate",
+                sim,
+                {
+                    "caster": caster,
+                    "target": target,
+                    "enemy_target": target,
+                    "ability_spec": self.fqn,
+                    "tags": self.tags,
+                    "from_actor": 2,
+                },
+            )
 
         caster.current_target = target
         is_aggressive = (
@@ -1211,7 +1345,307 @@ class Ability:
         for entry_id in self.entry_effect_ids:
             self.execute_effect(entry_id, caster, ability_target, sim)
 
+        # If on_apply triggered ability_cancel, do not schedule ticks and return actor to ready
+        if getattr(channel, "is_finished", False):
+            if sim is not None:
+                from src.swtorsim.events import PlayerReady
+                target_time = max(sim.current_time, getattr(caster, "next_gcd", sim.current_time))
+                sim.schedule_absolute(target_time, PlayerReady(caster, ability_target))
+            return
+
         # Schedule the first periodic tick event
         if sim is not None:
             sim.schedule_relative(scaled_interval, ChannelTickEvent(channel))
 
+def handle_invoke_projectile(sim, caster, target, action, ability=None, context=None):
+    """Resolves or schedules on_travel_complete for projectile actions based on distance & travel speed."""
+    parent_effect = (context or {}).get("effect")
+    if parent_effect is None:
+        return
+
+    from src.swtorsim.settings import is_projectile_flight_time_enabled, get_default_combat_distance
+
+    floats = action.get("floats")
+    travel_speed = float(floats.get("travel_speed", 0.0)) if isinstance(floats, dict) else 0.0
+
+    time_to_hit = 0.0
+    if is_projectile_flight_time_enabled() and travel_speed > 0.0:
+        distance = getattr(target, "combat_distance", None)
+        if distance is None:
+            distance = get_default_combat_distance()
+        if distance > 0.0:
+            time_to_hit = distance / (travel_speed * 10.0)
+
+    if time_to_hit > 0.0 and sim is not None:
+        from src.swtorsim.events import ProjectileImpactEvent
+        sim.schedule_relative(
+            time_to_hit,
+            ProjectileImpactEvent(
+                parent_effect,
+                caster,
+                target,
+                ability=ability,
+                context=context,
+            ),
+        )
+    else:
+        parent_effect.execute_triggered_branches(
+            "on_travel_complete",
+            sim,
+            caster,
+            target,
+            context=context,
+            ability=ability,
+        )
+
+def handle_reset_timer(sim, caster, target, action, ability=None, context=None):
+    """Resets the duration and ticks of the active effect on owner_entity back to full."""
+    if not isinstance(context, dict):
+        return
+
+    owner_entity = context.get("owner_entity")
+    effect_key = context.get("owner_effect_key")
+    if owner_entity is None or effect_key is None:
+        return
+
+    active_effect = getattr(owner_entity, "effects", {}).get(effect_key)
+    if active_effect is None or getattr(active_effect, "is_expired", False):
+        return
+
+    current_time = sim.current_time if sim is not None else 0.0
+    duration = getattr(active_effect, "duration", 0.0)
+    if duration <= 0.0:
+        eff_bp = getattr(active_effect, "effect_blueprint", None)
+        duration = float(getattr(eff_bp, "duration", 0.0) if eff_bp else 0.0)
+
+    if duration > 0.0:
+        new_expires_at = current_time + duration
+        active_effect.expires_at = new_expires_at
+        if sim is not None:
+            from src.swtorsim.events import EffectExpire
+            sim.schedule_absolute(new_expires_at, EffectExpire(owner_entity, effect_key, active_effect))
+
+    total_ticks = getattr(active_effect, "total_ticks", 0)
+    if total_ticks > 0:
+        active_effect.ticks_remaining = total_ticks
+
+def handle_modify_active_duration(sim, caster, target, action, ability=None, context=None):
+    """Modifies the active duration of target effect(s) by adding action['duration'] seconds."""
+    duration_delta = float(action.get("duration", 0.0) or 0.0)
+    if duration_delta == 0.0:
+        intervals = action.get("intervals")
+        if isinstance(intervals, dict) and "18" in intervals:
+            duration_delta = float(intervals["18"] or 0.0)
+    if duration_delta == 0.0:
+        return
+
+    # Determine target actor (1 = caster, 2 = target)
+    ints = action.get("ints")
+    actor_id = ints.get("actor", 1) if isinstance(ints, dict) else 1
+    actor = caster if actor_id == 1 else target
+    if actor is None or not hasattr(actor, "effects"):
+        return
+
+    action_tags = frozenset(action.get("tags") or [])
+    current_time = sim.current_time if sim is not None else 0.0
+
+    matching_effects = []
+    if action_tags:
+        for eff_key, eff_inst in actor.effects.items():
+            if getattr(eff_inst, "is_expired", False):
+                continue
+            eff_tags = getattr(eff_inst, "tags", frozenset())
+            if eff_tags & action_tags:
+                matching_effects.append((eff_key, eff_inst))
+    else:
+        if isinstance(context, dict):
+            owner_key = context.get("owner_effect_key")
+            if owner_key and owner_key in actor.effects:
+                eff_inst = actor.effects[owner_key]
+                if not getattr(eff_inst, "is_expired", False):
+                    matching_effects.append((owner_key, eff_inst))
+
+    for eff_key, active_eff in matching_effects:
+        if active_eff.expires_at is not None:
+            new_expires_at = max(current_time, active_eff.expires_at + duration_delta)
+            active_eff.expires_at = new_expires_at
+            if sim is not None:
+                from src.swtorsim.events import EffectExpire
+                sim.schedule_absolute(new_expires_at, EffectExpire(actor, eff_key, active_eff))
+
+def _resolve_state_actor(caster, target, action):
+    if not isinstance(action, dict):
+        return caster
+    if action.get("to_actor") == "target" or action.get("ints", {}).get("actor") == 2:
+        return target
+    return caster
+
+
+def handle_take_cover(caster, target, action, is_portable: bool = False):
+    """Sets the actor in cover state."""
+    actor = _resolve_state_actor(caster, target, action)
+    if actor is not None:
+        actor.is_in_cover = True
+        if is_portable:
+            actor.is_in_portable_cover = True
+
+
+def handle_leave_cover(caster, target, action):
+    """Clears the actor's cover state."""
+    actor = _resolve_state_actor(caster, target, action)
+    if actor is not None:
+        actor.is_in_cover = False
+        actor.is_in_portable_cover = False
+
+
+def handle_become_stealthed(caster, target, action):
+    """Enters stealth mode on the actor."""
+    actor = _resolve_state_actor(caster, target, action)
+    if actor is not None:
+        actor.is_stealthed = True
+
+
+def handle_enter_combat(caster, target, action, sim=None):
+    """Puts the actor into combat state."""
+    actor = _resolve_state_actor(caster, target, action)
+    if actor is not None:
+        actor.in_combat = True
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch("on_enter_combat", sim, {"caster": caster, "target": target, "actor": actor})
+
+
+def handle_exit_combat(caster, target, action, sim=None):
+    """Drops the actor from combat state."""
+    actor = _resolve_state_actor(caster, target, action)
+    if actor is not None:
+        actor.in_combat = False
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch("on_exit_combat", sim, {"caster": caster, "target": target, "actor": actor})
+
+def handle_grant_immunity(sim, caster, target, action, context=None):
+    """Handles effAction_GrantImmunity by registering immunity tags on the target or active effect."""
+    actor = _resolve_state_actor(caster, target, action) or target or caster
+    if actor is None:
+        return True
+    tags = action.get("tags") or []
+    if not tags:
+        val = (action.get("strings") or {}).get("tag")
+        if val:
+            tags = [t.strip() for t in val.split(",") if t.strip()]
+    if not tags:
+        return True
+    active_effect = (context or {}).get("active_effect")
+    if active_effect is not None and hasattr(active_effect, "immunities"):
+        active_effect.immunities.update(tags)
+    elif hasattr(actor, "_base_immunities"):
+        actor._base_immunities.update(tags)
+    return True
+
+def handle_ability_cancel(caster, target, action):
+    """Cancels active channel or cast on the actor."""
+    actor = _resolve_state_actor(caster, target, action)
+    if actor is None:
+        return
+    active_channel = getattr(actor, "active_channel", None)
+    if active_channel is not None:
+        active_channel.is_finished = True
+        actor.active_channel = None
+        actor.is_channeling = False
+        sim_ref = getattr(actor, "_sim_ref", None)
+        if sim_ref is not None and hasattr(sim_ref, "triggers"):
+            sim_ref.triggers.dispatch(
+                "on_channeling_ended",
+                sim_ref,
+                {
+                    "caster": actor,
+                    "target": getattr(active_channel, "target", None),
+                    "enemy_target": getattr(active_channel, "target", None),
+                    "ability_spec": getattr(getattr(active_channel, "ability", None), "fqn", None),
+                    "tags": getattr(getattr(active_channel, "ability", None), "tags", ()),
+                    "is_successful": False,
+                },
+            )
+
+    active_cast = getattr(actor, "active_cast", None)
+    if active_cast is not None:
+        actor.active_cast = None
+        actor.is_casting = False
+
+
+def handle_cooldown_action(sim, caster, action, ability=None, context=None):
+    """Triggers a cooldown on the ability or specified ability spec."""
+    if caster is None or sim is None:
+        return
+
+    target_abl = ability
+    if target_abl is None and isinstance(context, dict):
+        target_abl = context.get("ability")
+
+    spec = action.get("ints", {}).get("ability_spec") or action.get("ability_spec")
+    if spec and hasattr(caster, "ability_db") and spec in caster.ability_db:
+        target_abl = caster.ability_db[spec]
+
+    if target_abl is None:
+        return
+
+    cd_val = float(getattr(target_abl, "cooldown", 0.0) or 0.0)
+    if cd_val <= 0.0:
+        bp = getattr(target_abl, "blueprint", None)
+        cd_val = float(getattr(bp, "cooldown", 0.0) or 0.0)
+
+    custom_cd = action.get("floats", {}).get("duration") or action.get("duration")
+    if custom_cd is not None and float(custom_cd) > 0.0:
+        cd_val = float(custom_cd)
+
+    if cd_val > 0.0:
+        ignore_alacrity = bool(action.get("bools", {}).get("ignore_alacrity", False))
+        if ignore_alacrity:
+            final_cd = cd_val
+        elif hasattr(caster, "calculate_cooldown"):
+            final_cd = caster.calculate_cooldown(cd_val, ability=target_abl)
+        else:
+            final_cd = cd_val
+        abl_name = getattr(target_abl, "name", None) or getattr(target_abl, "fqn", "")
+        current_cd = caster.cooldowns.get(abl_name, 0.0)
+        new_cd = round(sim.current_time + final_cd, 4)
+        caster.cooldowns[abl_name] = max(current_cd, new_cd)
+
+
+def handle_global_cooldown(sim, caster, action):
+    """Triggers a global cooldown lock on the actor."""
+    if caster is None or sim is None:
+        return
+    base_gcd = float(
+        action.get("duration")
+        or (action.get("intervals", {}).get("18") if isinstance(action.get("intervals"), dict) else None)
+        or (action.get("floats", {}).get("duration") if isinstance(action.get("floats"), dict) else None)
+        or 1.5
+    )
+    if hasattr(caster, "calculate_gcd"):
+        gcd = caster.calculate_gcd(base_gcd)
+    else:
+        gcd = base_gcd
+    caster.next_gcd = max(getattr(caster, "next_gcd", 0.0), round(sim.current_time + gcd, 4))
+
+
+def handle_custom_action(sim, caster, target, action, context=None):
+    """Handles engine-level custom action hooks (such as programmatic ability triggers)."""
+    if caster is None:
+        return
+    ints = action.get("ints", {}) if isinstance(action, dict) else {}
+    param1 = str(ints.get("param1", ""))
+
+    # 6855115466292073041: BioWare programmatic ability trigger hook
+    # (used by Force Cloak, Cloaking Screen, Disappearing Act, and Shoulder Cannon)
+    if param1 == "6855115466292073041":
+        spec = ints.get("param2")
+        if not spec:
+            return
+        target_abl = getattr(caster, "ability_db", {}).get(spec)
+        if target_abl is None:
+            return
+
+        entry_effect_ids = getattr(target_abl, "entry_effect_ids", ()) or ()
+        for entry_id in entry_effect_ids:
+            if hasattr(target_abl, "execute_effect"):
+                target_abl.execute_effect(entry_id, caster, caster, sim, context=context)

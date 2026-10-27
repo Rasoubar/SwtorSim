@@ -56,6 +56,7 @@ class ActiveEffect:
 
     # Timers
     expires_at: Optional[float] = None
+    duration: float = 0.0
     tick_interval: Optional[float] = None
 
     # Stacks / Charges
@@ -79,6 +80,7 @@ class ActiveEffect:
     # Payloads
     modifiers: List[Modifier] = field(default_factory=list)
     branches: List[Dict[str, Any]] = field(default_factory=list)
+    immunities: set[str] = field(default_factory=set)
 
     # State
     is_passive: bool = False
@@ -97,6 +99,12 @@ class ActiveEffect:
 
     def modify_stacks(self, amount: int) -> None:
         self.stacks = max(0, min(self.stacks + amount, self.max_stacks))
+        if self.stacks == 0 and self.max_stacks > 0:
+            self.is_expired = True
+
+    def set_stacks(self, value: int) -> None:
+        max_st = self.max_stacks if self.max_stacks > 0 else 1
+        self.stacks = max(0, min(value, max_st))
         if self.stacks == 0 and self.max_stacks > 0:
             self.is_expired = True
 
@@ -154,12 +162,14 @@ class ActiveEffect:
             for init in effect_node.get("initializers", [])
         )
 
+        duration = float(effect_node.get("duration", 0.0) or 0.0)
+
         if is_passive:
             computed_expires_at = None
         elif expires_at is not None:
             computed_expires_at = expires_at
-        elif "duration" in effect_node and current_time is not None:
-            computed_expires_at = current_time + effect_node["duration"]
+        elif duration > 0.0 and current_time is not None:
+            computed_expires_at = current_time + duration
         else:
             computed_expires_at = None
 
@@ -204,6 +214,7 @@ class ActiveEffect:
             number=effect_node.get("number", 1),
             tags=frozenset(effect_node.get("tags", [])),
             expires_at=computed_expires_at,
+            duration=duration,
             tick_interval=effect_node.get("tick_interval"),
             stacks=initial_stacks,
             max_stacks=max_stacks,
@@ -333,6 +344,7 @@ class ActiveEffect:
             number=getattr(effect, "number", 1),
             tags=frozenset(getattr(effect, "tags", None) or []),
             expires_at=computed_expires_at,
+            duration=duration,
             tick_interval=tick_interval,
             stacks=initial_stacks,
             max_stacks=max_stacks,

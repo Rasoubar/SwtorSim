@@ -20,12 +20,58 @@ class Entity:
     RECALCULATE_STATS = set()
     def __init__(self, name: str):
         self.name = name
+        self.max_hp = 1_000_000
+        self.hp = 1_000_000
+        self.is_player = False
+        self.immune_by_resolve = False
+        self.in_combat = False
+        self.is_in_cover = False
+        self.is_in_portable_cover = False
+        self.is_stealthed = False
         self.effects = {}
         self.stats = {}
         self.active_channel = None
         self.is_channeling = False
         self.active_cast = None
         self.is_casting = False
+        self._base_immunities = set()
+
+    @property
+    def immunities(self) -> set[str]:
+        """Returns the set of active immunity tags from active effects and base immunities."""
+        active_tags = set(self._base_immunities)
+        for eff in self.effects.values():
+            if not getattr(eff, "is_expired", False):
+                active_tags.update(getattr(eff, "immunities", ()))
+        return active_tags
+
+    def has_immunity(self, tag: str) -> bool:
+        """Returns True if the entity is currently immune to the given tag."""
+        return tag in self.immunities
+
+    def is_immune_to_effect(self, effect) -> bool:
+        """Returns True if the entity is immune to any tag of the incoming effect."""
+        tags = getattr(effect, "tags", ()) or ()
+        active_immunities = self.immunities
+        if not active_immunities or not tags:
+            return False
+        return any(t in active_immunities for t in tags)
+
+    def interrupt(self, sim=None) -> bool:
+        """Interrupts active cast or channel unless the entity has interrupt immunity."""
+        if self.has_immunity("tag.abl.debuff.interrupt"):
+            return False
+        interrupted = False
+        if self.is_channeling and self.active_channel is not None:
+            self.active_channel.is_finished = True
+            self.active_channel = None
+            self.is_channeling = False
+            interrupted = True
+        if self.is_casting:
+            self.active_cast = None
+            self.is_casting = False
+            interrupted = True
+        return interrupted
 
     def apply_effect(self, sim, ability, effect, caster=None): #can be improved on the refresh
         """Applies or refreshes an extracted ActiveEffect, calculates expiration, and triggers stat updates if needed."""
@@ -74,6 +120,7 @@ class Entity:
             scaled_tick = None
 
         effect_instance.caster_ref = caster
+        effect_instance.duration = duration
         effect_instance.tick_interval = scaled_tick
         effect_instance.total_ticks = total_ticks
         effect_instance.ticks_remaining = total_ticks
@@ -117,6 +164,16 @@ class Entity:
                         effect_key=effect_key,
                         effect_tags=effect_tags,
                     )
+                eff_ctx = {
+                    "caster": caster or self,
+                    "target": self,
+                    "tags": frozenset(effect_tags),
+                    "effect_tags": frozenset(effect_tags),
+                    "ability_spec": getattr(ability, "fqn", None),
+                    "include_effect_refreshes": (existing is not None and not getattr(existing, "is_expired", False)),
+                }
+                sim.triggers.dispatch("on_effect_applied", sim, eff_ctx)
+                sim.triggers.dispatch("on_effect_received", sim, eff_ctx)
 
             if total_ticks > 0 and scaled_tick is not None:
                 from src.swtorsim.events import DotTick
@@ -212,11 +269,19 @@ class Player(Entity):
         self.level = 85
         self.rotation = None
         self.toughness = 1
-        self.creature_type = 1
+        self.max_hp = 1_000_000
+        self.hp = 1_000_000
+        self.creature_type = 4
         self.is_droid = False
         self.is_stealthed = False
         self.is_mounted = False
+        self.combat_distance = 30.0
         self.is_behind_target = True
+        self.is_player = True
+        self.in_combat = False
+        self.is_in_cover = False
+        self.is_in_portable_cover = False
+        self.is_stealthed = False
         self.character_class = "assassin"
         self.faction = "empire"
         self.resource = create_resource_pool(
@@ -821,6 +886,12 @@ class Dummy(Entity):
         self.is_droid = False
         self.is_stealthed = False
         self.is_mounted = False
+        self.combat_distance = 30.0
+        self.immune_by_resolve = True
+        self.in_combat = True
+        self.is_in_cover = False
+        self.is_in_portable_cover = False
+        self.is_stealthed = False
         self.base_stats = {
             "Armor" : 17225
         }

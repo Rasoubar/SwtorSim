@@ -288,6 +288,14 @@ def _decode_generic_ints(
             if skip_zero and int_value == 0:
                 continue
             ints[_snake_case(key)] = int_value
+        elif str(value).lstrip('-').isdigit():
+            int_value = int(value)
+            if skip_zero and int_value == 0:
+                continue
+            ints[_snake_case(key)] = int_value
+        elif isinstance(value, str) and value:
+            resolved = _resolve_ability_spec(value, id_to_fqn) if id_to_fqn else value
+            ints[_snake_case(key)] = resolved if resolved is not None else value
     return ints
 
 
@@ -1264,6 +1272,16 @@ def _decode_action(
         strings["conditional_tag"] = resolved_tag
     if strings:
         generic["strings"] = strings
+
+    intervals = {
+        key: _raw_time_interval_seconds(value)
+        for key, value in params.get("time_interval", {}).items()
+        if _raw_time_interval_seconds(value) is not None
+    }
+    if intervals:
+        generic["intervals"] = intervals
+        if "18" in intervals and "duration" not in generic:
+            generic["duration"] = intervals["18"]
 
     return generic
 
