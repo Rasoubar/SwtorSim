@@ -289,7 +289,16 @@ class DotTick(Event):
                 sim.schedule_absolute(next_tick_time, self)
             else:
                 self.target.cleanup_expired_effects([dot_name])
-                print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
+                is_dot = (
+                    "tag.abl.debuff.damage_over_time" in getattr(self.instance_ref, "tags", ())
+                    or any(
+                        t.get("trigger") == "on_tick"
+                        for b in getattr(effect_blueprint, "branches", ())
+                        for t in getattr(b, "triggers", ())
+                    )
+                )
+                label = "DoT" if is_dot else "Buff"
+                print(f"[{sim.current_time:.2f}s] {label} expired and cleared: {dot_name}")
             return
 
         # Legacy fallback without blueprint

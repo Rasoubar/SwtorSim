@@ -21,6 +21,7 @@ DEFAULT_BASE_GCD = 1.5
 
 CRIT_RESULT_NAME = "effResultCrit"
 CRIT_RESULT_TOKENS = frozenset({CRIT_RESULT_NAME, "32"})
+OK_RESULT_TOKENS = frozenset({"effResultOk", "1"})
 
 ACTOR_LABELS: dict[str, str] = {
     "2": "caster",
@@ -833,7 +834,9 @@ def _int_list_items(value: Any) -> list[str]:
 
 def _decode_eff_results(int_list_params: dict[str, Any]) -> list[str]:
     tokens = _int_list_items(int_list_params.get("effParam_Results"))
-    if any(token in CRIT_RESULT_TOKENS for token in tokens):
+    if any(token in CRIT_RESULT_TOKENS for token in tokens) and not any(
+        token in OK_RESULT_TOKENS for token in tokens
+    ):
         return [CRIT_RESULT_NAME]
     return []
 

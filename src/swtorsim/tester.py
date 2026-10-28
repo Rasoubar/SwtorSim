@@ -19,7 +19,7 @@ class Tester:
         self.debuff_module = debuff_module
         self.enable_stem_matching = enable_stem_matching
 
-    def run_test(self):
+    def run_test(self, show_buffs: bool = True):
         """Orchestrates a single simulation."""
         print(f"--- Starting Single Test Run ({self.duration}s) ---")
         sim, player, target = prepare_simulation(
@@ -30,7 +30,7 @@ class Tester:
             self.debuff_module
         )
         sim.run_timed(duration=self.duration, target=target)
-        sim.tracker.print_metrics(sim.current_time)
+        sim.tracker.print_metrics(sim.current_time, show_buffs=show_buffs)
 
     def run_monte_carlo(self, iterations=1000):
         """Orchestrates monte carlo workflow."""

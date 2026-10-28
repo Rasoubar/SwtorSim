@@ -10,6 +10,28 @@ _LIFECYCLE_TRIGGERS = frozenset({
     "on_stack_charge_decreased",
 })
 
+_TARGET_MATCH_TRIGGERS = frozenset({
+    "on_damage_taken",
+    "on_pre_damage_taken",
+    "on_healing_taken",
+    "on_pre_healing_taken",
+    "on_death",
+    "on_pre_death",
+    "on_effect_received",
+})
+
+_CASTER_MATCH_TRIGGERS = frozenset({
+    "on_damage_dealt",
+    "on_pre_damage_dealt",
+    "on_healing_dealt",
+    "on_pre_healing_dealt",
+    "on_kill",
+    "on_effect_applied",
+    "on_ability_activate",
+    "on_ability_activated",
+    "on_channeling_ended",
+})
+
 
 class TriggerManager:
     def __init__(self):
@@ -66,6 +88,19 @@ class TriggerManager:
             abl_fqn = getattr(abl, "fqn", None)
             all_sub_tags = set(sub["tags"]) | set(sub.get("effect_tags") or ())
             frozen_sub_tags = frozenset(all_sub_tags)
+
+            # Fast reject if actor context does not match subscriber role
+            if event_name in _TARGET_MATCH_TRIGGERS:
+                ctx_target = context.get("target")
+                sub_target = sub.get("target")
+                if ctx_target is not None and sub_target is not None and ctx_target != sub_target:
+                    continue
+
+            if event_name in _CASTER_MATCH_TRIGGERS:
+                ctx_caster = context.get("caster")
+                sub_caster = sub.get("caster")
+                if ctx_caster is not None and sub_caster is not None and ctx_caster != sub_caster:
+                    continue
 
             # 0. Internal cooldown / rate limit on trigger (STAT_eff_trigger_rate_limit_modifier_fixed / 229)
             base_min_interval = sub["min_interval"]

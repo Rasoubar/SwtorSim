@@ -147,6 +147,14 @@ class Entity:
 
         if sim is not None:
             self._sim_ref = sim
+            if hasattr(sim, "tracker") and sim.tracker is not None and hasattr(sim.tracker, "log_effect_applied"):
+                sim.tracker.log_effect_applied(
+                    self.name,
+                    effect_key,
+                    current_time,
+                    stacks=getattr(effect_instance, "stacks", 1),
+                    is_passive=is_passive,
+                )
             if hasattr(sim, "triggers") and ability is not None:
                 sim.triggers.unsubscribe(owner_id)
                 effect_tags = (
@@ -231,6 +239,8 @@ class Entity:
                 continue
             if hasattr(popped_effect, "is_expired"):
                 popped_effect.is_expired = True
+            if sim_ref is not None and hasattr(sim_ref, "tracker") and sim_ref.tracker is not None and hasattr(sim_ref.tracker, "log_effect_removed"):
+                sim_ref.tracker.log_effect_removed(self.name, r_id, getattr(sim_ref, "current_time", 0.0))
             owner_id = getattr(popped_effect, "owner_id", None)
             if owner_id and sim_ref is not None and hasattr(sim_ref, "triggers"):
                 sim_ref.triggers.unsubscribe(owner_id)

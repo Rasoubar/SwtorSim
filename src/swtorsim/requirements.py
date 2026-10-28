@@ -310,13 +310,25 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         comparison = item.get("comparison", "gte")
         expected_rank = item.get("ints", {}).get("rank", 1)
         has_it = False
-        if hasattr(caster, "passive_blueprints") and spec in caster.passive_blueprints:
+        target_entity = actor if actor is not None else caster
+        if hasattr(target_entity, "passive_blueprints") and spec in target_entity.passive_blueprints:
             has_it = True
-        elif hasattr(caster, "ability_db"):
-            if spec in caster.ability_db or (isinstance(spec, str) and spec.lower().replace(" ", "_") in caster.ability_db):
+        elif hasattr(target_entity, "passive_db") and spec in target_entity.passive_db:
+            has_it = True
+        elif hasattr(target_entity, "ability_db"):
+            if spec in target_entity.ability_db or (isinstance(spec, str) and spec.lower().replace(" ", "_") in target_entity.ability_db):
                 has_it = True
-        actual_rank = 1 if has_it else 0
-        res = compare_values(actual_rank, comparison, expected_rank)
+            elif isinstance(spec, str):
+                from src.swtorsim.settings import is_stem_matching_enabled
+                if is_stem_matching_enabled():
+                    base_stem = spec.split(".")[-1]
+                    if any(getattr(a, "fqn", "").endswith(f".{base_stem}_plus") for a in target_entity.ability_db.values()):
+                        has_it = True
+        if not has_it:
+            res = False
+        else:
+            actual_rank = 1
+            res = compare_values(actual_rank, comparison, expected_rank)
 
     elif cond_type == "has_effect":
         tags = item.get("tags")

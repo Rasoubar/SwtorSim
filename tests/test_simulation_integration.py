@@ -111,6 +111,33 @@ class SimulationIntegrationTests(unittest.TestCase):
                 "Crushed (Eradicate) should be expired and removed after 6 ticks",
             )
 
+    def test_02b_creeping_terror_dot_lifecycle_and_ticks(self):
+        """Verifies Creeping Terror applies DoT, ticks 6 periodic damage hits + 1 initial hit, and lasts full duration."""
+        self.sim.queue.clear()
+        self.target.effects.clear()
+        ct = self.player.ability_db["creeping_terror"]
+        self.assertTrue(ct.cast(self.player, self.target, self.sim))
+
+        with self.subTest("creeping_terror_applied_to_target"):
+            self.assertTrue(
+                self.target.has_effect("Creeping Terror"),
+                "Creeping Terror DoT should be active on target immediately after cast",
+            )
+
+        with self.subTest("creeping_terror_ticks_and_expires_at_full_duration"):
+            # 1 initial hit + 6 periodic DoT ticks over ~16.6s with alacrity
+            self.sim.run_timed(duration=18.0, target=self.target)
+            ct_metrics = self.sim.tracker.breakdown.get("Creeping Terror", {})
+            self.assertEqual(
+                ct_metrics.get("hit_count", 0),
+                7,
+                "Creeping Terror should record 1 initial hit + 6 periodic DoT ticks (7 total hits)",
+            )
+            self.assertFalse(
+                self.target.has_effect("Creeping Terror"),
+                "Creeping Terror should be expired and removed after 6 ticks",
+            )
+
     def test_03_extracted_combat_action_handlers(self):
         """Verifies extracted resource recovery, cooldown modification, charge modification, and dispel."""
         with self.subTest("energy_recovery_and_regen_force"):
