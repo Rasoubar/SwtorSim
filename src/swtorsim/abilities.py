@@ -29,6 +29,9 @@ def _resolve_target_overrides(overrides, current_target, caster, context=None):
             resolved = caster
         elif o_type in ("aoe_sphere", "aoe_cone", "enemies_list", "primary_target"):
             resolved = enemy_target
+        elif o_type in ("party_members"):
+            # In single-actor simulation, party members resolves to caster
+            resolved = caster
         elif o_type == "trigger_target" and context and "target" in context:
             resolved = context["target"]
         elif o_type == "trigger_caster" and context and "caster" in context:
@@ -1239,6 +1242,14 @@ class Ability:
         )
         if is_aggressive and hasattr(caster, "break_stealth"):
             caster.break_stealth(sim)
+        if is_aggressive and not getattr(caster, "in_combat", False):
+            caster.in_combat = True
+            if sim is not None and hasattr(sim, "triggers"):
+                sim.triggers.dispatch(
+                    "on_enter_combat",
+                    sim,
+                    {"caster": caster, "target": target, "actor": caster},
+                )
         ability_target = target if is_aggressive else caster
 
         # Check if ability has channel or cast activation

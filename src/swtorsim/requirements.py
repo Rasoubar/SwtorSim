@@ -422,7 +422,7 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         res = (actual_stacks == expected_count)
 
     elif cond_type == "is_target_caster":
-        effective_target = context.get("target") if context and "target" in context else target
+        effective_target = target if target is not None else ((context or {}).get("target"))
         res = (effective_target is caster)
 
     elif cond_type == "is_casting":
