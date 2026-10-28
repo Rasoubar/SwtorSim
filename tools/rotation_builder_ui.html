@@ -1,0 +1,2484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwtorSim - Rotation Builder</title>
+<style>
+  :root {
+    --bg-base: #0d1117;
+    --bg-panel: #161b22;
+    --bg-card: #1c232d;
+    --bg-card-hover: #222b38;
+    --bg-input: #0f141b;
+    --border: #30363d;
+    --border-subtle: #21262d;
+    --text-main: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --purple: #a371f7;
+    --amber: #d29922;
+    --amber-bg: rgba(210, 153, 34, 0.14);
+    --green: #3fb950;
+    --green-bg: rgba(63, 185, 80, 0.14);
+    --red: #f85149;
+    --red-bg: rgba(248, 81, 73, 0.14);
+    --cyan: #39c5cf;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-base);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header Bar */
+  header {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    color: var(--text-main);
+  }
+
+  .brand-badge {
+    background: linear-gradient(135deg, #238636, #1f6feb);
+    color: #fff;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Main 3-Column Workspace */
+  .workspace {
+    display: grid;
+    grid-template-columns: 330px 1fr 400px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
+    background: var(--bg-panel);
+  }
+
+  .panel:last-child {
+    border-right: none;
+  }
+
+  .panel-center {
+    background: var(--bg-base);
+  }
+
+  .panel-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .panel-body {
+    padding: 12px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  /* Controls & Inputs */
+  select, input[type="text"], input[type="number"], textarea {
+    background: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 12.5px;
+    font-family: inherit;
+    outline: none;
+  }
+
+  select:focus, input:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  button {
+    background: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: background 0.12s, border-color 0.12s;
+  }
+
+  button:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--text-muted);
+  }
+
+  button.btn-primary {
+    background: #1f6feb;
+    border-color: #388bfd;
+    color: #fff;
+  }
+
+  button.btn-primary:hover {
+    background: #388bfd;
+  }
+
+  button.btn-success {
+    background: #238636;
+    border-color: #2ea043;
+    color: #fff;
+  }
+
+  button.btn-success:hover {
+    background: #2ea043;
+  }
+
+  button.btn-amber {
+    background: var(--amber-bg);
+    border-color: var(--amber);
+    color: #f0b72f;
+  }
+
+  button.btn-purple {
+    background: rgba(163, 113, 247, 0.14);
+    border-color: var(--purple);
+    color: #d2a8ff;
+  }
+
+  button.btn-danger {
+    background: transparent;
+    border-color: transparent;
+    color: var(--text-muted);
+    padding: 4px 6px;
+  }
+
+  button.btn-danger:hover {
+    background: var(--red-bg);
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  button.btn-sm {
+    padding: 3px 7px;
+    font-size: 11px;
+  }
+
+  .form-group {
+    margin-bottom: 10px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  /* Skill Tree Choices Mini-Grid */
+  .skill-tree-drawer {
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 10px;
+  }
+
+  .st-row {
+    display: grid;
+    grid-template-columns: 34px 1fr 1fr 1fr;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
+  .st-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .st-lvl {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+
+  .st-btn {
+    padding: 4px 5px;
+    font-size: 10.5px;
+    text-align: center;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 4px;
+  }
+
+  .st-btn.active {
+    background: rgba(88, 166, 255, 0.2);
+    border-color: var(--accent);
+    color: var(--accent-hover);
+    font-weight: 600;
+  }
+
+  /* Palette Tabs */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    flex-shrink: 0;
+  }
+
+  .tab-btn {
+    flex: 1;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    padding: 8px 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    justify-content: center;
+  }
+
+  .tab-btn:hover {
+    background: var(--bg-card);
+    border-color: transparent;
+  }
+
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    background: rgba(88, 166, 255, 0.06);
+  }
+
+  /* Ability Cards in Left Palette */
+  .ability-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 7px 9px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .ability-item:hover {
+    border-color: var(--border);
+  }
+
+  .ability-info {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .ability-title {
+    font-weight: 600;
+    font-size: 12.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .ability-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+    display: inline-block;
+  }
+
+  .badge-offgcd {
+    background: var(--amber-bg);
+    color: #f0b72f;
+    border: 1px solid rgba(210, 153, 34, 0.4);
+  }
+
+  .badge-gcd {
+    background: rgba(88, 166, 255, 0.12);
+    color: var(--accent);
+  }
+
+  .badge-opener {
+    background: rgba(57, 197, 207, 0.15);
+    color: var(--cyan);
+    border: 1px solid rgba(57, 197, 207, 0.35);
+  }
+
+  .badge-loop {
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--green);
+    border: 1px solid rgba(63, 185, 80, 0.35);
+  }
+
+  /* Timeline Cards */
+  .timeline-toolbar {
+    padding: 10px 14px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+  }
+
+  .step-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+
+  .step-card.active-block {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.3);
+  }
+
+  .step-card.step-optional {
+    border-left: 4px solid var(--amber);
+  }
+
+  .step-card.step-fixed {
+    border-left: 4px solid var(--accent);
+  }
+
+  .step-card.step-priority {
+    border-left: 4px solid var(--purple);
+  }
+
+  .step-card.step-anchor {
+    background: linear-gradient(90deg, rgba(63, 185, 80, 0.15), rgba(31, 111, 235, 0.15));
+    border: 1px dashed var(--green);
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .step-header {
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .step-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .step-num {
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 24px;
+  }
+
+  .step-type-pill {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .type-priority {
+    background: rgba(163, 113, 247, 0.18);
+    color: #d2a8ff;
+  }
+
+  .type-optional {
+    background: var(--amber-bg);
+    color: #f0b72f;
+  }
+
+  .type-fixed {
+    background: rgba(88, 166, 255, 0.18);
+    color: var(--accent-hover);
+  }
+
+  .step-body {
+    padding: 10px 12px;
+  }
+
+  /* Priority Pool Rows */
+  .pool-row {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .pool-row:hover {
+    border-color: var(--border);
+  }
+
+  .pool-rank {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding-top: 5px;
+    min-width: 20px;
+  }
+
+  .pool-main {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pool-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .rules-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 6px;
+    align-items: center;
+  }
+
+  .rule-pill {
+    background: rgba(88, 166, 255, 0.12);
+    border: 1px solid rgba(88, 166, 255, 0.35);
+    color: #c9d1d9;
+    border-radius: 14px;
+    padding: 2px 8px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .rule-pill strong {
+    color: var(--accent-hover);
+  }
+
+  .rule-pill .rule-del {
+    cursor: pointer;
+    color: var(--text-muted);
+    font-weight: 700;
+    padding: 0 2px;
+  }
+
+  .rule-pill .rule-del:hover {
+    color: var(--red);
+  }
+
+  .rule-unconditional {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  /* Modal for Guided Rule Builder */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.68);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  .modal-backdrop.open {
+    display: flex;
+  }
+
+  .modal {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 500px;
+    max-width: 94vw;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 700;
+    font-size: 14px;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+
+  .modal-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    background: var(--bg-card);
+  }
+
+  /* Linter & Alerts */
+  .lint-box {
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    font-size: 11.5px;
+    line-height: 1.4;
+  }
+
+  .lint-warn {
+    background: var(--amber-bg);
+    border: 1px solid rgba(210, 153, 34, 0.45);
+    color: #f0b72f;
+  }
+
+  .lint-ok {
+    background: var(--green-bg);
+    border: 1px solid rgba(63, 185, 80, 0.4);
+    color: var(--green);
+  }
+
+  /* JSON Editor */
+  .json-textarea {
+    width: 100%;
+    height: 360px;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.45;
+    resize: vertical;
+  }
+
+  /* Cast Preview Table */
+  .cast-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+  }
+
+  .cast-table th, .cast-table td {
+    padding: 5px 6px;
+    border-bottom: 1px solid var(--border-subtle);
+    text-align: left;
+  }
+
+  .cast-table th {
+    color: var(--text-muted);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    background: var(--bg-panel);
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 18px;
+    right: 18px;
+    background: #238636;
+    color: #fff;
+    padding: 9px 14px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 12.5px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    display: none;
+    z-index: 2000;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span>SWTOR SIM // ROTATION BUILDER</span>
+    <span class="brand-badge" id="activeSpecBadge">Loading...</span>
+  </div>
+  <div class="header-actions">
+    <label style="font-size:11.5px;color:var(--text-muted);">Quick Preset (RunConfig):</label>
+    <select id="runConfigSelect" onchange="onSelectRunConfig(this.value)">
+      <option value="">-- Load from Run Config --</option>
+    </select>
+
+    <label style="font-size:11.5px;color:var(--text-muted);margin-left:6px;">Load Rotation:</label>
+    <select id="existingRotationSelect" onchange="onSelectExistingRotation(this.value)">
+      <option value="">-- Open Existing Rotation JSON --</option>
+    </select>
+    <button onclick="triggerLocalFileImport()" title="Import any .json file from disk">Import File...</button>
+    <input type="file" id="localFileInput" accept=".json" style="display:none" onchange="handleLocalFileImport(event)">
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- LEFT PANEL: Loadout & Auto-Discovered Palette -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>1. Spec, Choices & Auto-Discovery</span>
+      <button class="btn-sm" onclick="toggleSkillTreeDrawer()" id="toggleTreeBtn">Skill Tree</button>
+    </div>
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Class</label>
+          <select id="classSelect" style="width:100%;" onchange="onClassChange()"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Discipline</label>
+          <select id="specSelect" style="width:100%;" onchange="onSpecChange()"></select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Choices Preset</label>
+          <select id="choicesFileSelect" style="width:100%;" onchange="onChoicesPresetChange()"></select>
+        </div>
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Tactical</label>
+          <select id="tacticalSelect" style="width:100%;" onchange="refreshLoadoutCatalog()">
+            <option value="">(None)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Legendary Implant 1</label>
+          <select id="legendary1Select" style="width:100%;" onchange="onGearOrRelicChange('legendary', 1)">
+            <option value="">(None)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Legendary Implant 2</label>
+          <select id="legendary2Select" style="width:100%;" onchange="onGearOrRelicChange('legendary', 2)">
+            <option value="">(None)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Relic 1</label>
+          <select id="relic1Select" style="width:100%;" onchange="onGearOrRelicChange('relic', 1)">
+            <option value="">(None)</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Relic 2</label>
+          <select id="relic2Select" style="width:100%;" onchange="onGearOrRelicChange('relic', 2)">
+            <option value="">(None)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Interactive Skill Tree Drawer -->
+      <div id="skillTreeDrawer" class="skill-tree-drawer" style="display:none;">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;">
+          Skill Tree Choices (Click to toggle 1 / 2 / 3)
+        </div>
+        <div id="skillTreeRows"></div>
+      </div>
+
+      <input type="text" id="paletteSearch" placeholder="Search abilities, buffs, debuffs, procs..." style="width:100%;" oninput="renderPalette()">
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tabAbilities" onclick="switchPaletteTab('abilities')">Abilities (<span id="countAbilities">0</span>)</button>
+      <button class="tab-btn" id="tabBuffs" onclick="switchPaletteTab('buffs')">Buffs (<span id="countBuffs">0</span>)</button>
+      <button class="tab-btn" id="tabDebuffs" onclick="switchPaletteTab('debuffs')">Debuffs (<span id="countDebuffs">0</span>)</button>
+      <button class="tab-btn" id="tabProcs" onclick="switchPaletteTab('procs')">Procs (<span id="countProcs">0</span>)</button>
+    </div>
+
+    <div class="panel-body" id="paletteContainer"></div>
+  </div>
+
+  <!-- CENTER PANEL: Interactive Rotation Timeline -->
+  <div class="panel panel-center">
+    <div class="timeline-toolbar">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+        <button class="btn-purple" onclick="addPriorityBlock()">+ Priority Block</button>
+        <button class="btn-amber" onclick="addOptionalStep()">+ Optional Cast</button>
+        <button class="btn-primary" onclick="addFixedStep()">+ Fixed Cast</button>
+        <button onclick="addLoopAnchor()">+ Loop Anchor</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label style="font-size:11px;color:var(--text-muted);">ID Format:</label>
+        <select id="idFormatSelect" onchange="onChangeIdFormat(this.value)" style="padding:3px 6px;font-size:11px;">
+          <option value="slug">Short Slug (assassinate+)</option>
+          <option value="fqn">Full FQN (abl.sith_inquisitor...)</option>
+        </select>
+        <button class="btn-sm" onclick="expandCollapseAll(false)">Expand All</button>
+        <button class="btn-sm" onclick="expandCollapseAll(true)">Collapse All</button>
+        <button class="btn-sm btn-danger" onclick="clearRotation()" title="Clear all steps">Clear</button>
+      </div>
+    </div>
+
+    <div class="panel-body" id="timelineContainer"></div>
+  </div>
+
+  <!-- RIGHT PANEL: Save, Templates, Linter, Preview & JSON -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>3. Save, Verify & Simulate</span>
+    </div>
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div class="form-row">
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Class Folder</label>
+          <input type="text" id="saveClassFolder" style="width:100%;" value="assassin">
+        </div>
+        <div class="form-group" style="margin-bottom:6px;">
+          <label>Spec Folder</label>
+          <input type="text" id="saveSpecFolder" style="width:100%;" value="hatred">
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:8px;">
+        <label>Rotation Filename</label>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="saveFilename" style="flex:1;" value="CustomRotation.json">
+          <button class="btn-success" onclick="saveRotationToDisk()">Save to Disk</button>
+          <button onclick="downloadRotationJson()" title="Download .json file">Download</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="rTabLint" onclick="switchRightTab('lint')">Linter & Clipboard</button>
+      <button class="tab-btn" id="rTabPreview" onclick="switchRightTab('preview')">Dry-Run Sim</button>
+      <button class="tab-btn" id="rTabJson" onclick="switchRightTab('json')">Raw JSON</button>
+    </div>
+
+    <div class="panel-body" id="rightPanelBody"></div>
+  </div>
+</div>
+
+<!-- Guided Rule Builder Modal -->
+<div class="modal-backdrop" id="ruleModalBackdrop">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="ruleModalTitle">Add Condition Rule</span>
+      <button class="btn-sm" onclick="closeRuleModal()">X</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Condition Type</label>
+        <select id="ruleKeySelect" style="width:100%;" onchange="renderRuleValueForm()"></select>
+        <div id="ruleTypeDesc" style="font-size:11px;color:var(--text-muted);margin-top:4px;"></div>
+      </div>
+      <div id="ruleDynamicFields"></div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeRuleModal()">Cancel</button>
+      <button class="btn-primary" onclick="commitRuleFromModal()">Save Condition</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toastBanner"></div>
+
+<script>
+// ---------------------------------------------------------------------------
+// Global Builder State
+// ---------------------------------------------------------------------------
+let workspaceCatalog = null;
+let currentLoadout = {
+  class_name: "",
+  spec_name: "",
+  spec_path: "",
+  choices: {},
+  skill_tree: {},
+  tacticals: [],
+  legendaries: [],
+  abilities: [],
+  caster_buffs: [],
+  target_debuffs: [],
+  procs: []
+};
+
+let rotationSteps = [];
+let activeBlockIndex = null;
+let collapsedSteps = new Set();
+let savedTemplates = []; // { name, kind: 'step' | 'tail', data }
+let paletteTab = "abilities";
+let rightTab = "lint";
+let lastImportWarnings = [];
+let dryRunResult = null;
+let ruleModalContext = null; // { stepIndex, poolIndex (optional), editKey (optional) }
+
+// ---------------------------------------------------------------------------
+// Initialization & API Calls
+// ---------------------------------------------------------------------------
+window.addEventListener("DOMContentLoaded", async () => {
+  await loadWorkspaceCatalog();
+});
+
+function showToast(msg, isError = false) {
+  const el = document.getElementById("toastBanner");
+  el.textContent = msg;
+  el.style.background = isError ? "#da3633" : "#238636";
+  el.style.display = "block";
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => {
+    el.style.display = "none";
+  }, 3200);
+}
+
+async function loadWorkspaceCatalog() {
+  const res = await fetch("/api/catalog");
+  workspaceCatalog = await res.json();
+
+  // Populate RunConfig dropdown
+  const rcSel = document.getElementById("runConfigSelect");
+  rcSel.innerHTML = '<option value="">-- Load from Run Config --</option>';
+  for (const rc of workspaceCatalog.run_configs || []) {
+    const opt = document.createElement("option");
+    opt.value = rc.path;
+    opt.textContent = rc.label;
+    rcSel.appendChild(opt);
+  }
+
+  // Populate Existing Rotations dropdown
+  populateExistingRotationsSelect();
+
+  // Populate Choices Preset dropdown
+  const chSel = document.getElementById("choicesFileSelect");
+  chSel.innerHTML = "";
+  for (const ch of workspaceCatalog.choices_files || []) {
+    const opt = document.createElement("option");
+    opt.value = ch.path;
+    opt.textContent = ch.label;
+    chSel.appendChild(opt);
+  }
+
+  // Populate Relic 1 & Relic 2 dropdowns
+  for (const relSelectId of ["relic1Select", "relic2Select"]) {
+    const relSel = document.getElementById(relSelectId);
+    relSel.innerHTML = '<option value="">(No Relic)</option>';
+    for (const r of workspaceCatalog.relics || []) {
+      const opt = document.createElement("option");
+      opt.value = r.fqn;
+      opt.textContent = r.label;
+      relSel.appendChild(opt);
+    }
+  }
+
+  // Populate Class dropdown
+  const clsSel = document.getElementById("classSelect");
+  clsSel.innerHTML = "";
+  const classes = Object.keys(workspaceCatalog.disciplines || {}).sort();
+  for (const c of classes) {
+    const opt = document.createElement("option");
+    opt.value = c;
+    opt.textContent = c;
+    clsSel.appendChild(opt);
+  }
+
+  // Default to Assassin -> Hatred if available
+  if (classes.includes("Assassin")) {
+    clsSel.value = "Assassin";
+  }
+  await onClassChange("Hatred");
+
+  // Preload BasicMaliPS.json if available so user immediately sees a working example
+  const basicMali = (workspaceCatalog.rotations || []).find(r => r.path.includes("BasicMaliPS.json"));
+  if (basicMali) {
+    document.getElementById("existingRotationSelect").value = basicMali.path;
+    await onSelectExistingRotation(basicMali.path);
+  } else {
+    renderTimeline();
+    renderRightPanel();
+  }
+}
+
+function populateExistingRotationsSelect() {
+  const rotSel = document.getElementById("existingRotationSelect");
+  const cur = rotSel.value;
+  rotSel.innerHTML = '<option value="">-- Open Existing Rotation JSON --</option>';
+  for (const rot of workspaceCatalog.rotations || []) {
+    const opt = document.createElement("option");
+    opt.value = rot.path;
+    opt.textContent = rot.label;
+    rotSel.appendChild(opt);
+  }
+  if (cur) rotSel.value = cur;
+}
+
+async function onClassChange(preferredSpec = null) {
+  const cls = document.getElementById("classSelect").value;
+  const specSel = document.getElementById("specSelect");
+  specSel.innerHTML = "";
+  const specs = Object.keys((workspaceCatalog.disciplines || {})[cls] || {}).sort();
+  for (const s of specs) {
+    const opt = document.createElement("option");
+    opt.value = s;
+    opt.textContent = s;
+    specSel.appendChild(opt);
+  }
+  if (preferredSpec && specs.includes(preferredSpec)) {
+    specSel.value = preferredSpec;
+  }
+  await onSpecChange();
+}
+
+async function onSpecChange() {
+  const cls = document.getElementById("classSelect").value;
+  const spec = document.getElementById("specSelect").value;
+  const specPath = ((workspaceCatalog.disciplines || {})[cls] || {})[spec];
+  if (!specPath) return;
+
+  // Pick matching choices file if one matches class/spec
+  const chSel = document.getElementById("choicesFileSelect");
+  const matchChoice = (workspaceCatalog.choices_files || []).find(
+    c => c.path.toLowerCase().includes(spec.toLowerCase()) || c.path.toLowerCase().includes(cls.toLowerCase())
+  );
+  if (matchChoice) {
+    chSel.value = matchChoice.path;
+  }
+
+  await refreshLoadoutCatalog(chSel.value);
+}
+
+async function onChoicesPresetChange() {
+  const chPath = document.getElementById("choicesFileSelect").value;
+  await refreshLoadoutCatalog(chPath);
+}
+
+function getSelectedLegendaries() {
+  const l1 = document.getElementById("legendary1Select").value || "";
+  const l2 = document.getElementById("legendary2Select").value || "";
+  return [l1, l2].filter((v, idx, arr) => v && arr.indexOf(v) === idx);
+}
+
+function getSelectedRelics() {
+  const r1 = document.getElementById("relic1Select").value || "";
+  const r2 = document.getElementById("relic2Select").value || "";
+  return [r1, r2].filter((v, idx, arr) => v && arr.indexOf(v) === idx);
+}
+
+async function onGearOrRelicChange(kind, slot) {
+  if (kind === "legendary") {
+    const l1 = document.getElementById("legendary1Select");
+    const l2 = document.getElementById("legendary2Select");
+    if (l1.value && l1.value === l2.value) {
+      showToast("Legendary implants must be unique.", true);
+      if (slot === 2) l2.value = "";
+      else l1.value = "";
+    }
+  } else if (kind === "relic") {
+    const r1 = document.getElementById("relic1Select");
+    const r2 = document.getElementById("relic2Select");
+    if (r1.value && r1.value === r2.value) {
+      showToast("Relics must be unique.", true);
+      if (slot === 2) r2.value = "";
+      else r1.value = "";
+    }
+  }
+  await refreshLoadoutCatalog();
+}
+
+async function refreshLoadoutCatalog(choicesSource = null, gearOverrides = null) {
+  const cls = document.getElementById("classSelect").value;
+  const spec = document.getElementById("specSelect").value;
+  const specPath = ((workspaceCatalog.disciplines || {})[cls] || {})[spec];
+  if (!specPath) return;
+
+  const tacticalFqn = (gearOverrides && gearOverrides.tactical_fqn !== undefined)
+    ? gearOverrides.tactical_fqn
+    : (document.getElementById("tacticalSelect").value || "");
+  const legendaryFqns = (gearOverrides && gearOverrides.legendary_fqns !== undefined)
+    ? gearOverrides.legendary_fqns
+    : getSelectedLegendaries();
+  const relicFqns = (gearOverrides && gearOverrides.relic_fqns !== undefined)
+    ? gearOverrides.relic_fqns
+    : getSelectedRelics();
+
+  const payload = {
+    spec_path: specPath,
+    choices: choicesSource || currentLoadout.choices || document.getElementById("choicesFileSelect").value,
+    tactical_fqn: tacticalFqn,
+    legendary_fqns: legendaryFqns,
+    relic_fqns: relicFqns
+  };
+
+  const res = await fetch("/api/loadout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  if (data.error) {
+    showToast(data.error, true);
+    return;
+  }
+
+  currentLoadout = data;
+  document.getElementById("activeSpecBadge").textContent = `${data.class_name} // ${data.spec_name}`;
+  document.getElementById("saveClassFolder").value = data.default_class_folder;
+  document.getElementById("saveSpecFolder").value = data.default_spec_folder;
+
+  // Populate Tactical Select while preserving current choice
+  const tacSel = document.getElementById("tacticalSelect");
+  const prevTac = tacticalFqn || tacSel.value;
+  tacSel.innerHTML = '<option value="">(No Tactical)</option>';
+  for (const t of data.tacticals || []) {
+    const opt = document.createElement("option");
+    opt.value = t.fqn;
+    opt.textContent = t.name;
+    tacSel.appendChild(opt);
+  }
+  if (prevTac && (data.tacticals || []).some(t => t.fqn === prevTac)) {
+    tacSel.value = prevTac;
+  }
+
+  // Populate Legendary Implant 1 & 2 Selects while preserving current choices
+  const leg1Sel = document.getElementById("legendary1Select");
+  const leg2Sel = document.getElementById("legendary2Select");
+  const prevLeg1 = legendaryFqns[0] !== undefined ? legendaryFqns[0] : leg1Sel.value;
+  const prevLeg2 = legendaryFqns[1] !== undefined ? legendaryFqns[1] : leg2Sel.value;
+
+  for (const legSel of [leg1Sel, leg2Sel]) {
+    legSel.innerHTML = '<option value="">(No Implant)</option>';
+    for (const leg of data.legendaries || []) {
+      const opt = document.createElement("option");
+      opt.value = leg.fqn;
+      opt.textContent = leg.name;
+      legSel.appendChild(opt);
+    }
+  }
+  if (prevLeg1 && (data.legendaries || []).some(l => l.fqn === prevLeg1)) {
+    leg1Sel.value = prevLeg1;
+  }
+  if (prevLeg2 && prevLeg2 !== prevLeg1 && (data.legendaries || []).some(l => l.fqn === prevLeg2)) {
+    leg2Sel.value = prevLeg2;
+  }
+
+  // Update counts
+  document.getElementById("countAbilities").textContent = (data.abilities || []).length;
+  document.getElementById("countBuffs").textContent = (data.caster_buffs || []).length;
+  document.getElementById("countDebuffs").textContent = (data.target_debuffs || []).length;
+  document.getElementById("countProcs").textContent = (data.procs || []).length;
+
+  renderSkillTreeDrawer();
+  renderPalette();
+  renderTimeline();
+  renderRightPanel();
+}
+
+async function onSelectRunConfig(rcPath) {
+  if (!rcPath) return;
+  const res = await fetch(`/api/run_config?path=${encodeURIComponent(rcPath)}`);
+  const data = await res.json();
+  if (data.error) {
+    showToast(data.error, true);
+    return;
+  }
+  const rc = data.run_config;
+  // Find matching class and spec for rc.spec_path
+  for (const [cls, specs] of Object.entries(workspaceCatalog.disciplines || {})) {
+    for (const [sp, p] of Object.entries(specs)) {
+      if (p === rc.spec_path) {
+        document.getElementById("classSelect").value = cls;
+        await onClassChange(sp);
+        break;
+      }
+    }
+  }
+  if (rc.choices_path) {
+    document.getElementById("choicesFileSelect").value = rc.choices_path;
+  }
+  const rcRelics = Array.isArray(rc.relic_fqns) ? rc.relic_fqns : [];
+  document.getElementById("relic1Select").value = rcRelics[0] || "";
+  document.getElementById("relic2Select").value = rcRelics[1] || "";
+
+  const rcLegendaries = Array.isArray(rc.legendary_fqns) ? rc.legendary_fqns : [];
+  await refreshLoadoutCatalog(data.choices || rc.choices_path, {
+    tactical_fqn: rc.tactical_fqn || "",
+    legendary_fqns: rcLegendaries,
+    relic_fqns: rcRelics
+  });
+
+  if (rc.rotation_path) {
+    document.getElementById("existingRotationSelect").value = rc.rotation_path;
+    await onSelectExistingRotation(rc.rotation_path);
+  }
+  showToast(`Loaded loadout & rotation from ${rcPath}`);
+}
+
+async function onSelectExistingRotation(rotPath) {
+  if (!rotPath) return;
+  const res = await fetch(`/api/rotation?path=${encodeURIComponent(rotPath)}`);
+  const data = await res.json();
+  if (data.error) {
+    showToast(data.error, true);
+    return;
+  }
+  rotationSteps = data.steps || [];
+  lastImportWarnings = data.warnings || [];
+  collapsedSteps.clear();
+  activeBlockIndex = rotationSteps.findIndex(s => s.type === "priority_block");
+  if (activeBlockIndex === -1) activeBlockIndex = null;
+
+  if (data.filename) {
+    document.getElementById("saveFilename").value = data.filename;
+  }
+  renderTimeline();
+  renderRightPanel();
+  showToast(`Loaded ${rotPath} (${rotationSteps.length} steps)`);
+}
+
+function triggerLocalFileImport() {
+  document.getElementById("localFileInput").click();
+}
+
+function handleLocalFileImport(ev) {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const parsed = JSON.parse(e.target.result);
+      if (!Array.isArray(parsed)) throw new Error("Rotation JSON must be an array of steps.");
+      rotationSteps = parsed;
+      collapsedSteps.clear();
+      document.getElementById("saveFilename").value = file.name;
+      renderTimeline();
+      renderRightPanel();
+      showToast(`Imported ${file.name}`);
+    } catch (err) {
+      showToast(`Invalid JSON: ${err.message}`, true);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ---------------------------------------------------------------------------
+// Skill Tree Drawer
+// ---------------------------------------------------------------------------
+function toggleSkillTreeDrawer() {
+  const el = document.getElementById("skillTreeDrawer");
+  el.style.display = el.style.display === "none" ? "block" : "none";
+}
+
+function renderSkillTreeDrawer() {
+  const container = document.getElementById("skillTreeRows");
+  container.innerHTML = "";
+  const tree = currentLoadout.skill_tree || {};
+  const choices = currentLoadout.choices || {};
+
+  for (const [lvl, slots] of Object.entries(tree)) {
+    const row = document.createElement("div");
+    row.className = "st-row";
+    const lvlSpan = document.createElement("span");
+    lvlSpan.className = "st-lvl";
+    lvlSpan.textContent = `L${lvl}`;
+    row.appendChild(lvlSpan);
+
+    for (const slotNum of ["1", "2", "3"]) {
+      const entries = slots[slotNum] || [];
+      const label = entries.map(e => e.name).join(" + ") || `Option ${slotNum}`;
+      const btn = document.createElement("button");
+      btn.className = "st-btn" + (String(choices[lvl]) === slotNum ? " active" : "");
+      btn.textContent = label;
+      btn.title = `Level ${lvl} Option ${slotNum}: ${label}`;
+      btn.onclick = async () => {
+        const updated = { ...currentLoadout.choices, [lvl]: parseInt(slotNum, 10) };
+        await refreshLoadoutCatalog(updated);
+      };
+      row.appendChild(btn);
+    }
+    container.appendChild(row);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Left Palette Rendering (Abilities, Buffs, Debuffs, Procs)
+// ---------------------------------------------------------------------------
+function switchPaletteTab(tab) {
+  paletteTab = tab;
+  for (const [id, key] of [
+    ["tabAbilities", "abilities"],
+    ["tabBuffs", "buffs"],
+    ["tabDebuffs", "debuffs"],
+    ["tabProcs", "procs"]
+  ]) {
+    document.getElementById(id).classList.toggle("active", key === tab);
+  }
+  renderPalette();
+}
+
+function preferredAbilityId(abilityObj) {
+  const fmt = document.getElementById("idFormatSelect").value;
+  return fmt === "fqn" ? abilityObj.fqn : abilityObj.slug;
+}
+
+function resolveAbilityDisplay(abilityId) {
+  const norm = String(abilityId || "").toLowerCase().replace(/\s+/g, "_");
+  const found = (currentLoadout.abilities || []).find(
+    a => a.slug === norm || a.fqn === abilityId || a.name.toLowerCase() === String(abilityId || "").toLowerCase()
+  );
+  return found || null;
+}
+
+function renderPalette() {
+  const container = document.getElementById("paletteContainer");
+  const q = (document.getElementById("paletteSearch").value || "").trim().toLowerCase();
+  container.innerHTML = "";
+
+  if (paletteTab === "abilities") {
+    const abilities = (currentLoadout.abilities || []).filter(
+      a => !q || a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q) || a.fqn.toLowerCase().includes(q)
+    );
+
+    if (!abilities.length) {
+      container.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">No matching castable abilities.</div>';
+      return;
+    }
+
+    for (const abl of abilities) {
+      const card = document.createElement("div");
+      card.className = "ability-item";
+
+      const gcdBadge = abl.triggers_gcd
+        ? '<span class="badge badge-gcd">GCD</span>'
+        : '<span class="badge badge-offgcd">Off-GCD</span>';
+
+      const metaParts = [];
+      if (abl.cooldown > 0) metaParts.push(`CD: ${abl.cooldown}s`);
+      if (abl.energy_cost > 0) metaParts.push(`Cost: ${abl.energy_cost}`);
+      if (abl.activation_type !== "instant") metaParts.push(`${abl.activation_type} (${abl.activation_duration}s)`);
+      if (abl.max_charges) metaParts.push(`${abl.max_charges} charges`);
+      metaParts.push(`id: ${abl.slug}`);
+
+      card.innerHTML = `
+        <div class="ability-info">
+          <div class="ability-title">${escapeHtml(abl.name)} ${gcdBadge}</div>
+          <div class="ability-meta" title="${escapeHtml(abl.fqn)}">${escapeHtml(metaParts.join(" · "))}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button class="btn-sm btn-purple" title="Add to active Priority Block" onclick="quickAddAbilityToBlock('${escapeAttr(abl.slug)}', '${escapeAttr(abl.fqn)}')">+Block</button>
+          <button class="btn-sm btn-amber" title="Add as Optional Step" onclick="quickAddOptional('${escapeAttr(abl.slug)}', '${escapeAttr(abl.fqn)}')">+Opt</button>
+        </div>
+      `;
+      container.appendChild(card);
+    }
+    return;
+  }
+
+  if (paletteTab === "buffs") {
+    const buffs = (currentLoadout.caster_buffs || []).filter(
+      b => !q || b.name.toLowerCase().includes(q) || b.source_name.toLowerCase().includes(q)
+    );
+    for (const b of buffs) {
+      const card = document.createElement("div");
+      card.className = "ability-item";
+      const meta = [];
+      if (b.duration > 0) meta.push(`${b.duration}s`);
+      if (b.max_stacks > 1) meta.push(`Max Stacks: ${b.max_stacks}`);
+      meta.push(`Source: ${b.source_name}`);
+      card.innerHTML = `
+        <div class="ability-info">
+          <div class="ability-title">${escapeHtml(b.name)} ${b.is_proc ? '<span class="badge badge-offgcd">Proc</span>' : ''}</div>
+          <div class="ability-meta">${escapeHtml(meta.join(" · "))}</div>
+        </div>
+      `;
+      container.appendChild(card);
+    }
+    return;
+  }
+
+  if (paletteTab === "debuffs") {
+    const debuffs = (currentLoadout.target_debuffs || []).filter(
+      d => !q || d.name.toLowerCase().includes(q) || d.source_name.toLowerCase().includes(q)
+    );
+    for (const d of debuffs) {
+      const card = document.createElement("div");
+      card.className = "ability-item";
+      const meta = [];
+      if (d.duration > 0) meta.push(`${d.duration}s`);
+      if (d.max_stacks > 1) meta.push(`Max Stacks: ${d.max_stacks}`);
+      meta.push(`Source: ${d.source_name}`);
+      card.innerHTML = `
+        <div class="ability-info">
+          <div class="ability-title">${escapeHtml(d.name)} ${d.is_dot ? '<span class="badge badge-gcd">DoT</span>' : ''}</div>
+          <div class="ability-meta">${escapeHtml(meta.join(" · "))}</div>
+        </div>
+      `;
+      container.appendChild(card);
+    }
+    return;
+  }
+
+  if (paletteTab === "procs") {
+    const procs = (currentLoadout.procs || []).filter(
+      p => !q || p.name.toLowerCase().includes(q) || p.source_name.toLowerCase().includes(q)
+    );
+    for (const p of procs) {
+      const card = document.createElement("div");
+      card.className = "ability-item";
+      card.innerHTML = `
+        <div class="ability-info">
+          <div class="ability-title">${escapeHtml(p.name)} <span class="badge badge-offgcd">${p.icd}s ICD/Lockout</span></div>
+          <div class="ability-meta">Source: ${escapeHtml(p.source_name)} (${escapeHtml(p.kind)})</div>
+        </div>
+      `;
+      container.appendChild(card);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Center Timeline Rendering & Manipulation
+// ---------------------------------------------------------------------------
+function getDefaultAbilityId(preferOffGcd = false) {
+  const list = currentLoadout.abilities || [];
+  if (!list.length) return "saber_strike";
+  if (preferOffGcd) {
+    const off = list.find(a => !a.triggers_gcd);
+    if (off) return preferredAbilityId(off);
+  }
+  const onGcd = list.find(a => a.triggers_gcd) || list[0];
+  return preferredAbilityId(onGcd);
+}
+
+function quickAddAbilityToBlock(slug, fqn) {
+  const fmt = document.getElementById("idFormatSelect").value;
+  const abId = fmt === "fqn" ? fqn : slug;
+
+  if (activeBlockIndex !== null && rotationSteps[activeBlockIndex] && rotationSteps[activeBlockIndex].type === "priority_block") {
+    rotationSteps[activeBlockIndex].pool.push({ ability_id: abId, rules: {} });
+    collapsedSteps.delete(activeBlockIndex);
+  } else {
+    // Create a new priority block and make it active
+    rotationSteps.push({
+      type: "priority_block",
+      name: `Priority Window ${rotationSteps.length + 1}`,
+      pool: [{ ability_id: abId, rules: {} }]
+    });
+    activeBlockIndex = rotationSteps.length - 1;
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function quickAddOptional(slug, fqn) {
+  const fmt = document.getElementById("idFormatSelect").value;
+  const abId = fmt === "fqn" ? fqn : slug;
+  rotationSteps.push({
+    type: "optional",
+    ability_id: abId,
+    rules: {}
+  });
+  renderTimeline();
+  renderRightPanel();
+}
+
+function addPriorityBlock() {
+  const defaultFiller = (currentLoadout.abilities || []).find(a => a.slug.includes("saber_strike") || (a.cooldown === 0 && a.energy_cost === 0));
+  const fillerId = defaultFiller ? preferredAbilityId(defaultFiller) : getDefaultAbilityId(false);
+  rotationSteps.push({
+    type: "priority_block",
+    name: `Window ${rotationSteps.filter(s => s.type === "priority_block").length + 1}`,
+    pool: [{ ability_id: fillerId, rules: {} }]
+  });
+  activeBlockIndex = rotationSteps.length - 1;
+  renderTimeline();
+  renderRightPanel();
+}
+
+function addOptionalStep() {
+  rotationSteps.push({
+    type: "optional",
+    ability_id: getDefaultAbilityId(true),
+    rules: {}
+  });
+  renderTimeline();
+  renderRightPanel();
+}
+
+function addFixedStep() {
+  rotationSteps.push({
+    type: "fixed",
+    ability_id: getDefaultAbilityId(false)
+  });
+  renderTimeline();
+  renderRightPanel();
+}
+
+function addLoopAnchor() {
+  const existingIdx = rotationSteps.findIndex(s => s.type === "loop_anchor");
+  if (existingIdx !== -1) {
+    showToast("A Loop Anchor already exists in the timeline. Move it using the Up/Down buttons.", true);
+    return;
+  }
+  rotationSteps.push({ type: "loop_anchor" });
+  renderTimeline();
+  renderRightPanel();
+}
+
+function clearRotation() {
+  if (!rotationSteps.length) return;
+  rotationSteps = [];
+  activeBlockIndex = null;
+  collapsedSteps.clear();
+  renderTimeline();
+  renderRightPanel();
+}
+
+function expandCollapseAll(collapse) {
+  collapsedSteps.clear();
+  if (collapse) {
+    rotationSteps.forEach((s, idx) => {
+      if (s.type === "priority_block") collapsedSteps.add(idx);
+    });
+  }
+  renderTimeline();
+}
+
+function toggleStepCollapse(idx) {
+  if (collapsedSteps.has(idx)) {
+    collapsedSteps.delete(idx);
+  } else {
+    collapsedSteps.add(idx);
+  }
+  renderTimeline();
+}
+
+function moveStep(idx, delta) {
+  const target = idx + delta;
+  if (target < 0 || target >= rotationSteps.length) return;
+  const tmp = rotationSteps[idx];
+  rotationSteps[idx] = rotationSteps[target];
+  rotationSteps[target] = tmp;
+  if (activeBlockIndex === idx) activeBlockIndex = target;
+  else if (activeBlockIndex === target) activeBlockIndex = idx;
+  renderTimeline();
+  renderRightPanel();
+}
+
+function duplicateStep(idx) {
+  const clone = JSON.parse(JSON.stringify(rotationSteps[idx]));
+  if (clone.type === "priority_block") {
+    clone.name = `${clone.name} (Copy)`;
+  }
+  rotationSteps.splice(idx + 1, 0, clone);
+  if (clone.type === "priority_block") {
+    activeBlockIndex = idx + 1;
+  }
+  renderTimeline();
+  renderRightPanel();
+  showToast("Duplicated step below.");
+}
+
+function deleteStep(idx) {
+  rotationSteps.splice(idx, 1);
+  if (activeBlockIndex === idx) activeBlockIndex = null;
+  else if (activeBlockIndex !== null && activeBlockIndex > idx) activeBlockIndex--;
+  renderTimeline();
+  renderRightPanel();
+}
+
+function saveStepToTemplates(idx) {
+  const step = rotationSteps[idx];
+  const defaultName = step.type === "priority_block" ? step.name : `Opt: ${step.ability_id}`;
+  const name = prompt("Enter a name for this reusable template:", defaultName);
+  if (!name) return;
+  savedTemplates.push({
+    name: name.trim(),
+    kind: "step",
+    data: JSON.parse(JSON.stringify(step))
+  });
+  renderTimeline();
+  renderRightPanel();
+  showToast(`Saved template '${name.trim()}'`);
+}
+
+function saveBlockTailAsTemplate(idx) {
+  const step = rotationSteps[idx];
+  if (!step || step.type !== "priority_block" || !step.pool.length) return;
+  const name = prompt("Save this block's priority rows as a reusable Filler Tail macro:", `${step.name} Tail`);
+  if (!name) return;
+  savedTemplates.push({
+    name: name.trim(),
+    kind: "tail",
+    data: JSON.parse(JSON.stringify(step.pool))
+  });
+  renderTimeline();
+  renderRightPanel();
+  showToast(`Saved filler tail '${name.trim()}' (${step.pool.length} rows)`);
+}
+
+function injectTailIntoBlock(stepIdx, templateIdx) {
+  const tmpl = savedTemplates[templateIdx];
+  if (!tmpl) return;
+  const rows = tmpl.kind === "tail" ? tmpl.data : (tmpl.data.pool || []);
+  if (!rows.length) return;
+  rotationSteps[stepIdx].pool.push(...JSON.parse(JSON.stringify(rows)));
+  renderTimeline();
+  renderRightPanel();
+  showToast(`Appended ${rows.length} rows from '${tmpl.name}'`);
+}
+
+function movePoolRow(stepIdx, rowIdx, delta) {
+  const pool = rotationSteps[stepIdx].pool;
+  const target = rowIdx + delta;
+  if (target < 0 || target >= pool.length) return;
+  const tmp = pool[rowIdx];
+  pool[rowIdx] = pool[target];
+  pool[target] = tmp;
+  renderTimeline();
+  renderRightPanel();
+}
+
+function duplicatePoolRow(stepIdx, rowIdx) {
+  const pool = rotationSteps[stepIdx].pool;
+  pool.splice(rowIdx + 1, 0, JSON.parse(JSON.stringify(pool[rowIdx])));
+  renderTimeline();
+  renderRightPanel();
+}
+
+function deletePoolRow(stepIdx, rowIdx) {
+  rotationSteps[stepIdx].pool.splice(rowIdx, 1);
+  renderTimeline();
+  renderRightPanel();
+}
+
+function addPoolRow(stepIdx) {
+  rotationSteps[stepIdx].pool.push({
+    ability_id: getDefaultAbilityId(false),
+    rules: {}
+  });
+  activeBlockIndex = stepIdx;
+  renderTimeline();
+  renderRightPanel();
+}
+
+function onChangeIdFormat(fmt) {
+  // Convert existing ability_ids in rotationSteps to the chosen format when matched
+  for (const step of rotationSteps) {
+    if (step.type === "fixed" || step.type === "optional") {
+      const m = resolveAbilityDisplay(step.ability_id);
+      if (m) step.ability_id = fmt === "fqn" ? m.fqn : m.slug;
+    } else if (step.type === "priority_block") {
+      for (const row of step.pool || []) {
+        const m = resolveAbilityDisplay(row.ability_id);
+        if (m) row.ability_id = fmt === "fqn" ? m.fqn : m.slug;
+      }
+    }
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function buildAbilitySelectHtml(currentId, onChangeJs) {
+  const fmt = document.getElementById("idFormatSelect").value;
+  const abilities = currentLoadout.abilities || [];
+  let matched = false;
+  let opts = "";
+
+  for (const a of abilities) {
+    const val = fmt === "fqn" ? a.fqn : a.slug;
+    const isSel = (a.slug === String(currentId).toLowerCase().replace(/\s+/g, "_")) || (a.fqn === currentId) || (val === currentId);
+    if (isSel) matched = true;
+    const gcdTag = a.triggers_gcd ? "" : " [Off-GCD]";
+    opts += `<option value="${escapeAttr(isSel ? currentId : val)}" ${isSel ? "selected" : ""}>${escapeHtml(a.name)}${gcdTag} (${escapeHtml(a.slug)})</option>`;
+  }
+
+  if (!matched && currentId) {
+    opts = `<option value="${escapeAttr(currentId)}" selected>${escapeHtml(currentId)} (Custom / Unmatched)</option>` + opts;
+  }
+  return `<select onchange="${onChangeJs}">${opts}</select>`;
+}
+
+function formatRulePillText(key, val) {
+  switch (key) {
+    case "target_hp_below_pct":
+      if (val && typeof val === "object") {
+        const pct = Math.round((val.pct ?? 0.3) * 100);
+        return `<strong>Target HP &le; ${pct}%</strong> (or buff: ${escapeHtml(String(val.bypass_if_buff_active))})`;
+      }
+      return `<strong>Target HP &le; ${Math.round(Number(val) * 100)}%</strong> (${val})`;
+    case "target_hp_above_pct":
+      return `<strong>Target HP &gt; ${Math.round(Number(val) * 100)}%</strong> (${val})`;
+    case "caster_has_buff":
+      return `<strong>Caster Buff:</strong> ${escapeHtml(Array.isArray(val) ? val.join(" OR ") : String(val))}`;
+    case "caster_does_not_have_buff":
+      return `<strong>No Caster Buff:</strong> ${escapeHtml(Array.isArray(val) ? val.join(", ") : String(val))}`;
+    case "target_has_debuff":
+      return `<strong>Target Debuff:</strong> ${escapeHtml(Array.isArray(val) ? val.join(" OR ") : String(val))}`;
+    case "target_doesnt_have_debuff":
+      return `<strong>No Target Debuff:</strong> ${escapeHtml(Array.isArray(val) ? val.join(", ") : String(val))}`;
+    case "caster_energy_below":
+      return `<strong>Energy/Force &lt;</strong> ${escapeHtml(String(val))}`;
+    case "caster_energy_above":
+      return `<strong>Energy/Force &ge;</strong> ${escapeHtml(String(val))}`;
+    case "proc_cooldown_above":
+      if (val && typeof val === "object") {
+        return `<strong>Proc ICD &gt; ${escapeHtml(String(val.value))}s:</strong> ${escapeHtml(String(val.name))}`;
+      }
+      return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+    case "ability_cooldown_under":
+      if (val && typeof val === "object") {
+        return `<strong>Ability CD &lt; ${escapeHtml(String(val.value))}s:</strong> ${escapeHtml(String(val.name))}`;
+      }
+      return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+    case "caster_buff_stacks":
+    case "caster_has_buff_stacks":
+    case "caster_buff_charges":
+    case "target_debuff_stacks":
+    case "target_has_debuff_stacks": {
+      const isTarget = key.startsWith("target");
+      const actorLbl = isTarget ? "Target Debuff Stacks" : "Caster Buff Stacks";
+      if (Array.isArray(val)) {
+        const op = val[2] || ">=";
+        return `<strong>${actorLbl}:</strong> ${escapeHtml(String(val[0]))} ${escapeHtml(op)} ${escapeHtml(String(val[1]))}`;
+      }
+      if (val && typeof val === "object") {
+        const bName = val.name || val.buff || val.debuff || val.ability_spec || "?";
+        const st = val.stacks ?? val.count ?? val.value ?? 1;
+        const op = val.comparison || val.operator || ">=";
+        return `<strong>${actorLbl}:</strong> ${escapeHtml(String(bName))} ${escapeHtml(String(op))} ${escapeHtml(String(st))}`;
+      }
+      return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+    }
+    default:
+      return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+  }
+}
+
+function renderRulesHtml(rulesObj, stepIdx, poolIdx = null) {
+  const entries = Object.entries(rulesObj || {});
+  let html = '<div class="rules-container">';
+  if (!entries.length) {
+    html += '<span class="rule-unconditional">Always (No conditions)</span>';
+  } else {
+    for (const [k, v] of entries) {
+      const poolArg = poolIdx === null ? "null" : poolIdx;
+      html += `
+        <span class="rule-pill" onclick="openRuleModal(${stepIdx}, ${poolArg}, '${escapeAttr(k)}')" style="cursor:pointer;" title="Click to edit condition">
+          ${formatRulePillText(k, v)}
+          <span class="rule-del" onclick="event.stopPropagation(); deleteRule(${stepIdx}, ${poolArg}, '${escapeAttr(k)}')">&times;</span>
+        </span>
+      `;
+    }
+  }
+  const poolArg = poolIdx === null ? "null" : poolIdx;
+  html += `<button class="btn-sm" onclick="openRuleModal(${stepIdx}, ${poolArg}, null)">+ Rule</button>`;
+  html += "</div>";
+  return html;
+}
+
+function deleteRule(stepIdx, poolIdx, ruleKey) {
+  if (poolIdx === null) {
+    delete rotationSteps[stepIdx].rules[ruleKey];
+  } else {
+    delete rotationSteps[stepIdx].pool[poolIdx].rules[ruleKey];
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function renderTimeline() {
+  const container = document.getElementById("timelineContainer");
+  container.innerHTML = "";
+
+  if (!rotationSteps.length) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:48px 20px;color:var(--text-muted);border:1px dashed var(--border);border-radius:8px;">
+        <div style="font-size:15px;font-weight:600;color:var(--text-main);margin-bottom:8px;">Rotation Timeline is Empty</div>
+        <div style="margin-bottom:14px;">Click <strong>+ Priority Block</strong>, <strong>+ Optional Cast</strong>, or select an existing rotation from the top bar.</div>
+        <button class="btn-purple" onclick="addPriorityBlock()">+ Create First Priority Block</button>
+      </div>
+    `;
+    return;
+  }
+
+  const anchorIdx = rotationSteps.findIndex(s => s.type === "loop_anchor");
+  let execStepCounter = 0;
+
+  rotationSteps.forEach((step, idx) => {
+    const isOpener = anchorIdx !== -1 && idx < anchorIdx;
+    const phaseBadge = isOpener
+      ? '<span class="badge badge-opener">OPENER</span>'
+      : '<span class="badge badge-loop">LOOP</span>';
+
+    if (step.type === "loop_anchor") {
+      const anchorCard = document.createElement("div");
+      anchorCard.className = "step-card step-anchor";
+      anchorCard.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;font-weight:700;color:var(--green);">
+          <span>=== LOOP ANCHOR ===</span>
+          <span style="font-size:11.5px;font-weight:400;color:var(--text-main);">Steps above run once on pull (Opener); steps below repeat indefinitely.</span>
+        </div>
+        <div style="display:flex;gap:4px;">
+          <button class="btn-sm" onclick="moveStep(${idx}, -1)">&uarr;</button>
+          <button class="btn-sm" onclick="moveStep(${idx}, 1)">&darr;</button>
+          <button class="btn-sm btn-danger" onclick="deleteStep(${idx})">Delete</button>
+        </div>
+      `;
+      container.appendChild(anchorCard);
+      return;
+    }
+
+    execStepCounter++;
+    const card = document.createElement("div");
+
+    if (step.type === "fixed") {
+      card.className = "step-card step-fixed";
+      const selectHtml = buildAbilitySelectHtml(
+        step.ability_id,
+        `rotationSteps[${idx}].ability_id = this.value; renderTimeline(); renderRightPanel();`
+      );
+      card.innerHTML = `
+        <div class="step-header">
+          <div class="step-header-left">
+            <span class="step-num">#${execStepCounter}</span>
+            ${phaseBadge}
+            <span class="step-type-pill type-fixed">Fixed Cast</span>
+            ${selectHtml}
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button class="btn-sm" onclick="moveStep(${idx}, -1)" title="Move Up">&uarr;</button>
+            <button class="btn-sm" onclick="moveStep(${idx}, 1)" title="Move Down">&darr;</button>
+            <button class="btn-sm" onclick="duplicateStep(${idx})" title="Duplicate Step">Clone</button>
+            <button class="btn-sm btn-danger" onclick="deleteStep(${idx})" title="Delete Step">&times;</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+      return;
+    }
+
+    if (step.type === "optional") {
+      card.className = "step-card step-optional";
+      const selectHtml = buildAbilitySelectHtml(
+        step.ability_id,
+        `rotationSteps[${idx}].ability_id = this.value; renderTimeline(); renderRightPanel();`
+      );
+      card.innerHTML = `
+        <div class="step-header">
+          <div class="step-header-left">
+            <span class="step-num">#${execStepCounter}</span>
+            ${phaseBadge}
+            <span class="step-type-pill type-optional">Optional (Non-Blocking)</span>
+            ${selectHtml}
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button class="btn-sm" onclick="saveStepToTemplates(${idx})" title="Save to Clipboard">Save Template</button>
+            <button class="btn-sm" onclick="moveStep(${idx}, -1)" title="Move Up">&uarr;</button>
+            <button class="btn-sm" onclick="moveStep(${idx}, 1)" title="Move Down">&darr;</button>
+            <button class="btn-sm" onclick="duplicateStep(${idx})" title="Duplicate Step">Clone</button>
+            <button class="btn-sm btn-danger" onclick="deleteStep(${idx})" title="Delete Step">&times;</button>
+          </div>
+        </div>
+        <div class="step-body">
+          ${renderRulesHtml(step.rules || {}, idx, null)}
+        </div>
+      `;
+      container.appendChild(card);
+      return;
+    }
+
+    if (step.type === "priority_block") {
+      const isCollapsed = collapsedSteps.has(idx);
+      const isActive = activeBlockIndex === idx;
+      card.className = "step-card step-priority" + (isActive ? " active-block" : "");
+      card.onclick = () => {
+        if (activeBlockIndex !== idx) {
+          activeBlockIndex = idx;
+          document.querySelectorAll(".step-card").forEach(el => el.classList.remove("active-block"));
+          card.classList.add("active-block");
+        }
+      };
+
+      const pool = step.pool || [];
+      let rowsHtml = "";
+      if (!isCollapsed) {
+        pool.forEach((row, rIdx) => {
+          const selectHtml = buildAbilitySelectHtml(
+            row.ability_id,
+            `rotationSteps[${idx}].pool[${rIdx}].ability_id = this.value; renderTimeline(); renderRightPanel();`
+          );
+          rowsHtml += `
+            <div class="pool-row">
+              <div class="pool-rank">${rIdx + 1}.</div>
+              <div class="pool-main">
+                <div class="pool-top">
+                  ${selectHtml}
+                </div>
+                ${renderRulesHtml(row.rules || {}, idx, rIdx)}
+              </div>
+              <div style="display:flex;gap:3px;flex-shrink:0;">
+                <button class="btn-sm" onclick="event.stopPropagation(); movePoolRow(${idx}, ${rIdx}, -1)" title="Move Priority Up">&uarr;</button>
+                <button class="btn-sm" onclick="event.stopPropagation(); movePoolRow(${idx}, ${rIdx}, 1)" title="Move Priority Down">&darr;</button>
+                <button class="btn-sm" onclick="event.stopPropagation(); duplicatePoolRow(${idx}, ${rIdx})" title="Duplicate Row">Clone</button>
+                <button class="btn-sm btn-danger" onclick="event.stopPropagation(); deletePoolRow(${idx}, ${rIdx})" title="Remove Row">&times;</button>
+              </div>
+            </div>
+          `;
+        });
+
+        let tailInjectHtml = "";
+        if (savedTemplates.length > 0) {
+          const opts = savedTemplates.map((t, tIdx) => `<option value="${tIdx}">${escapeHtml(t.name)}</option>`).join("");
+          tailInjectHtml = `
+            <select onchange="if(this.value!==''){injectTailIntoBlock(${idx}, Number(this.value)); this.value='';}" style="font-size:11px;padding:3px 6px;">
+              <option value="">+ Append Saved Template/Tail...</option>
+              ${opts}
+            </select>
+          `;
+        }
+
+        rowsHtml += `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn-sm btn-purple" onclick="event.stopPropagation(); addPoolRow(${idx})">+ Add Ability to Pool</button>
+              ${tailInjectHtml}
+            </div>
+            <button class="btn-sm" onclick="event.stopPropagation(); saveBlockTailAsTemplate(${idx})" title="Save these priority rows as a reusable filler tail">Save Pool as Filler Tail</button>
+          </div>
+        `;
+      } else {
+        const summary = pool.map(r => r.ability_id).join(" → ");
+        rowsHtml = `<div style="font-size:11.5px;color:var(--text-muted);">${pool.length} abilities: ${escapeHtml(summary)}</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="step-header">
+          <div class="step-header-left">
+            <button class="btn-sm" onclick="event.stopPropagation(); toggleStepCollapse(${idx})">${isCollapsed ? "▸" : "▾"}</button>
+            <span class="step-num">#${execStepCounter}</span>
+            ${phaseBadge}
+            <span class="step-type-pill type-priority">Priority Block (${pool.length})</span>
+            <input type="text" value="${escapeAttr(step.name || "")}" onchange="rotationSteps[${idx}].name = this.value; renderRightPanel();" onclick="event.stopPropagation();" style="flex:1;min-width:160px;font-weight:600;">
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button class="btn-sm" onclick="event.stopPropagation(); saveStepToTemplates(${idx})" title="Save Block to Clipboard">Save Template</button>
+            <button class="btn-sm" onclick="event.stopPropagation(); moveStep(${idx}, -1)" title="Move Block Up">&uarr;</button>
+            <button class="btn-sm" onclick="event.stopPropagation(); moveStep(${idx}, 1)" title="Move Block Down">&darr;</button>
+            <button class="btn-sm" onclick="event.stopPropagation(); duplicateStep(${idx})" title="Clone entire Priority Block below">Clone Block</button>
+            <button class="btn-sm btn-danger" onclick="event.stopPropagation(); deleteStep(${idx})" title="Delete Block">&times;</button>
+          </div>
+        </div>
+        <div class="step-body">
+          ${rowsHtml}
+        </div>
+      `;
+      container.appendChild(card);
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Guided Rule Builder Modal
+// ---------------------------------------------------------------------------
+function openRuleModal(stepIdx, poolIdx = null, editKey = null) {
+  ruleModalContext = { stepIndex: stepIdx, poolIndex: poolIdx, editKey: editKey };
+  const conditions = (workspaceCatalog && workspaceCatalog.conditions) || [];
+  const sel = document.getElementById("ruleKeySelect");
+  sel.innerHTML = "";
+
+  for (const c of conditions) {
+    const opt = document.createElement("option");
+    opt.value = c.key;
+    opt.textContent = `${c.category}: ${c.label} (${c.key})`;
+    sel.appendChild(opt);
+  }
+
+  const targetRules = poolIdx === null
+    ? (rotationSteps[stepIdx].rules || {})
+    : (rotationSteps[stepIdx].pool[poolIdx].rules || {});
+
+  let initialVal = null;
+  if (editKey && editKey in targetRules) {
+    // Normalize aliases to canonical keys if needed
+    sel.value = conditions.some(c => c.key === editKey) ? editKey : "caster_buff_stacks";
+    initialVal = targetRules[editKey];
+  } else {
+    sel.value = "caster_has_buff";
+  }
+
+  renderRuleValueForm(initialVal);
+  document.getElementById("ruleModalBackdrop").classList.add("open");
+}
+
+function closeRuleModal() {
+  document.getElementById("ruleModalBackdrop").classList.remove("open");
+  ruleModalContext = null;
+}
+
+function buildDatalistOrSelect(id, items, currentVal, placeholder) {
+  const listId = `${id}_datalist`;
+  const opts = items.map(it => `<option value="${escapeAttr(it.name)}">${escapeHtml(it.label || it.name)}</option>`).join("");
+  return `
+    <div style="display:flex;gap:6px;">
+      <select onchange="document.getElementById('${id}').value = this.value" style="flex:1;">
+        <option value="">-- Pick Discovered ${escapeHtml(placeholder)} --</option>
+        ${opts}
+      </select>
+      <input type="text" id="${id}" list="${listId}" value="${escapeAttr(currentVal || "")}" placeholder="Or type exact name..." style="flex:1;">
+    </div>
+  `;
+}
+
+function renderRuleValueForm(existingVal = null) {
+  const key = document.getElementById("ruleKeySelect").value;
+  const conditions = (workspaceCatalog && workspaceCatalog.conditions) || [];
+  const meta = conditions.find(c => c.key === key) || {};
+  document.getElementById("ruleTypeDesc").textContent = meta.description || "";
+
+  const container = document.getElementById("ruleDynamicFields");
+  const buffItems = (currentLoadout.caster_buffs || []).map(b => ({
+    name: b.name,
+    label: `${b.name} (${b.source_name}${b.max_stacks > 1 ? `, max ${b.max_stacks} stacks` : ""})`
+  }));
+  const debuffItems = (currentLoadout.target_debuffs || []).map(d => ({
+    name: d.name,
+    label: `${d.name} (${d.source_name}${d.is_dot ? ", DoT" : ""})`
+  }));
+  const procItems = (currentLoadout.procs || []).map(p => ({
+    name: p.name,
+    label: `${p.name} (${p.icd}s ICD)`
+  }));
+  const abilityItems = (currentLoadout.abilities || []).map(a => ({
+    name: a.name,
+    label: `${a.name} (CD: ${a.cooldown}s)`
+  }));
+
+  if (key === "caster_has_buff" || key === "caster_does_not_have_buff") {
+    const cur = typeof existingVal === "string" ? existingVal : (buffItems[0]?.name || "");
+    container.innerHTML = `
+      <div class="form-group">
+        <label>Caster Buff Name</label>
+        ${buildDatalistOrSelect("ruleBuffInput", buffItems, cur, "Caster Buff")}
+      </div>
+    `;
+    return;
+  }
+
+  if (key === "target_has_debuff" || key === "target_doesnt_have_debuff") {
+    const cur = typeof existingVal === "string" ? existingVal : (debuffItems[0]?.name || "");
+    container.innerHTML = `
+      <div class="form-group">
+        <label>Target Debuff / DoT Name</label>
+        ${buildDatalistOrSelect("ruleDebuffInput", debuffItems, cur, "Target Debuff")}
+      </div>
+    `;
+    return;
+  }
+
+  if (key === "caster_buff_stacks" || key === "target_debuff_stacks") {
+    const isTarget = key === "target_debuff_stacks";
+    const items = isTarget ? debuffItems : buffItems;
+    let curName = items[0]?.name || "";
+    let curStacks = 3;
+    let curOp = "gte";
+    if (Array.isArray(existingVal)) {
+      curName = existingVal[0] || curName;
+      curStacks = existingVal[1] ?? 3;
+      curOp = existingVal[2] || "gte";
+    } else if (existingVal && typeof existingVal === "object") {
+      curName = existingVal.name || existingVal.buff || existingVal.debuff || curName;
+      curStacks = existingVal.stacks ?? existingVal.count ?? existingVal.value ?? 3;
+      curOp = existingVal.comparison || existingVal.operator || "gte";
+    }
+    container.innerHTML = `
+      <div class="form-group">
+        <label>${isTarget ? "Target Debuff / DoT Name" : "Caster Buff Name"}</label>
+        ${buildDatalistOrSelect("ruleStackBuffInput", items, curName, isTarget ? "Debuff" : "Buff")}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Comparison Operator</label>
+          <select id="ruleStackOpInput" style="width:100%;">
+            <option value="gte" ${curOp === "gte" || curOp === ">=" ? "selected" : ""}>&ge; (At least)</option>
+            <option value="eq" ${curOp === "eq" || curOp === "==" ? "selected" : ""}>== (Exactly)</option>
+            <option value="lte" ${curOp === "lte" || curOp === "<=" ? "selected" : ""}>&le; (At most)</option>
+            <option value="gt" ${curOp === "gt" || curOp === ">" ? "selected" : ""}>&gt; (Greater than)</option>
+            <option value="lt" ${curOp === "lt" || curOp === "<" ? "selected" : ""}>&lt; (Less than)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Required Stacks</label>
+          <input type="number" id="ruleStackCountInput" min="1" max="99" step="1" value="${curStacks}" style="width:100%;">
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (key === "target_hp_below_pct" || key === "target_hp_above_pct") {
+    let curDec = 0.4;
+    let curBypass = "";
+    if (typeof existingVal === "number") {
+      curDec = existingVal;
+    } else if (existingVal && typeof existingVal === "object") {
+      curDec = existingVal.pct ?? 0.4;
+      curBypass = existingVal.bypass_if_buff_active || "";
+    }
+    container.innerHTML = `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Decimal Fraction (0.0 - 1.0)</label>
+          <input type="number" id="ruleHpDecInput" min="0.01" max="1.0" step="0.05" value="${curDec}" style="width:100%;" oninput="document.getElementById('ruleHpPctPreview').textContent = Math.round(this.value * 100) + '%'">
+        </div>
+        <div class="form-group">
+          <label>Target Health %</label>
+          <div id="ruleHpPctPreview" style="padding:6px 10px;font-weight:700;color:var(--accent);font-size:14px;">${Math.round(curDec * 100)}%</div>
+        </div>
+      </div>
+      ${key === "target_hp_below_pct" ? `
+      <div class="form-group">
+        <label>Optional: Bypass HP Check if Caster Buff Active</label>
+        ${buildDatalistOrSelect("ruleHpBypassInput", buffItems, curBypass, "Bypass Buff")}
+      </div>` : ""}
+    `;
+    return;
+  }
+
+  if (key === "caster_energy_below" || key === "caster_energy_above") {
+    const cur = typeof existingVal === "number" ? existingVal : 35;
+    container.innerHTML = `
+      <div class="form-group">
+        <label>Resource Threshold (Force / Energy / Heat)</label>
+        <input type="number" id="ruleResourceInput" min="0" max="600" step="5" value="${cur}" style="width:100%;">
+      </div>
+    `;
+    return;
+  }
+
+  if (key === "proc_cooldown_above") {
+    const curName = (existingVal && existingVal.name) ? existingVal.name : (procItems[0]?.name || "Bloodletting");
+    const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 1.5;
+    container.innerHTML = `
+      <div class="form-group">
+        <label>Proc / Lockout Name</label>
+        ${buildDatalistOrSelect("ruleProcNameInput", procItems, curName, "Proc")}
+      </div>
+      <div class="form-group">
+        <label>Remaining Lockout / ICD Above (seconds)</label>
+        <input type="number" id="ruleProcSecInput" min="0" max="120" step="0.1" value="${curVal}" style="width:100%;">
+      </div>
+    `;
+    return;
+  }
+
+  if (key === "ability_cooldown_under") {
+    const curName = (existingVal && existingVal.name) ? existingVal.name : (abilityItems[0]?.name || "");
+    const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 1.5;
+    container.innerHTML = `
+      <div class="form-group">
+        <label>Ability Name</label>
+        ${buildDatalistOrSelect("ruleAblCdNameInput", abilityItems, curName, "Ability")}
+      </div>
+      <div class="form-group">
+        <label>Remaining Cooldown Under (seconds)</label>
+        <input type="number" id="ruleAblCdSecInput" min="0" max="180" step="0.1" value="${curVal}" style="width:100%;">
+      </div>
+    `;
+  }
+}
+
+function commitRuleFromModal() {
+  if (!ruleModalContext) return;
+  const { stepIndex, poolIndex, editKey } = ruleModalContext;
+  const key = document.getElementById("ruleKeySelect").value;
+  let value = null;
+
+  if (key === "caster_has_buff" || key === "caster_does_not_have_buff") {
+    value = document.getElementById("ruleBuffInput").value.trim();
+    if (!value) return showToast("Please select or enter a buff name.", true);
+  } else if (key === "target_has_debuff" || key === "target_doesnt_have_debuff") {
+    value = document.getElementById("ruleDebuffInput").value.trim();
+    if (!value) return showToast("Please select or enter a debuff name.", true);
+  } else if (key === "caster_buff_stacks" || key === "target_debuff_stacks") {
+    const name = document.getElementById("ruleStackBuffInput").value.trim();
+    const op = document.getElementById("ruleStackOpInput").value;
+    const count = parseInt(document.getElementById("ruleStackCountInput").value, 10) || 1;
+    if (!name) return showToast("Please select or enter an effect name.", true);
+    value = op === "gte" ? [name, count] : [name, count, op];
+  } else if (key === "target_hp_below_pct" || key === "target_hp_above_pct") {
+    let dec = parseFloat(document.getElementById("ruleHpDecInput").value);
+    if (isNaN(dec) || dec <= 0) dec = 0.4;
+    if (dec > 1.0) dec = Number((dec / 100.0).toFixed(4));
+    const bypassEl = document.getElementById("ruleHpBypassInput");
+    const bypass = bypassEl ? bypassEl.value.trim() : "";
+    value = bypass ? { pct: dec, bypass_if_buff_active: bypass } : dec;
+  } else if (key === "caster_energy_below" || key === "caster_energy_above") {
+    value = parseFloat(document.getElementById("ruleResourceInput").value) || 0;
+  } else if (key === "proc_cooldown_above") {
+    const name = document.getElementById("ruleProcNameInput").value.trim();
+    const sec = parseFloat(document.getElementById("ruleProcSecInput").value) || 0.5;
+    if (!name) return showToast("Please select or enter a proc name.", true);
+    value = { name, value: sec };
+  } else if (key === "ability_cooldown_under") {
+    const name = document.getElementById("ruleAblCdNameInput").value.trim();
+    const sec = parseFloat(document.getElementById("ruleAblCdSecInput").value) || 1.5;
+    if (!name) return showToast("Please select or enter an ability name.", true);
+    value = { name, value: sec };
+  }
+
+  const targetObj = poolIndex === null
+    ? rotationSteps[stepIndex]
+    : rotationSteps[stepIndex].pool[poolIndex];
+
+  if (!targetObj.rules) targetObj.rules = {};
+  if (editKey && editKey !== key) {
+    delete targetObj.rules[editKey];
+  }
+  targetObj.rules[key] = value;
+
+  closeRuleModal();
+  renderTimeline();
+  renderRightPanel();
+}
+
+// ---------------------------------------------------------------------------
+// Right Panel: Linter, Clipboard Templates, Dry-Run Sim, Raw JSON
+// ---------------------------------------------------------------------------
+function switchRightTab(tab) {
+  rightTab = tab;
+  for (const [id, key] of [
+    ["rTabLint", "lint"],
+    ["rTabPreview", "preview"],
+    ["rTabJson", "json"]
+  ]) {
+    document.getElementById(id).classList.toggle("active", key === tab);
+  }
+  renderRightPanel();
+}
+
+function runRotationLinter() {
+  const issues = [...lastImportWarnings];
+
+  rotationSteps.forEach((step, idx) => {
+    if (step.type === "fixed" || step.type === "optional") {
+      const m = resolveAbilityDisplay(step.ability_id);
+      if (!m) {
+        issues.push(`Step #${idx + 1} (${step.type}): ability '${step.ability_id}' is not in the active ${currentLoadout.spec_name} loadout.`);
+      } else if (step.type === "fixed" && !m.triggers_gcd && m.cooldown > 0) {
+        issues.push(`Step #${idx + 1}: Off-GCD ability '${m.name}' (${m.cooldown}s CD) is a Fixed Step and will block the rotation while on cooldown. Consider 'Optional Cast'.`);
+      }
+    } else if (step.type === "priority_block") {
+      const pool = step.pool || [];
+      if (!pool.length) {
+        issues.push(`Block '${step.name}' (#${idx + 1}) has an empty ability pool.`);
+        return;
+      }
+      const last = pool[pool.length - 1];
+      const lastRules = Object.keys(last.rules || {});
+      const lastAbl = resolveAbilityDisplay(last.ability_id);
+      if (lastRules.length > 0 || (lastAbl && (lastAbl.cooldown > 0 || lastAbl.energy_cost > 0))) {
+        issues.push(`Block '${step.name}' (#${idx + 1}): last fallback ability '${last.ability_id}' has conditions/cooldown/cost. Adding an unconditional basic attack (e.g. saber_strike) at the bottom prevents GCD stalls.`);
+      }
+      pool.forEach((row, rIdx) => {
+        if (!resolveAbilityDisplay(row.ability_id)) {
+          issues.push(`Block '${step.name}' row #${rIdx + 1}: ability '${row.ability_id}' is not in the active ${currentLoadout.spec_name} loadout.`);
+        }
+      });
+    }
+  });
+
+  return issues;
+}
+
+function renderRightPanel() {
+  const container = document.getElementById("rightPanelBody");
+  if (rightTab === "lint") {
+    const issues = runRotationLinter();
+    let html = `<div style="font-weight:700;margin-bottom:8px;">Rotation Health Check (${rotationSteps.length} steps)</div>`;
+    if (!issues.length) {
+      html += `<div class="lint-box lint-ok">[OK] All ${rotationSteps.length} steps validated cleanly against ${escapeHtml(currentLoadout.class_name)} // ${escapeHtml(currentLoadout.spec_name)}.</div>`;
+    } else {
+      for (const issue of issues) {
+        html += `<div class="lint-box lint-warn">[WARN] ${escapeHtml(issue)}</div>`;
+      }
+    }
+
+    // Reusable Templates & Clipboard Section
+    html += `
+      <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px;">
+        <div style="font-weight:700;margin-bottom:6px;">Saved Templates & Filler Tails (${savedTemplates.length})</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">
+          Click <strong>Save Template</strong> or <strong>Save Pool as Filler Tail</strong> on any timeline card to reuse blocks across windows.
+        </div>
+    `;
+
+    if (!savedTemplates.length) {
+      html += `<div style="color:var(--text-muted);font-size:11.5px;font-style:italic;">No saved templates yet.</div>`;
+    } else {
+      savedTemplates.forEach((t, tIdx) => {
+        html += `
+          <div class="ability-item">
+            <div class="ability-info">
+              <div class="ability-title">${escapeHtml(t.name)} <span class="badge badge-gcd">${escapeHtml(t.kind)}</span></div>
+            </div>
+            <div style="display:flex;gap:4px;">
+              ${t.kind === "step" ? `<button class="btn-sm btn-primary" onclick="insertSavedStepTemplate(${tIdx})">Insert Step</button>` : ""}
+              <button class="btn-sm btn-danger" onclick="savedTemplates.splice(${tIdx}, 1); renderTimeline(); renderRightPanel();">&times;</button>
+            </div>
+          </div>
+        `;
+      });
+    }
+    html += `</div>`;
+    container.innerHTML = html;
+    return;
+  }
+
+  if (rightTab === "preview") {
+    let html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div>
+          <div style="font-weight:700;">Live Dry-Run Cast Preview</div>
+          <div style="font-size:11px;color:var(--text-muted);">Simulates 30s with SwtorSim engine to verify cast order</div>
+        </div>
+        <button class="btn-primary" onclick="runDryRunSimulation()">Run 30s Preview</button>
+      </div>
+    `;
+
+    if (dryRunResult) {
+      html += `
+        <div class="lint-box lint-ok" style="display:flex;justify-content:space-between;">
+          <span><strong>Casts:</strong> ${dryRunResult.casts.length}</span>
+          <span><strong>Total Damage:</strong> ${dryRunResult.total_damage.toLocaleString()}</span>
+          <span><strong>Simulated DPS:</strong> ${dryRunResult.dps.toLocaleString()}</span>
+        </div>
+        <div style="max-height:460px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+          <table class="cast-table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Ability</th>
+                <th>Step</th>
+                <th>Res</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${dryRunResult.casts.map(c => `
+                <tr>
+                  <td style="font-family:monospace;color:var(--text-muted);">${c.time.toFixed(2)}s</td>
+                  <td>
+                    <strong>${escapeHtml(c.ability)}</strong>
+                    ${c.triggers_gcd ? "" : '<span class="badge badge-offgcd">Off-GCD</span>'}
+                  </td>
+                  <td style="color:var(--text-muted);">#${c.step_index} (${escapeHtml(c.step_label)})</td>
+                  <td>${c.resource}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else {
+      html += `<div style="color:var(--text-muted);text-align:center;padding:30px 10px;">Click <strong>Run 30s Preview</strong> to test this rotation against the Training Dummy.</div>`;
+    }
+    container.innerHTML = html;
+    return;
+  }
+
+  if (rightTab === "json") {
+    const jsonStr = JSON.stringify(rotationSteps, null, 4);
+    container.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-weight:700;">Live Rotation JSON</span>
+        <div style="display:flex;gap:6px;">
+          <button class="btn-sm" onclick="copyJsonToClipboard()">Copy JSON</button>
+          <button class="btn-sm btn-primary" onclick="applyEditedJson()">Apply Edited JSON</button>
+        </div>
+      </div>
+      <textarea id="rawJsonEditor" class="json-textarea">${escapeHtml(jsonStr)}</textarea>
+    `;
+  }
+}
+
+function insertSavedStepTemplate(tIdx) {
+  const tmpl = savedTemplates[tIdx];
+  if (!tmpl || tmpl.kind !== "step") return;
+  rotationSteps.push(JSON.parse(JSON.stringify(tmpl.data)));
+  renderTimeline();
+  renderRightPanel();
+  showToast(`Inserted '${tmpl.name}' at end of timeline.`);
+}
+
+async function runDryRunSimulation() {
+  if (!rotationSteps.length) {
+    return showToast("Add at least one step before running preview.", true);
+  }
+  const res = await fetch("/api/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      spec_path: currentLoadout.spec_path,
+      choices: currentLoadout.choices,
+      tactical_fqn: document.getElementById("tacticalSelect").value || "",
+      legendary_fqns: getSelectedLegendaries(),
+      relic_fqns: getSelectedRelics(),
+      rotation: rotationSteps,
+      duration: 30.0
+    })
+  });
+  const data = await res.json();
+  if (data.error) {
+    showToast(`Preview failed: ${data.error}`, true);
+    return;
+  }
+  dryRunResult = data;
+  renderRightPanel();
+  showToast(`Simulated 30s: ${data.casts.length} casts (${data.dps.toLocaleString()} DPS)`);
+}
+
+function copyJsonToClipboard() {
+  const str = JSON.stringify(rotationSteps, null, 4);
+  navigator.clipboard.writeText(str);
+  showToast("Copied rotation JSON to clipboard.");
+}
+
+function applyEditedJson() {
+  const el = document.getElementById("rawJsonEditor");
+  if (!el) return;
+  try {
+    const parsed = JSON.parse(el.value);
+    if (!Array.isArray(parsed)) throw new Error("Root JSON must be an array.");
+    rotationSteps = parsed;
+    renderTimeline();
+    renderRightPanel();
+    showToast("Applied JSON changes to timeline.");
+  } catch (err) {
+    showToast(`JSON Error: ${err.message}`, true);
+  }
+}
+
+async function saveRotationToDisk() {
+  const classFolder = document.getElementById("saveClassFolder").value.trim() || "assassin";
+  const specFolder = document.getElementById("saveSpecFolder").value.trim() || "hatred";
+  const filename = document.getElementById("saveFilename").value.trim() || "CustomRotation.json";
+
+  const res = await fetch("/api/rotation/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      class_folder: classFolder,
+      spec_folder: specFolder,
+      filename: filename,
+      steps: rotationSteps
+    })
+  });
+  const data = await res.json();
+  if (data.error) {
+    showToast(`Save failed: ${data.error}`, true);
+    return;
+  }
+  await loadWorkspaceCatalog();
+  document.getElementById("existingRotationSelect").value = data.path;
+  showToast(`[OK] Saved to ${data.path}`);
+}
+
+function downloadRotationJson() {
+  const filename = (document.getElementById("saveFilename").value.trim() || "CustomRotation.json").replace(/(\.json)?$/, ".json");
+  const blob = new Blob([JSON.stringify(rotationSteps, null, 4)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function escapeHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function escapeAttr(str) {
+  return escapeHtml(str).replace(/'/g, "&#39;");
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,2386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwtorSim - Combat Simulator Dashboard</title>
+<style>
+  :root {
+    --bg-base: #0d1117;
+    --bg-panel: #161b22;
+    --bg-card: #1c232d;
+    --bg-card-hover: #222b38;
+    --bg-input: #0f141b;
+    --border: #30363d;
+    --border-subtle: #21262d;
+    --text-main: #e6edf3;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --accent-bg: rgba(88, 166, 255, 0.12);
+    --purple: #a371f7;
+    --purple-bg: rgba(163, 113, 247, 0.14);
+    --amber: #d29922;
+    --amber-bg: rgba(210, 153, 34, 0.14);
+    --green: #3fb950;
+    --green-bg: rgba(63, 185, 80, 0.14);
+    --red: #f85149;
+    --red-bg: rgba(248, 81, 73, 0.14);
+    --cyan: #39c5cf;
+    --cyan-bg: rgba(57, 197, 207, 0.14);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg-base);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Header Bar */
+  header {
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    color: var(--text-main);
+    white-space: nowrap;
+  }
+
+  .brand-badge {
+    background: linear-gradient(135deg, #1f6feb, #8957e5);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* Inputs & Buttons */
+  select, input[type="text"], input[type="number"] {
+    background: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 5px 8px;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  select:focus, input:focus {
+    border-color: var(--accent);
+  }
+
+  .btn {
+    background: var(--bg-card);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover:not(:disabled) {
+    background: var(--bg-card-hover);
+    border-color: var(--text-muted);
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-primary {
+    background: #238636;
+    border-color: rgba(240, 246, 252, 0.1);
+    color: #fff;
+    padding: 7px 16px;
+    font-size: 13px;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #2ea043;
+    border-color: rgba(240, 246, 252, 0.2);
+  }
+
+  .btn-accent {
+    background: rgba(56, 139, 253, 0.15);
+    border-color: rgba(56, 139, 253, 0.4);
+    color: var(--accent);
+  }
+
+  .btn-accent:hover:not(:disabled) {
+    background: rgba(56, 139, 253, 0.25);
+    border-color: var(--accent);
+  }
+
+  .btn-purple {
+    background: var(--purple-bg);
+    border-color: rgba(163, 113, 247, 0.4);
+    color: var(--purple);
+  }
+
+  .btn-purple:hover:not(:disabled) {
+    background: rgba(163, 113, 247, 0.25);
+    border-color: var(--purple);
+  }
+
+  .btn-sm {
+    padding: 3px 8px;
+    font-size: 11px;
+  }
+
+  /* Main Workspace Split */
+  .workspace {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* Left Configuration Sidebar */
+  .sidebar {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 12px 12px 28px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .config-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .section-header {
+    padding: 9px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--border-subtle);
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-body {
+    padding: 10px 12px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .section-body.collapsed {
+    display: none;
+  }
+
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .form-row select,
+  .form-row input[type="text"],
+  .form-row input[type="number"] {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .form-grid-3 {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .form-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* Mode Switcher */
+  .mode-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    background: var(--bg-input);
+    padding: 3px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+  }
+
+  .mode-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+  }
+
+  .mode-btn.active {
+    background: var(--accent);
+    color: #0d1117;
+  }
+
+  .chip-row {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .chip:hover, .chip.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-bg);
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-main);
+    cursor: pointer;
+    padding: 2px 0;
+  }
+
+  .checkbox-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+  }
+
+  /* Computed Sheet Preview Mini-Grid */
+  .sheet-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .sheet-mini-box {
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 5px 6px;
+    text-align: center;
+  }
+
+  .sheet-mini-lbl {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .sheet-mini-val {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cyan);
+    margin-top: 2px;
+  }
+
+  /* Right Main Results Area */
+  .main-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    background: var(--bg-base);
+  }
+
+  /* KPI Strip */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr 1.2fr;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .kpi-card.primary {
+    border-color: rgba(88, 166, 255, 0.5);
+    background: linear-gradient(180deg, rgba(88, 166, 255, 0.08) 0%, var(--bg-card) 100%);
+  }
+
+  .kpi-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--text-main);
+    margin: 4px 0 2px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-card.primary .kpi-value {
+    color: var(--accent);
+    font-size: 25px;
+  }
+
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .delta-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .delta-pos {
+    background: var(--green-bg);
+    color: var(--green);
+  }
+
+  .delta-neg {
+    background: var(--red-bg);
+    color: var(--red);
+  }
+
+  /* Navigation Tabs */
+  .tabs-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+
+  .tabs-list {
+    display: flex;
+    gap: 4px;
+  }
+
+  .tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+
+  .tab-btn:hover {
+    color: var(--text-main);
+  }
+
+  .tab-btn.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+
+  .tab-badge {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  /* Tab Content Area */
+  .tab-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: none;
+  }
+
+  .tab-content.active {
+    display: block;
+  }
+
+  /* Tables */
+  .panel-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .panel-card-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.015);
+  }
+
+  .panel-card-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  table.data-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  table.data-table th:hover {
+    color: var(--text-main);
+  }
+
+  table.data-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--text-main);
+  }
+
+  table.data-table tr:hover td {
+    background: rgba(88, 166, 255, 0.04);
+  }
+
+  .num-col {
+    text-align: right !important;
+  }
+
+  /* Share Progress Bar */
+  .share-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 130px;
+  }
+
+  .share-bar-bg {
+    flex: 1;
+    height: 7px;
+    background: var(--bg-input);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .share-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--purple));
+  }
+
+  /* Damage Type Badges */
+  .dtype-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    white-space: nowrap;
+  }
+
+  .dtype-internal, .dtype-elemental {
+    background: var(--amber-bg);
+    color: var(--amber);
+    border: 1px solid rgba(210, 153, 34, 0.3);
+  }
+
+  .dtype-kinetic, .dtype-energy {
+    background: var(--accent-bg);
+    color: var(--accent);
+    border: 1px solid rgba(88, 166, 255, 0.3);
+  }
+
+  /* Histogram SVG Box */
+  .chart-container {
+    padding: 16px;
+    background: var(--bg-card);
+    border-radius: 6px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* Buff Gantt Timeline */
+  .gantt-row {
+    display: grid;
+    grid-template-columns: 200px 75px 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .gantt-label {
+    font-weight: 600;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .gantt-pct {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .gantt-track {
+    position: relative;
+    height: 16px;
+    background: var(--bg-input);
+    border-radius: 3px;
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+  }
+
+  .gantt-seg {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    border-radius: 2px;
+    min-width: 2px;
+  }
+
+  .gantt-seg.player-buff {
+    background: rgba(63, 185, 80, 0.75);
+    border: 1px solid var(--green);
+  }
+
+  .gantt-seg.target-debuff {
+    background: rgba(163, 113, 247, 0.75);
+    border: 1px solid var(--purple);
+  }
+
+  /* Combat Log Controls */
+  .log-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+
+  .crit-tag {
+    color: var(--amber);
+    font-weight: 700;
+  }
+
+  .cast-tag {
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  /* Empty / Loading State */
+  .empty-state {
+    padding: 48px 20px;
+    text-align: center;
+    color: var(--text-muted);
+  }
+
+  .status-pill {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+
+  .status-ready {
+    background: var(--green-bg);
+    color: var(--green);
+  }
+
+  .status-running {
+    background: var(--amber-bg);
+    color: var(--amber);
+  }
+
+  .status-error {
+    background: var(--red-bg);
+    color: var(--red);
+  }
+
+  /* Monte Carlo Progress Meter */
+  .sim-progress-box {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .sim-progress-track {
+    width: 110px;
+    height: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .sim-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    border-radius: 3px;
+    transition: width 0.12s ease-out;
+  }
+
+  .sim-progress-text {
+    font-weight: 700;
+    color: var(--text-main);
+    min-width: 78px;
+    text-align: right;
+  }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .modal-backdrop.open {
+    display: flex;
+  }
+
+  .modal-box {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 420px;
+    max-width: 92vw;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .modal-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-badge">SwtorSim</span>
+    <span>Combat Simulator Dashboard</span>
+    <span id="statusPill" class="status-pill status-ready">Ready</span>
+    <div id="simProgressBox" class="sim-progress-box">
+      <div class="sim-progress-track">
+        <div id="simProgressBar" class="sim-progress-fill"></div>
+      </div>
+      <span id="simProgressText" class="sim-progress-text">0 / 0 (0%)</span>
+    </div>
+  </div>
+
+  <div class="header-controls">
+    <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Preset Config:</label>
+    <select id="presetConfigSelect" style="min-width:170px;">
+      <option value="">-- Select Run Config --</option>
+    </select>
+    <button class="btn btn-sm" id="saveRunConfigBtn" title="Save current configuration to data/run_config/">Save Config</button>
+    <button class="btn btn-sm" id="reloadCatalogBtn" title="Reload files from workspace">Refresh</button>
+    <button class="btn btn-purple btn-sm" id="openRotationBuilderBtn" title="Launch or switch to the Web Rotation Builder">Rotation Builder</button>
+    <button class="btn btn-primary" id="runSimBtn" title="Run Simulation (Ctrl+Enter)">▶ Run Simulation</button>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- LEFT SIDEBAR: CONFIGURATION -->
+  <aside class="sidebar">
+
+    <!-- 1. Simulation Mode & Target -->
+    <div class="config-section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span>1. Execution Mode &amp; Target</span>
+        <span>▾</span>
+      </div>
+      <div class="section-body">
+        <div class="mode-switch">
+          <button type="button" class="mode-btn active" id="modeTestBtn" onclick="setSimMode('TEST')">TEST (Single Run)</button>
+          <button type="button" class="mode-btn" id="modeBatchBtn" onclick="setSimMode('BATCH')">BATCH (Monte Carlo)</button>
+        </div>
+
+        <div id="batchIterationsRow" class="form-row" style="display:none;">
+          <div class="form-label">
+            <span>Monte Carlo Iterations</span>
+            <div class="chip-row">
+              <span class="chip" onclick="setIterations(25)">25</span>
+              <span class="chip" onclick="setIterations(50)">50</span>
+              <span class="chip" onclick="setIterations(100)">100</span>
+              <span class="chip" onclick="setIterations(250)">250</span>
+              <span class="chip" onclick="setIterations(500)">500</span>
+            </div>
+          </div>
+          <input type="number" id="iterationsInput" value="50" min="1" max="10000" step="10">
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            <span>Target Dummy HP</span>
+            <div class="chip-row">
+              <span class="chip" onclick="setDummyHp(1000000)">1M</span>
+              <span class="chip" onclick="setDummyHp(2500000)">2.5M</span>
+              <span class="chip" onclick="setDummyHp(6000000)">6M</span>
+              <span class="chip" onclick="setDummyHp(6500000)">6.5M</span>
+              <span class="chip" onclick="setDummyHp(10000000)">10M</span>
+            </div>
+          </div>
+          <input type="number" id="dummyHpInput" value="6000000" min="10000" step="500000">
+        </div>
+
+        <div class="form-grid-3">
+          <div class="form-row">
+            <label class="form-label">Max Time (s)</label>
+            <input type="number" id="durationInput" value="1000" min="5" max="7200">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Char Level</label>
+            <input type="number" id="levelInput" value="85" min="1" max="100">
+          </div>
+          <div class="form-row">
+            <div class="form-label">
+              <span>RNG Seed</span>
+              <span class="chip" onclick="randomizeSeed()" title="Generate random seed">🎲</span>
+            </div>
+            <input type="number" id="seedInput" value="42">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Loadout & Gear -->
+    <div class="config-section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span>2. Loadout, Gear &amp; Rotation</span>
+        <span>▾</span>
+      </div>
+      <div class="section-body">
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label class="form-label">Class</label>
+            <select id="classSelect"></select>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Discipline (Spec)</label>
+            <select id="specSelect"></select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">Rotation File</label>
+          <select id="rotationSelect"></select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            <span>Skill Tree Choices</span>
+            <span id="choicesPreviewBadge" style="color:var(--cyan);font-size:10px;"></span>
+          </div>
+          <select id="choicesSelect"></select>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">Tactical Item</label>
+          <select id="tacticalSelect"></select>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">Legendary Implant 1</label>
+          <select id="legendary1Select"></select>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">Legendary Implant 2</label>
+          <select id="legendary2Select"></select>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label class="form-label">Relic 1</label>
+            <select id="relic1Select"></select>
+          </div>
+          <div class="form-row">
+            <label class="form-label">Relic 2</label>
+            <select id="relic2Select"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Character Stats Editor -->
+    <div class="config-section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span>3. Character Stats &amp; Sheet</span>
+        <span>▾</span>
+      </div>
+      <div class="section-body">
+        <div class="form-row">
+          <div class="form-label">
+            <span>Build Stat Preset</span>
+            <div style="display:flex;gap:4px;">
+              <button type="button" class="btn btn-sm" onclick="refreshComputedStats()">Calc Sheet</button>
+              <button type="button" class="btn btn-sm" onclick="openSaveBuildModal()">Save Build</button>
+            </div>
+          </div>
+          <select id="buildSelect"></select>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label class="form-label">Mastery</label>
+            <input type="number" class="stat-input" data-stat="Mastery" value="23362">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Power</label>
+            <input type="number" class="stat-input" data-stat="Power" value="18607">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Force Power</label>
+            <input type="number" class="stat-input" data-stat="Force Power" value="11740">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Tech Power</label>
+            <input type="number" class="stat-input" data-stat="Tech Power" value="0">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Critical Rating</label>
+            <input type="number" class="stat-input" data-stat="Critical Rating" value="5968">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Alacrity Rating</label>
+            <input type="number" class="stat-input" data-stat="Alacrity Rating" value="2646">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Accuracy Rating</label>
+            <input type="number" class="stat-input" data-stat="Accuracy Rating" value="2916">
+          </div>
+          <div class="form-row">
+            <label class="form-label">Armor Pen (0-1)</label>
+            <input type="number" class="stat-input" data-stat="Armor Penetration" value="0" step="0.05">
+          </div>
+          <div class="form-row">
+            <label class="form-label">MH Min Dmg</label>
+            <input type="number" class="stat-input" data-stat="Main_hand_min" value="3161">
+          </div>
+          <div class="form-row">
+            <label class="form-label">MH Max Dmg</label>
+            <input type="number" class="stat-input" data-stat="Main_hand_max" value="4741">
+          </div>
+        </div>
+
+        <div class="sheet-mini-grid" id="miniSheetGrid">
+          <div class="sheet-mini-box">
+            <div class="sheet-mini-lbl">GCD</div>
+            <div class="sheet-mini-val" id="sheetGcd">--</div>
+          </div>
+          <div class="sheet-mini-box">
+            <div class="sheet-mini-lbl">Alacrity</div>
+            <div class="sheet-mini-val" id="sheetAlacrity">--</div>
+          </div>
+          <div class="sheet-mini-box">
+            <div class="sheet-mini-lbl">Crit Chance</div>
+            <div class="sheet-mini-val" id="sheetCritChance">--</div>
+          </div>
+          <div class="sheet-mini-box">
+            <div class="sheet-mini-lbl">Crit Mult</div>
+            <div class="sheet-mini-val" id="sheetCritMult">--</div>
+          </div>
+          <div class="sheet-mini-box">
+            <div class="sheet-mini-lbl">Accuracy</div>
+            <div class="sheet-mini-val" id="sheetAccuracy">--</div>
+          </div>
+          <div class="sheet-mini-box">
+            <div class="sheet-mini-lbl">Bonus Dmg</div>
+            <div class="sheet-mini-val" id="sheetBonusDmg">--</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Engine Toggles -->
+    <div class="config-section">
+      <div class="section-header" onclick="toggleSection(this)">
+        <span>4. Engine Mechanics &amp; Toggles</span>
+        <span>▾</span>
+      </div>
+      <div class="section-body">
+        <label class="checkbox-row" title="Applies all 8 Operation Dummy debuffs: -20% Armor, +5% Melee/Ranged/Force/Tech Dmg, +7% Internal/Elemental Dmg, +10% AoE Dmg">
+          <input type="checkbox" id="toggleArmorDebuff" checked>
+          <span>Training Dummy Operation Debuffs (All Raid Debuffs)</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="toggleStemMatching" checked>
+          <span>Ability Stem Matching (e.g. assassinate_plus)</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="toggleFlightTime">
+          <span>Projectile Travel Flight Time</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="checkbox" id="toggleInOperation" checked>
+          <span>In Flashpoint / Operation Instance</span>
+        </label>
+
+        <div class="form-row" style="margin-top:4px;">
+          <div class="form-label">
+            <span>Combat Distance (meters)</span>
+            <div class="chip-row">
+              <span class="chip" onclick="setDistance(4)">4m</span>
+              <span class="chip" onclick="setDistance(10)">10m</span>
+              <span class="chip" onclick="setDistance(30)">30m</span>
+            </div>
+          </div>
+          <input type="number" id="combatDistanceInput" value="30.0" min="0" max="60" step="1">
+        </div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- RIGHT MAIN PANEL: RESULTS & TELEMETRY -->
+  <main class="main-panel">
+
+    <!-- Top KPI Strip -->
+    <section class="kpi-strip">
+      <div class="kpi-card primary">
+        <div class="kpi-title">
+          <span id="kpiDpsLabel">Total DPS</span>
+          <span id="kpiModeBadge" class="tab-badge">TEST</span>
+        </div>
+        <div class="kpi-value" id="kpiDpsValue">--</div>
+        <div class="kpi-sub" id="kpiDpsSub">Run a simulation to view telemetry</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">Fight Duration &amp; Damage</div>
+        <div class="kpi-value" id="kpiDurationValue">--</div>
+        <div class="kpi-sub" id="kpiDamageSub">Total Damage: --</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">Execute Phase (&lt;30% HP)</div>
+        <div class="kpi-value" id="kpiExecDpsValue">--</div>
+        <div class="kpi-sub" id="kpiExecSub">Duration: --</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">Crit Rate &amp; Hits</div>
+        <div class="kpi-value" id="kpiCritValue">--</div>
+        <div class="kpi-sub" id="kpiHitsSub">Total Hits: --</div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-title">
+          <span>Pinned Baseline</span>
+          <button class="btn btn-sm" id="pinCurrentRunBtn" onclick="pinCurrentRun()" disabled>📌 Pin Run</button>
+        </div>
+        <div class="kpi-value" id="kpiBaselineValue" style="font-size:16px;">None Pinned</div>
+        <div class="kpi-sub" id="kpiBaselineSub">Pin any run to compare deltas</div>
+      </div>
+    </section>
+
+    <!-- Navigation Tabs -->
+    <nav class="tabs-bar">
+      <div class="tabs-list">
+        <button class="tab-btn active" data-tab="tabBreakdown" onclick="switchTab('tabBreakdown')">
+          Ability Breakdown <span class="tab-badge" id="badgeAbilities">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tabMonteCarlo" onclick="switchTab('tabMonteCarlo')">
+          Monte Carlo Distribution <span class="tab-badge" id="badgeBatch">BATCH</span>
+        </button>
+        <button class="tab-btn" data-tab="tabBuffs" onclick="switchTab('tabBuffs')">
+          Buffs &amp; Debuffs <span class="tab-badge" id="badgeBuffs">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tabCombatLog" onclick="switchTab('tabCombatLog')">
+          Combat Event Log <span class="tab-badge" id="badgeLog">0</span>
+        </button>
+        <button class="tab-btn" data-tab="tabCompare" onclick="switchTab('tabCompare')">
+          Run History &amp; Compare <span class="tab-badge" id="badgeHistory">0</span>
+        </button>
+      </div>
+      <div id="wallTimeLabel" style="font-size:11px;color:var(--text-muted);"></div>
+    </nav>
+
+    <!-- TAB 1: ABILITY DAMAGE BREAKDOWN -->
+    <div class="tab-content active" id="tabBreakdown">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-card-title">
+            <span>Ability Damage Breakdown</span>
+            <div class="chip-row" style="margin-left:8px;">
+              <span class="chip active" id="phaseBtnOverall" onclick="setBreakdownPhase('overall')">Full Fight</span>
+              <span class="chip" id="phaseBtnExecute" onclick="setBreakdownPhase('execute')">Execute Phase (&lt;30% HP)</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);" id="breakdownSummaryRight">Click column headers to sort</div>
+        </div>
+        <div id="breakdownTableContainer">
+          <div class="empty-state">Select a preset or configure your loadout on the left, then click <b>▶ Run Simulation</b>.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: MONTE CARLO DISTRIBUTION -->
+    <div class="tab-content" id="tabMonteCarlo">
+      <div id="monteCarloContent">
+        <div class="empty-state">Switch execution mode to <b>BATCH (Monte Carlo)</b> and run a simulation to view the DPS distribution histogram and statistical percentiles.</div>
+      </div>
+    </div>
+
+    <!-- TAB 3: BUFFS & DEBUFFS -->
+    <div class="tab-content" id="tabBuffs">
+      <div id="buffsContent">
+        <div class="empty-state">Run a <b>TEST (Single Run)</b> simulation to inspect buff/debuff uptimes and active timeline windows.</div>
+      </div>
+    </div>
+
+    <!-- TAB 4: COMBAT EVENT LOG -->
+    <div class="tab-content" id="tabCombatLog">
+      <div class="panel-card">
+        <div class="log-toolbar">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span style="font-weight:700;font-size:12px;">Filter:</span>
+            <span class="chip active" data-logfilter="all" onclick="setLogFilter('all')">All Events</span>
+            <span class="chip" data-logfilter="cast" onclick="setLogFilter('cast')">Casts Only</span>
+            <span class="chip" data-logfilter="damage" onclick="setLogFilter('damage')">Damage Hits</span>
+            <span class="chip" data-logfilter="crit" onclick="setLogFilter('crit')">Critical Hits</span>
+            <span class="chip" data-logfilter="execute" onclick="setLogFilter('execute')">Execute (&lt;30% HP)</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="text" id="logSearchInput" placeholder="Search ability or damage type..." oninput="renderCombatLog()" style="width:210px;">
+            <button class="btn btn-sm" onclick="exportCombatLog()">Export .TXT</button>
+          </div>
+        </div>
+        <div id="combatLogContainer">
+          <div class="empty-state">Run a <b>TEST (Single Run)</b> simulation to view the timestamped combat event log.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: RUN HISTORY & COMPARISON -->
+    <div class="tab-content" id="tabCompare">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-card-title">Session Run History</div>
+          <button class="btn btn-sm" onclick="clearRunHistory()">Clear History</button>
+        </div>
+        <div id="historyTableContainer">
+          <div class="empty-state">No runs recorded in this session yet.</div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-card-title">Side-by-Side Comparison (Pinned Baseline vs Active Run)</div>
+        </div>
+        <div id="comparisonContainer">
+          <div class="empty-state">Pin a run as your baseline, then execute another run to compare ability DPS and crit rates side-by-side.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- SAVE RUN CONFIG MODAL -->
+<div class="modal-backdrop" id="saveConfigModal">
+  <div class="modal-box">
+    <div class="modal-title">Save Run Configuration (`data/run_config/`)</div>
+    <div class="form-row">
+      <label class="form-label">Filename (.json)</label>
+      <input type="text" id="saveConfigFilenameInput" value="custom_config.json">
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
+      <button class="btn" onclick="closeModal('saveConfigModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSaveRunConfig()">Save JSON</button>
+    </div>
+  </div>
+</div>
+
+<!-- SAVE BUILD STATS MODAL -->
+<div class="modal-backdrop" id="saveBuildModal">
+  <div class="modal-box">
+    <div class="modal-title">Save Character Build Stats (`data/builds/`)</div>
+    <div class="form-row">
+      <label class="form-label">Build Filename (.json)</label>
+      <input type="text" id="saveBuildFilenameInput" value="custom_build.json">
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
+      <button class="btn" onclick="closeModal('saveBuildModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmSaveBuildStats()">Save Build JSON</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let CATALOG = null;
+  let CURRENT_MODE = "TEST";
+  let BREAKDOWN_PHASE = "overall";
+  let BREAKDOWN_SORT = { col: "dps", asc: false };
+  let LOG_FILTER = "all";
+  let ACTIVE_RESULT = null;
+  let PINNED_BASELINE = null;
+  let RUN_HISTORY = [];
+
+  function setStatus(text, kind = "ready") {
+    const el = document.getElementById("statusPill");
+    el.textContent = text;
+    el.className = "status-pill status-" + kind;
+  }
+
+  function toggleSection(headerEl) {
+    const body = headerEl.nextElementSibling;
+    body.classList.toggle("collapsed");
+  }
+
+  function switchTab(tabId) {
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.tab === tabId);
+    });
+    document.querySelectorAll(".tab-content").forEach(panel => {
+      panel.classList.toggle("active", panel.id === tabId);
+    });
+  }
+
+  function setSimMode(mode) {
+    CURRENT_MODE = mode;
+    document.getElementById("modeTestBtn").classList.toggle("active", mode === "TEST");
+    document.getElementById("modeBatchBtn").classList.toggle("active", mode === "BATCH");
+    document.getElementById("batchIterationsRow").style.display = mode === "BATCH" ? "flex" : "none";
+  }
+
+  function setIterations(val) {
+    document.getElementById("iterationsInput").value = val;
+  }
+
+  function setDummyHp(val) {
+    document.getElementById("dummyHpInput").value = val;
+  }
+
+  function setDistance(val) {
+    document.getElementById("combatDistanceInput").value = val;
+  }
+
+  function randomizeSeed() {
+    document.getElementById("seedInput").value = Math.floor(Math.random() * 999999) + 1;
+  }
+
+  function openModal(id) {
+    document.getElementById(id).classList.add("open");
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove("open");
+  }
+
+  function openSaveBuildModal() {
+    const curBuild = document.getElementById("buildSelect").value;
+    if (curBuild) {
+      const parts = curBuild.split("/");
+      document.getElementById("saveBuildFilenameInput").value = parts[parts.length - 1];
+    }
+    openModal("saveBuildModal");
+  }
+
+  // Load workspace catalog
+  async function loadCatalog(preserveSelections = false) {
+    try {
+      setStatus("Loading catalog...", "running");
+      const res = await fetch("/api/catalog");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load catalog");
+      CATALOG = data;
+
+      // Preset Run Configs
+      const rcSel = document.getElementById("presetConfigSelect");
+      const prevRc = rcSel.value;
+      rcSel.innerHTML = '<option value="">-- Select Run Config --</option>';
+      (data.run_configs || []).forEach(rc => {
+        const opt = document.createElement("option");
+        opt.value = rc.path;
+        opt.textContent = rc.label;
+        rcSel.appendChild(opt);
+      });
+
+      // Builds
+      const bSel = document.getElementById("buildSelect");
+      bSel.innerHTML = "";
+      (data.builds || []).forEach(b => {
+        const opt = document.createElement("option");
+        opt.value = b.path;
+        opt.textContent = b.label;
+        bSel.appendChild(opt);
+      });
+
+      // Rotations
+      const rotSel = document.getElementById("rotationSelect");
+      rotSel.innerHTML = "";
+      (data.rotations || []).forEach(r => {
+        const opt = document.createElement("option");
+        opt.value = r.path;
+        opt.textContent = r.label;
+        rotSel.appendChild(opt);
+      });
+
+      // Choices
+      const chSel = document.getElementById("choicesSelect");
+      chSel.innerHTML = "";
+      (data.choices_files || []).forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.path;
+        opt.textContent = c.label;
+        chSel.appendChild(opt);
+      });
+
+      // Relics
+      ["relic1Select", "relic2Select"].forEach(id => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option value="">-- None --</option>';
+        (data.relics || []).forEach(rel => {
+          const opt = document.createElement("option");
+          opt.value = rel.fqn;
+          opt.textContent = rel.label;
+          sel.appendChild(opt);
+        });
+      });
+
+      // Classes
+      const clsSel = document.getElementById("classSelect");
+      clsSel.innerHTML = "";
+      Object.keys(data.disciplines || {}).sort().forEach(clsName => {
+        const opt = document.createElement("option");
+        opt.value = clsName;
+        opt.textContent = clsName;
+        clsSel.appendChild(opt);
+      });
+
+      if (!preserveSelections && data.run_configs && data.run_configs.length > 0) {
+        // Default to hatred_14gcd if present, else first config
+        const pref = data.run_configs.find(r => r.label.includes("hatred_14gcd")) || data.run_configs[0];
+        rcSel.value = pref.path;
+        await applyPresetRunConfig(pref.path);
+      } else if (prevRc) {
+        rcSel.value = prevRc;
+      }
+      setStatus("Ready", "ready");
+    } catch (err) {
+      console.error(err);
+      setStatus("Catalog Error", "error");
+    }
+  }
+
+  function populateSpecsForClass(clsName, targetSpecPath = null) {
+    const specSel = document.getElementById("specSelect");
+    specSel.innerHTML = "";
+    const specs = (CATALOG && CATALOG.disciplines && CATALOG.disciplines[clsName]) || {};
+    Object.keys(specs).sort().forEach(spName => {
+      const opt = document.createElement("option");
+      opt.value = specs[spName];
+      opt.textContent = spName;
+      specSel.appendChild(opt);
+    });
+    if (targetSpecPath) {
+      specSel.value = targetSpecPath;
+    }
+  }
+
+  async function updateClassGearOptions(specPath, selectedTactical = null, selectedLegs = []) {
+    if (!specPath) return;
+    const res = await fetch(`/api/class_gear?spec_path=${encodeURIComponent(specPath)}`);
+    const data = await res.json();
+    if (!res.ok) return;
+
+    const tacSel = document.getElementById("tacticalSelect");
+    tacSel.innerHTML = "";
+    (data.tacticals || []).forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t.fqn;
+      opt.textContent = `${t.name}`;
+      tacSel.appendChild(opt);
+    });
+    if (selectedTactical) tacSel.value = selectedTactical;
+
+    ["legendary1Select", "legendary2Select"].forEach((id, idx) => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = "";
+      (data.legendaries || []).forEach(leg => {
+        const opt = document.createElement("option");
+        opt.value = leg.fqn;
+        opt.textContent = `${leg.name}`;
+        sel.appendChild(opt);
+      });
+      if (selectedLegs[idx]) {
+        sel.value = selectedLegs[idx];
+      } else if (data.legendaries && data.legendaries.length > idx) {
+        sel.value = data.legendaries[idx].fqn;
+      }
+    });
+  }
+
+  function applyStatsToInputs(statsObj) {
+    document.querySelectorAll(".stat-input").forEach(inp => {
+      const k = inp.dataset.stat;
+      const val = statsObj && statsObj[k] !== undefined ? statsObj[k] : 0;
+      inp.value = val;
+    });
+  }
+
+  function getStatsOverrideFromInputs() {
+    const out = {};
+    document.querySelectorAll(".stat-input").forEach(inp => {
+      const k = inp.dataset.stat;
+      const v = parseFloat(inp.value);
+      if (!isNaN(v)) out[k] = v;
+    });
+    return out;
+  }
+
+  async function applyPresetRunConfig(path) {
+    if (!path) return;
+    try {
+      setStatus("Loading preset...", "running");
+      const res = await fetch(`/api/run_config?path=${encodeURIComponent(path)}`);
+      const bundle = await res.json();
+      if (!res.ok) throw new Error(bundle.error || "Failed to load preset");
+
+      const rc = bundle.run_config || {};
+      const clsName = bundle.class_name;
+      if (clsName) {
+        document.getElementById("classSelect").value = clsName;
+        populateSpecsForClass(clsName, rc.spec_path);
+      }
+
+      await updateClassGearOptions(
+        rc.spec_path,
+        rc.tactical_fqn,
+        rc.legendary_fqns || []
+      );
+
+      if (rc.stats_path) document.getElementById("buildSelect").value = rc.stats_path;
+      if (rc.rotation_path) document.getElementById("rotationSelect").value = rc.rotation_path;
+      if (rc.choices_path) document.getElementById("choicesSelect").value = rc.choices_path;
+
+      const relics = rc.relic_fqns || [];
+      document.getElementById("relic1Select").value = relics[0] || "";
+      document.getElementById("relic2Select").value = relics[1] || "";
+
+      if (bundle.stats) {
+        applyStatsToInputs(bundle.stats);
+      }
+
+      if (bundle.choices) {
+        const badge = Object.entries(bundle.choices).map(([lvl, slot]) => `L${lvl}:${slot}`).join(" ");
+        document.getElementById("choicesPreviewBadge").textContent = badge;
+      }
+
+      setSimMode((rc.mode || "TEST").toUpperCase());
+      if (rc.iterations) document.getElementById("iterationsInput").value = rc.iterations;
+      if (rc.dummy_hp) document.getElementById("dummyHpInput").value = rc.dummy_hp;
+      if (rc.duration) document.getElementById("durationInput").value = rc.duration;
+      if (rc.level) document.getElementById("levelInput").value = rc.level;
+      if (rc.seed !== undefined) document.getElementById("seedInput").value = rc.seed;
+
+      document.getElementById("toggleArmorDebuff").checked = Boolean(rc.training_dummy_armor_debuff);
+      document.getElementById("toggleStemMatching").checked = rc.enable_stem_matching !== undefined ? Boolean(rc.enable_stem_matching) : true;
+      document.getElementById("toggleFlightTime").checked = Boolean(rc.enable_projectile_flight_time);
+      document.getElementById("toggleInOperation").checked = rc.in_flashpoint_operation !== undefined ? Boolean(rc.in_flashpoint_operation) : true;
+      document.getElementById("combatDistanceInput").value = rc.combat_distance !== undefined ? rc.combat_distance : 30.0;
+
+      await refreshComputedStats();
+      setStatus("Ready", "ready");
+    } catch (err) {
+      console.error(err);
+      setStatus("Load Error", "error");
+    }
+  }
+
+  function buildPayloadFromForm() {
+    const leg1 = document.getElementById("legendary1Select").value;
+    const leg2 = document.getElementById("legendary2Select").value;
+    const rel1 = document.getElementById("relic1Select").value;
+    const rel2 = document.getElementById("relic2Select").value;
+    const relics = [];
+    if (rel1) relics.push(rel1);
+    if (rel2 && rel2 !== rel1) relics.push(rel2);
+
+    return {
+      spec_path: document.getElementById("specSelect").value,
+      stats_path: document.getElementById("buildSelect").value,
+      stats_override: getStatsOverrideFromInputs(),
+      rotation_path: document.getElementById("rotationSelect").value,
+      choices_path: document.getElementById("choicesSelect").value,
+      tactical_fqn: document.getElementById("tacticalSelect").value,
+      legendary_fqns: [leg1, leg2].filter(Boolean),
+      relic_fqns: relics,
+      mode: CURRENT_MODE,
+      iterations: parseInt(document.getElementById("iterationsInput").value, 10) || 50,
+      dummy_hp: parseInt(document.getElementById("dummyHpInput").value, 10) || 6000000,
+      duration: parseFloat(document.getElementById("durationInput").value) || 1000,
+      level: parseInt(document.getElementById("levelInput").value, 10) || 85,
+      seed: parseInt(document.getElementById("seedInput").value, 10) || 42,
+      training_dummy_armor_debuff: document.getElementById("toggleArmorDebuff").checked,
+      enable_stem_matching: document.getElementById("toggleStemMatching").checked,
+      enable_projectile_flight_time: document.getElementById("toggleFlightTime").checked,
+      in_flashpoint_operation: document.getElementById("toggleInOperation").checked,
+      combat_distance: parseFloat(document.getElementById("combatDistanceInput").value) || 30.0,
+    };
+  }
+
+  function updateMiniSheet(cs) {
+    if (!cs) return;
+    document.getElementById("sheetGcd").textContent = `${cs.gcd_seconds.toFixed(2)}s`;
+    document.getElementById("sheetAlacrity").textContent = `${cs.alacrity_pct.toFixed(2)}%`;
+    document.getElementById("sheetCritChance").textContent = `${cs.crit_chance_pct.toFixed(2)}%`;
+    document.getElementById("sheetCritMult").textContent = `${cs.crit_multiplier_pct.toFixed(2)}%`;
+    document.getElementById("sheetAccuracy").textContent = `${cs.accuracy_pct.toFixed(2)}%`;
+    const maxBonus = Math.max(cs.force_bonus_dmg || 0, cs.tech_bonus_dmg || 0, cs.melee_bonus_dmg || 0);
+    document.getElementById("sheetBonusDmg").textContent = Math.round(maxBonus).toLocaleString();
+  }
+
+  async function refreshComputedStats() {
+    try {
+      const payload = buildPayloadFromForm();
+      if (!payload.spec_path || !payload.stats_path) return;
+      const res = await fetch("/api/preview_stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.computed_player_stats) {
+        updateMiniSheet(data.computed_player_stats);
+      }
+    } catch (e) {
+      // Ignore transient validation errors during partial selection
+    }
+  }
+
+  function updateSimProgressUI(completed, total, visible = true) {
+    const box = document.getElementById("simProgressBox");
+    const bar = document.getElementById("simProgressBar");
+    const txt = document.getElementById("simProgressText");
+    if (!box || !bar || !txt) return;
+    if (!visible) {
+      box.style.display = "none";
+      return;
+    }
+    const safeTotal = Math.max(1, total || 1);
+    const safeComp = Math.max(0, Math.min(completed || 0, safeTotal));
+    const pct = Math.round((safeComp / safeTotal) * 100);
+    box.style.display = "inline-flex";
+    bar.style.width = `${pct}%`;
+    txt.textContent = `${safeComp} / ${safeTotal} (${pct}%)`;
+  }
+
+  async function runSimulation() {
+    const runBtn = document.getElementById("runSimBtn");
+    let progressTimer = null;
+    try {
+      const payload = buildPayloadFromForm();
+      if (payload.legendary_fqns.length !== 2 || payload.legendary_fqns[0] === payload.legendary_fqns[1]) {
+        alert("Please select 2 unique Legendary Implants before running.");
+        return;
+      }
+
+      runBtn.disabled = true;
+      runBtn.textContent = "⏳ Running...";
+      if (CURRENT_MODE === "BATCH") {
+        const totalIter = payload.iterations || 50;
+        updateSimProgressUI(0, totalIter, true);
+        setStatus(`Simulating 0 / ${totalIter} fights...`, "running");
+        progressTimer = setInterval(async () => {
+          try {
+            const pRes = await fetch("/api/progress", { cache: "no-store" });
+            if (!pRes.ok) return;
+            const pData = await pRes.json();
+            if (pData && pData.mode === "BATCH" && pData.total > 0) {
+              updateSimProgressUI(pData.completed, pData.total, true);
+              setStatus(`Simulating ${pData.completed} / ${pData.total} fights...`, "running");
+              runBtn.textContent = `⏳ ${pData.completed} / ${pData.total}`;
+            }
+          } catch (_e) {
+            // Ignore transient polling errors
+          }
+        }, 120);
+      } else {
+        updateSimProgressUI(0, 1, false);
+        setStatus("Simulating fight...", "running");
+      }
+
+      const res = await fetch("/api/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (progressTimer) {
+        clearInterval(progressTimer);
+        progressTimer = null;
+      }
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || "Simulation failed");
+      }
+
+      if (result.mode === "BATCH") {
+        updateSimProgressUI(result.iterations, result.iterations, true);
+      } else {
+        updateSimProgressUI(0, 1, false);
+      }
+
+      ACTIVE_RESULT = result;
+      ACTIVE_RESULT._timestamp = new Date().toLocaleTimeString();
+      ACTIVE_RESULT._rotationLabel = document.getElementById("rotationSelect").selectedOptions[0]?.textContent || "";
+      RUN_HISTORY.unshift(ACTIVE_RESULT);
+
+      document.getElementById("pinCurrentRunBtn").disabled = false;
+      updateMiniSheet(result.computed_player_stats);
+      renderAllResultPanels(result);
+      setStatus("Complete", "ready");
+
+      if (result.mode === "BATCH" && document.querySelector(".tab-btn.active")?.dataset.tab === "tabBuffs") {
+        switchTab("tabMonteCarlo");
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus("Error", "error");
+      updateSimProgressUI(0, 1, false);
+      alert("Simulation Error:\n" + err.message);
+    } finally {
+      if (progressTimer) {
+        clearInterval(progressTimer);
+      }
+      runBtn.disabled = false;
+      runBtn.textContent = "▶ Run Simulation";
+    }
+  }
+
+  function formatDeltaBadge(currentVal, baseVal, suffix = "") {
+    if (baseVal === undefined || baseVal === null || baseVal === 0) return "";
+    const diff = currentVal - baseVal;
+    const pct = (diff / baseVal) * 100.0;
+    const sign = diff >= 0 ? "+" : "";
+    const cls = diff >= 0 ? "delta-pos" : "delta-neg";
+    return `<span class="delta-badge ${cls}">${sign}${diff.toFixed(1)}${suffix} (${sign}${pct.toFixed(2)}%)</span>`;
+  }
+
+  function renderAllResultPanels(res) {
+    // 1. Update KPI Strip
+    const isBatch = res.mode === "BATCH";
+    document.getElementById("kpiModeBadge").textContent = isBatch ? `BATCH (${res.iterations})` : "TEST (1x)";
+    document.getElementById("kpiDpsLabel").textContent = isBatch ? "Mean DPS" : "Total DPS";
+    document.getElementById("kpiDpsValue").textContent = res.dps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+    let dpsSubHtml = "";
+    if (PINNED_BASELINE) {
+      dpsSubHtml += formatDeltaBadge(res.dps, PINNED_BASELINE.dps, " DPS") + " ";
+    }
+    if (isBatch) {
+      dpsSubHtml += `±${res.std_dev.toLocaleString()} SD | Med: ${res.median_dps.toLocaleString()}`;
+    } else {
+      dpsSubHtml += `${res.class_name} - ${res.spec} (Seed ${res.seed})`;
+    }
+    document.getElementById("kpiDpsSub").innerHTML = dpsSubHtml;
+
+    document.getElementById("kpiDurationValue").textContent = `${res.duration.toFixed(1)}s`;
+    document.getElementById("kpiDamageSub").textContent =
+      (isBatch ? "Avg Dmg: " : "Total Dmg: ") + Math.round(res.total_damage).toLocaleString();
+
+    if (res.execute_phase && res.execute_phase.active) {
+      document.getElementById("kpiExecDpsValue").textContent =
+        res.execute_phase.dps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      document.getElementById("kpiExecSub").textContent = `Duration: ${res.execute_phase.duration.toFixed(1)}s`;
+    } else {
+      document.getElementById("kpiExecDpsValue").textContent = "N/A";
+      document.getElementById("kpiExecSub").textContent = "No <30% HP window";
+    }
+
+    document.getElementById("kpiCritValue").textContent = `${res.overall_crit_pct.toFixed(1)}%`;
+    document.getElementById("kpiHitsSub").textContent =
+      (isBatch ? "Avg Hits: " : "Total Hits: ") + res.total_hits.toLocaleString();
+
+    document.getElementById("wallTimeLabel").textContent = `Completed in ${res.elapsed_wall_ms} ms`;
+
+    // Badges
+    document.getElementById("badgeAbilities").textContent = (res.breakdown || []).length;
+    document.getElementById("badgeBuffs").textContent = (res.buffs || []).length;
+    document.getElementById("badgeLog").textContent = (res.combat_log || []).length;
+    document.getElementById("badgeHistory").textContent = RUN_HISTORY.length;
+
+    renderAbilityBreakdown();
+    renderMonteCarloTab();
+    renderBuffsTab();
+    renderCombatLog();
+    renderHistoryAndComparison();
+  }
+
+  function setBreakdownPhase(phase) {
+    BREAKDOWN_PHASE = phase;
+    document.getElementById("phaseBtnOverall").classList.toggle("active", phase === "overall");
+    document.getElementById("phaseBtnExecute").classList.toggle("active", phase === "execute");
+    renderAbilityBreakdown();
+  }
+
+  function sortBreakdownBy(col) {
+    if (BREAKDOWN_SORT.col === col) {
+      BREAKDOWN_SORT.asc = !BREAKDOWN_SORT.asc;
+    } else {
+      BREAKDOWN_SORT.col = col;
+      BREAKDOWN_SORT.asc = col === "name" || col === "type_desc";
+    }
+    renderAbilityBreakdown();
+  }
+
+  function getDamageTypeBadgeClass(typeDesc) {
+    const low = (typeDesc || "").toLowerCase();
+    if (low.includes("internal") || low.includes("elemental")) return "dtype-badge dtype-internal";
+    return "dtype-badge dtype-kinetic";
+  }
+
+  function renderAbilityBreakdown() {
+    const container = document.getElementById("breakdownTableContainer");
+    if (!ACTIVE_RESULT) return;
+
+    const rowsRaw = BREAKDOWN_PHASE === "execute"
+      ? (ACTIVE_RESULT.execute_breakdown || [])
+      : (ACTIVE_RESULT.breakdown || []);
+
+    if (!rowsRaw.length) {
+      container.innerHTML = `<div class="empty-state">No ability damage recorded for this phase.</div>`;
+      return;
+    }
+
+    const rows = [...rowsRaw].sort((a, b) => {
+      const va = a[BREAKDOWN_SORT.col];
+      const vb = b[BREAKDOWN_SORT.col];
+      if (typeof va === "string") {
+        return BREAKDOWN_SORT.asc ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      return BREAKDOWN_SORT.asc ? (va - vb) : (vb - va);
+    });
+
+    const isTest = ACTIVE_RESULT.mode === "TEST";
+    let html = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th onclick="sortBreakdownBy('name')">Ability Name</th>
+            <th onclick="sortBreakdownBy('type_desc')">Attack / Damage Type</th>
+            <th class="num-col" onclick="sortBreakdownBy('dps')">DPS</th>
+            <th onclick="sortBreakdownBy('share_pct')">Damage Share</th>
+            <th class="num-col" onclick="sortBreakdownBy('total_damage')">${isTest ? 'Total Damage' : 'Avg Damage'}</th>
+            <th class="num-col" onclick="sortBreakdownBy('hits')">${isTest ? 'Hits' : 'Avg Hits'}</th>
+            <th class="num-col" onclick="sortBreakdownBy('crit_pct')">Crit %</th>
+            <th class="num-col" onclick="sortBreakdownBy('avg_hit')">Avg Hit</th>
+            ${isTest ? '<th class="num-col">Min / Max Hit</th>' : ''}
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (const r of rows) {
+      const minMaxCell = isTest
+        ? `<td class="num-col" style="color:var(--text-muted);">${(r.min_hit || 0).toLocaleString()} / ${(r.max_hit || 0).toLocaleString()}</td>`
+        : "";
+      html += `
+        <tr>
+          <td style="font-weight:700;">${r.name}</td>
+          <td><span class="${getDamageTypeBadgeClass(r.type_desc)}">${r.type_desc}</span></td>
+          <td class="num-col" style="font-weight:700;color:var(--accent);">${r.dps.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}</td>
+          <td>
+            <div class="share-cell">
+              <div class="share-bar-bg">
+                <div class="share-bar-fill" style="width:${Math.min(100, r.share_pct)}%;"></div>
+              </div>
+              <span style="min-width:42px;text-align:right;font-weight:600;">${r.share_pct.toFixed(1)}%</span>
+            </div>
+          </td>
+          <td class="num-col">${Math.round(r.total_damage).toLocaleString()}</td>
+          <td class="num-col">${r.hits.toLocaleString()}</td>
+          <td class="num-col" style="color:var(--amber);font-weight:600;">${r.crit_pct.toFixed(1)}%</td>
+          <td class="num-col">${Math.round(r.avg_hit).toLocaleString()}</td>
+          ${minMaxCell}
+        </tr>
+      `;
+    }
+    html += `</tbody></table>`;
+    container.innerHTML = html;
+  }
+
+  function renderMonteCarloTab() {
+    const container = document.getElementById("monteCarloContent");
+    if (!ACTIVE_RESULT || ACTIVE_RESULT.mode !== "BATCH") {
+      container.innerHTML = `<div class="empty-state">Switch mode to <b>BATCH (Monte Carlo)</b> and run a simulation to view the DPS distribution histogram and statistical summary.</div>`;
+      return;
+    }
+
+    const r = ACTIVE_RESULT;
+    const bins = r.histogram_bins || [];
+    const maxCount = Math.max(...bins.map(b => b.count), 1);
+
+    // Build SVG Histogram
+    const svgW = 780;
+    const svgH = 260;
+    const padL = 48;
+    const padR = 24;
+    const padT = 24;
+    const padB = 42;
+    const plotW = svgW - padL - padR;
+    const plotH = svgH - padT - padB;
+
+    const minX = bins.length ? bins[0].x0 : r.min_dps;
+    const maxX = bins.length ? bins[bins.length - 1].x1 : r.max_dps;
+    const spanX = Math.max(1, maxX - minX);
+
+    const xToPx = val => padL + ((val - minX) / spanX) * plotW;
+
+    let barsSvg = "";
+    bins.forEach((b, idx) => {
+      const bx0 = xToPx(b.x0);
+      const bx1 = xToPx(b.x1);
+      const bw = Math.max(4, bx1 - bx0 - 2);
+      const bh = (b.count / maxCount) * plotH;
+      const by = padT + (plotH - bh);
+      barsSvg += `
+        <g>
+          <rect x="${bx0 + 1}" y="${by}" width="${bw}" height="${bh}" rx="2"
+                fill="rgba(63, 185, 80, 0.72)" stroke="#3fb950" stroke-width="1">
+            <title>${b.x0.toLocaleString()} - ${b.x1.toLocaleString()} DPS: ${b.count} runs (${b.pct}%)</title>
+          </rect>
+          ${b.count > 0 ? `<text x="${bx0 + bw / 2 + 1}" y="${by - 5}" fill="#8b949e" font-size="10" text-anchor="middle">${b.count}</text>` : ''}
+        </g>
+      `;
+    });
+
+    const meanPx = xToPx(r.avg_dps);
+    const sdLoPx = Math.max(padL, xToPx(r.avg_dps - r.std_dev));
+    const sdHiPx = Math.min(padL + plotW, xToPx(r.avg_dps + r.std_dev));
+
+    container.innerHTML = `
+      <div class="kpi-strip" style="padding:0;margin-bottom:16px;background:transparent;border:none;grid-template-columns:repeat(6, 1fr);">
+        <div class="kpi-card">
+          <div class="kpi-title">Mean DPS</div>
+          <div class="kpi-value" style="font-size:18px;color:var(--accent);">${r.avg_dps.toLocaleString()}</div>
+          <div class="kpi-sub">95% CI: ±${r.ci_95}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Median DPS (P50)</div>
+          <div class="kpi-value" style="font-size:18px;">${r.median_dps.toLocaleString()}</div>
+          <div class="kpi-sub">P25: ${r.p25_dps.toLocaleString()} | P75: ${r.p75_dps.toLocaleString()}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Std Deviation</div>
+          <div class="kpi-value" style="font-size:18px;color:var(--amber);">±${r.std_dev.toLocaleString()}</div>
+          <div class="kpi-sub">CV: ${((r.std_dev / r.avg_dps) * 100).toFixed(2)}%</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Worst Run (Min)</div>
+          <div class="kpi-value" style="font-size:18px;color:var(--red);">${r.min_dps.toLocaleString()}</div>
+          <div class="kpi-sub">P10: ${r.p10_dps.toLocaleString()}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Best Run (Max)</div>
+          <div class="kpi-value" style="font-size:18px;color:var(--green);">${r.max_dps.toLocaleString()}</div>
+          <div class="kpi-sub">P90: ${r.p90_dps.toLocaleString()}</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-title">Sample Size</div>
+          <div class="kpi-value" style="font-size:18px;">${r.iterations} Fights</div>
+          <div class="kpi-sub">Avg Time: ${r.duration.toFixed(1)}s</div>
+        </div>
+      </div>
+
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-card-title">Monte Carlo DPS Distribution Histogram (${r.iterations} Fights)</div>
+          <div style="font-size:11px;color:var(--text-muted);">Hover bars for bin frequency details</div>
+        </div>
+        <div style="padding:16px;">
+          <svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-height:320px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border-subtle);">
+            <!-- +/- 1 SD Band -->
+            <rect x="${sdLoPx}" y="${padT}" width="${Math.max(0, sdHiPx - sdLoPx)}" height="${plotH}"
+                  fill="rgba(255, 255, 255, 0.05)" />
+            <!-- Baseline Axis -->
+            <line x1="${padL}" y1="${padT + plotH}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="#30363d" stroke-width="1" />
+            ${barsSvg}
+            <!-- Mean Line -->
+            <line x1="${meanPx}" y1="${padT}" x2="${meanPx}" y2="${padT + plotH}" stroke="#f85149" stroke-width="2" stroke-dasharray="5,4" />
+            <text x="${meanPx}" y="${padT - 7}" fill="#f85149" font-size="11" font-weight="700" text-anchor="middle">Mean: ${r.avg_dps.toLocaleString()}</text>
+            <!-- Min / Max Axis Labels -->
+            <text x="${padL}" y="${svgH - 12}" fill="#8b949e" font-size="11">${Math.round(minX).toLocaleString()} DPS</text>
+            <text x="${padL + plotW}" y="${svgH - 12}" fill="#8b949e" font-size="11" text-anchor="end">${Math.round(maxX).toLocaleString()} DPS</text>
+          </svg>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderBuffsTab() {
+    const container = document.getElementById("buffsContent");
+    if (!ACTIVE_RESULT || ACTIVE_RESULT.mode !== "TEST") {
+      container.innerHTML = `<div class="empty-state">Run a <b>TEST (Single Run)</b> simulation to inspect buff and debuff active windows and uptimes.</div>`;
+      return;
+    }
+
+    const buffs = ACTIVE_RESULT.buffs || [];
+    const dur = Math.max(1, ACTIVE_RESULT.duration || 1);
+    if (!buffs.length) {
+      container.innerHTML = `<div class="empty-state">No buff or debuff windows recorded.</div>`;
+      return;
+    }
+
+    let ganttHtml = `
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-card-title">Active Effect Windows Timeline (0.0s — ${dur.toFixed(1)}s)</div>
+          <div style="display:flex;gap:12px;font-size:11px;">
+            <span style="color:var(--green);">■ Player Buffs</span>
+            <span style="color:var(--purple);">■ Target Debuffs / DoTs</span>
+          </div>
+        </div>
+        <div>
+    `;
+
+    for (const b of buffs) {
+      const segCls = b.is_target ? "gantt-seg target-debuff" : "gantt-seg player-buff";
+      let segs = "";
+      for (const w of (b.windows || [])) {
+        const leftPct = Math.max(0, Math.min(100, (w.start / dur) * 100));
+        const widthPct = Math.max(0.3, Math.min(100 - leftPct, (w.duration / dur) * 100));
+        const stackStr = w.max_stacks > 1 ? ` (x${w.max_stacks})` : "";
+        segs += `<div class="${segCls}" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;" title="${b.name}: ${w.start.toFixed(2)}s - ${w.end.toFixed(2)}s (${w.duration.toFixed(2)}s)${stackStr}"></div>`;
+      }
+      ganttHtml += `
+        <div class="gantt-row">
+          <div class="gantt-label" title="${b.name} (${b.entity})">${b.name} ${b.max_stacks > 1 ? `<span style="color:var(--amber);font-size:10px;">x${b.max_stacks}</span>` : ''}</div>
+          <div class="gantt-pct">${b.uptime_pct.toFixed(1)}%</div>
+          <div class="gantt-track">${segs}</div>
+        </div>
+      `;
+    }
+    ganttHtml += `</div></div>`;
+
+    let tableHtml = `
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <div class="panel-card-title">Buff &amp; Debuff Uptime Summary</div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Effect Name</th>
+              <th>Entity</th>
+              <th class="num-col">Windows</th>
+              <th class="num-col">Max Stacks</th>
+              <th class="num-col">Total Active Time</th>
+              <th>Uptime %</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+
+    for (const b of buffs) {
+      tableHtml += `
+        <tr>
+          <td style="font-weight:700;">${b.name}</td>
+          <td style="color:${b.is_target ? 'var(--purple)' : 'var(--green)'};font-weight:600;">${b.entity}</td>
+          <td class="num-col">${b.count}</td>
+          <td class="num-col">${b.max_stacks}</td>
+          <td class="num-col">${b.total_uptime.toFixed(2)}s</td>
+          <td>
+            <div class="share-cell">
+              <div class="share-bar-bg">
+                <div class="share-bar-fill" style="width:${Math.min(100, b.uptime_pct)}%;background:${b.is_target ? 'var(--purple)' : 'var(--green)'};"></div>
+              </div>
+              <span style="min-width:44px;text-align:right;font-weight:600;">${b.uptime_pct.toFixed(1)}%</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+    tableHtml += `</tbody></table></div>`;
+    container.innerHTML = ganttHtml + tableHtml;
+  }
+
+  function setLogFilter(filter) {
+    LOG_FILTER = filter;
+    document.querySelectorAll("[data-logfilter]").forEach(el => {
+      el.classList.toggle("active", el.dataset.logfilter === filter);
+    });
+    renderCombatLog();
+  }
+
+  function getFilteredCombatLog() {
+    if (!ACTIVE_RESULT || !ACTIVE_RESULT.combat_log) return [];
+    const q = (document.getElementById("logSearchInput").value || "").trim().toLowerCase();
+    return ACTIVE_RESULT.combat_log.filter(ev => {
+      if (LOG_FILTER === "cast" && ev.category !== "cast") return false;
+      if (LOG_FILTER === "damage" && ev.category !== "damage") return false;
+      if (LOG_FILTER === "crit" && !ev.is_crit) return false;
+      if (LOG_FILTER === "execute" && ev.target_hp_pct > 30.0) return false;
+      if (q) {
+        const hay = `${ev.ability} ${ev.text} ${ev.damage_type || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderCombatLog() {
+    const container = document.getElementById("combatLogContainer");
+    if (!ACTIVE_RESULT || ACTIVE_RESULT.mode !== "TEST") {
+      container.innerHTML = `<div class="empty-state">Run a <b>TEST (Single Run)</b> simulation to inspect the combat event log.</div>`;
+      return;
+    }
+
+    const events = getFilteredCombatLog();
+    if (!events.length) {
+      container.innerHTML = `<div class="empty-state">No combat events match the active filter.</div>`;
+      return;
+    }
+
+    const displayEvents = events.slice(0, 1500);
+    let html = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width:75px;">Time</th>
+            <th style="width:85px;">Event</th>
+            <th>Ability</th>
+            <th>Details</th>
+            <th class="num-col">Target HP %</th>
+            <th class="num-col">Resource</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (const ev of displayEvents) {
+      const catBadge = ev.category === "cast"
+        ? `<span class="cast-tag">CAST</span>`
+        : (ev.is_crit ? `<span class="crit-tag">CRIT HIT</span>` : `<span>HIT</span>`);
+      html += `
+        <tr>
+          <td style="color:var(--text-muted);">${ev.time.toFixed(2)}s</td>
+          <td>${catBadge}</td>
+          <td style="font-weight:600;">${ev.ability}</td>
+          <td class="${ev.is_crit ? 'crit-tag' : ''}">${ev.text}</td>
+          <td class="num-col" style="color:${ev.target_hp_pct <= 30 ? 'var(--red)' : 'var(--text-muted)'};">${ev.target_hp_pct.toFixed(1)}%</td>
+          <td class="num-col" style="color:var(--cyan);">${ev.resource.toFixed(1)}</td>
+        </tr>
+      `;
+    }
+    html += `</tbody></table>`;
+    if (events.length > 1500) {
+      html += `<div style="padding:8px 12px;color:var(--text-muted);font-size:11px;">Showing first 1,500 of ${events.length} matching events. Use the search box or Export .TXT for the full log.</div>`;
+    }
+    container.innerHTML = html;
+  }
+
+  function exportCombatLog() {
+    const events = getFilteredCombatLog();
+    if (!events.length) return;
+    const lines = events.map(e => `[${e.time.toFixed(2)}s] [${e.category.toUpperCase()}] ${e.text} (Target HP: ${e.target_hp_pct.toFixed(1)}%, Resource: ${e.resource.toFixed(1)})`);
+    const blob = new Blob([lines.join("\r\n")], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `swtorsim_combat_log_${Date.now()}.txt`;
+    a.click();
+  }
+
+  function pinCurrentRun() {
+    if (!ACTIVE_RESULT) return;
+    PINNED_BASELINE = ACTIVE_RESULT;
+    document.getElementById("kpiBaselineValue").textContent = `${PINNED_BASELINE.dps.toLocaleString()} DPS`;
+    document.getElementById("kpiBaselineSub").textContent = `${PINNED_BASELINE.spec} (${PINNED_BASELINE.mode}) @ ${PINNED_BASELINE._timestamp}`;
+    renderAllResultPanels(ACTIVE_RESULT);
+  }
+
+  function pinHistoryRun(idx) {
+    if (RUN_HISTORY[idx]) {
+      PINNED_BASELINE = RUN_HISTORY[idx];
+      document.getElementById("kpiBaselineValue").textContent = `${PINNED_BASELINE.dps.toLocaleString()} DPS`;
+      document.getElementById("kpiBaselineSub").textContent = `${PINNED_BASELINE.spec} (${PINNED_BASELINE.mode}) @ ${PINNED_BASELINE._timestamp}`;
+      if (ACTIVE_RESULT) renderAllResultPanels(ACTIVE_RESULT);
+    }
+  }
+
+  function selectHistoryRun(idx) {
+    if (RUN_HISTORY[idx]) {
+      ACTIVE_RESULT = RUN_HISTORY[idx];
+      renderAllResultPanels(ACTIVE_RESULT);
+    }
+  }
+
+  function clearRunHistory() {
+    RUN_HISTORY = [];
+    PINNED_BASELINE = null;
+    document.getElementById("kpiBaselineValue").textContent = "None Pinned";
+    document.getElementById("kpiBaselineSub").textContent = "Pin any run to compare deltas";
+    renderHistoryAndComparison();
+  }
+
+  function renderHistoryAndComparison() {
+    const histContainer = document.getElementById("historyTableContainer");
+    if (!RUN_HISTORY.length) {
+      histContainer.innerHTML = `<div class="empty-state">No runs recorded in this session yet.</div>`;
+    } else {
+      let hHtml = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Mode</th>
+              <th>Class / Spec</th>
+              <th>Rotation</th>
+              <th class="num-col">Dummy HP</th>
+              <th class="num-col">DPS</th>
+              <th class="num-col">Execute DPS</th>
+              <th class="num-col">Crit %</th>
+              <th class="num-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+      RUN_HISTORY.forEach((run, idx) => {
+        const isCurrent = run === ACTIVE_RESULT;
+        const isPinned = run === PINNED_BASELINE;
+        hHtml += `
+          <tr style="${isCurrent ? 'background:rgba(88,166,255,0.08);' : ''}">
+            <td>${run._timestamp}</td>
+            <td><span class="tab-badge">${run.mode}${run.mode === 'BATCH' ? ` (${run.iterations})` : ''}</span></td>
+            <td style="font-weight:600;">${run.class_name} / ${run.spec}</td>
+            <td style="color:var(--text-muted);">${run._rotationLabel}</td>
+            <td class="num-col">${(run.dummy_hp / 1000000).toFixed(1)}M</td>
+            <td class="num-col" style="font-weight:700;color:var(--accent);">${run.dps.toLocaleString()}</td>
+            <td class="num-col">${run.execute_phase && run.execute_phase.active ? run.execute_phase.dps.toLocaleString() : '--'}</td>
+            <td class="num-col">${run.overall_crit_pct.toFixed(1)}%</td>
+            <td class="num-col">
+              <button class="btn btn-sm" onclick="selectHistoryRun(${idx})">${isCurrent ? 'Active' : 'View'}</button>
+              <button class="btn btn-sm ${isPinned ? 'btn-accent' : ''}" onclick="pinHistoryRun(${idx})">${isPinned ? '📌 Baseline' : 'Pin'}</button>
+            </td>
+          </tr>
+        `;
+      });
+      hHtml += `</tbody></table>`;
+      histContainer.innerHTML = hHtml;
+    }
+
+    const compContainer = document.getElementById("comparisonContainer");
+    if (!PINNED_BASELINE || !ACTIVE_RESULT) {
+      compContainer.innerHTML = `<div class="empty-state">Pin a run as your baseline, then select or execute another run to compare ability DPS side-by-side.</div>`;
+      return;
+    }
+
+    const baseMap = {};
+    (PINNED_BASELINE.breakdown || []).forEach(r => { baseMap[r.name] = r; });
+    const curMap = {};
+    (ACTIVE_RESULT.breakdown || []).forEach(r => { curMap[r.name] = r; });
+    const allNames = Array.from(new Set([...Object.keys(baseMap), ...Object.keys(curMap)]));
+
+    allNames.sort((a, b) => ((curMap[b]?.dps || 0) - (curMap[a]?.dps || 0)));
+
+    let cHtml = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Ability Name</th>
+            <th class="num-col">Baseline DPS</th>
+            <th class="num-col">Active Run DPS</th>
+            <th class="num-col">DPS Delta</th>
+            <th class="num-col">Baseline Crit %</th>
+            <th class="num-col">Active Crit %</th>
+          </tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (const name of allNames) {
+      const bRow = baseMap[name] || { dps: 0, crit_pct: 0 };
+      const cRow = curMap[name] || { dps: 0, crit_pct: 0 };
+      cHtml += `
+        <tr>
+          <td style="font-weight:700;">${name}</td>
+          <td class="num-col">${bRow.dps.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}</td>
+          <td class="num-col" style="font-weight:700;color:var(--accent);">${cRow.dps.toLocaleString(undefined, {minimumFractionDigits: 1, maximumFractionDigits: 1})}</td>
+          <td class="num-col">${formatDeltaBadge(cRow.dps, bRow.dps, "") || '<span style="color:var(--text-muted);">0.0</span>'}</td>
+          <td class="num-col">${bRow.crit_pct.toFixed(1)}%</td>
+          <td class="num-col">${cRow.crit_pct.toFixed(1)}%</td>
+        </tr>
+      `;
+    }
+    cHtml += `</tbody></table>`;
+    compContainer.innerHTML = cHtml;
+  }
+
+  async function confirmSaveRunConfig() {
+    const filename = document.getElementById("saveConfigFilenameInput").value.trim() || "custom_config.json";
+    const p = buildPayloadFromForm();
+    const rcObj = {
+      spec_path: p.spec_path,
+      stats_path: p.stats_path,
+      rotation_path: p.rotation_path,
+      choices_path: p.choices_path,
+      tactical_fqn: p.tactical_fqn,
+      legendary_fqns: p.legendary_fqns,
+      relic_fqns: p.relic_fqns,
+      mode: p.mode,
+      iterations: p.iterations,
+      duration: p.duration,
+      level: p.level,
+      dummy_hp: p.dummy_hp,
+      seed: p.seed,
+      training_dummy_armor_debuff: p.training_dummy_armor_debuff,
+      enable_stem_matching: p.enable_stem_matching,
+      enable_projectile_flight_time: p.enable_projectile_flight_time,
+      in_flashpoint_operation: p.in_flashpoint_operation,
+      combat_distance: p.combat_distance,
+    };
+
+    const res = await fetch("/api/run_config/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, run_config: rcObj }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert("Error saving run config: " + (data.error || "Unknown error"));
+      return;
+    }
+    closeModal("saveConfigModal");
+    await loadCatalog(true);
+    document.getElementById("presetConfigSelect").value = data.path;
+  }
+
+  async function confirmSaveBuildStats() {
+    const filename = document.getElementById("saveBuildFilenameInput").value.trim() || "custom_build.json";
+    const stats = getStatsOverrideFromInputs();
+    const res = await fetch("/api/build_stats/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename, stats }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert("Error saving build stats: " + (data.error || "Unknown error"));
+      return;
+    }
+    closeModal("saveBuildModal");
+    await loadCatalog(true);
+    document.getElementById("buildSelect").value = data.path;
+  }
+
+  // Event Listeners
+  document.getElementById("presetConfigSelect").addEventListener("change", e => {
+    if (e.target.value) applyPresetRunConfig(e.target.value);
+  });
+
+  document.getElementById("classSelect").addEventListener("change", async e => {
+    populateSpecsForClass(e.target.value);
+    const specPath = document.getElementById("specSelect").value;
+    await updateClassGearOptions(specPath);
+    await refreshComputedStats();
+  });
+
+  document.getElementById("specSelect").addEventListener("change", async e => {
+    await updateClassGearOptions(e.target.value);
+    await refreshComputedStats();
+  });
+
+  document.getElementById("buildSelect").addEventListener("change", async e => {
+    if (!e.target.value) return;
+    const res = await fetch(`/api/build_stats?path=${encodeURIComponent(e.target.value)}`);
+    const data = await res.json();
+    if (res.ok && data.stats) {
+      applyStatsToInputs(data.stats);
+      await refreshComputedStats();
+    }
+  });
+
+  document.querySelectorAll(".stat-input").forEach(inp => {
+    inp.addEventListener("change", () => refreshComputedStats());
+  });
+
+  document.getElementById("saveRunConfigBtn").addEventListener("click", () => {
+    const cur = document.getElementById("presetConfigSelect").value;
+    if (cur) {
+      const parts = cur.split("/");
+      document.getElementById("saveConfigFilenameInput").value = parts[parts.length - 1];
+    }
+    openModal("saveConfigModal");
+  });
+
+  document.getElementById("reloadCatalogBtn").addEventListener("click", () => loadCatalog(true));
+  document.getElementById("runSimBtn").addEventListener("click", () => runSimulation());
+
+  document.getElementById("openRotationBuilderBtn").addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/launch_rotation_builder", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const data = await res.json();
+      if (res.ok && data.url) {
+        window.open(data.url, "_blank");
+      } else {
+        alert("Could not launch Rotation Builder: " + (data.error || "Unknown error"));
+      }
+    } catch (e) {
+      alert("Error launching Rotation Builder: " + e.message);
+    }
+  });
+
+  window.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      e.preventDefault();
+      runSimulation();
+    }
+  });
+
+  // Initialize
+  loadCatalog(false);
+</script>
+</body>
+</html>
