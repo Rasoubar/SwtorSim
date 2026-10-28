@@ -15,7 +15,14 @@ SWTORSIM_ROOT = Path(__file__).resolve().parents[1]
 if str(SWTORSIM_ROOT) not in sys.path:
     sys.path.insert(0, str(SWTORSIM_ROOT))
 
-from src.swtorsim.cli import index_disciplines, select_choices_path, select_discipline_path
+from src.swtorsim.cli import (
+    index_disciplines,
+    select_choices_path,
+    select_discipline_path,
+    select_legendaries,
+    select_relics,
+    select_tactical,
+)
 from src.swtorsim.config_load import fqn_to_relative_path, load_json_file
 from src.swtorsim.run_config import (
     BUILDS_DIR,
@@ -111,8 +118,11 @@ def build_castable_catalog(
     spec_path: str,
     choices_path: str | dict,
     parsed_dir: Path = PARSED_DIR,
+    tactical_fqn: str = "",
+    legendary_fqns: list[str] | None = None,
+    relic_fqns: list[str] | None = None,
 ) -> list[CastableAbility]:
-    """Returns active abilities for a discipline and skill-tree selection, sorted by name."""
+    """Returns active abilities for a discipline, skill-tree selection, and optional gear/relics, sorted by name."""
     resolved_spec = _resolve_workspace_path(spec_path)
     spec_data = load_json_file(str(resolved_spec))
     if isinstance(choices_path, dict):
@@ -125,7 +135,13 @@ def build_castable_catalog(
     passive_count = 0
     talent_count = 0
 
-    for fqn in loadout_fqns(spec_data, choices):
+    for fqn in loadout_fqns(
+        spec_data,
+        choices,
+        tactical_fqn=tactical_fqn,
+        legendary_fqns=legendary_fqns,
+        relic_fqns=relic_fqns,
+    ):
         if fqn.startswith("tal."):
             talent_count += 1
             continue
@@ -760,11 +776,31 @@ def get_workspace_catalog() -> dict[str, Any]:
 
     relics_path = _resolve_workspace_path(RELICS_PATH)
     relics_raw = load_json_file(str(relics_path)) if relics_path.is_file() else []
-    relics_list = [
-        {"label": relic_menu_label(fqn), "fqn": fqn}
-        for fqn in relics_raw
-        if isinstance(fqn, str)
-    ]
+    relics_list = []
+    for fqn in relics_raw:
+        if not isinstance(fqn, str):
+            continue
+        short_lbl = relic_menu_label(fqn)
+        r_name = short_lbl
+        r_type = "active" if ".onuse." in fqn else "passive"
+        bp_file = PARSED_DIR / fqn_to_relative_path(fqn)
+        if bp_file.is_file():
+            try:
+                bp_doc = load_json_file(str(bp_file))
+                r_name = bp_doc.get("name") or short_lbl
+                r_type = bp_doc.get("type") or r_type
+            except Exception:
+                pass
+        tag_lbl = "On-Use" if r_type == "active" else "Proc"
+        relics_list.append(
+            {
+                "label": f"{r_name} [{tag_lbl}] ({short_lbl})",
+                "name": r_name,
+                "short_label": short_lbl,
+                "type": r_type,
+                "fqn": fqn,
+            }
+        )
 
     return {
         "disciplines": rel_disciplines,
@@ -1192,9 +1228,18 @@ def cli_main():
     print("      SWTOR SIM - ROTATION BUILDER       ")
     print("=========================================")
 
-    _class_name, _spec, spec_path = select_discipline_path()
+    class_name, _spec, spec_path = select_discipline_path()
     choices_path = select_choices_path()
-    catalog = build_castable_catalog(spec_path, choices_path)
+    tactical_fqn = select_tactical(class_name)
+    legendary_fqns = select_legendaries(class_name)
+    relic_fqns = select_relics()
+    catalog = build_castable_catalog(
+        spec_path,
+        choices_path,
+        tactical_fqn=tactical_fqn,
+        legendary_fqns=legendary_fqns,
+        relic_fqns=relic_fqns,
+    )
     if not catalog:
         print("[WARN] No castable abilities found. Exiting without saving.")
         return
