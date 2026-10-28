@@ -5,6 +5,7 @@ editing character stats and engine settings, running single-run (TEST) and
 Monte Carlo (BATCH) combat simulations, and visualizing telemetry in the browser.
 """
 
+import atexit
 import copy
 import io
 import json
@@ -66,7 +67,7 @@ from src.swtorsim.settings import (
     set_projectile_flight_time,
     set_stem_matching,
 )
-from src.swtorsim.setup import prepare_simulation, schedule_periodic
+from src.swtorsim.setup import prepare_simulation
 
 PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "parsed"
 SIM_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
@@ -463,6 +464,7 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         "stats_config": stats_config,
         "loadout_blueprints": loadout_blueprints,
         "debuff_module": debuff_module,
+        "selected_fqns": selected_fqns,
     }
 
 
@@ -556,7 +558,7 @@ def _run_single_test_detailed(
         )
         player.combat_distance = config.combat_distance
         target.combat_distance = config.combat_distance
-        schedule_periodic(player, target, sim)
+
 
         computed_stats = _extract_computed_player_stats(player)
 
@@ -765,19 +767,78 @@ def _run_single_test_detailed(
     }
 
 
+_SIMULATION_POOL_LOCK = threading.Lock()
+_GLOBAL_SIMULATION_POOL: Any = None
+_GLOBAL_SIMULATION_POOL_KEY: Any = None
+_WORKER_SIM_CONTEXT: dict[str, Any] = {}
+
+
+def _init_batch_worker(sim_context: dict[str, Any]) -> None:
+    """Initializes worker process with the heavy simulation context (blueprints, rotation, etc.)."""
+    global _WORKER_SIM_CONTEXT
+    _WORKER_SIM_CONTEXT = sim_context
+
+
+def get_or_create_simulation_pool(cores: int, sim_context: dict[str, Any], pool_key: Any) -> Any:
+    """Returns a warm, persistent worker pool pre-loaded with static simulation context."""
+    global _GLOBAL_SIMULATION_POOL, _GLOBAL_SIMULATION_POOL_KEY
+    with _SIMULATION_POOL_LOCK:
+        if _GLOBAL_SIMULATION_POOL is None or _GLOBAL_SIMULATION_POOL_KEY != pool_key:
+            if _GLOBAL_SIMULATION_POOL is not None:
+                try:
+                    _GLOBAL_SIMULATION_POOL.close()
+                    _GLOBAL_SIMULATION_POOL.terminate()
+                    _GLOBAL_SIMULATION_POOL.join()
+                except Exception:
+                    pass
+            _GLOBAL_SIMULATION_POOL = Pool(
+                processes=cores,
+                initializer=_init_batch_worker,
+                initargs=(sim_context,),
+            )
+            _GLOBAL_SIMULATION_POOL_KEY = pool_key
+        return _GLOBAL_SIMULATION_POOL
+
+
+def cleanup_simulation_pool() -> None:
+    """Terminates persistent worker pool on shutdown."""
+    global _GLOBAL_SIMULATION_POOL
+    with _SIMULATION_POOL_LOCK:
+        if _GLOBAL_SIMULATION_POOL is not None:
+            try:
+                _GLOBAL_SIMULATION_POOL.close()
+                _GLOBAL_SIMULATION_POOL.terminate()
+                _GLOBAL_SIMULATION_POOL.join()
+            except Exception:
+                pass
+            _GLOBAL_SIMULATION_POOL = None
+
+
+atexit.register(cleanup_simulation_pool)
+
+
 def _batch_worker_task(args: tuple) -> dict[str, Any]:
     """Worker function for parallel Monte Carlo simulations."""
-    (
-        run_id,
-        base_seed,
-        duration,
-        dummy_hp,
-        rotation_config,
-        stats_config,
-        loadout_blueprints,
-        debuff_module,
-        settings_dict,
-    ) = args
+    if len(args) == 4:
+        run_id, base_seed, duration, dummy_hp = args
+        ctx = _WORKER_SIM_CONTEXT
+        rotation_config = ctx["rotation_config"]
+        stats_config = ctx["stats_config"]
+        loadout_blueprints = ctx["loadout_blueprints"]
+        debuff_module = ctx["debuff_module"]
+        settings_dict = ctx["settings_dict"]
+    else:
+        (
+            run_id,
+            base_seed,
+            duration,
+            dummy_hp,
+            rotation_config,
+            stats_config,
+            loadout_blueprints,
+            debuff_module,
+            settings_dict,
+        ) = args
 
     set_stem_matching(settings_dict["enable_stem_matching"])
     set_projectile_flight_time(settings_dict["enable_projectile_flight_time"])
@@ -795,7 +856,7 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
         )
         player.combat_distance = settings_dict["combat_distance"]
         target.combat_distance = settings_dict["combat_distance"]
-        schedule_periodic(player, target, sim)
+
         sim.run_timed(duration, target)
     finally:
         sys.stdout.close()
@@ -895,6 +956,33 @@ def _run_batch_monte_carlo_detailed(
         "in_flashpoint_operation": config.in_flashpoint_operation,
     }
 
+    sim_context = {
+        "rotation_config": sim_inputs["rotation_config"],
+        "stats_config": sim_inputs["stats_config"],
+        "loadout_blueprints": sim_inputs["loadout_blueprints"],
+        "debuff_module": sim_inputs["debuff_module"],
+        "settings_dict": settings_dict,
+    }
+
+    stats_tuple = tuple(sorted(sim_inputs["stats_config"].get("stats", {}).items()))
+    settings_tuple = (
+        settings_dict["enable_stem_matching"],
+        settings_dict["enable_projectile_flight_time"],
+        settings_dict["combat_distance"],
+        settings_dict["in_flashpoint_operation"],
+    )
+    selected_fqns_tuple = tuple(sim_inputs.get("selected_fqns") or ())
+    cores = max(1, min(cpu_count() or 2, iterations))
+    pool_key = (
+        cores,
+        selected_fqns_tuple,
+        config.stats_path,
+        config.rotation_path,
+        stats_tuple,
+        settings_tuple,
+        config.training_dummy_armor_debuff,
+    )
+
     t0 = time.perf_counter()
     payloads = [
         (
@@ -902,11 +990,6 @@ def _run_batch_monte_carlo_detailed(
             config.seed,
             config.duration,
             config.dummy_hp,
-            sim_inputs["rotation_config"],
-            sim_inputs["stats_config"],
-            sim_inputs["loadout_blueprints"],
-            sim_inputs["debuff_module"],
-            settings_dict,
         )
         for i in range(iterations)
     ]
@@ -915,19 +998,22 @@ def _run_batch_monte_carlo_detailed(
     harvested: list[dict[str, Any]] = []
     try:
         if iterations <= 1:
+            global _WORKER_SIM_CONTEXT
+            _WORKER_SIM_CONTEXT = sim_context
             for idx, p in enumerate(payloads, 1):
                 harvested.append(_batch_worker_task(p))
                 _update_simulation_progress(True, "BATCH", idx, iterations)
         else:
             from src.swtorsim.web_gui import _batch_worker_task as _parallel_worker
 
-            cores = max(1, min(cpu_count() or 2, iterations))
-            print(f"Using {cores} CPU Cores")
-            with Pool(processes=cores) as pool:
-                for idx, res in enumerate(
-                    pool.imap_unordered(_parallel_worker, payloads, chunksize=1), 1
-                ):
-                    harvested.append(res)
+            chunk_size = max(1, int(round(iterations * 0.01)))
+            pool = get_or_create_simulation_pool(cores, sim_context, pool_key)
+            print(f"Using {cores} CPU Cores (Warm Persistent Pool, chunksize={chunk_size})")
+            for idx, res in enumerate(
+                pool.imap_unordered(_parallel_worker, payloads, chunksize=chunk_size), 1
+            ):
+                harvested.append(res)
+                if idx % chunk_size == 0 or idx == iterations:
                     _update_simulation_progress(True, "BATCH", idx, iterations)
             harvested.sort(key=lambda r: r["run_id"])
             print(f"Runs completed in {time.perf_counter() - t0:.3f} seconds!")
