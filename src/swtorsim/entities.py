@@ -137,7 +137,10 @@ class Entity:
                     getattr(existing, "stacks", 1),
                     getattr(effect_instance, "initial_stacks", 1),
                 )
-            if existing.expires_at is not None and expires_at is not None:
+            if existing.expires_at is None:
+                effect_instance.expires_at = None
+                effect_instance.is_passive = getattr(existing, "is_passive", False)
+            elif expires_at is not None:
                 effect_instance.expires_at = max(existing.expires_at, expires_at)
 
         owner_id = f"{id(self)}:{effect_key}"

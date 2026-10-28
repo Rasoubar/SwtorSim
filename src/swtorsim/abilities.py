@@ -845,6 +845,15 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
     eff.modify_stacks(delta)
     cur_stacks = eff.stacks
 
+    if cur_stacks > 0 and sim is not None and hasattr(sim, "tracker") and sim.tracker is not None:
+        sim.tracker.log_effect_applied(
+            owner_entity.name,
+            owner_key,
+            getattr(sim, "current_time", 0.0),
+            stacks=cur_stacks,
+            is_passive=getattr(eff, "is_passive", False),
+        )
+
     if delta > 0 and cur_stacks > old_stacks:
         blueprint = getattr(eff, "effect_blueprint", None)
         if blueprint and hasattr(blueprint, "execute_triggered_branches"):
@@ -943,6 +952,15 @@ def handle_set_effect_stack_charge(sim, caster, target, action, ability=None, co
         return
 
     eff.set_stacks(target_stacks)
+
+    if getattr(eff, "stacks", 1) > 0 and sim is not None and hasattr(sim, "tracker") and sim.tracker is not None:
+        sim.tracker.log_effect_applied(
+            owner_entity.name,
+            owner_key,
+            getattr(sim, "current_time", 0.0),
+            stacks=eff.stacks,
+            is_passive=getattr(eff, "is_passive", False),
+        )
 
     if getattr(eff, "scales_with_stacks", False) and getattr(eff, "modifiers", None):
         if hasattr(owner_entity, "recalculate_stats"):

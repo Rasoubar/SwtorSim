@@ -1,3 +1,4 @@
+import re
 
 ATTACK_TYPE_NAMES = {
     1: "Melee",
@@ -19,6 +20,23 @@ def format_type_descriptor(attack_types, damage_types) -> str:
     at_str = "/".join(ATTACK_TYPE_NAMES.get(a, str(a)) for a in sorted(attack_types)) if attack_types else "Unknown"
     dt_str = "/".join(DAMAGE_TYPE_NAMES.get(d, str(d)) for d in sorted(damage_types)) if damage_types else "Unknown"
     return f"{at_str} / {dt_str}"
+
+
+_UNNAMED_EFFECT_SUFFIX_RE = re.compile(r"_\d+$")
+
+
+def has_proper_effect_name(name: str) -> bool:
+    """Returns True if the effect has a proper display name (does not end with _x or use a raw FQN fallback)."""
+    if not name or not isinstance(name, str):
+        return False
+    stripped = name.strip()
+    if not stripped:
+        return False
+    if _UNNAMED_EFFECT_SUFFIX_RE.search(stripped):
+        return False
+    if stripped.startswith(("abl.", "tal.")):
+        return False
+    return True
 
 
 class Metrics:
@@ -90,8 +108,8 @@ class Metrics:
         is_passive: bool = False,
     ):
         """Records the application or refresh/stack update of an effect."""
-        if is_passive and stacks <= 1:
-            return  # Filter permanent 1-stack baseline passives
+        if not has_proper_effect_name(effect_key):
+            return
         key = (entity_name, effect_key)
         if key not in self.active_effects:
             self.active_effects[key] = {
@@ -148,7 +166,7 @@ class Metrics:
 
         filtered = []
         for (entity, name), windows in self.effect_history.items():
-            if any(name.endswith(s) for s in ("_1", "_3", "_4", "_5", "_6")):
+            if not has_proper_effect_name(name):
                 continue
             total_active = sum(w["duration"] for w in windows)
             pct = (total_active / duration) * 100 if duration > 0 else 0

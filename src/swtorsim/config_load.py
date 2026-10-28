@@ -34,8 +34,7 @@ def load_from_run_config(config: RunConfig) -> SimulationInputs:
     loadout_blueprints = load_complete_loadout(selected_fqns_from_config(config))
     debuff_module: dict[str, Any] = {}
     if config.training_dummy_armor_debuff:
-        debuff = load_training_dummy_armor_debuff()
-        debuff_module[debuff.name] = debuff
+        debuff_module.update(load_training_dummy_armor_debuffs())
     return SimulationInputs(
         rotation_config=load_rotation_from_json(config.rotation_path),
         stats_config=load_character_stats_from_json(
@@ -44,6 +43,48 @@ def load_from_run_config(config: RunConfig) -> SimulationInputs:
         loadout_blueprints=loadout_blueprints,
         debuff_module=debuff_module,
     )
+
+
+_DUMMY_DEBUFF_ROUTING = (
+    (
+        "Sundered (Physical)",
+        {"STAT_rtg_armor"},
+        frozenset(("tag.abl.debuff.armor_reduced_stacks_by_tag", "tag.abl.debuff.armor_reduced", "tag.abl.dispel_type.physical")),
+    ),
+    (
+        "Beat Down (Physical)",
+        {"stat_cbt_damage_taken_scale_channel_melee_modifier_percentage"},
+        frozenset(("tag.abl.debuff.melee_vulnerability", "tag.abl.dispel_type.physical")),
+    ),
+    (
+        "Marked (Physical)",
+        {"stat_cbt_damage_taken_scale_channel_ranged_modifier_percentage"},
+        frozenset(("tag.abl.debuff.ranged_vulnerability", "tag.abl.dispel_type.physical")),
+    ),
+    (
+        "Vulnerable (Force)",
+        {"stat_cbt_damage_taken_scale_channel_force_modifier_percentage"},
+        frozenset(("tag.abl.debuff.force_vulnerability", "tag.abl.dispel_type.force")),
+    ),
+    (
+        "Susceptible (Tech)",
+        {"stat_cbt_damage_taken_scale_channel_tech_modifier_percentage"},
+        frozenset(("tag.abl.debuff.tech_vulnerability", "tag.abl.dispel_type.tech")),
+    ),
+    (
+        "Assailable (Mental)",
+        {
+            "stat_cbt_damage_taken_scale_type_elemental_modifier_percentage",
+            "stat_cbt_damage_taken_scale_type_internal_modifier_percentage",
+        },
+        frozenset(("tag.abl.debuff.elemental_and_internal_vulnerability", "tag.abl.dispel_type.mental")),
+    ),
+    (
+        "Overwhelmed (Mental)",
+        {"46", "STAT_cbt_damage_received_modifier_percentage"},
+        frozenset(("tag.abl.debuff.aoe_vulnerability", "tag.abl.dispel_type.mental")),
+    ),
+)
 
 
 def load_training_dummy_armor_debuff() -> ParsedEffect:
@@ -64,6 +105,33 @@ def load_training_dummy_armor_debuff() -> ParsedEffect:
         )
     parsed.name = TRAINING_DUMMY_ARMOR_DEBUFF_LABEL
     return parsed
+
+
+def load_training_dummy_armor_debuffs() -> Dict[str, ParsedEffect]:
+    """Decomposes the operation dummy armor debuff into the 7 canonical permanent raid debuffs."""
+    base_effect = load_training_dummy_armor_debuff()
+    debuffs: Dict[str, ParsedEffect] = {}
+    for debuff_name, stat_keys, tags in _DUMMY_DEBUFF_ROUTING:
+        matched_mods = [m for m in base_effect.modifiers if str(m.stat) in stat_keys]
+        if not matched_mods:
+            continue
+        debuffs[debuff_name] = ParsedEffect(
+            fqn=base_effect.fqn,
+            name=debuff_name,
+            number=base_effect.number,
+            tags=tags,
+            expires_at=None,
+            duration=0.0,
+            tick_interval=None,
+            stacks=1,
+            max_stacks=1,
+            initial_stacks=1,
+            scales_with_stacks=False,
+            modifiers=matched_mods,
+            branches=[],
+            is_passive=True,
+        )
+    return debuffs
 
 
 def selected_fqns_from_config(config: RunConfig) -> List[str]:

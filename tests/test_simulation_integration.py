@@ -296,6 +296,41 @@ class SimulationIntegrationTests(unittest.TestCase):
             dps = self.sim.tracker.total_damage / max(1.0, self.sim.current_time)
             self.assertGreater(dps, 5000.0, f"Expected meaningful DPS (>5,000), got {dps:.1f}")
 
+    def test_08_permanent_and_proper_named_effects_logged_in_metrics(self):
+        """Verifies permanent passives/debuffs with proper names are tracked in metrics while _x effects are excluded."""
+        from src.swtorsim.metrics import has_proper_effect_name
+
+        self.assertTrue(has_proper_effect_name("Lightning Charge"))
+        self.assertTrue(has_proper_effect_name("Mark of Power"))
+        self.assertTrue(has_proper_effect_name("Training Dummy Armor Debuff"))
+        self.assertFalse(has_proper_effect_name("Assassin's Training_1"))
+        self.assertFalse(has_proper_effect_name("Raze_2"))
+        self.assertFalse(has_proper_effect_name("Creeping Terror_10"))
+        self.assertFalse(has_proper_effect_name("abl.sith_inquisitor.lightning_charge:1"))
+
+        self.sim.run_timed(duration=10.0, target=self.target)
+        self.sim.tracker.finalize_effects(self.sim.current_time)
+
+        history_names = {name for (_entity, name) in self.sim.tracker.effect_history}
+        self.assertIn("Lightning Charge", history_names)
+        self.assertIn("Mark of Power", history_names)
+        self.assertIn("Thrashing Blades", history_names)
+        for expected_debuff in (
+            "Sundered (Physical)",
+            "Beat Down (Physical)",
+            "Marked (Physical)",
+            "Vulnerable (Force)",
+            "Susceptible (Tech)",
+            "Assailable (Mental)",
+            "Overwhelmed (Mental)",
+        ):
+            self.assertIn(expected_debuff, history_names)
+        for name in history_names:
+            self.assertTrue(
+                has_proper_effect_name(name),
+                f"Unnamed or _x suffixed effect '{name}' should not be stored in effect_history",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

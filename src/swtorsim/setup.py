@@ -53,6 +53,15 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
     sim = Simulation()
     player.current_target = target
 
+    for eff_key, eff in target.effects.items():
+        sim.tracker.log_effect_applied(
+            target.name,
+            eff_key,
+            0.0,
+            stacks=getattr(eff, "stacks", 1),
+            is_passive=getattr(eff, "is_passive", False),
+        )
+
     # Instantiate and activate passive blueprints (skill tree passives, tacticals, legendaries, relics)
     from src.swtorsim.effects import ActiveEffect
     for fqn, bp in passive_blueprints.items():
@@ -70,7 +79,15 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
                 }
             )
             eff.is_passive = True
-            player.effects[bp.name or bp.fqn] = eff
+            eff_key = bp.name or bp.fqn
+            player.effects[eff_key] = eff
+            sim.tracker.log_effect_applied(
+                player.name,
+                eff_key,
+                0.0,
+                stacks=getattr(eff, "stacks", 1),
+                is_passive=True,
+            )
         for entry_id in passive_abl.entry_effect_ids:
             passive_abl.execute_effect(entry_id, player, player, sim)
     player.recalculate_stats()

@@ -3,61 +3,135 @@
         "type": "priority_block",
         "name": "Eradicate Opener Block",
         "pool": [
-            {"ability_id": "eradicate", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "eradicate",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "priority_block",
         "name": "Creeping Terror Opener Block",
         "pool": [
-            {"ability_id": "creeping_terror", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "creeping_terror",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "priority_block",
         "name": "Discharge Opener Block",
         "pool": [
-            {"ability_id": "discharge", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "discharge",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "priority_block",
         "name": "Reck+DF+MPRIO1 Window 1",
         "pool": [
-            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "leeching_strike"},
-            {"ability_id": "saber_strike"}
+            {
+                "ability_id": "assassinate+",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "leeching_strike",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "priority_block",
         "name": "Mid-Rotation Eradicate Block",
         "pool": [
-            {"ability_id": "eradicate", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "eradicate",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "optional",
         "ability_id": "recklessness",
-        "rules": {"target_hp_above_pct": 0.4}
+        "rules": {
+            "target_hp_above_pct": 0.4
+        }
     },
     {
         "type": "priority_block",
         "name": "Reck+DF+MPRIO1 Window 1",
         "pool": [
-            {"ability_id": "leeching_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "death_field", "rules": {"caster_has_buff": "Recklessness"}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 70}},
-            {"ability_id": "assassinate+", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "death_field",
+                "rules": {
+                    "caster_has_buff": "Recklessness"
+                }
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 70
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {}
+            },
+            {
+                "ability_id": "leeching_strike",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
@@ -65,12 +139,15 @@
         "ability_id": "recklessness",
         "rules": {}
     },
-       {
+    {
         "type": "optional",
         "ability_id": "phantom_stride",
         "rules": {
-            "target_hp_above_pct": 0.40,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 1.5},
+            "target_hp_above_pct": 0.4,
+            "proc_cooldown_above": {
+                "name": "Bloodletting",
+                "value": 1.5
+            },
             "caster_does_not_have_buff": "Bloodletting"
         }
     },
@@ -78,21 +155,49 @@
         "type": "priority_block",
         "name": "Reck+DF+MPRIO1 Window 2",
         "pool": [
-            {"ability_id": "death_field"},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate+", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "death_field",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 35
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {}
+            },
+            {
+                "ability_id": "leeching_strike",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "optional",
         "ability_id": "phantom_stride",
         "rules": {
-            "target_hp_above_pct": 0.40,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 0.5},
+            "target_hp_above_pct": 0.4,
+            "proc_cooldown_above": {
+                "name": "Bloodletting",
+                "value": 0.5
+            },
             "caster_does_not_have_buff": "Bloodletting"
         }
     },
@@ -105,21 +210,51 @@
         "type": "priority_block",
         "name": "MPRIO 2 Window",
         "pool": [
-            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate+", "rules": {}},
-			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "assassinate+",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "leeching_strike",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 35
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "optional",
         "ability_id": "phantom_stride",
         "rules": {
-            "target_hp_above_pct": 0.40,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 2.0},
+            "target_hp_above_pct": 0.4,
+            "proc_cooldown_above": {
+                "name": "Bloodletting",
+                "value": 2
+            },
             "caster_does_not_have_buff": "Bloodletting"
         }
     },
@@ -127,20 +262,45 @@
         "type": "priority_block",
         "name": "Eradicate_block",
         "pool": [
-            {"ability_id": "eradicate", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 35}},
-            {"ability_id": "assassinate+", "rules": {}},
-			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "eradicate",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 35
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "optional",
         "ability_id": "phantom_stride",
         "rules": {
-            "target_hp_above_pct": 0.40,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 0.5},
+            "target_hp_above_pct": 0.4,
+            "proc_cooldown_above": {
+                "name": "Bloodletting",
+                "value": 0.5
+            },
             "caster_does_not_have_buff": "Bloodletting"
         }
     },
@@ -148,21 +308,51 @@
         "type": "priority_block",
         "name": "MPRIO 1 Window A",
         "pool": [
-            {"ability_id": "leeching_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 30}},
-            {"ability_id": "assassinate+", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "leeching_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 30
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "leeching_strike",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "optional",
         "ability_id": "phantom_stride",
         "rules": {
-            "target_hp_above_pct": 0.40,
-            "proc_cooldown_above": {"name": "Bloodletting", "value": 0.5},
+            "target_hp_above_pct": 0.4,
+            "proc_cooldown_above": {
+                "name": "Bloodletting",
+                "value": 0.5
+            },
             "caster_does_not_have_buff": "Bloodletting"
         }
     },
@@ -170,25 +360,74 @@
         "type": "priority_block",
         "name": "MPRIO 1 Window B",
         "pool": [
-            {"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 30}},
-            {"ability_id": "assassinate+", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 30
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {}
+            },
+            {
+                "ability_id": "leeching_strike",
+                "rules": {}
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     },
     {
         "type": "priority_block",
         "name": "MPRIO 3 Window",
         "pool": [
-            {"ability_id": "assassinate+", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "saber_strike", "rules": {"caster_energy_below": 50}},
-            {"ability_id": "assassinate+", "rules": {}},
-            {"ability_id": "leeching_strike", "rules": {}},
-			{"ability_id": "saber_strike", "rules": {"target_hp_below_pct" : 0.4}},
-            {"ability_id": "thrash", "rules": {}},
-            {"ability_id": "saber_strike", "rules": {}}
+            {
+                "ability_id": "assassinate+",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 50
+                }
+            },
+            {
+                "ability_id": "assassinate+",
+                "rules": {}
+            },
+            {
+                "ability_id": "leeching_strike",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "target_hp_below_pct": 0.4
+                }
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {}
+            }
         ]
     }
 ]
