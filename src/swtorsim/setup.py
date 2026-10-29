@@ -6,6 +6,7 @@ from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.combat_curves import player_standard_health
 from src.swtorsim.rotation import Rotation
+from src.swtorsim.class_buffs import apply_class_buffs
 
 def schedule_periodic(player, target, sim):
     """Schedules 1st even of periodic effects, like pt extra regen"""
@@ -90,6 +91,9 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
             )
         for entry_id in passive_abl.entry_effect_ids:
             passive_abl.execute_effect(entry_id, player, player, sim)
+
+    # Every player gets all class buffs plus the hidden permanent bonus
+    apply_class_buffs(player, sim)
     player.recalculate_stats()
 
     # Apply charge modifiers to active abilities

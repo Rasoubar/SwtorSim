@@ -328,6 +328,8 @@ class Player(Entity):
             "Standard_health": 0.0,
             "Armor Penetration": 0.0
         }
+        # Hidden permanent additive bonuses (Accuracy, Critical Chance, Critical Modifier)
+        self.permanent_bonuses: dict[str, float] = {}
         self.stats = self.base_stats.copy()
 
     @staticmethod
@@ -666,6 +668,8 @@ class Player(Entity):
                 elif stat in ("STAT_cbt_damage_bonus",):
                     bonuses["Bonus Damage"] += val
 
+        bonuses["Accuracy"] += self.permanent_bonuses.get("Accuracy", 0.0)
+
         #independent stats
         temp_stats["Mastery"] = (temp_stats["Mastery"] + bonuses["Mastery Stat"]) * (1 + bonuses["Mastery PCT"])
         temp_stats["Power"] += bonuses["Power Stat"]
@@ -715,8 +719,14 @@ class Player(Entity):
         )
 
         #dependant statts
-        temp_stats["Critical Chance"] = 0.05 + critical_chance + mastery_cc
-        temp_stats["Critical Modifier"] = 0.5 + critical_damage
+        temp_stats["Critical Chance"] = (
+            0.05 + critical_chance + mastery_cc
+            + self.permanent_bonuses.get("Critical Chance", 0.0)
+        )
+        temp_stats["Critical Modifier"] = (
+            0.5 + critical_damage
+            + self.permanent_bonuses.get("Critical Modifier", 0.0)
+        )
         temp_stats["Main Accuracy"] = 1 + acc_base + bonuses["Accuracy"]
         temp_stats["Off Accuracy"] = 0.67 + acc_base + bonuses["Accuracy"]
         temp_stats["Melee Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Melee Accuracy"]
