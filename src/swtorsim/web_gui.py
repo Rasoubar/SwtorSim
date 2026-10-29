@@ -573,6 +573,10 @@ def _run_single_test_detailed(
 
             def _make_cast_wrapper(ability_obj, fn):
                 def _wrapped_cast(caster, tgt, s):
+                    # Instant abilities resolve their damage inside fn(), which logs
+                    # damage events before fn() returns. Remember where this cast
+                    # belongs so it can be inserted ahead of those same-tick hits.
+                    insert_idx = len(combat_events)
                     ok = fn(caster, tgt, s)
                     if ok:
                         a_name = ability_obj.name or ability_obj.fqn
@@ -583,7 +587,8 @@ def _run_single_test_detailed(
                         ex["casts"] += 1
                         res_val = round(float(getattr(caster.resource, "current_value", 0.0)), 1)
                         hp_pct = round(float(tgt.hp_ratio) * 100.0, 1)
-                        combat_events.append(
+                        combat_events.insert(
+                            insert_idx,
                             {
                                 "time": round(float(s.current_time), 2),
                                 "category": "cast",
