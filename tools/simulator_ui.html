@@ -946,6 +946,18 @@
             <select id="relic2Select"></select>
           </div>
         </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            <span>Offhand Option</span>
+            <span id="offhandPreviewBadge" style="color:var(--cyan);font-size:10px;">None (0 Dmg)</span>
+          </div>
+          <select id="offhandSelect">
+            <option value="none">None / Shield / Focus / Generator (0 OH Dmg)</option>
+            <option value="weapon">Dual Wield Weapon (Match Main Hand: 3161 - 4741)</option>
+            <option value="custom">Custom Offhand Weapon Dmg</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -1007,6 +1019,14 @@
           <div class="form-row">
             <label class="form-label">MH Max Dmg</label>
             <input type="number" class="stat-input" data-stat="Main_hand_max" value="4741">
+          </div>
+          <div class="form-row">
+            <label class="form-label">OH Min Dmg</label>
+            <input type="number" class="stat-input" data-stat="Off_hand_min" value="0">
+          </div>
+          <div class="form-row">
+            <label class="form-label">OH Max Dmg</label>
+            <input type="number" class="stat-input" data-stat="Off_hand_max" value="0">
           </div>
         </div>
 
@@ -1459,12 +1479,39 @@
     });
   }
 
+  function syncOffhandOptionFromStats() {
+    const mhMinInp = document.querySelector('.stat-input[data-stat="Main_hand_min"]');
+    const mhMaxInp = document.querySelector('.stat-input[data-stat="Main_hand_max"]');
+    const ohMinInp = document.querySelector('.stat-input[data-stat="Off_hand_min"]');
+    const ohMaxInp = document.querySelector('.stat-input[data-stat="Off_hand_max"]');
+    const offSelect = document.getElementById("offhandSelect");
+    const badge = document.getElementById("offhandPreviewBadge");
+    if (!offSelect) return;
+
+    const mhMin = parseFloat(mhMinInp?.value) || 0;
+    const mhMax = parseFloat(mhMaxInp?.value) || 0;
+    const ohMin = parseFloat(ohMinInp?.value) || 0;
+    const ohMax = parseFloat(ohMaxInp?.value) || 0;
+
+    if (ohMin <= 0 && ohMax <= 0) {
+      offSelect.value = "none";
+      if (badge) badge.textContent = "None (0 Dmg)";
+    } else if (ohMin === mhMin && ohMax === mhMax && ohMax > 0) {
+      offSelect.value = "weapon";
+      if (badge) badge.textContent = `Weapon (${ohMin} - ${ohMax})`;
+    } else {
+      offSelect.value = "custom";
+      if (badge) badge.textContent = `Custom (${ohMin} - ${ohMax})`;
+    }
+  }
+
   function applyStatsToInputs(statsObj) {
     document.querySelectorAll(".stat-input").forEach(inp => {
       const k = inp.dataset.stat;
       const val = statsObj && statsObj[k] !== undefined ? statsObj[k] : 0;
       inp.value = val;
     });
+    syncOffhandOptionFromStats();
   }
 
   function getStatsOverrideFromInputs() {
@@ -1575,8 +1622,18 @@
     document.getElementById("sheetCritChance").textContent = `${cs.crit_chance_pct.toFixed(2)}%`;
     document.getElementById("sheetCritMult").textContent = `${cs.crit_multiplier_pct.toFixed(2)}%`;
     document.getElementById("sheetAccuracy").textContent = `${cs.accuracy_pct.toFixed(2)}%`;
-    const maxBonus = Math.max(cs.force_bonus_dmg || 0, cs.tech_bonus_dmg || 0, cs.melee_bonus_dmg || 0);
+    const maxBonus = Math.max(cs.force_bonus_dmg || 0, cs.tech_bonus_dmg || 0, cs.melee_bonus_dmg || 0, cs.ranged_bonus_dmg || 0);
     document.getElementById("sheetBonusDmg").textContent = Math.round(maxBonus).toLocaleString();
+    const ohEl = document.getElementById("sheetOffhand");
+    if (ohEl) {
+      if (cs.has_offhand_weapon && cs.off_hand_max > 0) {
+        ohEl.textContent = `${cs.off_hand_min.toLocaleString()} - ${cs.off_hand_max.toLocaleString()} (Active)`;
+        ohEl.style.color = "var(--green)";
+      } else {
+        ohEl.textContent = "None (0 Dmg)";
+        ohEl.style.color = "var(--text-muted)";
+      }
+    }
   }
 
   async function refreshComputedStats() {
@@ -2338,7 +2395,57 @@
     }
   });
 
+  document.getElementById("offhandSelect").addEventListener("change", e => {
+    const mode = e.target.value;
+    const mhMinInp = document.querySelector('.stat-input[data-stat="Main_hand_min"]');
+    const mhMaxInp = document.querySelector('.stat-input[data-stat="Main_hand_max"]');
+    const ohMinInp = document.querySelector('.stat-input[data-stat="Off_hand_min"]');
+    const ohMaxInp = document.querySelector('.stat-input[data-stat="Off_hand_max"]');
+    const badge = document.getElementById("offhandPreviewBadge");
+
+    const mhMin = parseFloat(mhMinInp?.value) || 3161;
+    const mhMax = parseFloat(mhMaxInp?.value) || 4741;
+
+    if (mode === "none") {
+      if (ohMinInp) ohMinInp.value = 0;
+      if (ohMaxInp) ohMaxInp.value = 0;
+      if (badge) badge.textContent = "None (0 Dmg)";
+    } else if (mode === "weapon") {
+      if (ohMinInp) ohMinInp.value = mhMin;
+      if (ohMaxInp) ohMaxInp.value = mhMax;
+      if (badge) badge.textContent = `Weapon (${mhMin} - ${mhMax})`;
+    } else if (mode === "custom") {
+      const curMax = parseFloat(ohMaxInp?.value) || 0;
+      if (curMax <= 0) {
+        if (ohMinInp) ohMinInp.value = mhMin;
+        if (ohMaxInp) ohMaxInp.value = mhMax;
+      }
+      const curMin = parseFloat(ohMinInp?.value) || 0;
+      const finalMax = parseFloat(ohMaxInp?.value) || 0;
+      if (badge) badge.textContent = `Custom (${curMin} - ${finalMax})`;
+    }
+    refreshComputedStats();
+  });
+
   document.querySelectorAll(".stat-input").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const stat = inp.dataset.stat;
+      if (stat === "Main_hand_min" || stat === "Main_hand_max") {
+        const offSelect = document.getElementById("offhandSelect");
+        if (offSelect && offSelect.value === "weapon") {
+          const mhMin = parseFloat(document.querySelector('.stat-input[data-stat="Main_hand_min"]')?.value) || 0;
+          const mhMax = parseFloat(document.querySelector('.stat-input[data-stat="Main_hand_max"]')?.value) || 0;
+          const ohMinInp = document.querySelector('.stat-input[data-stat="Off_hand_min"]');
+          const ohMaxInp = document.querySelector('.stat-input[data-stat="Off_hand_max"]');
+          if (ohMinInp) ohMinInp.value = mhMin;
+          if (ohMaxInp) ohMaxInp.value = mhMax;
+          const badge = document.getElementById("offhandPreviewBadge");
+          if (badge) badge.textContent = `Weapon (${mhMin} - ${mhMax})`;
+        }
+      } else if (stat === "Off_hand_min" || stat === "Off_hand_max") {
+        syncOffhandOptionFromStats();
+      }
+    });
     inp.addEventListener("change", () => refreshComputedStats());
   });
 

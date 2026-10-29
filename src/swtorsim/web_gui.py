@@ -346,6 +346,11 @@ def _extract_computed_player_stats(player: Any) -> dict[str, Any]:
         "accuracy_pct": round(float(st.get("Main Accuracy", 1.0)) * 100.0, 2),
         "armor_pen_pct": round(float(st.get("Armor Penetration", 0.0)) * 100.0, 2),
         "gcd_seconds": round(float(gcd_val), 2),
+        "main_hand_min": round(float(st.get("Main_hand_min", 0.0)), 1),
+        "main_hand_max": round(float(st.get("Main_hand_max", 0.0)), 1),
+        "off_hand_min": round(float(st.get("Off_hand_min", 0.0)), 1),
+        "off_hand_max": round(float(st.get("Off_hand_max", 0.0)), 1),
+        "has_offhand_weapon": float(st.get("Off_hand_max", 0.0)) > 0.0,
     }
 
 
