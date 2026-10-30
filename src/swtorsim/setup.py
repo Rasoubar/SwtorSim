@@ -7,6 +7,7 @@ from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
 from src.swtorsim.combat_curves import player_standard_health
 from src.swtorsim.rotation import Rotation
 from src.swtorsim.class_buffs import apply_class_buffs
+from src.swtorsim.resources import resource_type_for_class
 
 def schedule_periodic(player, target, sim):
     """Schedules 1st even of periodic effects, like pt extra regen"""
@@ -34,7 +35,8 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
     player = Player(
         name=stats_config.get("class_name", "Unknown"),
         abilities=active_abilities,
-        passives=passive_blueprints
+        passives=passive_blueprints,
+        resource=resource_type_for_class(stats_config.get("class_name")),
     )
 
     # Set up player base stats. Standard health comes from the level curve.

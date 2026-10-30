@@ -160,7 +160,23 @@ RESOURCE_POOL_MAP = {
 }
 
 
-def create_resource_pool(pool_type: str = "Force", max_value: float = 100.0, base_regen: float = 8.0) -> ResourcePool:
+# Class (discipline tab_name, lowercase) -> resource pool type. Classes not listed use the "Force" default.
+CLASS_RESOURCE_MAP = {
+    "marauder": "rage",
+}
+
+
+def resource_type_for_class(class_name: Optional[str]) -> str:
+    """Returns the resource pool type for a class name, defaulting to Force."""
+    return CLASS_RESOURCE_MAP.get((class_name or "").strip().lower(), "Force")
+
+
+def create_resource_pool(pool_type: str = "Force", max_value: Optional[float] = None, base_regen: float = 8.0) -> ResourcePool:
     """Helper to instantiate the appropriate ResourcePool subclass."""
     cls = RESOURCE_POOL_MAP.get(pool_type.lower(), StandardPool)
-    return cls(pool_type=pool_type, max_value=max_value, base_regen=base_regen)
+    if issubclass(cls, BuilderPool):
+        # Builder pools (Rage/Focus) have no passive regen and their own max value.
+        if max_value is None:
+            return cls(pool_type=pool_type)
+        return cls(pool_type=pool_type, max_value=max_value)
+    return cls(pool_type=pool_type, max_value=100.0 if max_value is None else max_value, base_regen=base_regen)
