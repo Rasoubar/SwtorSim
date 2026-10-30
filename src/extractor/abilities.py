@@ -505,10 +505,11 @@ def _activation(record: NodeRecord) -> dict[str, Any]:
 
 
 def _energy_cost(record: NodeRecord) -> float | None:
-    force_cost = _float_field(record, "ablForceCost")
-    if force_cost is not None:
-        return force_cost
-    return _float_field(record, "ablEnergyCost")
+    for field_name in ("ablForceCost", "ablEnergyCost", "ablActionPointCost"):
+        cost = _float_field(record, field_name)
+        if cost is not None:
+            return cost
+    return None
 
 
 def _gcd_fields(record: NodeRecord) -> tuple[bool, float]:
