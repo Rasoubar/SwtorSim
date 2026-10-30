@@ -1404,8 +1404,18 @@ def handle_invoke_projectile(sim, caster, target, action, ability=None, context=
     floats = action.get("floats")
     travel_speed = float(floats.get("travel_speed", 0.0)) if isinstance(floats, dict) else 0.0
 
+    bools = action.get("bools")
+    is_timed_projectile = bool(bools.get("timed_projectile", False)) if isinstance(bools, dict) else False
+
     time_to_hit = 0.0
-    if is_projectile_flight_time_enabled() and travel_speed > 0.0:
+    if is_timed_projectile:
+        # Timed projectiles (e.g. Saber Throw, Dual Saber Throw) use a fixed flight
+        # time (interval "41", seconds) that does not depend on distance or speed.
+        # Always active: the flight time toggle only gates distance-based projectiles.
+        intervals = action.get("intervals")
+        fixed_time = intervals.get("41") if isinstance(intervals, dict) else None
+        time_to_hit = max(0.0, float(fixed_time or 0.0))
+    elif is_projectile_flight_time_enabled() and travel_speed > 0.0:
         distance = getattr(target, "combat_distance", None)
         if distance is None:
             distance = get_default_combat_distance()
