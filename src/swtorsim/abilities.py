@@ -38,6 +38,9 @@ def _resolve_target_overrides(overrides, current_target, caster, context=None):
             resolved = context["caster"]
     return resolved
 
+HIT_RESULTS = {"effResultOk", "effResultGlance", "effResultCrit"}
+FAIL_RESULTS = {"effResultMiss", "effResultImmune", "effResultResisted"}
+
 
 @dataclass(slots=True)
 class Branch:
@@ -69,32 +72,32 @@ class Branch:
         )
 
     def execute(self, sim, caster, target, context=None, ability=None) -> tuple[bool, bool]:
-        """
-        Evaluates branch conditions and executes actions.
-        Returns: (ran, success)
-          - ran: True if conditions passed and actions were attempted.
-          - success: False only if non-damage actions failed, or every damage action missed.
-        """
-        # 1. Target overrides
         actual_target = _resolve_target_overrides(self.target_overrides, target, caster, context)
 
-        # 2. Branch conditions (failing conditions skips the branch, not an attack miss)
         if self.conditions:
             if not validate_all(self.conditions, caster, actual_target, sim=sim, context=context):
                 return False, True
 
-        # 3. Actions execution
         source_name = ability.name if ability else "Unknown"
         combat_outcomes: list[bool] = []
+        crit_flags: list = []  # True / False / None (unknown), parallel to combat_outcomes
 
         for action in self.actions:
             action_type = action.get("action_type")
 
-            # Skip actions that depend on the combat roll when the preceding damage missed
-            if action.get("combat_math_only", False) and combat_outcomes:
-                match_all = action.get("match_all", False)
-                passed_combat = all(combat_outcomes) if match_all else any(combat_outcomes)
-                if not passed_combat:
+            req = set(action.get("results") or ())
+            if (action.get("combat_math_only", False) or req) and combat_outcomes:
+                agg = all if action.get("match_all", False) else any
+                hit = agg(combat_outcomes)
+                if req and req <= FAIL_RESULTS:
+                    passed = not hit  # only when the attack failed
+                elif req == {"effResultCrit"}:
+                    vals = [(f if f is not None else o)  # unknown crit: fall back to "hit"
+                            for f, o in zip(crit_flags, combat_outcomes)]
+                    passed = agg(vals)
+                else:
+                    passed = hit  # any-hit gate
+                if not passed:
                     continue
 
             success = execute_single_action(
@@ -103,6 +106,7 @@ class Branch:
 
             if action_type == "damage":
                 combat_outcomes.append(bool(success))
+                crit_flags.append(getattr(success, "crit", None) if success else False)
             elif not success:
                 return True, False
 
@@ -567,6 +571,14 @@ def _find_target_abilities(caster, action):
             seen_ids.add(id(abl))
     return matched
 
+class HitResult:
+    """Truthy when the attack landed. crit is None when unknown (delayed hit)."""
+    __slots__ = ("hit", "crit")
+    def __init__(self, hit: bool, crit=None):
+        self.hit = hit
+        self.crit = crit
+    def __bool__(self):
+        return self.hit
 
 def handle_damage_action(sim, caster, target, action, source_name, delay, ability=None, context=None):
     """Rolls accuracy then schedules or executes the hit (accounting for flurry multi-blow actions)."""
@@ -641,6 +653,8 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
         action_data["shp_max"] = base_shp_max
 
     hit_any = False
+    crit_any = False
+    crit_known = True
     for i in range(flurry_count):
         if not accuracy_roll(
             caster,
@@ -663,10 +677,13 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
         )
         if delay > 0.0:
             sim.schedule_relative(delay, hit_event)
+            crit_known = False
         else:
             hit_event.resolve(sim)
+            crit_any = crit_any or hit_event.is_crit
 
-    return hit_any
+    return HitResult(hit_any, crit_any if (crit_known or crit_any) else None)
+
 
 
 def handle_resource_gain_action(sim, caster, action, delay: float = 0.0, ability: Any = None):

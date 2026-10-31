@@ -91,6 +91,7 @@ class DamageHit(Event):
         self.tags = frozenset(tags if tags is not None else action_data.get("tags", []))
         self.from_proc = from_proc
         self.ability_fqn = ability_fqn
+        self.is_crit = False
 
     def resolve(self, sim):
         """Calls damage calculation, determines when to apply damage, calls for damage to land,
@@ -101,6 +102,7 @@ class DamageHit(Event):
         action_with_ctx["ability_name"] = self.ability_name
 
         final_damage, is_crit = calculate_hit(self.source, self.target, action_with_ctx)
+        self.is_crit = is_crit
         resolved_at = action_with_ctx.get("resolved_attack_type", self.action_data.get("attack_type", 1))
         resolved_dt = action_with_ctx.get("resolved_damage_type", self.action_data.get("damage_type", 1))
 
