@@ -73,7 +73,7 @@ class Branch:
         Evaluates branch conditions and executes actions.
         Returns: (ran, success)
           - ran: True if conditions passed and actions were attempted.
-          - success: False only if an action failed (e.g. accuracy miss).
+          - success: False only if non-damage actions failed, or every damage action missed.
         """
         # 1. Target overrides
         actual_target = _resolve_target_overrides(self.target_overrides, target, caster, context)
@@ -85,14 +85,29 @@ class Branch:
 
         # 3. Actions execution
         source_name = ability.name if ability else "Unknown"
+        combat_outcomes: list[bool] = []
+
         for action in self.actions:
+            action_type = action.get("action_type")
+
+            # Skip actions that depend on the combat roll when the preceding damage missed
+            if action.get("combat_math_only", False) and combat_outcomes:
+                match_all = action.get("match_all", False)
+                passed_combat = all(combat_outcomes) if match_all else any(combat_outcomes)
+                if not passed_combat:
+                    continue
+
             success = execute_single_action(
                 sim, caster, actual_target, action, source_name, ability=ability, context=context
             )
-            if not success:
+
+            if action_type == "damage":
+                combat_outcomes.append(bool(success))
+            elif not success:
                 return True, False
 
-        return True, True
+        branch_success = any(combat_outcomes) if combat_outcomes else True
+        return True, branch_success
 
 
 @dataclass(slots=True)
@@ -206,8 +221,7 @@ class Effect:
             ran, success = branch.execute(sim, caster, target, context=branch_context, ability=ability)
             if ran:
                 executed_branches.add(branch.index)
-            if not success and getattr(branch, "is_attack", False):
-                break
+
 
     def schedule_timer_branches(self, sim, caster, target, context=None, ability=None):
         """Schedules any branches triggered on on_timer_expired at sim.current_time + delay."""

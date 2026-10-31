@@ -1239,6 +1239,17 @@ def _decode_action(
             decoded["from_actor"] = _decode_actor(int_params["effParam_FromActor"])
         if "effParam_ToActor" in int_params:
             decoded["to_actor"] = _decode_actor(int_params["effParam_ToActor"])
+        if "effParam_ResultsOption_CombatMathOnly" in bool_params:
+            decoded["combat_math_only"] = bool(
+                bool_params["effParam_ResultsOption_CombatMathOnly"]
+            )
+        if "effParam_ResultsOption_MatchAll" in bool_params:
+            decoded["match_all"] = bool(
+                bool_params["effParam_ResultsOption_MatchAll"]
+            )
+        results = _int_list_items(params["int_list"].get("effParam_Results"))
+        if results:
+            decoded["results"] = results
         return decoded
 
     generic: dict[str, Any] = {"action_type": _snake_case(action_name)}
