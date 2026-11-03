@@ -8,6 +8,7 @@ from pathlib import Path
 from extractor.config import (
     ABILITY_REPLACEMENT_NODE_ID,
     ALWAYS_EXTRACTED_ABILITY_FQNS,
+    DATA_DIR,
     DEFAULT_ITEM_RATING,
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
@@ -17,6 +18,7 @@ from extractor.config import (
 )
 from extractor.abilities import build_abilities
 from extractor.adrenals import build_adrenals
+from extractor.combat_curves import build_combat_curves
 from extractor.disciplines import build_disciplines
 from extractor.talents import build_talents
 from extractor.dump import write_node_dump
@@ -91,16 +93,24 @@ def build_parser() -> argparse.ArgumentParser:
             "and write PNGs to data/icons/"
         ),
     )
+    parser.add_argument(
+        "--parsed-only",
+        action="store_true",
+        help=(
+            "Only write final parsed data (disciplines, abilities, talents, gear, relics); "
+            "skip the ~400MB raw GOM node dump in extracted/"
+        ),
+    )
     return parser
 
 
-def run_extraction(config: ExtractorConfig) -> Path:
+def run_extraction(config: ExtractorConfig) -> Path | None:
     gom_js_path = ensure_jedipedia_gom_js(
-        config.data_dir, force_download=config.force_hash_update
+        DATA_DIR, force_download=config.force_hash_update
     )
     gom_names = parse_gom_js(gom_js_path)
     fnv1a64_js_path = ensure_jedipedia_fnv1a64_js(
-        config.data_dir,
+        DATA_DIR,
         force_download=config.force_hash_update,
     )
     tag_resolver = TagResolver.from_jedipedia_js(fnv1a64_js_path)
@@ -108,7 +118,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     resources_root, hash_dictionary = extract_relevant_files(
         config.assets_path,
         config.work_dir,
-        config.data_dir,
+        DATA_DIR,
         force_hash_update=config.force_hash_update,
         pts=config.pts,
     )
@@ -143,7 +153,10 @@ def run_extraction(config: ExtractorConfig) -> Path:
         additional_node_ids=[ABILITY_REPLACEMENT_NODE_ID],
         tag_resolver=tag_resolver,
     )
-    dis_count = sum(1 for r in records.values() if r.entry.fqn.startswith("dis."))
+
+    dis_count = sum(
+        1 for record in records.values() if record.entry.fqn.startswith("dis.")
+    )
     item_ability_counts = {
         prefix: sum(
             1
@@ -160,13 +173,16 @@ def run_extraction(config: ExtractorConfig) -> Path:
         and f".{RELIC_SCALES_WITH_ITEM_RATING_SEGMENT}" in record.entry.fqn
     )
     adrenal_count = len(discover_adrenal_ability_nodes(store))
-    index_path = write_node_dump(
-        records,
-        config.output_dir,
-        dis_roots,
-        included_fqn_prefixes=ITEM_ABILITY_FQN_PREFIXES,
-        flat_node_ids=frozenset({ABILITY_REPLACEMENT_NODE_ID}),
-    )
+
+    index_path: Path | None = None
+    if not config.parsed_only:
+        index_path = write_node_dump(
+            records,
+            config.output_dir,
+            dis_roots,
+            included_fqn_prefixes=ITEM_ABILITY_FQN_PREFIXES,
+            flat_node_ids=frozenset({ABILITY_REPLACEMENT_NODE_ID}),
+        )
 
     disciplines_dir = config.data_dir / "disciplines"
     discipline_count = build_disciplines(records, disciplines_dir)
@@ -204,11 +220,18 @@ def run_extraction(config: ExtractorConfig) -> Path:
     adrenals_path = config.data_dir / "adrenals.json"
     adrenal_list_count = build_adrenals(store, adrenals_path)
 
+    combat_curves_path = config.data_dir / "combat_curves.json"
+    build_combat_curves(store, gom, combat_curves_path)
+
     if not config.keep_work_files and config.work_dir.exists():
         shutil.rmtree(config.work_dir, ignore_errors=True)
 
-    print(f"Wrote {len(records)} nodes to {config.output_dir}")
-    print(f"Index: {index_path}")
+    if not config.parsed_only:
+        print(f"Wrote {len(records)} nodes to {config.output_dir}")
+        print(f"Index: {index_path}")
+    else:
+        print(f"[INFO] --parsed-only enabled: skipped raw node dump in {config.output_dir}")
+
     print(f"dis.* nodes extracted: {dis_count}")
     print(f"Base APC nodes seeded: {len(base_apc_roots)}")
     print(f"Wrote {discipline_count} discipline files to {disciplines_dir}")
@@ -223,6 +246,7 @@ def run_extraction(config: ExtractorConfig) -> Path:
     print(f"Wrote {gear_count} gear entries to {gear_path}")
     print(f"Wrote {relic_count} relics to {relics_path}")
     print(f"Wrote {adrenal_list_count} adrenals to {adrenals_path}")
+    print(f"Wrote combat curves to {combat_curves_path}")
     print(f"Known tag hashes loaded: {len(tag_resolver.tags_by_hash)}")
     for prefix, count in item_ability_counts.items():
         print(f"{prefix} nodes extracted: {count}")
@@ -245,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         keep_work_files=args.keep_work,
         item_rating=args.item_rating,
         extract_icons=args.extract_icons,
+        parsed_only=args.parsed_only,
     )
 
     try:

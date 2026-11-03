@@ -50,10 +50,11 @@ def _impact_from_key(key: str | None) -> dict[str, str] | None:
 
 def _parse_stat_change(stat_fields: list[dict[str, Any]]) -> dict[str, Any]:
     fields = _fields_to_dict(stat_fields)
+    enum_type = fields.get("talStatInfoStatEnumType")
     if "talStatInfoStatValue" in fields:
         value: Any = fields["talStatInfoStatValue"]
-    elif "talStatInfoStatEnumType" in fields:
-        value = fields["talStatInfoStatEnumType"]
+    elif enum_type is not None:
+        value = enum_type
     else:
         raise ValueError(
             f"Stat entry missing value for {fields.get('talStatInfoStat')}: {fields}"
@@ -64,6 +65,8 @@ def _parse_stat_change(stat_fields: list[dict[str, Any]]) -> dict[str, Any]:
         "stackable": fields.get("talStatInfoStackable", False),
         "impact": _impact_from_key(fields.get("talStatInfoKey")),
     }
+    if enum_type is not None:
+        change["enum_type"] = enum_type
     requires_tag = fields.get("talTalentStatTag")
     if requires_tag:
         change["requires_tag"] = requires_tag

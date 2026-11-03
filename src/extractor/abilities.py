@@ -21,6 +21,7 @@ DEFAULT_BASE_GCD = 1.5
 
 CRIT_RESULT_NAME = "effResultCrit"
 CRIT_RESULT_TOKENS = frozenset({CRIT_RESULT_NAME, "32"})
+OK_RESULT_TOKENS = frozenset({"effResultOk", "1"})
 
 ACTOR_LABELS: dict[str, str] = {
     "2": "caster",
@@ -108,6 +109,16 @@ def _float_field(record: NodeRecord, name: str) -> float | None:
     return None
 
 
+def _int_field(record: NodeRecord, name: str) -> int | None:
+    value = _field_value(record, name)
+    if value is None:
+        return None
+    try:
+        return int(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
 def _icon_png_name(spec: Any) -> str | None:
     if not isinstance(spec, str):
         return None
@@ -120,6 +131,14 @@ def _icon_png_name(spec: Any) -> str | None:
         if not spec:
             return None
     return f"{spec}.png"
+
+
+def _clean_effect_name(raw: Any) -> str | None:
+    if not isinstance(raw, str):
+        return None
+    stripped = re.sub(r"<[^>]+>", "", raw)
+    cleaned = " ".join(stripped.split())
+    return cleaned or None
 
 
 def icon_stems_from_payload(payload: dict[str, Any]) -> set[str]:
@@ -270,7 +289,26 @@ def _decode_generic_ints(
             if skip_zero and int_value == 0:
                 continue
             ints[_snake_case(key)] = int_value
+        elif str(value).lstrip('-').isdigit():
+            int_value = int(value)
+            if skip_zero and int_value == 0:
+                continue
+            ints[_snake_case(key)] = int_value
+        elif isinstance(value, str) and value:
+            resolved = _resolve_ability_spec(value, id_to_fqn) if id_to_fqn else value
+            ints[_snake_case(key)] = resolved if resolved is not None else value
     return ints
+
+
+def _resolved_conditional_tag(int_params: dict[str, Any]) -> str | None:
+    """Return a resolved tag string stored in the int-param ConditionalTag slot."""
+    raw = int_params.get("effParam_ConditionalTag")
+    if raw is None:
+        return None
+    value = str(raw).strip()
+    if not value or value.isdigit():
+        return None
+    return value
 
 
 def _should_drop_condition(condition_name: Any) -> bool:
@@ -467,10 +505,11 @@ def _activation(record: NodeRecord) -> dict[str, Any]:
 
 
 def _energy_cost(record: NodeRecord) -> float | None:
-    force_cost = _float_field(record, "ablForceCost")
-    if force_cost is not None:
-        return force_cost
-    return _float_field(record, "ablEnergyCost")
+    for field_name in ("ablForceCost", "ablEnergyCost", "ablActionPointCost"):
+        cost = _float_field(record, field_name)
+        if cost is not None:
+            return cost
+    return None
 
 
 def _gcd_fields(record: NodeRecord) -> tuple[bool, float]:
@@ -796,7 +835,9 @@ def _int_list_items(value: Any) -> list[str]:
 
 def _decode_eff_results(int_list_params: dict[str, Any]) -> list[str]:
     tokens = _int_list_items(int_list_params.get("effParam_Results"))
-    if any(token in CRIT_RESULT_TOKENS for token in tokens):
+    if any(token in CRIT_RESULT_TOKENS for token in tokens) and not any(
+        token in OK_RESULT_TOKENS for token in tokens
+    ):
         return [CRIT_RESULT_NAME]
     return []
 
@@ -860,13 +901,7 @@ def _effect_field_interval_seconds(record: NodeRecord, name: str) -> float | Non
 
 
 def _effect_int_field(effect_record: NodeRecord, name: str) -> int | None:
-    value = _field_value(effect_record, name)
-    if value is None:
-        return None
-    try:
-        return int(str(value))
-    except (TypeError, ValueError):
-        return None
+    return _int_field(effect_record, name)
 
 
 def _effect_stack_charge(effect_record: NodeRecord) -> dict[str, Any] | None:
@@ -1104,17 +1139,42 @@ def _decode_action(
     float_params = params["float"]
 
     if action_name == "effAction_WeaponDamage":
+        slots = set(_int_list_items(params["int_list"].get("effParam_Slots")))
+        # In SWTOR GOM equipment slots:
+        # 5 = Melee Mainhand, 3 = Melee Offhand
+        # 2 = Ranged Mainhand, 4 = Ranged Offhand
+        if slots & {"2", "4"}:
+            attack_type = 2  # Ranged
+            hand = "off" if "4" in slots else "main"
+        elif slots & {"3", "5"}:
+            attack_type = 1  # Melee
+            hand = "off" if "3" in slots else "main"
+        elif slots & {"3", "4"}:
+            attack_type = 2 if "4" in slots else 1
+            hand = "off"
+        elif slots & {"2", "5"}:
+            attack_type = 2 if "2" in slots else 1
+            hand = "main"
+        else:
+            hand = (
+                "main"
+                if bool_params.get("effParam_IgnoreDualWieldModifier")
+                else "off"
+            )
+            attack_type = 1
+
         decoded: dict[str, Any] = {
             "action_type": "damage",
-            "attack_type": 1,
-            "hand": "main"
-            if bool_params.get("effParam_IgnoreDualWieldModifier")
-            else "off",
+            "attack_type": attack_type,
+            "spell_type": 1,
+            "hand": hand,
             "coeff": _float_param(float_params, "effParam_Coefficient"),
             "amp": _float_param(float_params, "effParam_AmountModifierPercent"),
             "shp_min": _float_param(float_params, "effParam_StandardHealthPercentMin"),
             "shp_max": _float_param(float_params, "effParam_StandardHealthPercentMax"),
         }
+        if slots:
+            decoded["slots"] = sorted(slots)
         if "effParam_FlurryBlowsMin" in int_params:
             decoded["flurry_min"] = _int_param(int_params, "effParam_FlurryBlowsMin")
         if "effParam_FlurryBlowsMax" in int_params:
@@ -1129,6 +1189,7 @@ def _decode_action(
         decoded = {
             "action_type": "damage",
             "attack_type": 3,
+            "spell_type": 3,
             "damage_type": _int_param(int_params, "effParam_DamageType"),
             "coeff": _float_param(float_params, "effParam_Coefficient"),
             "amp": _float_param(float_params, "effParam_AmountModifierPercent"),
@@ -1178,6 +1239,17 @@ def _decode_action(
             decoded["from_actor"] = _decode_actor(int_params["effParam_FromActor"])
         if "effParam_ToActor" in int_params:
             decoded["to_actor"] = _decode_actor(int_params["effParam_ToActor"])
+        if "effParam_ResultsOption_CombatMathOnly" in bool_params:
+            decoded["combat_math_only"] = bool(
+                bool_params["effParam_ResultsOption_CombatMathOnly"]
+            )
+        if "effParam_ResultsOption_MatchAll" in bool_params:
+            decoded["match_all"] = bool(
+                bool_params["effParam_ResultsOption_MatchAll"]
+            )
+        results = _int_list_items(params["int_list"].get("effParam_Results"))
+        if results:
+            decoded["results"] = results
         return decoded
 
     generic: dict[str, Any] = {"action_type": _snake_case(action_name)}
@@ -1210,8 +1282,21 @@ def _decode_action(
         for key, value in params["string"].items()
         if key not in DROPPED_ACTION_PARAMS and isinstance(value, str)
     }
+    resolved_tag = _resolved_conditional_tag(int_params)
+    if resolved_tag and not strings.get("conditional_tag"):
+        strings["conditional_tag"] = resolved_tag
     if strings:
         generic["strings"] = strings
+
+    intervals = {
+        key: _raw_time_interval_seconds(value)
+        for key, value in params.get("time_interval", {}).items()
+        if _raw_time_interval_seconds(value) is not None
+    }
+    if intervals:
+        generic["intervals"] = intervals
+        if "18" in intervals and "duration" not in generic:
+            generic["duration"] = intervals["18"]
 
     return generic
 
@@ -1230,6 +1315,11 @@ def _decode_trigger(
     tag_keys = [key for key, enabled in params["tags"].items() if enabled is True]
     if tag_keys:
         decoded["tags"] = tag_keys
+
+    exclusion_map = _lookup_list_to_dict(fields.get("effTagExclusions"))
+    excluded_tags = [key for key, enabled in exclusion_map.items() if enabled is True]
+    if excluded_tags:
+        decoded["excluded_tags"] = excluded_tags
 
     if "effParam_TickNumber" in params["int"]:
         decoded["tick_number"] = _int_param(params["int"], "effParam_TickNumber")
@@ -1464,6 +1554,53 @@ def _effect_icon_png(effect_record: NodeRecord) -> str | None:
     return _icon_png_name(_set_icon_spec_from_initializers(effect_record))
 
 
+def _set_name_from_initializers(effect_record: NodeRecord) -> str | None:
+    for branch in _sub_effects(effect_record):
+        initializers_raw = _sub_effect_field(branch, "effInitializers")
+        if not isinstance(initializers_raw, dict):
+            continue
+        initializer_list = initializers_raw.get("list")
+        if not isinstance(initializer_list, list):
+            continue
+        for entry in initializer_list:
+            if not isinstance(entry, list):
+                continue
+            fields = _entry_fields(entry)
+            if fields.get("effInitializerName") != "effInitializer_SetName":
+                continue
+            string_params = _action_param_dicts(entry)["string"]
+            name = string_params.get("effParam_Name")
+            if not isinstance(name, str) or not name.strip():
+                raw = fields.get("effStringParams")
+                entries = raw.get("list") if isinstance(raw, dict) else raw
+                name = _lookup_list_to_dict(entries).get("effParam_Name")
+            cleaned = _clean_effect_name(name)
+            if cleaned:
+                return cleaned
+    return None
+
+
+def _is_effect_hidden(effect_record: NodeRecord) -> bool:
+    for branch in _sub_effects(effect_record):
+        initializers_raw = _sub_effect_field(branch, "effInitializers")
+        if not isinstance(initializers_raw, dict):
+            continue
+        initializer_list = initializers_raw.get("list")
+        if not isinstance(initializer_list, list):
+            continue
+        for entry in initializer_list:
+            if not isinstance(entry, list):
+                continue
+            fields = _entry_fields(entry)
+            init_name = fields.get("effInitializerName")
+            if init_name == "effInitializer_SetHidden":
+                return True
+            bool_params = _action_param_dicts(entry)["bool"]
+            if bool_params.get("effParam_IsHidden") is True:
+                return True
+    return False
+
+
 def _decode_initializer(entry: list[dict[str, Any]]) -> dict[str, Any] | None:
     fields = _entry_fields(entry)
     initializer_name = fields.get("effInitializerName")
@@ -1655,6 +1792,12 @@ def _is_redundant_self_aoe_branch(
     branch: list[dict[str, Any]],
     effect_tags: set[str],
 ) -> bool:
+    actions_raw = _sub_effect_field(branch, "effActions")
+    if isinstance(actions_raw, dict):
+        raw_list = actions_raw.get("list")
+        if isinstance(raw_list, list) and len(raw_list) > 0:
+            return False
+
     conditions_raw = _sub_effect_field(branch, "effConditions")
     if not isinstance(conditions_raw, list):
         return False
@@ -1677,6 +1820,14 @@ def _is_redundant_self_aoe_branch(
             continue
         if int_params.get("effParam_Actor") != "3":
             continue
+
+        raw_count = int_params.get("effParam_Count")
+        if raw_count is not None:
+            try:
+                if int(raw_count) > 1:
+                    continue
+            except (ValueError, TypeError):
+                pass
 
         tag_keys = [key for key, enabled in function_tags.items() if enabled is True]
         if any(tag in effect_tags for tag in tag_keys):
@@ -1745,9 +1896,8 @@ def _decode_branch(
     if triggers:
         _enrich_trigger_timing(triggers, effect_duration, effect_tick_interval)
         decoded["triggers"] = triggers
-        decoded["timing"] = "triggered"
     else:
-        decoded["timing"] = "immediate"
+        decoded["triggers"] = [{"trigger": "on_apply"}]
     return decoded
 
 
@@ -1756,6 +1906,7 @@ def _decode_effect(
     *,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
+    parent_name: str | None = None,
 ) -> dict[str, Any] | None:
     number = _effect_number(effect_record.entry.fqn)
     if number is None or number == 0:
@@ -1830,6 +1981,17 @@ def _decode_effect(
         "number": number,
         "entry": not _effect_has_if_called_by_effect(effect_record),
     }
+    init_name = _set_name_from_initializers(effect_record)
+    is_hidden = _is_effect_hidden(effect_record)
+    if is_hidden:
+        decoded["is_hidden"] = True
+
+    if init_name:
+        decoded["name"] = init_name
+    elif not is_hidden and parent_name:
+        decoded["name"] = parent_name
+    elif parent_name:
+        decoded["name"] = f"{parent_name}_{number}"
     icon = _effect_icon_png(effect_record)
     if icon:
         decoded["icon"] = icon
@@ -1863,6 +2025,7 @@ def _build_effects(
     *,
     id_to_fqn: dict[str, str] | None = None,
     standard_rating: float | None = None,
+    parent_name: str | None = None,
 ) -> list[dict[str, Any]]:
     effect_records = _effect_records(record, records_by_fqn)
     dropped_effect_numbers: set[int] = set()
@@ -1882,6 +2045,7 @@ def _build_effects(
             effect_record,
             id_to_fqn=id_to_fqn,
             standard_rating=standard_rating,
+            parent_name=parent_name,
         )
         if decoded is not None:
             effects.append(decoded)
@@ -1898,15 +2062,19 @@ def _build_ability_payload(
     standard_rating: float | None = None,
 ) -> dict[str, Any]:
     ability_type = _ability_type(record)
+    parent_name = _ability_name(record)
     payload: dict[str, Any] = {
         "fqn": record.entry.fqn,
-        "name": _ability_name(record),
+        "name": parent_name,
     }
     icon = _icon_png_name(_field_value(record, "ablIconSpec"))
     if icon:
         payload["icon"] = icon
     payload["type"] = ability_type
     payload["cooldown"] = _cooldown(record)
+    max_charges = _int_field(record, "ablMaxCharges")
+    if max_charges is not None:
+        payload["max_charges"] = max_charges
     payload["ablIgnoreAlacrity"] = _ignore_alacrity(
         record, "ablIgnoreAlacrity", default=False
     )
@@ -1931,6 +2099,7 @@ def _build_ability_payload(
         records_by_fqn,
         id_to_fqn=id_to_fqn,
         standard_rating=standard_rating,
+        parent_name=parent_name,
     )
 
     return payload

@@ -66,7 +66,7 @@ class TagResolver:
         return cls(parse_tag_hashes(path))
 
     @staticmethod
-    def _unsigned_decimal(value: Any) -> str | None:
+    def unsigned_decimal(value: Any) -> str | None:
         if isinstance(value, bool):
             return None
         if isinstance(value, int):
@@ -76,7 +76,7 @@ class TagResolver:
         return str(int(value) & U64_MASK)
 
     def resolve(self, value: Any) -> Any:
-        unsigned = self._unsigned_decimal(value)
+        unsigned = self.unsigned_decimal(value)
         if unsigned is None:
             return value
         return self.tags_by_hash.get(unsigned, value)

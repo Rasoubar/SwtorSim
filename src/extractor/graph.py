@@ -446,7 +446,13 @@ def _resolve_value(
         )
 
     if tag_resolver is not None:
-        return tag_resolver.resolve(value)
+        resolved = tag_resolver.resolve(value)
+        unsigned = TagResolver.unsigned_decimal(value)
+        if unsigned is not None and resolved == value:
+            entry = store.index.get(unsigned)
+            if entry:
+                return entry.fqn
+        return resolved
 
     return value
 

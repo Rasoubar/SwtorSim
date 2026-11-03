@@ -1,3 +1,5 @@
+from typing import Any, Optional
+
 class ResourcePool:
     """Base class for resource pools"""
 
@@ -19,7 +21,7 @@ class ResourcePool:
         """Adds `amount` of resource to the pool, capped at `max_value`."""
         raise NotImplementedError
 
-    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0):
+    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0, player: Any = None):
         """Ticks passive regeneration over time"""
         pass
 
@@ -42,8 +44,13 @@ class StandardPool(ResourcePool):
     def generate(self, amount: float):
         self.current_value = min(self.max_value, self.current_value + amount)
 
-    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0):
-        actual_regen = self.base_regen * alacrity_modifier
+    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0, player: Any = None):
+        base = self.base_regen
+        if player is not None and hasattr(player, "calculate_resource_regen"):
+            rate = player.calculate_resource_regen(base, self.pool_type)
+        else:
+            rate = base
+        actual_regen = rate * alacrity_modifier
         self.generate(actual_regen * delta_time)
 
 
@@ -79,8 +86,13 @@ class HeatPool(ResourcePool):
             return 3.0
         return 2.0
 
-    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0):
-        actual_regen = self.get_current_regen_rate() * alacrity_modifier
+    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0, player: Any = None):
+        base = self.get_current_regen_rate()
+        if player is not None and hasattr(player, "calculate_resource_regen"):
+            rate = player.calculate_resource_regen(base, self.pool_type)
+        else:
+            rate = base
+        actual_regen = rate * alacrity_modifier
         self.generate(actual_regen * delta_time)
 
 
@@ -104,8 +116,13 @@ class EnergyPool(StandardPool):
             return 3.0
         return 2.0
 
-    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0):
-        actual_regen = self.get_current_regen_rate() * alacrity_modifier
+    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0, player: Any = None):
+        base = self.get_current_regen_rate()
+        if player is not None and hasattr(player, "calculate_resource_regen"):
+            rate = player.calculate_resource_regen(base, self.pool_type)
+        else:
+            rate = base
+        actual_regen = rate * alacrity_modifier
         self.generate(actual_regen * delta_time)
 
 
@@ -129,7 +146,7 @@ class BuilderPool(ResourcePool):
     def generate(self, amount: float):
         self.current_value = min(self.max_value, self.current_value + amount)
 
-    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0):
+    def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0, player: Any = None):
         """Loses resource over time if decay_rate > 0. Not properly implemented yet."""
         if self.decay_rate > 0.0:
             self.current_value = max(0.0, self.current_value - (self.decay_rate * delta_time))
@@ -143,7 +160,23 @@ RESOURCE_POOL_MAP = {
 }
 
 
-def create_resource_pool(pool_type: str = "Force", max_value: float = 100.0, base_regen: float = 8.0) -> ResourcePool:
+# Class (discipline tab_name, lowercase) -> resource pool type. Classes not listed use the "Force" default.
+CLASS_RESOURCE_MAP = {
+    "marauder": "rage",
+}
+
+
+def resource_type_for_class(class_name: Optional[str]) -> str:
+    """Returns the resource pool type for a class name, defaulting to Force."""
+    return CLASS_RESOURCE_MAP.get((class_name or "").strip().lower(), "Force")
+
+
+def create_resource_pool(pool_type: str = "Force", max_value: Optional[float] = None, base_regen: float = 8.0) -> ResourcePool:
     """Helper to instantiate the appropriate ResourcePool subclass."""
     cls = RESOURCE_POOL_MAP.get(pool_type.lower(), StandardPool)
-    return cls(pool_type=pool_type, max_value=max_value, base_regen=base_regen)
+    if issubclass(cls, BuilderPool):
+        # Builder pools (Rage/Focus) have no passive regen and their own max value.
+        if max_value is None:
+            return cls(pool_type=pool_type)
+        return cls(pool_type=pool_type, max_value=max_value)
+    return cls(pool_type=pool_type, max_value=100.0 if max_value is None else max_value, base_regen=base_regen)

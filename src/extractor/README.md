@@ -108,15 +108,19 @@ One file per root `abl.*` node with base class `ablAbility`:
 }
 ```
 
-`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`.
+`icon` is the PNG filename derived from `ablIconSpec` (omitted when the spec is missing). Effects may include their own `icon` from `effIcon`, falling back to `effInitializer_SetIcon` / `effParam_IconSpec`. `effInitializer_SetIcon` is not kept in `initializers`. Effects may include `name` from `effInitializer_SetName` / `effParam_Name` (XML tags and surrounding whitespace stripped; omitted when missing). `effInitializer_SetName` is not kept in `initializers`.
 
-`ablIgnoreAlacrity` sits immediately under `cooldown`. The GOM field is sparse (written only when `true`); when absent the parsed value is `false`.
+`max_charges` is copied from sparse `ablMaxCharges` when that field is present and sits immediately under `cooldown`. It is omitted when the GOM field is missing.
+
+`ablIgnoreAlacrity` sits immediately under `cooldown` (or under `max_charges` when that field is present). The GOM field is sparse (written only when `true`); when absent the parsed value is `false`.
 
 Effects that have `duration` and/or `tick_interval` include `effIgnoreAlacrity` as a sibling after those fields. The GOM field is likewise sparse. Defaults when it is absent: `false` if the effect has a `tick_interval` (DoT/HoT ticks scale with alacrity), `true` if it does not (buff duration does not). An explicit stored boolean overrides the default. Instant effects with neither timing field omit the flag.
 
 `modify_stat` actions store `stat` as the `modStatEnum` member name string (e.g. `"STAT_rtg_armor"`), resolved from `client.gom` during parsing.
 
-Triggers may include `effResults` when `effParam_Results` lists Crit (`effResultCrit` only for now).
+Every effect branch has a `triggers` list. Apply-time branches (no GOM `effTriggers`) use `[{"trigger": "on_apply"}]`. There is no branch `timing` field.
+
+Triggers may include `effResults` when `effParam_Results` lists Crit (`effResultCrit` only for now). Triggers may include `excluded_tags` from `effTagExclusions` (enabled keys only; omitted when empty).
 
 ### Talents (`data/parsed/tal/`)
 
@@ -171,7 +175,7 @@ Loc retriever fields on abilities and talents (`locTextRetrieverMap`) are resolv
 
 Ability tag values are stable IDs: unsigned 64-bit FNV-1a hashes of uppercase names, rather than GOM node references. For example, `tag.abl.smuggler.healing_ability` hashes to `711562958929859131`.
 
-The extractor inverts the known `tag.*` strings published in Jedipedia's `fnv1a64.js`. Matching hashes anywhere in resolved field values are written as tag names; hashes missing from Jedipedia's dictionary remain unchanged as decimal IDs.
+The extractor inverts the known `tag.*` strings published in Jedipedia's `fnv1a64.js`. Matching hashes anywhere in resolved field values are written as tag names. Unknown hashes that match a known GOM node ID (typically an ability used as a tag key) resolve to that node's FQN; remaining IDs stay decimal.
 
 ## Module layout
 

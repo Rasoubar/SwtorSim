@@ -1,11 +1,26 @@
-import os
-from typing import Tuple
+from pathlib import Path
+
 from src.swtorsim.config_load import load_json_file
+from src.swtorsim.run_config import (
+    BUILDS_DIR,
+    CHOICES_DIR,
+    DISCIPLINES_DIR,
+    GEAR_PATH,
+    LEGENDARY_PREFIX,
+    RELICS_PATH,
+    ROTATIONS_DIR,
+    TACTICAL_PREFIX,
+    TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
+    RunConfig,
+    discipline_names,
+    filter_gear_for_class,
+    relic_menu_label,
+    validate_run_config,
+)
 
 
 def prompt_menu_choice(options: list[str], prompt: str) -> str:
-    """Helper to display a numbered list and repeatedly prompt until a valid choice is made."""
-    #Made by Gemini
+    """Displays a numbered list and prompts until the selection is valid."""
     for idx, name in enumerate(options, 1):
         print(f"  [{idx}] {name}")
 
@@ -19,149 +34,214 @@ def prompt_menu_choice(options: list[str], prompt: str) -> str:
             print(f"  ❌ Invalid selection. Please enter a number between 1 and {len(options)}.")
 
 
-def select_loadout_paths(data_root: str = "data"):
-    """Interactively prompts the user to select Class, Spec, Build, and Rotation."""
-    #Made by gemini from previous code.
+def collect_run_config_interactive() -> RunConfig:
+    """Prompts for every selection and returns a validated run config."""
+    mode, iterations = prompt_run_mode()
 
-    print("=== SWTOR Combat Simulator Environment Setup ===")
+    print("=== SWTOR Combat Simulator Loadout Setup ===")
+    class_name, spec, spec_path = select_discipline_path()
+    stats_path = select_stats_path()
+    rotation_path = select_rotation_path()
+    choices_path = select_choices_path()
+    tactical_fqn = select_tactical(class_name)
+    legendary_fqns = select_legendaries(class_name)
+    relic_fqns = select_relics()
+    training_dummy_armor_debuff = prompt_training_dummy_armor_debuff()
 
-    # 1. Select Class
-    print(f"\n📂 Available Classes inside '{data_root}':")
-    class_options = sorted([
-        d for d in os.listdir(data_root)
-        if os.path.isdir(os.path.join(data_root, d))
-    ])
-    class_name = prompt_menu_choice(class_options, "Select Class Number: ")
-    class_dir = os.path.join(data_root, class_name)
+    config = RunConfig(
+        spec_path=spec_path,
+        class_name=class_name,
+        spec=spec,
+        stats_path=stats_path,
+        rotation_path=rotation_path,
+        choices_path=choices_path,
+        tactical_fqn=tactical_fqn,
+        legendary_fqns=legendary_fqns,
+        relic_fqns=relic_fqns,
+        training_dummy_armor_debuff=training_dummy_armor_debuff,
+        mode=mode,
+        iterations=iterations,
+    )
+    validate_run_config(config)
+    return config
 
-    # 2. Select Specialization
-    print(f"\n📂 Available Specializations inside '{class_name}':")
-    spec_options = sorted([
-        d for d in os.listdir(class_dir)
-        if os.path.isdir(os.path.join(class_dir, d))
-    ])
-    spec_name = prompt_menu_choice(spec_options, "Select Specialization Number: ")
-    base_dir = os.path.join(data_root, class_name, spec_name)
 
-    # 3. Select Stat Profile
-    builds_dir = os.path.join(base_dir, "PlayerBuilds")
-    print(f"\n📂 Available Stat Profiles in '{builds_dir}':")
-    stat_options = sorted([f for f in os.listdir(builds_dir) if f.endswith(".json")])
-    stats_choice = prompt_menu_choice(stat_options, "Select Stats Profile Number: ")
-    stats_path = os.path.join(builds_dir, stats_choice)
+def select_discipline_path(
+    disciplines_dir: str = DISCIPLINES_DIR,
+) -> tuple[str, str, str]:
+    """Prompts for a class (tab_name) and spec (package_name). Returns both plus the JSON path."""
+    disciplines = index_disciplines(disciplines_dir)
 
-    # 4. Select Rotation
-    rotations_dir = os.path.join(base_dir, "Rotations")
+    print("\n📂 Available Classes:")
+    class_name = prompt_menu_choice(sorted(disciplines), "Select Class Number: ")
+
+    print(f"\n📂 Available Specs for {class_name}:")
+    spec = prompt_menu_choice(sorted(disciplines[class_name]), "Select Spec Number: ")
+    return class_name, spec, disciplines[class_name][spec]
+
+
+def index_disciplines(disciplines_dir: str = DISCIPLINES_DIR) -> dict[str, dict[str, str]]:
+    """Maps tab_name -> package_name -> discipline JSON path."""
+    root = Path(disciplines_dir)
+    if not root.is_dir():
+        raise FileNotFoundError(f"Discipline directory not found: {disciplines_dir}")
+
+    disciplines: dict[str, dict[str, str]] = {}
+    for path in sorted(root.rglob("*.json")):
+        if not path.is_file():
+            continue
+        spec_data = load_json_file(str(path))
+        class_name, spec = discipline_names(spec_data, str(path))
+        specs = disciplines.setdefault(class_name, {})
+        if spec in specs:
+            raise ValueError(
+                f"Duplicate spec '{spec}' for class '{class_name}' in '{path}'."
+            )
+        specs[spec] = str(path)
+
+    if not disciplines:
+        raise FileNotFoundError(f"No discipline JSON files found in '{disciplines_dir}'.")
+    return disciplines
+
+
+def select_stats_path(builds_dir: str = BUILDS_DIR) -> str:
+    """Prompts for a build JSON from the top level of the builds directory."""
+    options = catalog_json_files(builds_dir, recursive=False)
+    print(f"\n📂 Available Builds in '{builds_dir}':")
+    choice = prompt_menu_choice(sorted(options), "Select Build Number: ")
+    return options[choice]
+
+
+def select_rotation_path(rotations_dir: str = ROTATIONS_DIR) -> str:
+    """Prompts for a rotation JSON, including files in subdirectories."""
+    options = catalog_json_files(rotations_dir, recursive=True)
     print(f"\n📂 Available Rotations in '{rotations_dir}':")
-    rotation_options = sorted([f for f in os.listdir(rotations_dir) if f.endswith(".json")])
-    rotation_file = prompt_menu_choice(rotation_options, "Select Rotation Sequence Number: ")
-    rotation_path = os.path.join(rotations_dir, rotation_file)
-
-    return class_name, base_dir, stats_path, rotation_path
+    choice = prompt_menu_choice(sorted(options), "Select Rotation Number: ")
+    return options[choice]
 
 
-def _process_item_additions(to_add_list: list, abilities: dict, procs: dict, buffs: dict) -> None:
-    """Helper to unpack inner additions and categorize them into respective raw dicts."""
-    #made by gemini from my previous draft_choices code
-
-    for addition in to_add_list:
-        for inner_name, inner_config in addition.items():
-            inner_type = inner_config.get("item_type", "unknown").lower()
-            inner_config["name"] = inner_name
-
-            if inner_type == "ability":
-                abilities[inner_name] = inner_config
-            elif inner_type == "proc":
-                procs[inner_name] = inner_config
-            elif inner_type == "buff":
-                buffs[inner_name] = inner_config
-            else:
-                print(f"⚠️ Unknown item type '{inner_type}' in {inner_name}")
+def select_choices_path(choices_dir: str = CHOICES_DIR) -> str:
+    """Prompts for a skill-tree choice JSON, including files in subdirectories."""
+    options = catalog_json_files(choices_dir, recursive=True)
+    print(f"\n📂 Available Skill Tree Choices in '{choices_dir}':")
+    choice = prompt_menu_choice(sorted(options), "Select Choices Number: ")
+    return options[choice]
 
 
-def draft_choices(
-        filepath: str,
-        prompt_title: str,
-        max_picks: int | None = None,
-        check_levels: bool = False
-) -> Tuple[dict, dict, dict]:
-    """Interactively drafts items from a JSON file based on specific rules."""
-    #Adapted by gemini from my code
+def catalog_json_files(directory: str, recursive: bool) -> dict[str, str]:
+    """Maps a display label (path without .json) to the file path. Raises if the catalog is empty."""
+    root = Path(directory)
+    if not root.is_dir():
+        raise FileNotFoundError(f"Catalog directory not found: {directory}")
 
-    raw_data = load_json_file(filepath)
-
-    selected_raw_abilities = {}
-    selected_raw_procs = {}
-    selected_raw_buffs = {}
-    picked_levels = set()
-    picks = 0
-
-    print(f"\n--- {prompt_title} ---")
-
-    for item_name, item_data in raw_data.items():
-        if max_picks and picks >= max_picks:
-            print(f"🛑 Max limit of {max_picks} reached. Skipping remaining.")
-            break
-
-        to_add_list = item_data.get("To_add", [])
-        if not to_add_list:
+    paths = root.rglob("*.json") if recursive else root.glob("*.json")
+    options: dict[str, str] = {}
+    for path in sorted(paths):
+        if not path.is_file():
             continue
+        label = path.relative_to(root).with_suffix("").as_posix()
+        options[label] = str(path)
 
-        # Safely inspect item type without risking an IndexError
-        first_entry = next(iter(to_add_list[0].values()), {})
-        primary_type = first_entry.get("item_type", "unknown").lower()
-        item_level = item_data.get("level")
-
-        if check_levels and item_level in picked_levels:
-            continue
-
-        while True:
-            choice = input(f"Equip '{item_name}' ({primary_type})? [y/n]: ").strip().lower()
-            if choice in ['y', 'yes']:
-                _process_item_additions(
-                    to_add_list,
-                    selected_raw_abilities,
-                    selected_raw_procs,
-                    selected_raw_buffs
-                )
-                if check_levels and item_level:
-                    picked_levels.add(item_level)
-                picks += 1
-                print("  ✅ Added")
-                break
-            elif choice in ['n', 'no', '']:
-                break
-            else:
-                print("  ❌ Please enter 'y' for yes or 'n' for no.")
-
-    return selected_raw_abilities, selected_raw_buffs, selected_raw_procs
+    if not options:
+        raise FileNotFoundError(f"No JSON files found in '{directory}'.")
+    return options
 
 
-def prompt_optional_choices(base_dir: str) -> Tuple[dict, dict, dict]:
-    """Interactively drafts optional choices for relics, tactical, tree, and implants."""
-    #Made by gemini from my old code
-    choice_dict = {
-        "relics": f"{base_dir}/choices/relics.json",
-        "tree": f"{base_dir}/choices/tree.json",
-        "tactical": f"{base_dir}/choices/tacticals.json",
-        "implants": f"{base_dir}/choices/implants.json"
-    }
-
-    relics = draft_choices(choice_dict["relics"], prompt_title="Relics", max_picks=2)
-    tactical = draft_choices(choice_dict["tactical"], prompt_title="Tactical", max_picks=1)
-    tree = draft_choices(choice_dict["tree"], prompt_title="Tree", check_levels=True)
-    implants = draft_choices(choice_dict["implants"], prompt_title="Implant", max_picks=2)
-
-    raw_abilities = relics[0] | tactical[0] | tree[0] | implants[0]
-    raw_buffs = relics[1] | tactical[1] | tree[1] | implants[1]
-    raw_procs = relics[2] | tactical[2] | tree[2] | implants[2]
-
-    return raw_abilities, raw_buffs, raw_procs
+def select_tactical(
+    class_name: str,
+    gear_path: str = GEAR_PATH,
+) -> str:
+    """Prompts for one class-compatible tactical and returns its FQN."""
+    tacticals = _gear_options(class_name, TACTICAL_PREFIX, gear_path)
+    print("\n📂 Available Tacticals:")
+    chosen_name = prompt_menu_choice(sorted(tacticals), "Select Tactical Number: ")
+    return tacticals[chosen_name]
 
 
-def prompt_run_mode() -> Tuple[str, int]:
-    """Prompts the user to select execution mode and iteration count for Monte Carlo."""
-    #Made by gemini, this part is too boring
+def select_legendaries(
+    class_name: str,
+    gear_path: str = GEAR_PATH,
+) -> list[str]:
+    """Prompts for two unique class-compatible legendary implants and returns their FQNs."""
+    legendaries = _gear_options(class_name, LEGENDARY_PREFIX, gear_path)
+    if len(legendaries) < 2:
+        raise ValueError(
+            f"Need at least 2 legendary implants for class '{class_name}', found {len(legendaries)}."
+        )
+    print("\n📂 Available Legendary Implants (Select 2):")
+    options = sorted(legendaries)
+
+    first_choice = prompt_menu_choice(options, "Select First Legendary Number: ")
+    options.remove(first_choice)
+    second_choice = prompt_menu_choice(options, "Select Second Legendary Number: ")
+    return [legendaries[first_choice], legendaries[second_choice]]
+
+
+def select_relics(relics_path: str = RELICS_PATH) -> list[str]:
+    """Prompts for 0, 1, or 2 unique relics and returns their FQNs."""
+    catalog = load_json_file(relics_path)
+    if not isinstance(catalog, list):
+        raise ValueError(f"Relic catalog '{relics_path}' must be a JSON array.")
+
+    print("\n📂 Relics:")
+    count = _prompt_relic_count()
+    if count == 0:
+        return []
+
+    remaining = [fqn for fqn in catalog if isinstance(fqn, str) and fqn.strip()]
+    if len(remaining) < count:
+        raise ValueError(
+            f"Relic catalog '{relics_path}' does not contain {count} relics."
+        )
+
+    selected: list[str] = []
+    for index in range(1, count + 1):
+        labels = _relic_menu_options(remaining)
+        print(f"\n📂 Relic {index}:")
+        chosen_label = prompt_menu_choice(sorted(labels), "Select Relic Number: ")
+        chosen = labels[chosen_label]
+        selected.append(chosen)
+        remaining.remove(chosen)
+    return selected
+
+
+def _prompt_relic_count() -> int:
+    """Asks for a relic count of 0, 1, or 2."""
+    while True:
+        user_input = input("How many relics? (0-2): ").strip()
+        if user_input in {"0", "1", "2"}:
+            return int(user_input)
+        print("  ❌ Enter 0, 1, or 2.")
+
+
+def _relic_menu_options(fqns: list[str]) -> dict[str, str]:
+    """Maps a menu label to a relic FQN. Duplicate short labels fall back to the full FQN."""
+    short_counts: dict[str, int] = {}
+    for fqn in fqns:
+        label = relic_menu_label(fqn)
+        short_counts[label] = short_counts.get(label, 0) + 1
+
+    options: dict[str, str] = {}
+    for fqn in fqns:
+        label = relic_menu_label(fqn)
+        if short_counts[label] > 1:
+            label = fqn
+        options[label] = fqn
+    return options
+
+
+def prompt_training_dummy_armor_debuff() -> bool:
+    """Asks whether the operation training dummy armor debuff is on the target."""
+    print("\n📂 Target Debuff:")
+    choice = prompt_menu_choice(
+        ["No", TRAINING_DUMMY_ARMOR_DEBUFF_LABEL],
+        "Select Target Debuff: ",
+    )
+    return choice == TRAINING_DUMMY_ARMOR_DEBUFF_LABEL
+
+
+def prompt_run_mode() -> tuple[str, int]:
+    """Prompts for a single test run or a Monte Carlo batch, plus the iteration count."""
     print("\n📂 Select Execution Mode:")
     mode_options = ["TEST (Single Test Run)", "BATCH (Monte Carlo Simulation)"]
     selected = prompt_menu_choice(mode_options, "Select Mode Number: ")
@@ -169,9 +249,7 @@ def prompt_run_mode() -> Tuple[str, int]:
     if "TEST" in selected:
         return "TEST", 1
 
-    # Prompt for iterations if BATCH is chosen
     user_input = input("\nEnter number of iterations [Default: 1000]: ").strip()
-
     if not user_input:
         return "BATCH", 1000
 
@@ -181,3 +259,14 @@ def prompt_run_mode() -> Tuple[str, int]:
     except ValueError:
         print("⚠️ Invalid input. Using default (1000).")
         return "BATCH", 1000
+
+
+def _gear_options(class_name: str, prefix: str, gear_path: str) -> dict[str, str]:
+    gear_data = load_json_file(gear_path)
+    if not isinstance(gear_data, dict):
+        raise ValueError(f"Gear catalog '{gear_path}' must be a JSON object.")
+    options = filter_gear_for_class(gear_data, prefix, class_name)
+    if not options:
+        kind = "tacticals" if prefix == TACTICAL_PREFIX else "legendary implants"
+        raise ValueError(f"No {kind} available for class '{class_name}'.")
+    return options
