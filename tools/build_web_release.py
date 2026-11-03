@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import shutil
 import sys
+import time
 from pathlib import Path
 
 SWTORSIM_ROOT = Path(__file__).resolve().parents[1]
@@ -24,16 +25,18 @@ sys.path.insert(0, str(SWTORSIM_ROOT))
 from tools.bundle_pyodide_assets import build_asset_bundle
 
 
-def inject_pyodide_client(html_content: str) -> str:
-    """Injects the pyodide_client.js script tag before the closing </head> tag."""
-    tag = '  <script src="pyodide_client.js"></script>\n</head>'
+def inject_pyodide_client(html_content: str, version: int | None = None) -> str:
+    """Injects the pyodide_client.js script tag with cache-busting version before </head>."""
+    v_str = f"?v={version}" if version else ""
+    tag = f'  <script src="pyodide_client.js{v_str}"></script>\n</head>'
     if '</head>' in html_content:
         return html_content.replace('</head>', tag, 1)
-    return html_content + '\n<script src="pyodide_client.js"></script>'
+    return html_content + f'\n<script src="pyodide_client.js{v_str}"></script>'
 
 
 def build_web_release() -> None:
-    print("[INFO] Starting SwtorSim Web Release Build...")
+    build_version = int(time.time())
+    print(f"[INFO] Starting SwtorSim Web Release Build (v{build_version})...")
     DIST_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1. Build runtime assets archive
@@ -47,7 +50,10 @@ def build_web_release() -> None:
     client_src = WEB_TOOLS_DIR / "pyodide_client.js"
 
     shutil.copy2(worker_src, DIST_DIR / "sim_worker.js")
-    shutil.copy2(client_src, DIST_DIR / "pyodide_client.js")
+    # Inject cache-busting asset URL into pyodide_client.js
+    client_content = client_src.read_text(encoding="utf-8")
+    client_content = client_content.replace('"swtorsim_assets.zip"', f'"swtorsim_assets.zip?v={build_version}"')
+    (DIST_DIR / "pyodide_client.js").write_text(client_content, encoding="utf-8")
     headers_src = WEB_TOOLS_DIR / "_headers"
     if headers_src.is_file():
         shutil.copy2(headers_src, DIST_DIR / "_headers")
@@ -59,7 +65,7 @@ def build_web_release() -> None:
     print("\n--- Step 3: Preparing HTML Entrypoints ---")
     if SIM_UI_PATH.is_file():
         sim_html = SIM_UI_PATH.read_text(encoding="utf-8")
-        injected_sim = inject_pyodide_client(sim_html)
+        injected_sim = inject_pyodide_client(sim_html, version=build_version)
         (DIST_DIR / "index.html").write_text(injected_sim, encoding="utf-8")
         print("[OK] Generated dist/index.html (Combat Simulator Dashboard)")
     else:
@@ -68,7 +74,7 @@ def build_web_release() -> None:
     # 4. Process & copy rotation builder UI
     if ROT_UI_PATH.is_file():
         rot_html = ROT_UI_PATH.read_text(encoding="utf-8")
-        injected_rot = inject_pyodide_client(rot_html)
+        injected_rot = inject_pyodide_client(rot_html, version=build_version)
         (DIST_DIR / "rotation_builder.html").write_text(injected_rot, encoding="utf-8")
         print("[OK] Generated dist/rotation_builder.html (Rotation Builder)")
 
