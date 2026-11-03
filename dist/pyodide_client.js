@@ -95,7 +95,7 @@
         badge.style.fontWeight = "600";
         badge.style.padding = "2px 7px";
         badge.style.borderRadius = "4px";
-        badge.style.border = "1px solid #30363d";
+        badge.style.border = "1px solid #388bc2";
         badge.style.letterSpacing = "0.2px";
         badge.style.display = "inline-flex";
         badge.style.alignItems = "center";
@@ -112,27 +112,27 @@
       const dotStyle = (color) => `display:inline-block; width:6px; height:6px; border-radius:50%; background:${color}; flex-shrink:0;`;
 
       if (className === "badge-native" || state.mode === "native") {
-        badge.style.background = "rgba(63, 185, 80, 0.15)";
-        badge.style.color = "#3fb950";
-        badge.style.borderColor = "rgba(63, 185, 80, 0.4)";
+        badge.style.background = "#dcfce7";
+        badge.style.color = "#16a34a";
+        badge.style.borderColor = "#86efac";
         badge.title = "Running on Native CPython with OS multiprocessing.Pool";
-        badge.innerHTML = `<span style="${dotStyle('#3fb950')}"></span><span>Native</span>`;
+        badge.innerHTML = `<span style="${dotStyle('#16a34a')}"></span><span>Native</span>`;
       } else if (isWarming) {
-        badge.style.background = "rgba(210, 153, 34, 0.15)";
-        badge.style.color = "#d29922";
-        badge.style.borderColor = "rgba(210, 153, 34, 0.4)";
+        badge.style.background = "#fef3c7";
+        badge.style.color = "#d97706";
+        badge.style.borderColor = "#fde68a";
         badge.title = isBuilderPage
           ? "Warming Web Worker environment..."
           : `Warming Web Workers (${readyCount}/${state.targetPoolSize} cores online)...`;
-        badge.innerHTML = `<span style="${dotStyle('#d29922')}"></span><span>${isBuilderPage ? "Warming" : `Warming (${readyCount}/${state.targetPoolSize})`}</span>`;
+        badge.innerHTML = `<span style="${dotStyle('#d97706')}"></span><span>${isBuilderPage ? "Warming" : `Warming (${readyCount}/${state.targetPoolSize})`}</span>`;
       } else {
-        badge.style.background = "rgba(88, 166, 255, 0.15)";
-        badge.style.color = "#58a6ff";
-        badge.style.borderColor = "rgba(88, 166, 255, 0.4)";
+        badge.style.background = "#ffeada";
+        badge.style.color = "#ff7818";
+        badge.style.borderColor = "#ff7818";
         badge.title = isBuilderPage
           ? "Running In-Browser via Pyodide WebAssembly"
           : `Running In-Browser via Pyodide WebAssembly (${readyCount}/${state.targetPoolSize} cores online)`;
-        badge.innerHTML = `<span style="${dotStyle('#58a6ff')}"></span><span>Web</span>`;
+        badge.innerHTML = `<span style="${dotStyle('#ff7818')}"></span><span>Web</span>`;
       }
       if (state.mode === "pyodide" && !isBuilderPage) {
         updateCoreSelectorUI();
@@ -161,16 +161,16 @@
         label.htmlFor = "swtor-core-select";
         label.textContent = "Cores:";
         label.style.fontSize = "11px";
-        label.style.color = "#8b949e";
+        label.style.color = "#ffffff";
         label.style.fontWeight = "600";
 
         const select = document.createElement("select");
         select.id = "swtor-core-select";
         select.style.fontSize = "11px";
         select.style.padding = "2px 6px";
-        select.style.background = "#0f141b";
-        select.style.color = "#e6edf3";
-        select.style.border = "1px solid #30363d";
+        select.style.background = "#f0f7fc";
+        select.style.color = "#0c2138";
+        select.style.border = "1px solid #388bc2";
         select.style.borderRadius = "4px";
         select.style.cursor = "pointer";
 
@@ -258,24 +258,24 @@
       overlay.style.left = "0";
       overlay.style.width = "100vw";
       overlay.style.height = "100vh";
-      overlay.style.backgroundColor = "rgba(13, 17, 23, 0.90)";
+      overlay.style.backgroundColor = "rgba(88, 171, 223, 0.85)";
       overlay.style.backdropFilter = "blur(4px)";
       overlay.style.zIndex = "99999";
       overlay.style.display = "flex";
       overlay.style.flexDirection = "column";
       overlay.style.alignItems = "center";
       overlay.style.justifyContent = "center";
-      overlay.style.color = "#e6edf3";
+      overlay.style.color = "#0c2138";
       overlay.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
       overlay.innerHTML = `
-        <div style="background:#161b22; border:1px solid #30363d; border-radius:8px; padding:28px 36px; text-align:center; max-width:440px; box-shadow:0 12px 32px rgba(0,0,0,0.6);">
-          <div style="font-size:16px; font-weight:700; margin-bottom:12px; color:#58a6ff; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <div style="background:#ffffff; border:1px solid #388bc2; border-radius:8px; padding:28px 36px; text-align:center; max-width:440px; box-shadow:0 12px 32px rgba(12,33,56,0.25);">
+          <div style="font-size:16px; font-weight:700; margin-bottom:12px; color:#ff7818; display:flex; align-items:center; justify-content:center; gap:8px;">
             <span>SwtorSim WebAssembly</span>
           </div>
-          <div id="swtor-loading-text" style="font-size:13px; color:#8b949e; margin-bottom:18px;">${initialText}</div>
-          <div style="width:100%; height:4px; background:#21262d; border-radius:2px; overflow:hidden;">
-            <div id="swtor-loading-progress" style="width:100%; height:100%; background:linear-gradient(90deg, #1f6feb, #8957e5); animation:pulseBar 1.5s infinite linear;"></div>
+          <div id="swtor-loading-text" style="font-size:13px; color:#496885; margin-bottom:18px;">${initialText}</div>
+          <div style="width:100%; height:4px; background:#c2e4f6; border-radius:2px; overflow:hidden;">
+            <div id="swtor-loading-progress" style="width:100%; height:100%; background:linear-gradient(90deg, #58abdf, #ff7818); animation:pulseBar 1.5s infinite linear;"></div>
           </div>
         </div>
       `;
@@ -381,7 +381,7 @@
       rejectWorkerReady(err);
     };
 
-    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1793718530" });
+    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1793740739" });
     return wState;
   }
 

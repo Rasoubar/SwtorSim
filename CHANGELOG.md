@@ -883,3 +883,9 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Updated `docs/rewrite.md` to archive the completed blueprint migration and link to the current documentation suite.
 - **Inline Codebase Docstrings (`src/swtorsim/`, `src/extractor/`, `data/rotation_builder.py`)**:
   - Added module, class, and function/method docstrings across all 18 `src/swtorsim/` modules, all 30 `src/extractor/` modules, and `data/rotation_builder.py` while preserving strict CRLF (`\r\n`) line endings.
+
+### 30. Mudkip Blue & Gill Orange Web UI Color Scheme - [DONE]
+- **Updated Web UI Color Palette (`tools/simulator_ui.html`, `tools/rotation_builder_ui.html`, `tools/web/pyodide_client.js`)**:
+  - Updated CSS custom properties (`:root`) and component color rules without altering any HTML structure, DOM elements, or layout geometry.
+  - Applied Mudkip Body Blue (`--bg-panel: #58abdf`) to outer chrome (Header, Sidebar, and Navigation Tab Bars), Soft Blue (`--bg-base: #c2e4f6`) to the main workspace canvas, Crisp White (`--bg-card: #ffffff`) to inner metric/table/config boxes, and Mudkip Gill Orange (`--accent: #ff7818`, `#e65c00`) to primary CTAs, badges, active states, and DPS highlights.
+  - Rebuilt standalone web release bundle in `dist/` via `tools/build_web_release.py`.

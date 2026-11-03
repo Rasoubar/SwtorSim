@@ -6,28 +6,28 @@
 <title>SwtorSim - Combat Simulator Dashboard</title>
 <style>
   :root {
-    --bg-base: #0d1117;
-    --bg-panel: #161b22;
-    --bg-card: #1c232d;
-    --bg-card-hover: #222b38;
-    --bg-input: #0f141b;
-    --border: #30363d;
-    --border-subtle: #21262d;
-    --text-main: #e6edf3;
-    --text-muted: #8b949e;
-    --accent: #58a6ff;
-    --accent-hover: #79c0ff;
-    --accent-bg: rgba(88, 166, 255, 0.12);
-    --purple: #a371f7;
-    --purple-bg: rgba(163, 113, 247, 0.14);
-    --amber: #d29922;
-    --amber-bg: rgba(210, 153, 34, 0.14);
-    --green: #3fb950;
-    --green-bg: rgba(63, 185, 80, 0.14);
-    --red: #f85149;
-    --red-bg: rgba(248, 81, 73, 0.14);
-    --cyan: #39c5cf;
-    --cyan-bg: rgba(57, 197, 207, 0.14);
+    --bg-base: #c2e4f6;
+    --bg-panel: #58abdf;
+    --bg-card: #ffffff;
+    --bg-card-hover: #fff6ee;
+    --bg-input: #f0f7fc;
+    --border: #388bc2;
+    --border-subtle: #c5e2f5;
+    --text-main: #0c2138;
+    --text-muted: #496885;
+    --accent: #ff7818;
+    --accent-hover: #e65c00;
+    --accent-bg: #ffeada;
+    --purple: #ff7818;
+    --purple-bg: #ffeada;
+    --amber: #d97706;
+    --amber-bg: #fef3c7;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --cyan: #1d72a8;
+    --cyan-bg: #d7eefa;
   }
 
   * {
@@ -66,12 +66,16 @@
     font-weight: 700;
     font-size: 15px;
     letter-spacing: 0.3px;
-    color: var(--text-main);
+    color: #ffffff;
     white-space: nowrap;
   }
 
+  header label {
+    color: #ffffff !important;
+  }
+
   .brand-badge {
-    background: linear-gradient(135deg, #1f6feb, #8957e5);
+    background: linear-gradient(135deg, #ff7818, #e65c00);
     color: #fff;
     font-size: 11px;
     font-weight: 700;
@@ -130,38 +134,38 @@
   }
 
   .btn-primary {
-    background: #238636;
-    border-color: rgba(240, 246, 252, 0.1);
+    background: #ff7818;
+    border-color: rgba(255, 255, 255, 0.25);
     color: #fff;
     padding: 7px 16px;
     font-size: 13px;
   }
 
   .btn-primary:hover:not(:disabled) {
-    background: #2ea043;
-    border-color: rgba(240, 246, 252, 0.2);
+    background: #e65c00;
+    border-color: rgba(255, 255, 255, 0.35);
   }
 
   .btn-accent {
-    background: rgba(56, 139, 253, 0.15);
-    border-color: rgba(56, 139, 253, 0.4);
+    background: var(--accent-bg);
+    border-color: rgba(255, 120, 24, 0.4);
     color: var(--accent);
   }
 
   .btn-accent:hover:not(:disabled) {
-    background: rgba(56, 139, 253, 0.25);
+    background: rgba(255, 120, 24, 0.25);
     border-color: var(--accent);
   }
 
   .btn-purple {
-    background: var(--purple-bg);
-    border-color: rgba(163, 113, 247, 0.4);
-    color: var(--purple);
+    background: #ffffff;
+    border-color: var(--accent);
+    color: var(--accent);
   }
 
   .btn-purple:hover:not(:disabled) {
-    background: rgba(163, 113, 247, 0.25);
-    border-color: var(--purple);
+    background: var(--accent-bg);
+    border-color: var(--accent-hover);
   }
 
   .btn-sm {
@@ -200,7 +204,7 @@
 
   .section-header {
     padding: 9px 12px;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--bg-input);
     border-bottom: 1px solid var(--border-subtle);
     font-weight: 700;
     font-size: 12px;
@@ -272,7 +276,7 @@
     text-overflow: ellipsis;
     border-radius: 4px;
     border: 1px solid var(--border);
-    background: var(--bg-panel);
+    background: var(--bg-card);
     color: var(--text-main);
     cursor: pointer;
     transition: all 0.15s ease;
@@ -282,7 +286,7 @@
     color: var(--accent);
   }
   .st-btn.active {
-    background: rgba(88, 166, 255, 0.2);
+    background: var(--accent-bg);
     border-color: var(--accent);
     color: var(--accent-hover);
     font-weight: 600;
@@ -335,7 +339,7 @@
 
   .mode-btn.active {
     background: var(--accent);
-    color: #0d1117;
+    color: #ffffff;
   }
 
   .chip-row {
@@ -424,7 +428,7 @@
     grid-template-columns: 1.3fr 1fr 1fr 1fr 1.2fr;
     gap: 10px;
     padding: 12px 16px;
-    background: var(--bg-panel);
+    background: var(--bg-base);
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
   }
@@ -440,8 +444,8 @@
   }
 
   .kpi-card.primary {
-    border-color: rgba(88, 166, 255, 0.5);
-    background: linear-gradient(180deg, rgba(88, 166, 255, 0.08) 0%, var(--bg-card) 100%);
+    border-color: var(--accent);
+    background: linear-gradient(180deg, rgba(255, 120, 24, 0.08) 0%, var(--bg-card) 100%);
   }
 
   .kpi-title {
@@ -514,7 +518,7 @@
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.85);
     padding: 10px 14px;
     font-size: 12px;
     font-weight: 600;
@@ -526,21 +530,25 @@
   }
 
   .tab-btn:hover {
-    color: var(--text-main);
+    color: #ffffff;
   }
 
   .tab-btn.active {
-    color: var(--accent);
+    color: #ffffff;
     border-bottom-color: var(--accent);
   }
 
   .tab-badge {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
+    background: var(--accent);
+    border: 1px solid var(--accent-hover);
+    color: #ffffff;
     font-size: 10px;
     padding: 1px 6px;
     border-radius: 10px;
+  }
+
+  #wallTimeLabel {
+    color: rgba(255, 255, 255, 0.9) !important;
   }
 
   /* Tab Content Area */
@@ -557,7 +565,7 @@
 
   /* Tables */
   .panel-card {
-    background: var(--bg-panel);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 6px;
     margin-bottom: 16px;
@@ -571,7 +579,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    background: rgba(255, 255, 255, 0.015);
+    background: var(--bg-card);
   }
 
   .panel-card-title {
@@ -593,7 +601,7 @@
   table.data-table th {
     text-align: left;
     padding: 8px 12px;
-    background: var(--bg-card);
+    background: var(--bg-input);
     color: var(--text-muted);
     font-weight: 600;
     font-size: 11px;
@@ -616,7 +624,7 @@
   }
 
   table.data-table tr:hover td {
-    background: rgba(88, 166, 255, 0.04);
+    background: rgba(255, 120, 24, 0.06);
   }
 
   .num-col {
@@ -658,13 +666,13 @@
   .dtype-internal, .dtype-elemental {
     background: var(--amber-bg);
     color: var(--amber);
-    border: 1px solid rgba(210, 153, 34, 0.3);
+    border: 1px solid rgba(217, 119, 6, 0.35);
   }
 
   .dtype-kinetic, .dtype-energy {
-    background: var(--accent-bg);
-    color: var(--accent);
-    border: 1px solid rgba(88, 166, 255, 0.3);
+    background: var(--cyan-bg);
+    color: var(--cyan);
+    border: 1px solid rgba(29, 114, 168, 0.35);
   }
 
   /* Histogram SVG Box */
@@ -718,12 +726,12 @@
   }
 
   .gantt-seg.player-buff {
-    background: rgba(63, 185, 80, 0.75);
+    background: rgba(22, 163, 74, 0.75);
     border: 1px solid var(--green);
   }
 
   .gantt-seg.target-debuff {
-    background: rgba(163, 113, 247, 0.75);
+    background: rgba(255, 120, 24, 0.75);
     border: 1px solid var(--purple);
   }
 
@@ -830,7 +838,7 @@
   }
 
   .modal-box {
-    background: var(--bg-panel);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 8px;
     width: 420px;
@@ -847,7 +855,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1793718530"></script>
+  <script src="pyodide_client.js?v=1793740739"></script>
 </head>
 <body>
 
@@ -2178,10 +2186,10 @@
       barsSvg += `
         <g>
           <rect x="${bx0 + 1}" y="${by}" width="${bw}" height="${bh}" rx="2"
-                fill="rgba(63, 185, 80, 0.72)" stroke="#3fb950" stroke-width="1">
+                fill="rgba(255, 120, 24, 0.75)" stroke="#ff7818" stroke-width="1">
             <title>${b.x0.toLocaleString()} - ${b.x1.toLocaleString()} DPS: ${b.count} runs (${b.pct}%)</title>
           </rect>
-          ${b.count > 0 ? `<text x="${bx0 + bw / 2 + 1}" y="${by - 5}" fill="#8b949e" font-size="10" text-anchor="middle">${b.count}</text>` : ''}
+          ${b.count > 0 ? `<text x="${bx0 + bw / 2 + 1}" y="${by - 5}" fill="#496885" font-size="10" text-anchor="middle">${b.count}</text>` : ''}
         </g>
       `;
     });
@@ -2233,16 +2241,16 @@
           <svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;max-height:320px;background:var(--bg-input);border-radius:6px;border:1px solid var(--border-subtle);">
             <!-- +/- 1 SD Band -->
             <rect x="${sdLoPx}" y="${padT}" width="${Math.max(0, sdHiPx - sdLoPx)}" height="${plotH}"
-                  fill="rgba(255, 255, 255, 0.05)" />
+                  fill="rgba(56, 139, 194, 0.10)" />
             <!-- Baseline Axis -->
-            <line x1="${padL}" y1="${padT + plotH}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="#30363d" stroke-width="1" />
+            <line x1="${padL}" y1="${padT + plotH}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="#388bc2" stroke-width="1" />
             ${barsSvg}
             <!-- Mean Line -->
-            <line x1="${meanPx}" y1="${padT}" x2="${meanPx}" y2="${padT + plotH}" stroke="#f85149" stroke-width="2" stroke-dasharray="5,4" />
-            <text x="${meanPx}" y="${padT - 7}" fill="#f85149" font-size="11" font-weight="700" text-anchor="middle">Mean: ${r.avg_dps.toLocaleString()}</text>
+            <line x1="${meanPx}" y1="${padT}" x2="${meanPx}" y2="${padT + plotH}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,4" />
+            <text x="${meanPx}" y="${padT - 7}" fill="#dc2626" font-size="11" font-weight="700" text-anchor="middle">Mean: ${r.avg_dps.toLocaleString()}</text>
             <!-- Min / Max Axis Labels -->
-            <text x="${padL}" y="${svgH - 12}" fill="#8b949e" font-size="11">${Math.round(minX).toLocaleString()} DPS</text>
-            <text x="${padL + plotW}" y="${svgH - 12}" fill="#8b949e" font-size="11" text-anchor="end">${Math.round(maxX).toLocaleString()} DPS</text>
+            <text x="${padL}" y="${svgH - 12}" fill="#496885" font-size="11">${Math.round(minX).toLocaleString()} DPS</text>
+            <text x="${padL + plotW}" y="${svgH - 12}" fill="#496885" font-size="11" text-anchor="end">${Math.round(maxX).toLocaleString()} DPS</text>
           </svg>
         </div>
       </div>
@@ -2480,7 +2488,7 @@
         const isCurrent = run === ACTIVE_RESULT;
         const isPinned = run === PINNED_BASELINE;
         hHtml += `
-          <tr style="${isCurrent ? 'background:rgba(88,166,255,0.08);' : ''}">
+          <tr style="${isCurrent ? 'background:rgba(255,120,24,0.10);' : ''}">
             <td>${run._timestamp}</td>
             <td><span class="tab-badge">${run.mode}${run.mode === 'BATCH' ? ` (${run.iterations})` : ''}</span></td>
             <td style="font-weight:600;">${run.class_name} / ${run.spec}</td>

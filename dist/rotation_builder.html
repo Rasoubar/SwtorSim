@@ -6,25 +6,28 @@
 <title>SwtorSim - Rotation Builder</title>
 <style>
   :root {
-    --bg-base: #0d1117;
-    --bg-panel: #161b22;
-    --bg-card: #1c232d;
-    --bg-card-hover: #222b38;
-    --bg-input: #0f141b;
-    --border: #30363d;
-    --border-subtle: #21262d;
-    --text-main: #e6edf3;
-    --text-muted: #8b949e;
-    --accent: #58a6ff;
-    --accent-hover: #79c0ff;
-    --purple: #a371f7;
-    --amber: #d29922;
-    --amber-bg: rgba(210, 153, 34, 0.14);
-    --green: #3fb950;
-    --green-bg: rgba(63, 185, 80, 0.14);
-    --red: #f85149;
-    --red-bg: rgba(248, 81, 73, 0.14);
-    --cyan: #39c5cf;
+    --bg-base: #c2e4f6;
+    --bg-panel: #58abdf;
+    --bg-card: #ffffff;
+    --bg-card-hover: #fff6ee;
+    --bg-input: #f0f7fc;
+    --border: #388bc2;
+    --border-subtle: #c5e2f5;
+    --text-main: #0c2138;
+    --text-muted: #496885;
+    --accent: #ff7818;
+    --accent-hover: #e65c00;
+    --accent-bg: #ffeada;
+    --purple: #ff7818;
+    --purple-bg: #ffeada;
+    --amber: #d97706;
+    --amber-bg: #fef3c7;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --cyan: #1d72a8;
+    --cyan-bg: #d7eefa;
   }
 
   * {
@@ -63,11 +66,15 @@
     font-weight: 700;
     font-size: 15px;
     letter-spacing: 0.3px;
-    color: var(--text-main);
+    color: #ffffff;
+  }
+
+  header label {
+    color: #ffffff !important;
   }
 
   .brand-badge {
-    background: linear-gradient(135deg, #238636, #1f6feb);
+    background: linear-gradient(135deg, #ff7818, #e65c00);
     color: #fff;
     font-size: 11px;
     padding: 2px 8px;
@@ -79,19 +86,19 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: #1f6feb;
+    background: #ff7818;
     color: #fff;
     text-decoration: none;
     font-size: 11.5px;
     font-weight: 600;
     padding: 4px 10px;
     border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
     cursor: pointer;
     transition: background 0.15s ease;
   }
   .btn-simulator-link:hover {
-    background: #388bfd;
+    background: #e65c00;
     color: #fff;
   }
 
@@ -138,14 +145,20 @@
     font-size: 12px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: var(--text-muted);
+    color: #ffffff;
     flex-shrink: 0;
+  }
+
+  .panel > div > .form-row .form-group label,
+  .panel > div > .form-group label {
+    color: #ffffff;
   }
 
   .panel-body {
     padding: 12px;
     overflow-y: auto;
     flex: 1;
+    background: var(--bg-base);
   }
 
   /* Controls & Inputs */
@@ -185,35 +198,35 @@
   }
 
   button.btn-primary {
-    background: #1f6feb;
-    border-color: #388bfd;
+    background: #ff7818;
+    border-color: #e65c00;
     color: #fff;
   }
 
   button.btn-primary:hover {
-    background: #388bfd;
+    background: #e65c00;
   }
 
   button.btn-success {
-    background: #238636;
-    border-color: #2ea043;
+    background: #16a34a;
+    border-color: #15803d;
     color: #fff;
   }
 
   button.btn-success:hover {
-    background: #2ea043;
+    background: #15803d;
   }
 
   button.btn-amber {
     background: var(--amber-bg);
     border-color: var(--amber);
-    color: #f0b72f;
+    color: var(--amber);
   }
 
   button.btn-purple {
-    background: rgba(163, 113, 247, 0.14);
+    background: var(--purple-bg);
     border-color: var(--purple);
-    color: #d2a8ff;
+    color: var(--purple);
   }
 
   button.btn-danger {
@@ -291,7 +304,7 @@
   }
 
   .st-btn.active {
-    background: rgba(88, 166, 255, 0.2);
+    background: var(--accent-bg);
     border-color: var(--accent);
     color: var(--accent-hover);
     font-weight: 600;
@@ -314,19 +327,20 @@
     padding: 8px 6px;
     font-size: 11.5px;
     font-weight: 600;
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.85);
     justify-content: center;
   }
 
   .tab-btn:hover {
-    background: var(--bg-card);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
     border-color: transparent;
   }
 
   .tab-btn.active {
-    color: var(--accent);
+    color: #ffffff;
     border-bottom-color: var(--accent);
-    background: rgba(88, 166, 255, 0.06);
+    background: rgba(255, 120, 24, 0.22);
   }
 
   /* Ability Cards in Left Palette */
@@ -378,25 +392,25 @@
 
   .badge-offgcd {
     background: var(--amber-bg);
-    color: #f0b72f;
-    border: 1px solid rgba(210, 153, 34, 0.4);
+    color: var(--amber);
+    border: 1px solid rgba(217, 119, 6, 0.4);
   }
 
   .badge-gcd {
-    background: rgba(88, 166, 255, 0.12);
+    background: var(--accent-bg);
     color: var(--accent);
   }
 
   .badge-opener {
-    background: rgba(57, 197, 207, 0.15);
+    background: var(--cyan-bg);
     color: var(--cyan);
-    border: 1px solid rgba(57, 197, 207, 0.35);
+    border: 1px solid rgba(29, 114, 168, 0.35);
   }
 
   .badge-loop {
-    background: rgba(63, 185, 80, 0.15);
+    background: var(--green-bg);
     color: var(--green);
-    border: 1px solid rgba(63, 185, 80, 0.35);
+    border: 1px solid rgba(22, 163, 74, 0.35);
   }
 
   /* Timeline Cards */
@@ -412,8 +426,12 @@
     flex-shrink: 0;
   }
 
+  .timeline-toolbar label {
+    color: #ffffff !important;
+  }
+
   .step-card {
-    background: var(--bg-panel);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 8px;
     margin-bottom: 10px;
@@ -422,7 +440,7 @@
 
   .step-card.active-block {
     border-color: var(--accent);
-    box-shadow: 0 0 0 1px rgba(88, 166, 255, 0.3);
+    box-shadow: 0 0 0 1px rgba(255, 120, 24, 0.35);
   }
 
   .step-card.step-optional {
@@ -430,7 +448,7 @@
   }
 
   .step-card.step-fixed {
-    border-left: 4px solid var(--accent);
+    border-left: 4px solid var(--cyan);
   }
 
   .step-card.step-priority {
@@ -438,7 +456,7 @@
   }
 
   .step-card.step-anchor {
-    background: linear-gradient(90deg, rgba(63, 185, 80, 0.15), rgba(31, 111, 235, 0.15));
+    background: linear-gradient(90deg, rgba(22, 163, 74, 0.12), rgba(88, 171, 223, 0.2));
     border: 1px dashed var(--green);
     padding: 8px 14px;
     display: flex;
@@ -448,7 +466,7 @@
 
   .step-header {
     padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--bg-input);
     border-bottom: 1px solid var(--border-subtle);
     display: flex;
     align-items: center;
@@ -480,18 +498,18 @@
   }
 
   .type-priority {
-    background: rgba(163, 113, 247, 0.18);
-    color: #d2a8ff;
+    background: var(--purple-bg);
+    color: var(--purple);
   }
 
   .type-optional {
     background: var(--amber-bg);
-    color: #f0b72f;
+    color: var(--amber);
   }
 
   .type-fixed {
-    background: rgba(88, 166, 255, 0.18);
-    color: var(--accent-hover);
+    background: var(--cyan-bg);
+    color: var(--cyan);
   }
 
   .step-body {
@@ -500,7 +518,7 @@
 
   /* Priority Pool Rows */
   .pool-row {
-    background: var(--bg-card);
+    background: var(--bg-input);
     border: 1px solid var(--border-subtle);
     border-radius: 6px;
     padding: 7px 10px;
@@ -544,9 +562,9 @@
   }
 
   .rule-pill {
-    background: rgba(88, 166, 255, 0.12);
-    border: 1px solid rgba(88, 166, 255, 0.35);
-    color: #c9d1d9;
+    background: var(--accent-bg);
+    border: 1px solid rgba(255, 120, 24, 0.35);
+    color: var(--text-main);
     border-radius: 14px;
     padding: 2px 8px;
     font-size: 11px;
@@ -592,7 +610,7 @@
   }
 
   .modal {
-    background: var(--bg-panel);
+    background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 10px;
     width: 500px;
@@ -621,7 +639,7 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-    background: var(--bg-card);
+    background: var(--bg-input);
   }
 
   /* Linter & Alerts */
@@ -635,8 +653,8 @@
 
   .lint-warn {
     background: var(--amber-bg);
-    border: 1px solid rgba(210, 153, 34, 0.45);
-    color: #f0b72f;
+    border: 1px solid rgba(217, 119, 6, 0.45);
+    color: var(--amber);
   }
 
   .lint-ok {
@@ -660,6 +678,7 @@
     width: 100%;
     border-collapse: collapse;
     font-size: 11.5px;
+    background: var(--bg-card);
   }
 
   .cast-table th, .cast-table td {
@@ -673,14 +692,14 @@
     font-weight: 600;
     position: sticky;
     top: 0;
-    background: var(--bg-panel);
+    background: var(--bg-input);
   }
 
   .toast {
     position: fixed;
     bottom: 18px;
     right: 18px;
-    background: #238636;
+    background: #ff7818;
     color: #fff;
     padding: 9px 14px;
     border-radius: 6px;
@@ -691,7 +710,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1793718530"></script>
+  <script src="pyodide_client.js?v=1793740739"></script>
 </head>
 <body>
 
@@ -928,7 +947,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 function showToast(msg, isError = false) {
   const el = document.getElementById("toastBanner");
   el.textContent = msg;
-  el.style.background = isError ? "#da3633" : "#238636";
+  el.style.background = isError ? "#dc2626" : "#ff7818";
   el.style.display = "block";
   clearTimeout(el._timer);
   el._timer = setTimeout(() => {
