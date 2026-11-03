@@ -30,6 +30,35 @@
     --cyan-bg: #d7eefa;
   }
 
+  [data-theme="dark"] {
+    --bg-base: #0e121a;
+    --bg-panel: #141a24;
+    --bg-card: #1c2331;
+    --bg-card-hover: #232c3d;
+    --bg-input: #10141d;
+    --border: #263144;
+    --border-subtle: #19202c;
+    --text-main: #f1f5f9;
+    --text-muted: #869ab3;
+    --accent: #ff7818;
+    --accent-hover: #fb923c;
+    --accent-bg: rgba(255, 120, 24, 0.14);
+    --purple: #ff7818;
+    --purple-bg: rgba(255, 120, 24, 0.14);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245, 158, 11, 0.14);
+    --green: #22c55e;
+    --green-bg: rgba(34, 197, 94, 0.14);
+    --red: #ef4444;
+    --red-bg: rgba(239, 68, 68, 0.14);
+    --cyan: #58abdf;
+    --cyan-bg: rgba(88, 171, 223, 0.14);
+  }
+
+  [data-theme="dark"] .brand-badge {
+    background: #ff7818;
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -710,7 +739,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1793740739"></script>
+  <script src="pyodide_client.js?v=1793741937"></script>
 </head>
 <body>
 
@@ -735,6 +764,7 @@
       <option value="">-- Open Existing Rotation JSON --</option>
     </select>
     <button onclick="triggerLocalFileImport()" title="Import any .json file from disk">Import File...</button>
+    <button class="btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">🌙 Dark</button>
     <input type="file" id="localFileInput" accept=".json" style="display:none" onchange="handleLocalFileImport(event)">
   </div>
 </header>
@@ -897,6 +927,37 @@
 <div class="toast" id="toastBanner"></div>
 
 <script>
+  function applyTheme(theme) {
+    const isDark = theme === "dark";
+    if (isDark) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+    const btn = document.getElementById("themeToggleBtn");
+    if (btn) {
+      btn.textContent = isDark ? "☀️ Light" : "🌙 Dark";
+    }
+  }
+
+  function toggleTheme() {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const next = isDark ? "light" : "dark";
+    try { localStorage.setItem("swtorsim_theme", next); } catch (e) {}
+    applyTheme(next);
+  }
+
+  (function initTheme() {
+    let saved = "light";
+    try { saved = localStorage.getItem("swtorsim_theme") || "light"; } catch (e) {}
+    applyTheme(saved);
+    window.addEventListener("storage", (e) => {
+      if (e.key === "swtorsim_theme") {
+        applyTheme(e.newValue || "light");
+      }
+    });
+  })();
+
 // ---------------------------------------------------------------------------
 // Global Builder State
 // ---------------------------------------------------------------------------

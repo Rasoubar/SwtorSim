@@ -95,7 +95,7 @@
         badge.style.fontWeight = "600";
         badge.style.padding = "2px 7px";
         badge.style.borderRadius = "4px";
-        badge.style.border = "1px solid #388bc2";
+        badge.style.border = "1px solid var(--border)";
         badge.style.letterSpacing = "0.2px";
         badge.style.display = "inline-flex";
         badge.style.alignItems = "center";
@@ -112,27 +112,27 @@
       const dotStyle = (color) => `display:inline-block; width:6px; height:6px; border-radius:50%; background:${color}; flex-shrink:0;`;
 
       if (className === "badge-native" || state.mode === "native") {
-        badge.style.background = "#dcfce7";
-        badge.style.color = "#16a34a";
-        badge.style.borderColor = "#86efac";
+        badge.style.background = "var(--green-bg)";
+        badge.style.color = "var(--green)";
+        badge.style.borderColor = "var(--green)";
         badge.title = "Running on Native CPython with OS multiprocessing.Pool";
-        badge.innerHTML = `<span style="${dotStyle('#16a34a')}"></span><span>Native</span>`;
+        badge.innerHTML = `<span style="${dotStyle('var(--green)')}"></span><span>Native</span>`;
       } else if (isWarming) {
-        badge.style.background = "#fef3c7";
-        badge.style.color = "#d97706";
-        badge.style.borderColor = "#fde68a";
+        badge.style.background = "var(--amber-bg)";
+        badge.style.color = "var(--amber)";
+        badge.style.borderColor = "var(--amber)";
         badge.title = isBuilderPage
           ? "Warming Web Worker environment..."
           : `Warming Web Workers (${readyCount}/${state.targetPoolSize} cores online)...`;
-        badge.innerHTML = `<span style="${dotStyle('#d97706')}"></span><span>${isBuilderPage ? "Warming" : `Warming (${readyCount}/${state.targetPoolSize})`}</span>`;
+        badge.innerHTML = `<span style="${dotStyle('var(--amber)')}"></span><span>${isBuilderPage ? "Warming" : `Warming (${readyCount}/${state.targetPoolSize})`}</span>`;
       } else {
-        badge.style.background = "#ffeada";
-        badge.style.color = "#ff7818";
-        badge.style.borderColor = "#ff7818";
+        badge.style.background = "var(--accent-bg)";
+        badge.style.color = "var(--accent)";
+        badge.style.borderColor = "var(--accent)";
         badge.title = isBuilderPage
           ? "Running In-Browser via Pyodide WebAssembly"
           : `Running In-Browser via Pyodide WebAssembly (${readyCount}/${state.targetPoolSize} cores online)`;
-        badge.innerHTML = `<span style="${dotStyle('#ff7818')}"></span><span>Web</span>`;
+        badge.innerHTML = `<span style="${dotStyle('var(--accent)')}"></span><span>Web</span>`;
       }
       if (state.mode === "pyodide" && !isBuilderPage) {
         updateCoreSelectorUI();
@@ -168,9 +168,9 @@
         select.id = "swtor-core-select";
         select.style.fontSize = "11px";
         select.style.padding = "2px 6px";
-        select.style.background = "#f0f7fc";
-        select.style.color = "#0c2138";
-        select.style.border = "1px solid #388bc2";
+        select.style.background = "var(--bg-input)";
+        select.style.color = "var(--text-main)";
+        select.style.border = "1px solid var(--border)";
         select.style.borderRadius = "4px";
         select.style.cursor = "pointer";
 
@@ -269,12 +269,12 @@
       overlay.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
       overlay.innerHTML = `
-        <div style="background:#ffffff; border:1px solid #388bc2; border-radius:8px; padding:28px 36px; text-align:center; max-width:440px; box-shadow:0 12px 32px rgba(12,33,56,0.25);">
-          <div style="font-size:16px; font-weight:700; margin-bottom:12px; color:#ff7818; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:8px; padding:28px 36px; text-align:center; max-width:440px; box-shadow:0 12px 32px rgba(12,33,56,0.25);">
+          <div style="font-size:16px; font-weight:700; margin-bottom:12px; color:var(--accent); display:flex; align-items:center; justify-content:center; gap:8px;">
             <span>SwtorSim WebAssembly</span>
           </div>
-          <div id="swtor-loading-text" style="font-size:13px; color:#496885; margin-bottom:18px;">${initialText}</div>
-          <div style="width:100%; height:4px; background:#c2e4f6; border-radius:2px; overflow:hidden;">
+          <div id="swtor-loading-text" style="font-size:13px; color:var(--text-muted); margin-bottom:18px;">${initialText}</div>
+          <div style="width:100%; height:4px; background:var(--bg-base); border-radius:2px; overflow:hidden;">
             <div id="swtor-loading-progress" style="width:100%; height:100%; background:linear-gradient(90deg, #58abdf, #ff7818); animation:pulseBar 1.5s infinite linear;"></div>
           </div>
         </div>
@@ -381,7 +381,7 @@
       rejectWorkerReady(err);
     };
 
-    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1793740739" });
+    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1793741937" });
     return wState;
   }
 

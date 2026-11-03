@@ -888,4 +888,5 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **Updated Web UI Color Palette (`tools/simulator_ui.html`, `tools/rotation_builder_ui.html`, `tools/web/pyodide_client.js`)**:
   - Updated CSS custom properties (`:root`) and component color rules without altering any HTML structure, DOM elements, or layout geometry.
   - Applied Mudkip Body Blue (`--bg-panel: #58abdf`) to outer chrome (Header, Sidebar, and Navigation Tab Bars), Soft Blue (`--bg-base: #c2e4f6`) to the main workspace canvas, Crisp White (`--bg-card: #ffffff`) to inner metric/table/config boxes, and Mudkip Gill Orange (`--accent: #ff7818`, `#e65c00`) to primary CTAs, badges, active states, and DPS highlights.
+  - Added `[data-theme="dark"]` Matte Mudkip Night CSS variable overrides (`--bg-base: #0e121a`, `--bg-panel: #141a24`, `--bg-card: #1c2331`, `--border: #263144`, `--accent: #ff7818`, `--cyan: #58abdf`) and a header theme toggle button (`#themeToggleBtn`) with `localStorage` persistence (`swtorsim_theme`) and cross-tab `storage` synchronization.
   - Rebuilt standalone web release bundle in `dist/` via `tools/build_web_release.py`.

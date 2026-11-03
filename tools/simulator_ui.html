@@ -30,6 +30,41 @@
     --cyan-bg: #d7eefa;
   }
 
+  [data-theme="dark"] {
+    --bg-base: #0e121a;
+    --bg-panel: #141a24;
+    --bg-card: #1c2331;
+    --bg-card-hover: #232c3d;
+    --bg-input: #10141d;
+    --border: #263144;
+    --border-subtle: #19202c;
+    --text-main: #f1f5f9;
+    --text-muted: #869ab3;
+    --accent: #ff7818;
+    --accent-hover: #fb923c;
+    --accent-bg: rgba(255, 120, 24, 0.14);
+    --purple: #ff7818;
+    --purple-bg: rgba(255, 120, 24, 0.14);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245, 158, 11, 0.14);
+    --green: #22c55e;
+    --green-bg: rgba(34, 197, 94, 0.14);
+    --red: #ef4444;
+    --red-bg: rgba(239, 68, 68, 0.14);
+    --cyan: #58abdf;
+    --cyan-bg: rgba(88, 171, 223, 0.14);
+  }
+
+  [data-theme="dark"] .brand-badge {
+    background: #ff7818;
+  }
+
+  [data-theme="dark"] .btn-purple {
+    background: var(--purple-bg);
+    border-color: var(--purple);
+    color: var(--purple);
+  }
+
   * {
     box-sizing: border-box;
   }
@@ -886,6 +921,7 @@
     <button class="btn btn-sm" id="saveRunConfigBtn" title="Save current configuration to data/run_config/">Save Config</button>
     <button class="btn btn-sm" id="reloadCatalogBtn" title="Reload files from workspace">Refresh</button>
     <button class="btn btn-purple btn-sm" id="openRotationBuilderBtn" title="Launch or switch to the Web Rotation Builder">Rotation Builder</button>
+    <button class="btn btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">🌙 Dark</button>
     <button class="btn btn-primary" id="runSimBtn" title="Run Simulation (Ctrl+Enter)">▶ Run Simulation</button>
   </div>
 </header>
@@ -1362,6 +1398,37 @@
 </div>
 
 <script>
+  function applyTheme(theme) {
+    const isDark = theme === "dark";
+    if (isDark) {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+    const btn = document.getElementById("themeToggleBtn");
+    if (btn) {
+      btn.textContent = isDark ? "☀️ Light" : "🌙 Dark";
+    }
+  }
+
+  function toggleTheme() {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    const next = isDark ? "light" : "dark";
+    try { localStorage.setItem("swtorsim_theme", next); } catch (e) {}
+    applyTheme(next);
+  }
+
+  (function initTheme() {
+    let saved = "light";
+    try { saved = localStorage.getItem("swtorsim_theme") || "light"; } catch (e) {}
+    applyTheme(saved);
+    window.addEventListener("storage", (e) => {
+      if (e.key === "swtorsim_theme") {
+        applyTheme(e.newValue || "light");
+      }
+    });
+  })();
+
   let CATALOG = null;
   let CURRENT_MODE = "TEST";
   let BREAKDOWN_PHASE = "overall";
@@ -2185,10 +2252,10 @@
       barsSvg += `
         <g>
           <rect x="${bx0 + 1}" y="${by}" width="${bw}" height="${bh}" rx="2"
-                fill="rgba(255, 120, 24, 0.75)" stroke="#ff7818" stroke-width="1">
+                fill="rgba(255, 120, 24, 0.75)" stroke="var(--accent)" stroke-width="1">
             <title>${b.x0.toLocaleString()} - ${b.x1.toLocaleString()} DPS: ${b.count} runs (${b.pct}%)</title>
           </rect>
-          ${b.count > 0 ? `<text x="${bx0 + bw / 2 + 1}" y="${by - 5}" fill="#496885" font-size="10" text-anchor="middle">${b.count}</text>` : ''}
+          ${b.count > 0 ? `<text x="${bx0 + bw / 2 + 1}" y="${by - 5}" fill="var(--text-muted)" font-size="10" text-anchor="middle">${b.count}</text>` : ''}
         </g>
       `;
     });
@@ -2242,14 +2309,14 @@
             <rect x="${sdLoPx}" y="${padT}" width="${Math.max(0, sdHiPx - sdLoPx)}" height="${plotH}"
                   fill="rgba(56, 139, 194, 0.10)" />
             <!-- Baseline Axis -->
-            <line x1="${padL}" y1="${padT + plotH}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="#388bc2" stroke-width="1" />
+            <line x1="${padL}" y1="${padT + plotH}" x2="${padL + plotW}" y2="${padT + plotH}" stroke="var(--border)" stroke-width="1" />
             ${barsSvg}
             <!-- Mean Line -->
-            <line x1="${meanPx}" y1="${padT}" x2="${meanPx}" y2="${padT + plotH}" stroke="#dc2626" stroke-width="2" stroke-dasharray="5,4" />
-            <text x="${meanPx}" y="${padT - 7}" fill="#dc2626" font-size="11" font-weight="700" text-anchor="middle">Mean: ${r.avg_dps.toLocaleString()}</text>
+            <line x1="${meanPx}" y1="${padT}" x2="${meanPx}" y2="${padT + plotH}" stroke="var(--red)" stroke-width="2" stroke-dasharray="5,4" />
+            <text x="${meanPx}" y="${padT - 7}" fill="var(--red)" font-size="11" font-weight="700" text-anchor="middle">Mean: ${r.avg_dps.toLocaleString()}</text>
             <!-- Min / Max Axis Labels -->
-            <text x="${padL}" y="${svgH - 12}" fill="#496885" font-size="11">${Math.round(minX).toLocaleString()} DPS</text>
-            <text x="${padL + plotW}" y="${svgH - 12}" fill="#496885" font-size="11" text-anchor="end">${Math.round(maxX).toLocaleString()} DPS</text>
+            <text x="${padL}" y="${svgH - 12}" fill="var(--text-muted)" font-size="11">${Math.round(minX).toLocaleString()} DPS</text>
+            <text x="${padL + plotW}" y="${svgH - 12}" fill="var(--text-muted)" font-size="11" text-anchor="end">${Math.round(maxX).toLocaleString()} DPS</text>
           </svg>
         </div>
       </div>
