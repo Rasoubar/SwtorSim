@@ -309,12 +309,36 @@ def get_class_gear_options(spec_path: str, env: str = "live") -> dict[str, Any]:
         for name, fqn in sorted(legendaries_map.items(), key=lambda x: x[0].lower())
     ]
 
+    parsed_dir = SWTORSIM_ROOT / "data" / "extractor" / ("pts/parsed" if active_env == "pts" else "parsed")
+    skill_tree_raw = spec_data.get("skill_tree", {})
+    skill_tree_info: dict[str, dict[str, list[dict[str, str]]]] = {}
+    for lvl, slots in sorted(skill_tree_raw.items(), key=lambda item: int(item[0]) if str(item[0]).isdigit() else 999):
+        lvl_str = str(lvl)
+        skill_tree_info[lvl_str] = {}
+        if isinstance(slots, dict):
+            for slot_key, fqns in slots.items():
+                entries = []
+                for fqn in fqns or []:
+                    bp_path = parsed_dir / fqn_to_relative_path(fqn)
+                    bp_name = fqn.split(".")[-1].replace("_", " ").title()
+                    bp_type = "ability"
+                    if bp_path.is_file():
+                        try:
+                            bp_data = load_json_file(str(bp_path))
+                            bp_name = bp_data.get("name") or bp_name
+                            bp_type = bp_data.get("type") or bp_type
+                        except Exception:
+                            pass
+                    entries.append({"fqn": fqn, "name": bp_name, "type": bp_type})
+                skill_tree_info[lvl_str][str(slot_key)] = entries
+
     return {
         "class_name": class_name,
         "spec": spec_name,
         "spec_path": _to_workspace_rel(resolved_spec),
         "tacticals": tacticals,
         "legendaries": legendaries,
+        "skill_tree": skill_tree_info,
         "skill_tree_levels": sorted(
             (str(k) for k in (spec_data.get("skill_tree") or {}).keys()),
             key=lambda x: int(x) if x.isdigit() else 999,

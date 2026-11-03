@@ -239,6 +239,55 @@
     min-width: 0;
   }
 
+  /* Skill Tree Choices Mini-Grid */
+  .skill-tree-drawer {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    margin-top: 6px;
+    margin-bottom: 4px;
+  }
+  .st-row {
+    display: grid;
+    grid-template-columns: 34px 1fr 1fr 1fr;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .st-row:last-child {
+    margin-bottom: 0;
+  }
+  .st-lvl {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .st-btn {
+    padding: 3px 5px;
+    font-size: 10.5px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-main);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .st-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .st-btn.active {
+    background: rgba(88, 166, 255, 0.2);
+    border-color: var(--accent);
+    color: var(--accent-hover);
+    font-weight: 600;
+  }
+
   .form-grid-2 {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -930,13 +979,22 @@
         <div class="form-row">
           <div class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
             <span>Skill Tree Choices <span id="choicesPreviewBadge" style="color:var(--cyan);font-size:10px;"></span></span>
-            <div style="display:flex; gap:4px;">
+            <div style="display:flex; gap:4px; align-items:center;">
+              <button class="btn btn-sm" id="toggleTreeBtn" type="button" style="padding:1px 6px; font-size:10px; font-weight:600; color:var(--accent);" onclick="toggleSkillTreeDrawer()" title="Toggle interactive skill tree choices grid">Skill Tree</button>
               <button class="btn btn-sm" id="importChoicesBtn" type="button" style="padding:1px 6px; font-size:10px;" title="Import custom skill tree choices JSON">📁 Import</button>
               <button class="btn btn-sm" id="deleteChoicesBtn" type="button" style="padding:1px 6px; font-size:10px; display:none; color:var(--red);" title="Delete selected custom choices">🗑️</button>
               <input type="file" id="importChoicesFile" accept=".json" style="display:none;">
             </div>
           </div>
           <select id="choicesSelect"></select>
+          <!-- Interactive Skill Tree Drawer -->
+          <div id="skillTreeDrawer" class="skill-tree-drawer" style="display:none;">
+            <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
+              <span>Skill Tree Choices (Click 1 / 2 / 3)</span>
+              <span id="stSummaryBadge" style="font-size:10px;color:var(--text-muted);font-weight:normal;"></span>
+            </div>
+            <div id="skillTreeRows"></div>
+          </div>
         </div>
 
         <div class="form-row">
@@ -1546,11 +1604,80 @@
     }
   }
 
+  let CURRENT_SKILL_TREE = {};
+  let CURRENT_CHOICES = {};
+
+  function toggleSkillTreeDrawer() {
+    const el = document.getElementById("skillTreeDrawer");
+    if (!el) return;
+    el.style.display = el.style.display === "none" ? "block" : "none";
+  }
+
+  function renderSkillTreeDrawer() {
+    const container = document.getElementById("skillTreeRows");
+    if (!container) return;
+    container.innerHTML = "";
+    const tree = CURRENT_SKILL_TREE || {};
+
+    const levels = Object.keys(tree).sort((a, b) => (parseInt(a, 10) || 999) - (parseInt(b, 10) || 999));
+    if (levels.length === 0) {
+      container.innerHTML = '<div style="font-size:11px; color:var(--text-muted); padding:4px;">No skill tree choices found for this discipline.</div>';
+      return;
+    }
+
+    levels.forEach(lvl => {
+      const slots = tree[lvl] || {};
+      const row = document.createElement("div");
+      row.className = "st-row";
+
+      const lvlSpan = document.createElement("span");
+      lvlSpan.className = "st-lvl";
+      lvlSpan.textContent = `L${lvl}`;
+      row.appendChild(lvlSpan);
+
+      ["1", "2", "3"].forEach(slotNum => {
+        const entries = slots[slotNum] || [];
+        const label = entries.map(e => e.name).join(" + ") || `Option ${slotNum}`;
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "st-btn" + (String(CURRENT_CHOICES[lvl]) === slotNum ? " active" : "");
+        btn.textContent = label;
+        btn.title = `Level ${lvl} Option ${slotNum}: ${label}`;
+        btn.onclick = () => {
+          CURRENT_CHOICES[lvl] = parseInt(slotNum, 10);
+          updateChoicesBadge();
+          renderSkillTreeDrawer();
+        };
+        row.appendChild(btn);
+      });
+      container.appendChild(row);
+    });
+  }
+
+  function updateChoicesBadge() {
+    const badge = Object.entries(CURRENT_CHOICES)
+      .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+      .map(([lvl, slot]) => `L${lvl}:${slot}`).join(" ");
+    const badgeEl = document.getElementById("choicesPreviewBadge");
+    if (badgeEl) badgeEl.textContent = badge;
+    const summaryEl = document.getElementById("stSummaryBadge");
+    if (summaryEl) summaryEl.textContent = badge;
+  }
+
   async function updateClassGearOptions(specPath, selectedTactical = null, selectedLegs = []) {
     if (!specPath) return;
     const res = await fetch(`/api/class_gear?spec_path=${encodeURIComponent(specPath)}&env=${encodeURIComponent(currentEnvironment)}`);
     const data = await res.json();
     if (!res.ok) return;
+
+    if (data.skill_tree) {
+      CURRENT_SKILL_TREE = data.skill_tree;
+      Object.keys(data.skill_tree).forEach(lvl => {
+        if (!CURRENT_CHOICES[lvl]) CURRENT_CHOICES[lvl] = 1;
+      });
+      renderSkillTreeDrawer();
+      updateChoicesBadge();
+    }
 
     const tacSel = document.getElementById("tacticalSelect");
     tacSel.innerHTML = "";
@@ -1661,9 +1788,12 @@
         applyStatsToInputs(bundle.stats);
       }
 
-      if (bundle.choices) {
-        const badge = Object.entries(bundle.choices).map(([lvl, slot]) => `L${lvl}:${slot}`).join(" ");
-        document.getElementById("choicesPreviewBadge").textContent = badge;
+      if (bundle.choices && typeof bundle.choices === "object") {
+        Object.entries(bundle.choices).forEach(([k, v]) => {
+          CURRENT_CHOICES[String(k)] = parseInt(v, 10) || 1;
+        });
+        renderSkillTreeDrawer();
+        updateChoicesBadge();
       }
 
       setSimMode((rc.mode || "TEST").toUpperCase());
@@ -1705,6 +1835,7 @@
       stats_override: getStatsOverrideFromInputs(),
       rotation_path: document.getElementById("rotationSelect").value,
       choices_path: document.getElementById("choicesSelect").value,
+      choices_override: CURRENT_CHOICES,
       tactical_fqn: document.getElementById("tacticalSelect").value,
       legendary_fqns: [leg1, leg2].filter(Boolean),
       relic_fqns: relics,
@@ -2426,6 +2557,7 @@
       stats_path: p.stats_path,
       rotation_path: p.rotation_path,
       choices_path: p.choices_path,
+      choices_override: p.choices_override || CURRENT_CHOICES,
       tactical_fqn: p.tactical_fqn,
       legendary_fqns: p.legendary_fqns,
       relic_fqns: p.relic_fqns,
@@ -2490,6 +2622,27 @@
   document.getElementById("specSelect").addEventListener("change", async e => {
     await updateClassGearOptions(e.target.value);
     await refreshComputedStats();
+  });
+
+  document.getElementById("choicesSelect").addEventListener("change", async e => {
+    const val = e.target.value;
+    if (!val) return;
+    try {
+      const res = await fetch(`/api/run_config?path=${encodeURIComponent(val)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const choices = (data && data.choices) || data;
+        if (choices && typeof choices === "object") {
+          Object.entries(choices).forEach(([k, v]) => {
+            if (["23", "27", "39", "43", "51", "64", "68", "73"].includes(String(k))) {
+              CURRENT_CHOICES[String(k)] = parseInt(v, 10) || 1;
+            }
+          });
+          renderSkillTreeDrawer();
+          updateChoicesBadge();
+        }
+      }
+    } catch (_e) {}
   });
 
   document.getElementById("buildSelect").addEventListener("change", async e => {
