@@ -847,7 +847,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1793715948"></script>
+  <script src="pyodide_client.js?v=1793718530"></script>
 </head>
 <body>
 
@@ -934,7 +934,7 @@
           </div>
           <div class="form-row">
             <label class="form-label">Char Level</label>
-            <input type="number" id="levelInput" value="85" min="1" max="100">
+            <input type="number" id="levelInput" value="80" min="1" max="100">
           </div>
           <div class="form-row">
             <div class="form-label">
@@ -1062,15 +1062,15 @@
         <div class="form-grid-2">
           <div class="form-row">
             <label class="form-label">Mastery</label>
-            <input type="number" class="stat-input" data-stat="Mastery" value="23362">
+            <input type="number" class="stat-input" data-stat="Mastery" value="16570">
           </div>
           <div class="form-row">
             <label class="form-label">Power</label>
-            <input type="number" class="stat-input" data-stat="Power" value="18607">
+            <input type="number" class="stat-input" data-stat="Power" value="14394">
           </div>
           <div class="form-row">
             <label class="form-label">Force Power</label>
-            <input type="number" class="stat-input" data-stat="Force Power" value="11740">
+            <input type="number" class="stat-input" data-stat="Force Power" value="9332">
           </div>
           <div class="form-row">
             <label class="form-label">Tech Power</label>
@@ -1078,15 +1078,15 @@
           </div>
           <div class="form-row">
             <label class="form-label">Critical Rating</label>
-            <input type="number" class="stat-input" data-stat="Critical Rating" value="5968">
+            <input type="number" class="stat-input" data-stat="Critical Rating" value="4029">
           </div>
           <div class="form-row">
             <label class="form-label">Alacrity Rating</label>
-            <input type="number" class="stat-input" data-stat="Alacrity Rating" value="2646">
+            <input type="number" class="stat-input" data-stat="Alacrity Rating" value="2218">
           </div>
           <div class="form-row">
             <label class="form-label">Accuracy Rating</label>
-            <input type="number" class="stat-input" data-stat="Accuracy Rating" value="2916">
+            <input type="number" class="stat-input" data-stat="Accuracy Rating" value="2824">
           </div>
           <div class="form-row">
             <label class="form-label">Armor Pen (0-1)</label>
@@ -1094,11 +1094,11 @@
           </div>
           <div class="form-row">
             <label class="form-label">MH Min Dmg</label>
-            <input type="number" class="stat-input" data-stat="Main_hand_min" value="3161">
+            <input type="number" class="stat-input" data-stat="Main_hand_min" value="2513">
           </div>
           <div class="form-row">
             <label class="form-label">MH Max Dmg</label>
-            <input type="number" class="stat-input" data-stat="Main_hand_max" value="4741">
+            <input type="number" class="stat-input" data-stat="Main_hand_max" value="3769">
           </div>
           <div class="form-row">
             <label class="form-label">OH Min Dmg</label>
@@ -1445,11 +1445,7 @@
     }
     const lvlInp = document.getElementById("levelInput");
     if (lvlInp) {
-      if (currentEnvironment === "pts" && lvlInp.value === "80") {
-        lvlInp.value = "85";
-      } else if (currentEnvironment === "live" && lvlInp.value === "85") {
-        lvlInp.value = "80";
-      }
+      lvlInp.value = currentEnvironment === "pts" ? "85" : "80";
     }
     await loadCatalog(true);
   }
@@ -1552,8 +1548,9 @@
       });
 
       if (!preserveSelections && data.run_configs && data.run_configs.length > 0) {
-        // Default to hatred_14gcd if present, else first config
-        const pref = data.run_configs.find(r => r.label.includes("hatred_14gcd")) || data.run_configs[0];
+        const pref = currentEnvironment === "pts"
+          ? (data.run_configs.find(r => r.label.includes("pts") || r.path.includes("pts")) || data.run_configs[0])
+          : (data.run_configs.find(r => !r.label.includes("pts") && !r.path.includes("pts") && r.label.includes("hatred_14gcd")) || data.run_configs[0]);
         rcSel.value = pref.path;
         await applyPresetRunConfig(pref.path);
       } else {
