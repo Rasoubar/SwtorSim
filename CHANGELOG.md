@@ -862,3 +862,11 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - In `updateCoreSelectorUI()`, added early return and cleanup when `isBuilderPage` is true: removes `#swtor-core-selector-container` so the multi-core dropdown is never shown in the Rotation Builder.
   - In `updateBackendBadge()`, adjusted tooltips and warming labels on the Rotation Builder to avoid referencing multi-core worker pool counts, keeping the discreet `Web` status badge clean.
   - Rebuilt production bundle in `dist/`.
+
+
+### 28. Interactive Skill Tree Drawer in Combat Simulator - [DONE]
+- **Added Visual 1/2/3 Choice Drawer to Simulator (`simulator_ui.html`, `web_gui.py`)**:
+  - Upgraded `get_class_gear_options` in `web_gui.py` to compile human-readable `skill_tree` tier data (level, slot names, and ability types) matching the discipline.
+  - Added an interactive `[Skill Tree]` toggle button and drawer inside Box 2 ("Discipline, Gear & Choices") on `simulator_ui.html`.
+  - Clicking any tier option (Option 1, 2, or 3 across all 8 tiers) dynamically updates active talent selections, highlights choices in the drawer, syncs `#choicesPreviewBadge`, and passes `choices_override` directly to simulation batches.
+  - Rebuilt production bundle in `dist/`.
