@@ -1,3 +1,5 @@
+"""GOM node graph discovery, BFS reference traversal, and field value resolution across `.bkt` buckets."""
+
 from __future__ import annotations
 
 import sys

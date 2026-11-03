@@ -1,3 +1,5 @@
+"""Class primary resource pool models (Force, Energy, Heat, Rage/Focus) and passive regeneration rules."""
+
 from typing import Any, Optional
 
 class ResourcePool:
@@ -147,7 +149,7 @@ class BuilderPool(ResourcePool):
         self.current_value = min(self.max_value, self.current_value + amount)
 
     def tick_passive_regen(self, delta_time: float, alacrity_modifier: float = 1.0, player: Any = None):
-        """Loses resource over time if decay_rate > 0. Not properly implemented yet."""
+        """Decays resource over time when ``decay_rate > 0`` (e.g. out-of-combat decay)."""
         if self.decay_rate > 0.0:
             self.current_value = max(0.0, self.current_value - (self.decay_rate * delta_time))
 

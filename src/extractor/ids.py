@@ -1,3 +1,5 @@
+"""64-bit unsigned/signed integer helpers and delta-encoded GOM field ID accumulators."""
+
 from __future__ import annotations
 
 import struct

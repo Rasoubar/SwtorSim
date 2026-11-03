@@ -1,3 +1,5 @@
+"""Writes raw resolved GOM node graphs (`nodes.json`, `edges.json`, and per-FQN JSON dumps)."""
+
 from __future__ import annotations
 
 import json

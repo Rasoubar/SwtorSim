@@ -1,3 +1,5 @@
+"""Binary reader and Zlib/Zstandard decompressor for SWTOR `.tor` (MYP) archive files."""
+
 from __future__ import annotations
 
 import struct

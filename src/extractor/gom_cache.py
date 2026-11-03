@@ -1,3 +1,5 @@
+"""Downloads and caches Jedipedia's `gom.js` class/field/enum name mapping."""
+
 from __future__ import annotations
 
 import urllib.request

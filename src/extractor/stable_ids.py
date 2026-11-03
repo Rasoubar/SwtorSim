@@ -1,3 +1,5 @@
+"""FNV-1a 64-bit hash computation and Jedipedia `fnv1a64.js` tag dictionary resolver."""
+
 from __future__ import annotations
 
 import re

@@ -1,3 +1,5 @@
+"""Condition and requirement evaluators for rotation steps, ability activations, and effect branches."""
+
 import random
 from typing import Any, TYPE_CHECKING
 if TYPE_CHECKING:
@@ -8,6 +10,7 @@ def _to_list(val: Any) -> list:
     return [val] if isinstance(val, str) else val
 
 def check_target_hp(conditions, caster: "Player", target: "Dummy", **_kwargs) -> bool:
+    """Checks if target HP ratio is at or below threshold, or if an execute-bypass buff is active."""
     if isinstance(conditions, dict):
         threshold = conditions.get("pct", 0.3)
         bypass_buffs = conditions.get("bypass_if_buff_active", None)
@@ -21,21 +24,27 @@ def check_target_hp(conditions, caster: "Player", target: "Dummy", **_kwargs) ->
     return False
 
 def check_caster_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
+    """Returns True if the caster has any of the specified active buffs."""
     return any(caster.has_effect(b) for b in _to_list(conditions))
 
 def check_target_debuff(conditions: Any, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
+    """Returns True if the target has any of the specified active debuffs."""
     return any(target.has_effect(d) for d in _to_list(conditions))
 
 def inverse_check_target_debuff(conditions: Any, caster: "Player", target: "Dummy", **kwargs) -> bool:
+    """Returns True if the target does NOT have any of the specified debuffs."""
     return not check_target_debuff(conditions, caster, target, **kwargs)
 
 def check_caster_energy_above(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
+    """Returns True if the caster's current primary resource is at or above ``threshold``."""
     return caster.resource.current_value >= threshold
 
 def check_caster_energy_below(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
+    """Returns True if the caster's current primary resource is strictly below ``threshold``."""
     return caster.resource.current_value < threshold
 
 def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
+    """Returns True if the named proc is not currently active and its remaining ICD exceeds ``data['value']``."""
     name = data["name"]
     if caster.has_effect(name):
         return False
@@ -56,14 +65,17 @@ def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", si
     return remaining_cooldown > data["value"]
 
 def check_target_hp_above(threshold: float, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
+    """Returns True if the target's HP ratio is strictly above ``threshold``."""
     return target.hp_ratio > threshold
 
 def check_caster_does_not_have_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
+    """Returns True if the caster does not have any of the specified buffs active."""
     buff_list = [conditions] if isinstance(conditions, str) else conditions
     has_any_buff = any(caster.has_effect(b) for b in buff_list)
     return not has_any_buff
 
 def check_ability_cooldown_under(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
+    """Returns True if the remaining cooldown of ``data['name']`` is strictly below ``data['value']`` seconds."""
     cooldown = caster.cooldowns.get(data["name"], 0)
     remaining_cooldown = cooldown - sim.current_time
 

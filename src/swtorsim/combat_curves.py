@@ -1,3 +1,5 @@
+"""Level-dependent combat rating curves, standard health tables, and armor constants."""
+
 import json
 from functools import lru_cache
 from pathlib import Path
@@ -20,6 +22,7 @@ _ARMOR_MULTIPLIER = "dcvArmorDamageReductionLevelMultiplier"
 
 @lru_cache(maxsize=4)
 def _load_curves(env: str) -> dict[str, Any]:
+    """Loads and caches combat_curves.json for the specified data environment."""
     curves_path = get_extractor_data_dir(env) / "combat_curves.json"
     if not curves_path.exists():
         curves_path = Path("data/extractor/combat_curves.json")
@@ -28,6 +31,7 @@ def _load_curves(env: str) -> dict[str, Any]:
 
 
 def _curves(env: str | None = None) -> dict[str, Any]:
+    """Returns the loaded combat curves dictionary for the requested or active environment."""
     active_env = env or get_data_environment()
     return _load_curves(active_env)
 
@@ -69,6 +73,7 @@ def armor_constants(level: int, env: str | None = None) -> tuple[float, float]:
 
 
 def _level_row(table: dict, level: int, label: str) -> Any:
+    """Looks up the curve row for ``level``, clamping to the nearest available level bound if needed."""
     key = str(level)
     if key in table:
         return table[key]

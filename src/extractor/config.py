@@ -1,3 +1,5 @@
+"""Configuration constants, GOM node IDs, FQN prefixes, and directory paths for the extractor."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

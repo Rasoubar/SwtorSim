@@ -1,3 +1,5 @@
+"""Binary parser for `client.gom` DBLB type/field/enum definitions."""
+
 from __future__ import annotations
 
 import struct

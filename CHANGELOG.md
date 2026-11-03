@@ -870,3 +870,16 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Added an interactive `[Skill Tree]` toggle button and drawer inside Box 2 ("Discipline, Gear & Choices") on `simulator_ui.html`.
   - Clicking any tier option (Option 1, 2, or 3 across all 8 tiers) dynamically updates active talent selections, highlights choices in the drawer, syncs `#choicesPreviewBadge`, and passes `choices_override` directly to simulation batches.
   - Rebuilt production bundle in `dist/`.
+
+
+### 29. Comprehensive Project Documentation & Inline Docstrings Suite - [DONE]
+- **Multi-File Documentation Suite (`README.md`, `docs/`)**:
+  - Rewrote root `README.md` with an accessible overview, quickstart workflows (Web GUI, CLI, Rotation Builder, Extractor, Pyodide Web Release), repository structure map, and documentation index.
+  - Created `docs/user_guide.md` covering Web GUI usage, CLI flags, `run_config.json` schema, character stats (`data/builds/`), skill-tree choices (`data/choices/`), visual Rotation Builder & rotation JSON condition syntax, and auxiliary tools.
+  - Rewrote `docs/architecture.md` with end-to-end Mermaid diagrams and detailed phase breakdowns (blueprint hydration, `prepare_simulation`, 7 raid dummy debuffs, `SimulationEngine` event loop, 11 discrete event types, action handlers, `ActiveEffect` stacking, `TriggerManager` proc bus, resource pools, and dual-runtime execution).
+  - Created `docs/combat_math.md` documenting `Player.recalculate_stats`, class buffs & companion bonuses, diminishing returns (`calc_dr`), Alacrity/GCD rounding, `accuracy_roll`, `calculate_base_damage`, `handle_mitigation`, the 6 multiplicative damage buckets, and `calculate_crit`.
+  - Created `docs/extractor_and_schemas.md` documenting the `.tor` MYP / GOM `.bkt` / `.stb` / FNV-1a 64-bit tag hash extraction pipeline and annotated JSON schemas for disciplines, abilities, talents, and combat curves.
+  - Created `docs/developer_guide.md` covering `AGENTS.md` invariants, architectural routing, step-by-step extension workflows (stat IDs, action handlers, conditions, proc triggers, new disciplines), and testing protocols.
+  - Updated `docs/rewrite.md` to archive the completed blueprint migration and link to the current documentation suite.
+- **Inline Codebase Docstrings (`src/swtorsim/`, `src/extractor/`, `data/rotation_builder.py`)**:
+  - Added module, class, and function/method docstrings across all 18 `src/swtorsim/` modules, all 30 `src/extractor/` modules, and `data/rotation_builder.py` while preserving strict CRLF (`\r\n`) line endings.

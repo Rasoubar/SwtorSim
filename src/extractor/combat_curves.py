@@ -1,3 +1,5 @@
+"""Extracts level-indexed combat rating curves, armor constants, and standard damage/healing tables."""
+
 from __future__ import annotations
 
 import json

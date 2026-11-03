@@ -1,3 +1,5 @@
+"""Single-run and multiprocessing Monte Carlo simulation runner and report generator."""
+
 import sys
 import os
 import math
@@ -9,6 +11,8 @@ from src.swtorsim.metrics import format_type_descriptor
 
 
 class Tester:
+    """Orchestrates single-fight verbose runs and multi-core Monte Carlo batch simulations."""
+
     def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False):
         self.rotation_config = rotation_config
         self.stats_config = stats_config
@@ -115,6 +119,7 @@ class Tester:
 
     @staticmethod
     def _aggregate_results(harvested_results):
+        """Aggregates per-worker simulation results into macro DPS statistics and ability breakdowns."""
         all_dps = [r["dps"] for r in harvested_results]
         total_time = sum(r["elapsed"] for r in harvested_results)
 
@@ -175,6 +180,7 @@ class Tester:
 
     @staticmethod
     def produce_monte_carlo_report(summary, iterations):
+        """Prints the formatted Monte Carlo DPS summary, ability tables, and saves the DPS histogram."""
         avg_dps = summary["avg_dps"]
         total_combat_time_accumulated = summary["total_time"]
 
@@ -219,6 +225,7 @@ class Tester:
 
     @staticmethod
     def _plot_dps_histogram(all_dps, avg_dps, std_dev, iterations):
+        """Renders and saves a matplotlib histogram of Monte Carlo DPS outcomes to ``figures/``."""
         try:
             import matplotlib.pyplot as plt
         except ImportError:
@@ -255,6 +262,7 @@ class Tester:
 
     @staticmethod
     def print_macro_phase_table(breakdown_data, total_duration, total_dps, iterations):
+        """Prints a formatted per-ability DPS, damage share, hit count, and crit rate table."""
         print(f"{'Ability Name':<25} | {'Type':<18} | {'Phase DPS':<12} | {'Phase %':<8} | {'Avg Hits':<9} | {'Crit %':<7}")
         print("-" * 95)
         sorted_abilities = sorted(breakdown_data.items(), key=lambda item: item[1]["total_damage"], reverse=True)

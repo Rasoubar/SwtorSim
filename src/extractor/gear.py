@@ -1,3 +1,5 @@
+"""Extracts tactical and legendary implant item definitions and maps them to their equipped ability/talent FQNs."""
+
 from __future__ import annotations
 
 import json

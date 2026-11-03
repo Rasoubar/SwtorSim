@@ -1,3 +1,5 @@
+"""Entry point wrapper for invoking the SWTOR game data extractor CLI."""
+
 import sys
 from pathlib import Path
 

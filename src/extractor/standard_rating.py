@@ -1,3 +1,5 @@
+"""Extracts the `cbtStandardRatingInfo` item-rating-to-stat-budget lookup table for relics and adrenals."""
+
 from __future__ import annotations
 
 from typing import Any

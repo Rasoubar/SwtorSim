@@ -1,6 +1,10 @@
+"""Sequential and priority-based ability rotation evaluator."""
+
 from src.swtorsim.requirements import validate_all
 
 class Rotation:
+    """Evaluates an ordered sequence of opener and looping priority/fixed/optional ability steps."""
+
     def __init__(self, name, steps_config, loop: bool = True):
         self.name = name
         self.sequence = []
@@ -41,6 +45,8 @@ class Rotation:
 
 
 class FixedAbilityStep:
+    """Mandatory rotation step that blocks until its target ability is successfully cast."""
+
     def __init__(self, ability_id):
         self.ability_id = ability_id
 
@@ -50,6 +56,8 @@ class FixedAbilityStep:
         return ability.cast(player, target, sim)
 
 class PriorityBlockStep:
+    """Priority-ordered pool of conditional ability options; casts the first available option."""
+
     def __init__(self, name, pool):
         self.name = name
         self.pool = pool
@@ -66,6 +74,8 @@ class PriorityBlockStep:
 
 
 class OptionalAbilityStep:
+    """Non-blocking step (typically off-GCD buffs/adrenals) that attempts to cast and always advances."""
+
     def __init__(self, ability_id, rules=None):
         self.ability_id = ability_id
         self.rules = rules if rules is not None else {}

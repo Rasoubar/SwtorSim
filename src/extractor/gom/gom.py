@@ -1,3 +1,5 @@
+"""Unified GOM name lookup combining `gom.js` symbol names with `client.gom` enum tables."""
+
 from __future__ import annotations
 
 import json

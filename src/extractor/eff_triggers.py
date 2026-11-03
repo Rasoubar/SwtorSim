@@ -1,3 +1,5 @@
+"""Authoritative GOM `effTriggerEnum` ID-to-name lookup table and trigger normalization helpers."""
+
 from __future__ import annotations
 
 import re

@@ -1,3 +1,5 @@
+"""Command-line interface and pipeline orchestration for the SWTOR game data extractor."""
+
 from __future__ import annotations
 
 import argparse

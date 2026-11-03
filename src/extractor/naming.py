@@ -1,3 +1,5 @@
+"""Identifier normalization helpers (such as folding stack/charge tokens onto `stack_charge`)."""
+
 from __future__ import annotations
 
 import re

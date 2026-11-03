@@ -1,3 +1,5 @@
+"""Transforms raw GOM ability (`abl.*`) and effect (`eff.*`) nodes into structured simulator blueprints."""
+
 from __future__ import annotations
 
 import json

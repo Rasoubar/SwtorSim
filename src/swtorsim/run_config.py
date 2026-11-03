@@ -1,3 +1,5 @@
+"""RunConfig schema, validation, skill-tree FQN resolution, and environment-aware path helpers."""
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -25,18 +27,22 @@ TRAINING_DUMMY_ARMOR_DEBUFF_LABEL = "Training Dummy Armor Debuff"
 
 
 def get_disciplines_dir(env: str | None = None) -> str:
+    """Returns the disciplines directory path for the active or specified environment."""
     return str(get_extractor_data_dir(env) / "disciplines")
 
 
 def get_gear_path(env: str | None = None) -> str:
+    """Returns the gear abilities/talents catalog path for the active or specified environment."""
     return str(get_extractor_data_dir(env) / "gear_abilities_talents.json")
 
 
 def get_relics_path(env: str | None = None) -> str:
+    """Returns the relics catalog path for the active or specified environment."""
     return str(get_extractor_data_dir(env) / "relics.json")
 
 
 def get_training_dummy_armor_debuff_path(env: str | None = None) -> str:
+    """Returns the parsed training dummy armor/raid debuff blueprint path for the environment."""
     return str(
         get_extractor_data_dir(env)
         / "parsed"

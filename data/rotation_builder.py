@@ -1,3 +1,5 @@
+"""Interactive CLI and browser-based rotation builder for authoring SwtorSim rotation JSON files."""
+
 import argparse
 import copy
 import json
@@ -50,6 +52,8 @@ UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
 
 @dataclass(frozen=True)
 class CastableAbility:
+    """Metadata for a castable active ability discovered from a discipline loadout."""
+
     fqn: str
     name: str
     triggers_gcd: bool
@@ -123,10 +127,10 @@ def build_castable_catalog(
     relic_fqns: list[str] | None = None,
     env: str = "live",
 ) -> list[CastableAbility]:
+    """Returns active abilities for a discipline, skill-tree selection, and optional gear/relics, sorted by name."""
     active_env = str(env).lower().strip()
     if parsed_dir is None or parsed_dir == PARSED_DIR:
         parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
-    """Returns active abilities for a discipline, skill-tree selection, and optional gear/relics, sorted by name."""
     resolved_spec = _resolve_workspace_path(spec_path)
     spec_data = load_json_file(str(resolved_spec))
     if isinstance(choices_path, dict):

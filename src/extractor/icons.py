@@ -1,3 +1,5 @@
+"""Extracts `.dds` ability/talent icons from `swtor_main_gfx_assets_1.tor` and converts them to `.png`."""
+
 from __future__ import annotations
 
 import sys

@@ -1,3 +1,5 @@
+"""Configuration loaders for character stats, rotations, skill-tree loadouts, and target dummy debuffs."""
+
 import json
 import os
 from pathlib import Path

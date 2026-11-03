@@ -1,3 +1,5 @@
+"""Binary decoder for SWTOR GOM node fields (`DOM_*` wire types) and nested class structures."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

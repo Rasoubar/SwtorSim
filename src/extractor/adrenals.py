@@ -1,3 +1,5 @@
+"""Discovers and writes the catalog of configured adrenal item ability FQNs."""
+
 from __future__ import annotations
 
 import json

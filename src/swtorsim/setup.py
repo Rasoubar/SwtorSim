@@ -1,3 +1,5 @@
+"""Simulation entity initialization, passive blueprint hydration, and opening event scheduling."""
+
 import copy
 import random
 from src.swtorsim.engine import Simulation
@@ -10,7 +12,7 @@ from src.swtorsim.class_buffs import apply_class_buffs
 from src.swtorsim.resources import resource_type_for_class
 
 def schedule_periodic(player, target, sim):
-    """Schedules 1st even of periodic effects, like pt extra regen"""
+    """Schedules the randomized initial tick for periodic proc effects."""
     for proc in player.procs.values():
         if getattr(proc, 'trigger', None) == "periodic":
             is_affected = getattr(proc, 'affected_by_cdr', False)

@@ -1,4 +1,5 @@
-# src/swtorsim/triggers.py
+"""Event-bus trigger subscription, filtering, rate-limiting (ICD), and dispatch engine."""
+
 import random
 
 
@@ -34,6 +35,8 @@ _CASTER_MATCH_TRIGGERS = frozenset({
 
 
 class TriggerManager:
+    """Manages reactive proc listeners, actor/tag/attack-type filtering, and rate-limit lockouts."""
+
     def __init__(self):
         # Maps event_name -> list of compiled trigger dicts
         self._listeners = {}

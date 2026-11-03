@@ -1,3 +1,5 @@
+"""Discrete simulation event classes resolved by the priority queue."""
+
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
 from src.swtorsim.combat_math import calculate_hit
@@ -19,8 +21,7 @@ class Event:
         return False
 
 class AbilityCast(Event):
-    """Represents a single ability cast event
-        TEMPORARY PLACEHOLDER"""
+    """Represents a queued ability cast event resolved on the simulation timeline."""
     def __init__(self,source,target,ability):
         super().__init__(f"Ability Cast {ability.name}")
         self.source = source
@@ -435,6 +436,7 @@ class CastFinishEvent(Event):
         self.entry_effect_ids = entry_effect_ids
 
     def resolve(self, sim):
+        """Completes the cast if uninterrupted, executes entry effects, and dispatches ``on_ability_post_activate``."""
         # Safeguard: if cast was interrupted or cancelled, abort
         if getattr(self.caster, "active_cast", None) is not self.ability:
             return
@@ -516,6 +518,7 @@ class DelayedBranchEvent(Event):
         self.context = context or {}
 
     def resolve(self, sim):
+        """Executes the delayed branch if neither caster nor target is dead."""
         if getattr(self.target, "is_dead", False) or getattr(self.caster, "is_dead", False):
             return
         self.branch.execute(
@@ -539,6 +542,7 @@ class ProjectileImpactEvent(Event):
         self.context = context or {}
 
     def resolve(self, sim):
+        """Dispatches ``on_travel_complete`` branches on the projectile's effect."""
         if getattr(self.target, "is_dead", False) or getattr(self.caster, "is_dead", False):
             return
         if self.effect:

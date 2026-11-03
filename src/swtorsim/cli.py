@@ -1,3 +1,5 @@
+"""Interactive command-line prompts for building a RunConfig and launching simulations."""
+
 from pathlib import Path
 
 from src.swtorsim.config_load import load_json_file

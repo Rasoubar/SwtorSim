@@ -1,3 +1,5 @@
+"""Localized string retriever (`locTextRetrieverMap`) resolution against `.stb` string tables."""
+
 from __future__ import annotations
 
 from pathlib import Path

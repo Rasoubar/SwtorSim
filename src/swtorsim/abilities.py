@@ -1,3 +1,5 @@
+"""Ability, Effect, and Branch blueprint models, action handlers, and runtime Ability execution."""
+
 import random
 import json
 from dataclasses import dataclass, field
@@ -44,6 +46,8 @@ FAIL_RESULTS = {"effResultMiss", "effResultImmune", "effResultResisted"}
 
 @dataclass(slots=True)
 class Branch:
+    """A conditional execution branch inside an Effect containing triggers, conditions, and actions."""
+
     index: int
     triggers: List[Dict[str, Any]] = field(default_factory=list)
     conditions: Optional[Dict[str, Any]] = None
@@ -54,6 +58,7 @@ class Branch:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Branch":
+        """Hydrates a Branch blueprint from a parsed JSON dictionary."""
         return cls(
             index=data.get("index", 0),
             triggers=data.get("triggers", []),
@@ -72,6 +77,10 @@ class Branch:
         )
 
     def execute(self, sim, caster, target, context=None, ability=None) -> tuple[bool, bool]:
+        """Evaluates branch conditions and sequentially executes its actions.
+
+        Returns ``(branch_ran, branch_succeeded)``.
+        """
         actual_target = _resolve_target_overrides(self.target_overrides, target, caster, context)
 
         if self.conditions:
@@ -116,6 +125,8 @@ class Branch:
 
 @dataclass(slots=True)
 class Effect:
+    """An ability or talent effect node containing branches, tags, stack limits, and timing metadata."""
+
     number: int
     entry: bool
     duration: float = 0.0
@@ -133,6 +144,7 @@ class Effect:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Effect":
+        """Hydrates an Effect blueprint from a parsed JSON dictionary."""
         initializers = list(data.get("initializers") or [])
         is_passive = any(
             init.get("initializer_type") == "eff_initializer__set_passive"
@@ -346,6 +358,8 @@ class Effect:
 
 @dataclass(slots=True)
 class AbilityBlueprint:
+    """Immutable parsed representation of an active ability, passive ability, or talent JSON blueprint."""
+
     fqn: str
     name: str
     type: str  # "active" or "passive"
@@ -366,6 +380,7 @@ class AbilityBlueprint:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], file_path: Optional[Path] = None) -> "AbilityBlueprint":
+        """Constructs an AbilityBlueprint from a parsed ability or talent JSON dictionary."""
         effects_map: Dict[int, Effect] = {}
         entry_ids: List[int] = []
 
@@ -416,6 +431,7 @@ class AbilityBlueprint:
 
     @classmethod
     def from_file(cls, filepath: Path) -> "AbilityBlueprint":
+        """Loads and parses an AbilityBlueprint directly from a JSON file path."""
         with filepath.open("r", encoding="utf-8") as f:
             return cls.from_dict(json.load(f), file_path=filepath)
 # --- Action Handlers ---
@@ -1554,6 +1570,7 @@ def handle_modify_active_duration(sim, caster, target, action, ability=None, con
                 sim.schedule_absolute(new_expires_at, EffectExpire(actor, eff_key, active_eff))
 
 def _resolve_state_actor(caster, target, action):
+    """Resolves whether a state-changing action applies to the caster or the target."""
     if not isinstance(action, dict):
         return caster
     if action.get("to_actor") == "target" or action.get("ints", {}).get("actor") == 2:

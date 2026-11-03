@@ -1,3 +1,5 @@
+"""Runtime state representations for active buffs, debuffs, DoTs, and channeled abilities."""
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
@@ -94,16 +96,19 @@ class ActiveEffect:
     caster_ref: Any = field(default=None, repr=False, compare=False)
 
     def time_remaining(self, current_time: float) -> float:
+        """Returns remaining duration in seconds, or ``inf`` if permanent."""
         if self.expires_at is None:
             return float("inf")
         return max(0.0, self.expires_at - current_time)
 
     def modify_stacks(self, amount: int) -> None:
+        """Adjusts stack count by ``amount`` (clamped to ``[0, max_stacks]``) and marks expired at 0."""
         self.stacks = max(0, min(self.stacks + amount, self.max_stacks))
         if self.stacks == 0 and self.max_stacks > 0:
             self.is_expired = True
 
     def set_stacks(self, value: int) -> None:
+        """Sets stack count directly to ``value`` (clamped to ``[0, max_stacks]``) and marks expired at 0."""
         max_st = self.max_stacks if self.max_stacks > 0 else 1
         self.stacks = max(0, min(value, max_st))
         if self.stacks == 0 and self.max_stacks > 0:

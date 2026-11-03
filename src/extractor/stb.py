@@ -1,3 +1,5 @@
+"""Binary parser for SWTOR `.stb` localized string table files."""
+
 from __future__ import annotations
 
 import struct

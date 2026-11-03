@@ -1,3 +1,5 @@
+"""Discovers and writes the catalog of item-rating-scaled relic ability FQNs."""
+
 from __future__ import annotations
 
 import json

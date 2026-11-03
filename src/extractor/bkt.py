@@ -1,3 +1,5 @@
+"""Binary parser for SWTOR GOM `.bkt` (PBUK/DBLB) bucket files and node payload extraction."""
+
 from __future__ import annotations
 
 import re

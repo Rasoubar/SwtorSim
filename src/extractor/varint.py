@@ -1,3 +1,5 @@
+"""Binary decoder for SWTOR's variable-length integer (`SwtorVarInt`) wire format."""
+
 from __future__ import annotations
 
 import struct

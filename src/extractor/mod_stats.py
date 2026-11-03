@@ -1,3 +1,5 @@
+"""Authoritative GOM `modStatEnum` ID-to-name lookup table and stat normalization helpers."""
+
 from __future__ import annotations
 
 from pathlib import Path

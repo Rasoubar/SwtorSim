@@ -1,3 +1,5 @@
+"""Stat modifier representation, GOM Stat ID resolution, and ability/tag target filtering."""
+
 import csv
 from dataclasses import dataclass
 from pathlib import Path

@@ -1,3 +1,5 @@
+"""Core SWTOR combat math: base damage, mitigation, multiplicative damage buckets, accuracy, and critical hits."""
+
 import random
 from typing import Any, Optional
 
@@ -307,10 +309,12 @@ _DAMAGE_TYPE_NAMES = {
 
 
 def _channel_for_hit(tags, attack_type):
+    """Maps an numeric attack_type (1..4) to its canonical channel name ('melee', 'ranged', 'force', 'tech')."""
     return _ATTACK_TYPE_CHANNELS.get(attack_type)
 
 
 def _hit_is_aoe(tags) -> bool:
+    """Returns True if any tag on the hit marks it as an Area-of-Effect (AoE) ability."""
     return any(str(tag).endswith("is_aoe") or str(tag).endswith("aoe_ability") for tag in tags)
 
 

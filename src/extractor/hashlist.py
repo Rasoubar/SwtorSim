@@ -1,3 +1,5 @@
+"""Downloads, caches, and parses the Jedipedia MYP archive filename hash dictionary."""
+
 from __future__ import annotations
 
 import email.utils

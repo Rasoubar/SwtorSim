@@ -1,3 +1,5 @@
+"""Filters and unpacks relevant GOM buckets, string tables, and manifests from `.tor` MYP archives."""
+
 from __future__ import annotations
 
 from pathlib import Path

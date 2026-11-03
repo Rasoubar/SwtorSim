@@ -1,3 +1,5 @@
+"""Transforms raw GOM talent (`tal.*`) nodes into structured simulator talent blueprints."""
+
 from __future__ import annotations
 
 import json

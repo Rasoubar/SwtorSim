@@ -1,3 +1,5 @@
+"""Extracts class disciplines (`dis.*`), ability packages (`apc.*`), and skill-tree layouts."""
+
 from __future__ import annotations
 
 import json

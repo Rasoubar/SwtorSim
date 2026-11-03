@@ -1,3 +1,5 @@
+"""Combat telemetry tracker for damage breakdowns, execute-phase splits, and buff/debuff uptime."""
+
 import re
 
 ATTACK_TYPE_NAMES = {
@@ -40,6 +42,8 @@ def has_proper_effect_name(name: str) -> bool:
 
 
 class Metrics:
+    """Accumulates per-ability damage, critical hit counts, execute phase stats, and effect uptimes."""
+
     def __init__(self):
         self.total_damage = 0.0
         self.breakdown = {}

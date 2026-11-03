@@ -1,3 +1,5 @@
+"""Combat actor entities (Entity, Player, Dummy), stat recalculation, and timer/effect scaling."""
+
 import math
 from typing import Any, Optional
 from src.swtorsim.resources import create_resource_pool
@@ -891,6 +893,7 @@ class Player(Entity):
 
 
 def _effect_modifiers(effect):
+    """Returns stack-scaled effective modifiers from an active effect instance."""
     getter = getattr(effect, "get_effective_modifiers", None)
     if getter is None:
         return ()
