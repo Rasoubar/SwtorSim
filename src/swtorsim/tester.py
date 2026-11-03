@@ -3,7 +3,6 @@ import os
 import math
 import time
 import statistics
-import matplotlib.pyplot as plt
 from multiprocessing import Pool, cpu_count
 from src.swtorsim.setup import prepare_simulation
 from src.swtorsim.metrics import format_type_descriptor
@@ -70,7 +69,7 @@ class Tester:
 
         try:
             sim, player, target = prepare_simulation(
-                rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module
+                rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False
             )
             sim.run_timed(duration, target)
 
@@ -220,6 +219,12 @@ class Tester:
 
     @staticmethod
     def _plot_dps_histogram(all_dps, avg_dps, std_dev, iterations):
+        try:
+            import matplotlib.pyplot as plt
+        except ImportError:
+            print("[WARN] matplotlib is not installed. Skipping histogram image generation.")
+            return
+
         plt.figure(figsize=(10.0, 6.0))
         plt.hist(
             all_dps,

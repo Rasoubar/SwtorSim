@@ -117,11 +117,15 @@ def loadout_fqns(
 def build_castable_catalog(
     spec_path: str,
     choices_path: str | dict,
-    parsed_dir: Path = PARSED_DIR,
+    parsed_dir: Path | None = None,
     tactical_fqn: str = "",
     legendary_fqns: list[str] | None = None,
     relic_fqns: list[str] | None = None,
+    env: str = "live",
 ) -> list[CastableAbility]:
+    active_env = str(env).lower().strip()
+    if parsed_dir is None or parsed_dir == PARSED_DIR:
+        parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
     """Returns active abilities for a discipline, skill-tree selection, and optional gear/relics, sorted by name."""
     resolved_spec = _resolve_workspace_path(spec_path)
     spec_data = load_json_file(str(resolved_spec))
@@ -211,8 +215,20 @@ def discover_loadout_catalog(
     tactical_fqn: str = "",
     legendary_fqns: list[str] | None = None,
     relic_fqns: list[str] | None = None,
-    parsed_dir: Path = PARSED_DIR,
+    parsed_dir: Path | None = None,
+    env: str = "live",
 ) -> dict[str, Any]:
+    active_env = str(env).lower().strip()
+    if active_env == "pts" and "data/extractor/disciplines/" in spec_path and "data/extractor/pts/" not in spec_path:
+        cand = spec_path.replace("data/extractor/disciplines/", "data/extractor/pts/disciplines/", 1)
+        if _resolve_workspace_path(cand).is_file():
+            spec_path = cand
+    elif active_env == "live" and "data/extractor/pts/disciplines/" in spec_path:
+        cand = spec_path.replace("data/extractor/pts/disciplines/", "data/extractor/disciplines/", 1)
+        if _resolve_workspace_path(cand).is_file():
+            spec_path = cand
+    if parsed_dir is None or parsed_dir == PARSED_DIR:
+        parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
     """
     Inspects all blueprints in a loadout (discipline + skill tree + tactical + legendaries + relics)
     and auto-discovers:
@@ -227,10 +243,17 @@ def discover_loadout_catalog(
     class_name, spec_name = discipline_names(spec_data, str(resolved_spec))
     default_class_folder, default_spec_folder = rotation_folder_defaults(str(resolved_spec))
 
-    if isinstance(choices, str):
+    choices_dict: dict = {}
+    if isinstance(choices, str) and choices.strip():
         resolved_choices = _resolve_workspace_path(choices)
-        choices_dict = load_json_file(str(resolved_choices))
-    else:
+        if resolved_choices.is_file():
+            try:
+                loaded = load_json_file(str(resolved_choices))
+                if isinstance(loaded, dict):
+                    choices_dict = loaded
+            except Exception:
+                choices_dict = {}
+    elif isinstance(choices, dict):
         choices_dict = dict(choices)
 
     # Normalize skill tree choices to default to 1 if any level is missing
@@ -536,7 +559,8 @@ def discover_loadout_catalog(
     procs_list = sorted(procs_map.values(), key=lambda p: p["name"].lower())
 
     # Class-filtered gear options
-    gear_path = _resolve_workspace_path(GEAR_PATH)
+    gear_path_rel = "data/extractor/pts/gear_abilities_talents.json" if active_env == "pts" else GEAR_PATH
+    gear_path = _resolve_workspace_path(gear_path_rel)
     gear_data = load_json_file(str(gear_path)) if gear_path.is_file() else {}
     try:
         tacticals_map = filter_gear_for_class(gear_data, TACTICAL_PREFIX, class_name)
@@ -549,6 +573,7 @@ def discover_loadout_catalog(
     legendaries_list = [{"name": k, "fqn": v} for k, v in sorted(legendaries_map.items())]
 
     return {
+        "environment": active_env,
         "class_name": class_name,
         "spec_name": spec_name,
         "spec_path": spec_path,
@@ -738,9 +763,13 @@ def normalize_rotation_steps(raw_steps: list[Any]) -> tuple[list[dict[str, Any]]
     return normalized, warnings
 
 
-def get_workspace_catalog() -> dict[str, Any]:
+def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
     """Returns available disciplines, choices files, run configs, existing rotations, and relics."""
-    disc_dir = _resolve_workspace_path(DISCIPLINES_DIR)
+    active_env = str(env).lower().strip()
+    disc_dir_rel = "data/extractor/pts/disciplines" if active_env == "pts" else DISCIPLINES_DIR
+    parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
+    relics_path_rel = "data/extractor/pts/relics.json" if active_env == "pts" else RELICS_PATH
+    disc_dir = _resolve_workspace_path(disc_dir_rel)
     disciplines = index_disciplines(str(disc_dir))
     # Convert absolute discipline paths back to workspace-relative POSIX paths
     rel_disciplines: dict[str, dict[str, str]] = {}
@@ -769,12 +798,23 @@ def get_workspace_catalog() -> dict[str, Any]:
             items.append({"label": label, "path": rel_path})
         return items
 
-    choices_files = _scan_json_dir(CHOICES_DIR)
+    choices_files_raw = _scan_json_dir(CHOICES_DIR)
+    choices_files = []
+    for cf in choices_files_raw:
+        target = _resolve_workspace_path(cf["path"])
+        if target.is_file():
+            try:
+                doc = load_json_file(str(target))
+                # Must be a skill-tree choices dictionary (not a rotation list or stat build)
+                if isinstance(doc, dict) and not doc.get("stats") and not doc.get("gear") and not isinstance(doc.get("steps"), list):
+                    choices_files.append(cf)
+            except Exception:
+                pass
     rotations_files = _scan_json_dir(ROTATIONS_DIR)
     run_configs = _scan_json_dir("data/run_config")
     builds_files = _scan_json_dir(BUILDS_DIR)
 
-    relics_path = _resolve_workspace_path(RELICS_PATH)
+    relics_path = _resolve_workspace_path(relics_path_rel)
     relics_raw = load_json_file(str(relics_path)) if relics_path.is_file() else []
     relics_list = []
     for fqn in relics_raw:
@@ -783,7 +823,7 @@ def get_workspace_catalog() -> dict[str, Any]:
         short_lbl = relic_menu_label(fqn)
         r_name = short_lbl
         r_type = "active" if ".onuse." in fqn else "passive"
-        bp_file = PARSED_DIR / fqn_to_relative_path(fqn)
+        bp_file = parsed_dir / fqn_to_relative_path(fqn)
         if bp_file.is_file():
             try:
                 bp_doc = load_json_file(str(bp_file))
@@ -803,6 +843,7 @@ def get_workspace_catalog() -> dict[str, Any]:
         )
 
     return {
+        "environment": active_env,
         "disciplines": rel_disciplines,
         "choices_files": choices_files,
         "rotations": rotations_files,
@@ -815,6 +856,10 @@ def get_workspace_catalog() -> dict[str, Any]:
 
 def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     """Runs a quick single-iteration simulation preview for the current rotation and loadout."""
+    env = payload.get("env") or payload.get("environment") or "live"
+    active_env = str(env).lower().strip()
+    parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
+    level = int(payload.get("level") or (85 if active_env == "pts" else 80))
     import random
     from src.swtorsim.config_load import (
         load_character_stats_from_json,
@@ -852,8 +897,8 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
         legendary_fqns=legendary_fqns,
         relic_fqns=relic_fqns,
     )
-    loadout_bps = load_complete_loadout(fqns, parsed_dir=str(PARSED_DIR))
-    stats_cfg = load_character_stats_from_json(class_name, stats_path, 85)
+    loadout_bps = load_complete_loadout(fqns, parsed_dir=str(parsed_dir))
+    stats_cfg = load_character_stats_from_json(class_name, stats_path, level)
     debuff_mod = {}
     try:
         debuff = load_training_dummy_armor_debuff()
@@ -968,7 +1013,9 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 return
 
             if route == "/api/catalog":
-                self._send_json(get_workspace_catalog())
+                qs = parse_qs(parsed.query)
+                env = (qs.get("env") or ["live"])[0]
+                self._send_json(get_workspace_catalog(env=env))
                 return
 
             if route == "/api/rotation":
@@ -1031,6 +1078,7 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 tactical_fqn = payload.get("tactical_fqn") or ""
                 legendary_fqns = payload.get("legendary_fqns") or []
                 relic_fqns = payload.get("relic_fqns") or []
+                env = payload.get("env") or "live"
                 if not spec_path:
                     self._send_json({"error": "spec_path is required."}, status=400)
                     return
@@ -1040,6 +1088,7 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                     tactical_fqn=tactical_fqn,
                     legendary_fqns=legendary_fqns,
                     relic_fqns=relic_fqns,
+                    env=env,
                 )
                 self._send_json(result)
                 return
@@ -1065,7 +1114,11 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 formatted_crlf = formatted.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n"
                 full_path.write_bytes(formatted_crlf.encode("utf-8"))
 
-                rel_saved = full_path.relative_to(SWTORSIM_ROOT).as_posix()
+                custom_dir = SWTORSIM_ROOT / "data" / "rotations" / "custom"
+                custom_dir.mkdir(parents=True, exist_ok=True)
+                (custom_dir / filename).write_bytes(formatted_crlf.encode("utf-8"))
+
+                rel_saved = (custom_dir / filename).relative_to(SWTORSIM_ROOT).as_posix()
                 print(f"[OK] Saved rotation to {rel_saved}")
                 self._send_json({"ok": True, "path": rel_saved, "filename": filename})
                 return

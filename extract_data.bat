@@ -12,6 +12,8 @@ set "PTS_ASSETS=C:\Program Files (x86)\Steam\steamapps\common\Star Wars - The Ol
 :: Determine Python runner (prefer pyclean if available, else py/python)
 if exist "tools\pyclean.exe" (
     set "RUNNER=tools\pyclean.exe"
+) else if exist ".venv\Scripts\python.exe" (
+    set "RUNNER=.venv\Scripts\python.exe"
 ) else (
     set "RUNNER=py"
 )

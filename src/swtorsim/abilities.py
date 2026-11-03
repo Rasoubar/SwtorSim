@@ -1007,7 +1007,8 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
     effect_name = action.get("effect_name")
     if effect_name and caster.has_effect(effect_name):
         caster.cleanup_expired_effects([effect_name])
-        print(f"[{sim.current_time:.3f}] {caster.name} consumed/removed buff: {effect_name}")
+        if getattr(sim, "verbose", True):
+            print(f"[{sim.current_time:.3f}] {caster.name} consumed/removed buff: {effect_name}")
         return
 
     if action_type == "remove_effect":
@@ -1165,7 +1166,8 @@ class Ability:
             return
 
         self.charges = min(self.max_charges, self.charges + amount)
-        print(f"[{sim.current_time:.2f}s] {self.name} charge restored ({self.charges}/{self.max_charges})")
+        if getattr(sim, "verbose", True):
+            print(f"[{sim.current_time:.2f}s] {self.name} charge restored ({self.charges}/{self.max_charges})")
 
         if self.charges == self.max_charges:
             self.active_charge_event = None
@@ -1258,7 +1260,8 @@ class Ability:
 
         final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply=True)
         caster.resource.spend(final_spend)
-        print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
+        if getattr(sim, "verbose", True):
+            print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
 
         self.apply_cooldown_locks(caster, sim)
 

@@ -18,7 +18,7 @@ def schedule_periodic(player, target, sim):
             first_tick = random.uniform(0.0, interval)
             sim.schedule_absolute(first_tick, PeriodicProcTick(player, target, proc))
 
-def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module):
+def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose: bool = True):
     """Prepares simulation entities from unified loadout blueprints."""
     active_abilities = {}
     passive_blueprints = {}
@@ -53,7 +53,7 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
     target.effects = copy.deepcopy(debuff_module)
     target.recalculate_stats()
 
-    sim = Simulation()
+    sim = Simulation(verbose=verbose)
     player.current_target = target
 
     for eff_key, eff in target.effects.items():

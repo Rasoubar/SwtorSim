@@ -110,6 +110,15 @@ _SIM_PROGRESS: dict[str, Any] = {
 }
 
 
+_SIM_PROGRESS_CALLBACK: Any = None
+
+
+def set_simulation_progress_callback(callback: Any) -> None:
+    """Registers an optional callback for simulation progress events (e.g. Pyodide Web Workers)."""
+    global _SIM_PROGRESS_CALLBACK
+    _SIM_PROGRESS_CALLBACK = callback
+
+
 def _update_simulation_progress(running: bool, mode: str, completed: int, total: int) -> None:
     """Thread-safe update of the active simulation progress counter."""
     safe_total = max(1, int(total))
@@ -121,6 +130,11 @@ def _update_simulation_progress(running: bool, mode: str, completed: int, total:
         _SIM_PROGRESS["completed"] = safe_completed
         _SIM_PROGRESS["total"] = safe_total
         _SIM_PROGRESS["pct"] = pct
+    if _SIM_PROGRESS_CALLBACK is not None:
+        try:
+            _SIM_PROGRESS_CALLBACK(bool(running), str(mode), safe_completed, safe_total, pct)
+        except Exception:
+            pass
 
 
 def get_simulation_progress() -> dict[str, Any]:
@@ -137,6 +151,25 @@ def _resolve_workspace_path(rel_or_abs: str | Path) -> Path:
     candidate = SWTORSIM_ROOT / p
     if candidate.exists():
         return candidate.resolve()
+    # Case-insensitive resolution fallback for Linux/WASM virtual filesystems
+    parts = p.parts
+    curr = SWTORSIM_ROOT
+    matched = True
+    for part in parts:
+        found = False
+        try:
+            for child in curr.iterdir():
+                if child.name.lower() == part.lower():
+                    curr = child
+                    found = True
+                    break
+        except Exception:
+            pass
+        if not found:
+            matched = False
+            break
+    if matched and curr.exists():
+        return curr.resolve()
     return candidate
 
 
@@ -466,11 +499,11 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     baseline = spec_data.get("active_abilities", [])
     tree_fqns = resolve_skill_tree_fqns(spec_data.get("skill_tree", {}), choices_data)
     selected_fqns = [
-        *baseline,
-        *tree_fqns,
-        config.tactical_fqn,
-        *config.legendary_fqns,
-        *config.relic_fqns,
+        *[f for f in baseline if f and f.strip()],
+        *[f for f in tree_fqns if f and f.strip()],
+        *[f for f in [config.tactical_fqn] if f and f.strip()],
+        *[f for f in config.legendary_fqns if f and f.strip()],
+        *[f for f in config.relic_fqns if f and f.strip()],
     ]
 
     with redirect_stdout(io.StringIO()):
@@ -899,7 +932,7 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
     sys.stdout = open(os.devnull, "w")
     try:
         sim, player, target = prepare_simulation(
-            rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module
+            rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False
         )
         player.combat_distance = settings_dict["combat_distance"]
         target.combat_distance = settings_dict["combat_distance"]
@@ -1044,7 +1077,8 @@ def _run_batch_monte_carlo_detailed(
     _update_simulation_progress(True, "BATCH", 0, iterations)
     harvested: list[dict[str, Any]] = []
     try:
-        if iterations <= 1:
+        is_emscripten = sys.platform == "emscripten" or getattr(sys, "_emscripten_info", None) is not None
+        if iterations <= 1 or is_emscripten:
             global _WORKER_SIM_CONTEXT
             _WORKER_SIM_CONTEXT = sim_context
             for idx, p in enumerate(payloads, 1):
@@ -1068,7 +1102,17 @@ def _run_batch_monte_carlo_detailed(
         _update_simulation_progress(False, "BATCH", len(harvested), iterations)
 
     wall_ms = round((time.perf_counter() - t0) * 1000.0, 1)
+    return _aggregate_batch_results(harvested, config, wall_ms, iterations, computed_stats)
 
+
+def _aggregate_batch_results(
+    harvested: list[dict[str, Any]],
+    config: RunConfig,
+    wall_ms: float,
+    iterations: int,
+    computed_stats: dict[str, Any],
+) -> dict[str, Any]:
+    """Calculates statistical distributions and ability breakdowns from harvested runs."""
     all_dps = [float(r["dps"]) for r in harvested]
     all_durations = [float(r["elapsed"]) for r in harvested]
     total_time = sum(all_durations)
@@ -1214,6 +1258,72 @@ def execute_simulation_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
     if config.mode == "BATCH":
         return _run_batch_monte_carlo_detailed(config, sim_inputs)
     return _run_single_test_detailed(config, sim_inputs)
+
+def execute_simulation_slice(payload: dict[str, Any]) -> dict[str, Any]:
+    """Runs a chunk/slice of Monte Carlo runs for a Web Worker thread in parallel."""
+    start_run_id = int(payload.get("start_run_id") or 0)
+    slice_count = int(payload.get("slice_count") or 1)
+    config, sim_inputs = _resolve_simulation_inputs_from_payload(payload)
+
+    settings_dict = {
+        "enable_stem_matching": config.enable_stem_matching,
+        "enable_projectile_flight_time": config.enable_projectile_flight_time,
+        "combat_distance": config.combat_distance,
+        "in_flashpoint_operation": config.in_flashpoint_operation,
+    }
+    sim_context = {
+        "rotation_config": sim_inputs["rotation_config"],
+        "stats_config": sim_inputs["stats_config"],
+        "loadout_blueprints": sim_inputs["loadout_blueprints"],
+        "debuff_module": sim_inputs["debuff_module"],
+        "settings_dict": settings_dict,
+    }
+    global _WORKER_SIM_CONTEXT
+    _WORKER_SIM_CONTEXT = sim_context
+
+    payloads = [
+        (
+            start_run_id + i,
+            config.seed,
+            config.duration,
+            config.dummy_hp,
+        )
+        for i in range(slice_count)
+    ]
+
+    _update_simulation_progress(True, "BATCH", 0, slice_count)
+    harvested: list[dict[str, Any]] = []
+    try:
+        for idx, p in enumerate(payloads, 1):
+            harvested.append(_batch_worker_task(p))
+            _update_simulation_progress(True, "BATCH", idx, slice_count)
+    finally:
+        _update_simulation_progress(False, "BATCH", len(harvested), slice_count)
+
+    return {"harvested": harvested, "slice_count": slice_count}
+
+
+def aggregate_batch_slices(payload: dict[str, Any]) -> dict[str, Any]:
+    """Aggregates harvested slices from parallel Web Workers into the final report."""
+    base_payload = payload.get("payload", {})
+    all_harvested = payload.get("all_harvested", [])
+    wall_ms = float(payload.get("wall_ms", 0.0))
+    total_iterations = int(payload.get("total_iterations", len(all_harvested)))
+
+    config, sim_inputs = _resolve_simulation_inputs_from_payload(base_payload)
+    with redirect_stdout(io.StringIO()):
+        _sim0, player0, _target0 = prepare_simulation(
+            sim_inputs["rotation_config"],
+            sim_inputs["stats_config"],
+            sim_inputs["loadout_blueprints"],
+            config.dummy_hp,
+            sim_inputs["debuff_module"],
+        )
+        computed_stats = _extract_computed_player_stats(player0)
+
+    all_harvested.sort(key=lambda r: r.get("run_id", 0))
+    return _aggregate_batch_results(all_harvested, config, wall_ms, total_iterations, computed_stats)
+
 
 
 def ensure_rotation_builder_running(host: str = "127.0.0.1", default_port: int = 8765) -> str:
@@ -1388,6 +1498,52 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 rel_saved = _to_workspace_rel(target_file)
                 print(f"[OK] Saved build stats to {rel_saved}")
                 self._send_json({"ok": True, "path": rel_saved, "filename": filename})
+                return
+
+            if route == "/api/custom_file/import":
+                category = str(payload.get("category") or "rotations").strip().lower()
+                filename = str(payload.get("filename") or "custom.json").strip()
+                if not filename.endswith(".json"):
+                    filename += ".json"
+                filename = Path(filename).name
+                content = payload.get("content")
+
+                if category == "rotations":
+                    folder = SWTORSIM_ROOT / "data" / "rotations" / "custom"
+                elif category == "choices":
+                    folder = SWTORSIM_ROOT / "data" / "Choices" / "custom"
+                elif category == "builds":
+                    folder = SWTORSIM_ROOT / "data" / "builds" / "custom"
+                elif category == "run_config":
+                    folder = SWTORSIM_ROOT / "data" / "run_config" / "custom"
+                else:
+                    self._send_json({"error": f"Invalid category: {category}"}, status=400)
+                    return
+
+                folder.mkdir(parents=True, exist_ok=True)
+                target_file = folder / filename
+                _write_json_crlf(target_file, content)
+                rel_saved = _to_workspace_rel(target_file)
+                print(f"[OK] Imported custom {category} to {rel_saved}")
+                self._send_json({"ok": True, "path": rel_saved, "filename": filename})
+                return
+
+            if route == "/api/custom_file/delete":
+                rel_path = str(payload.get("path") or "").strip()
+                if not rel_path or "custom" not in rel_path:
+                    self._send_json({"error": "Only custom files can be deleted."}, status=400)
+                    return
+                target_file = _resolve_workspace_path(rel_path)
+                if target_file.is_file():
+                    try:
+                        target_file.unlink()
+                        print(f"[OK] Deleted custom file: {rel_path}")
+                        self._send_json({"ok": True, "path": rel_path})
+                        return
+                    except Exception as e:
+                        self._send_json({"error": str(e)}, status=500)
+                        return
+                self._send_json({"error": f"File not found: {rel_path}"}, status=404)
                 return
 
             if route == "/api/launch_rotation_builder":

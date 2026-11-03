@@ -75,6 +75,26 @@
     font-weight: 600;
   }
 
+  .btn-simulator-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #1f6feb;
+    color: #fff;
+    text-decoration: none;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-simulator-link:hover {
+    background: #388bfd;
+    color: #fff;
+  }
+
   .header-actions {
     display: flex;
     align-items: center;
@@ -676,7 +696,12 @@
 
 <header>
   <div class="brand">
+    <a href="index.html" target="_blank" class="btn-simulator-link" id="simulatorReturnBtn" title="Open Combat Simulator in a new tab">⚔️ Combat Simulator</a>
     <span>SWTOR SIM // ROTATION BUILDER</span>
+    <div style="display:inline-flex;align-items:center;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-left:6px;">
+      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--accent-bg);color:var(--accent);" onclick="setEnvironment('live')">Live (7.9)</button>
+      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('pts')">PTS (8.0)</button>
+    </div>
     <span class="brand-badge" id="activeSpecBadge">Loading...</span>
   </div>
   <div class="header-actions">
@@ -807,22 +832,12 @@
       <span>3. Save, Verify & Simulate</span>
     </div>
     <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
-      <div class="form-row">
-        <div class="form-group" style="margin-bottom:6px;">
-          <label>Class Folder</label>
-          <input type="text" id="saveClassFolder" style="width:100%;" value="assassin">
-        </div>
-        <div class="form-group" style="margin-bottom:6px;">
-          <label>Spec Folder</label>
-          <input type="text" id="saveSpecFolder" style="width:100%;" value="hatred">
-        </div>
-      </div>
       <div class="form-group" style="margin-bottom:8px;">
         <label>Rotation Filename</label>
-        <div style="display:flex;gap:6px;">
-          <input type="text" id="saveFilename" style="flex:1;" value="CustomRotation.json">
-          <button class="btn-success" onclick="saveRotationToDisk()">Save to Disk</button>
-          <button onclick="downloadRotationJson()" title="Download .json file">Download</button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <input type="text" id="saveFilename" style="flex:1;" value="CustomRotation.json" placeholder="CustomRotation.json">
+          <button class="btn-success btn-sm" onclick="saveRotationToDisk()" title="Save into simulator presets" style="font-weight:600;white-space:nowrap;">Save</button>
+          <button class="btn-sm" onclick="downloadRotationJson()" title="Download rotation .json file to PC" style="font-weight:600;white-space:nowrap;">Download</button>
         </div>
       </div>
     </div>
@@ -894,6 +909,18 @@ let ruleModalContext = null; // { stepIndex, poolIndex (optional), editKey (opti
 // Initialization & API Calls
 // ---------------------------------------------------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
+  document.getElementById("simulatorReturnBtn")?.addEventListener("click", (e) => {
+    if (window.location.port === "8765") {
+      e.preventDefault();
+      window.open("http://127.0.0.1:8000/", "_blank");
+    }
+    // In web mode, the native <a href="index.html" target="_blank"> opens a clean new tab without reload
+  });
+
+  window.onSwtorCustomFilesChanged = () => {
+    loadWorkspaceCatalog();
+  };
+
   await loadWorkspaceCatalog();
 });
 
@@ -908,8 +935,41 @@ function showToast(msg, isError = false) {
   }, 3200);
 }
 
+let currentEnvironment = "live";
+
+async function setEnvironment(env) {
+  currentEnvironment = env === "pts" ? "pts" : "live";
+  const liveBtn = document.getElementById("envLiveBtn");
+  const ptsBtn = document.getElementById("envPtsBtn");
+  if (liveBtn && ptsBtn) {
+    if (currentEnvironment === "pts") {
+      liveBtn.style.background = "transparent";
+      liveBtn.style.color = "var(--text-muted)";
+      ptsBtn.style.background = "var(--amber-bg)";
+      ptsBtn.style.color = "var(--amber)";
+    } else {
+      liveBtn.style.background = "var(--accent-bg)";
+      liveBtn.style.color = "var(--accent)";
+      ptsBtn.style.background = "transparent";
+      ptsBtn.style.color = "var(--text-muted)";
+    }
+  }
+
+  const fnEl = document.getElementById("saveFilename");
+  if (fnEl && fnEl.value) {
+    if (currentEnvironment === "pts" && !fnEl.value.includes("_PTS")) {
+      fnEl.value = fnEl.value.replace(/(\.json)?$/, "_PTS.json");
+    } else if (currentEnvironment === "live" && fnEl.value.includes("_PTS")) {
+      fnEl.value = fnEl.value.replace("_PTS", "");
+    }
+  }
+
+  await loadWorkspaceCatalog();
+  await refreshLoadoutCatalog();
+}
+
 async function loadWorkspaceCatalog() {
-  const res = await fetch("/api/catalog");
+  const res = await fetch(`/api/catalog?env=${encodeURIComponent(currentEnvironment)}`);
   workspaceCatalog = await res.json();
 
   // Populate RunConfig dropdown
@@ -927,7 +987,7 @@ async function loadWorkspaceCatalog() {
 
   // Populate Choices Preset dropdown
   const chSel = document.getElementById("choicesFileSelect");
-  chSel.innerHTML = "";
+  chSel.innerHTML = '<option value="">(Default Class Choices)</option>';
   for (const ch of workspaceCatalog.choices_files || []) {
     const opt = document.createElement("option");
     opt.value = ch.path;
@@ -979,12 +1039,34 @@ function populateExistingRotationsSelect() {
   const rotSel = document.getElementById("existingRotationSelect");
   const cur = rotSel.value;
   rotSel.innerHTML = '<option value="">-- Open Existing Rotation JSON --</option>';
-  for (const rot of workspaceCatalog.rotations || []) {
-    const opt = document.createElement("option");
-    opt.value = rot.path;
-    opt.textContent = rot.label;
-    rotSel.appendChild(opt);
+
+  const customRots = (workspaceCatalog.rotations || []).filter(r => r.path && r.path.includes("/custom/"));
+  const presetRots = (workspaceCatalog.rotations || []).filter(r => !r.path || !r.path.includes("/custom/"));
+
+  if (customRots.length > 0) {
+    const cGroup = document.createElement("optgroup");
+    cGroup.label = "★ My Custom Files";
+    for (const rot of customRots) {
+      const opt = document.createElement("option");
+      opt.value = rot.path;
+      opt.textContent = `★ ${rot.label}`;
+      cGroup.appendChild(opt);
+    }
+    rotSel.appendChild(cGroup);
   }
+
+  if (presetRots.length > 0) {
+    const pGroup = document.createElement("optgroup");
+    pGroup.label = "Built-In Rotations";
+    for (const rot of presetRots) {
+      const opt = document.createElement("option");
+      opt.value = rot.path;
+      opt.textContent = rot.label;
+      pGroup.appendChild(opt);
+    }
+    rotSel.appendChild(pGroup);
+  }
+
   if (cur) rotSel.value = cur;
 }
 
@@ -1018,9 +1100,16 @@ async function onSpecChange() {
   );
   if (matchChoice) {
     chSel.value = matchChoice.path;
+  } else {
+    chSel.value = "";
   }
 
-  await refreshLoadoutCatalog(chSel.value);
+  // Clear tactical & legendary selections when switching class/spec
+  document.getElementById("tacticalSelect").value = "";
+  document.getElementById("legendary1Select").value = "";
+  document.getElementById("legendary2Select").value = "";
+
+  await refreshLoadoutCatalog(chSel.value || {});
 }
 
 async function onChoicesPresetChange() {
@@ -1077,9 +1166,17 @@ async function refreshLoadoutCatalog(choicesSource = null, gearOverrides = null)
     ? gearOverrides.relic_fqns
     : getSelectedRelics();
 
+  let mappedSpec = specPath;
+  if (currentEnvironment === "pts" && mappedSpec.includes("data/extractor/disciplines/") && !mappedSpec.includes("data/extractor/pts/")) {
+    mappedSpec = mappedSpec.replace("data/extractor/disciplines/", "data/extractor/pts/disciplines/");
+  } else if (currentEnvironment === "live" && mappedSpec.includes("data/extractor/pts/disciplines/")) {
+    mappedSpec = mappedSpec.replace("data/extractor/pts/disciplines/", "data/extractor/disciplines/");
+  }
+
   const payload = {
-    spec_path: specPath,
-    choices: choicesSource || currentLoadout.choices || document.getElementById("choicesFileSelect").value,
+    env: currentEnvironment,
+    spec_path: mappedSpec,
+    choices: choicesSource || (currentLoadout && currentLoadout.class_name === cls ? currentLoadout.choices : "") || document.getElementById("choicesFileSelect").value || {},
     tactical_fqn: tacticalFqn,
     legendary_fqns: legendaryFqns,
     relic_fqns: relicFqns
@@ -1098,8 +1195,14 @@ async function refreshLoadoutCatalog(choicesSource = null, gearOverrides = null)
 
   currentLoadout = data;
   document.getElementById("activeSpecBadge").textContent = `${data.class_name} // ${data.spec_name}`;
-  document.getElementById("saveClassFolder").value = data.default_class_folder;
-  document.getElementById("saveSpecFolder").value = data.default_spec_folder;
+  const cfEl = document.getElementById("saveClassFolder");
+  if (cfEl) cfEl.value = data.default_class_folder;
+  const sfEl = document.getElementById("saveSpecFolder");
+  if (sfEl) sfEl.value = data.default_spec_folder;
+  const fnEl = document.getElementById("saveFilename");
+  if (fnEl && (!fnEl.value || fnEl.value === "CustomRotation.json")) {
+    fnEl.value = `${data.spec_name || "Custom"}_Rotation.json`;
+  }
 
   // Populate Tactical Select while preserving current choice
   const tacSel = document.getElementById("tacticalSelect");
@@ -2393,6 +2496,7 @@ async function runDryRunSimulation() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
+      env: currentEnvironment,
       spec_path: currentLoadout.spec_path,
       choices: currentLoadout.choices,
       tactical_fqn: document.getElementById("tacticalSelect").value || "",
@@ -2434,9 +2538,13 @@ function applyEditedJson() {
 }
 
 async function saveRotationToDisk() {
-  const classFolder = document.getElementById("saveClassFolder").value.trim() || "assassin";
-  const specFolder = document.getElementById("saveSpecFolder").value.trim() || "hatred";
-  const filename = document.getElementById("saveFilename").value.trim() || "CustomRotation.json";
+  let filename = (document.getElementById("saveFilename")?.value || "CustomRotation.json").trim();
+  if (!filename) filename = "CustomRotation.json";
+  if (!filename.endsWith(".json")) filename += ".json";
+  filename = filename.replace(/^.*[\\/]/, "");
+
+  const classFolder = (currentLoadout && currentLoadout.default_class_folder) || "assassin";
+  const specFolder = (currentLoadout && currentLoadout.default_spec_folder) || "hatred";
 
   const res = await fetch("/api/rotation/save", {
     method: "POST",
@@ -2454,18 +2562,32 @@ async function saveRotationToDisk() {
     return;
   }
   await loadWorkspaceCatalog();
-  document.getElementById("existingRotationSelect").value = data.path;
-  showToast(`[OK] Saved to ${data.path}`);
+  const existingSel = document.getElementById("existingRotationSelect");
+  if (existingSel) existingSel.value = data.path;
+
+  const isWebMode = window.PYODIDE_BRIDGE || window.location.port === "8080" || !window.location.port;
+  if (isWebMode) {
+    showToast(`[OK] Saved ${filename} to My Custom Files`);
+  } else {
+    showToast(`[OK] Saved to workspace disk: ${data.path}`);
+  }
 }
 
 function downloadRotationJson() {
-  const filename = (document.getElementById("saveFilename").value.trim() || "CustomRotation.json").replace(/(\.json)?$/, ".json");
+  let filename = (document.getElementById("saveFilename")?.value || "CustomRotation.json").trim();
+  if (!filename) filename = "CustomRotation.json";
+  if (!filename.endsWith(".json")) filename += ".json";
+  filename = filename.replace(/^.*[\\/]/, "");
+
   const blob = new Blob([JSON.stringify(rotationSteps, null, 4)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
+  showToast(`[OK] Downloaded ${filename}`);
 }
 
 function escapeHtml(str) {

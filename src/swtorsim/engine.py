@@ -4,12 +4,13 @@ from src.swtorsim.triggers import TriggerManager
 
 class Simulation:
     """Manages the event queue and core combat timeline."""
-    def __init__(self, in_flashpoint_operation: bool | None = None):
+    def __init__(self, in_flashpoint_operation: bool | None = None, verbose: bool = True):
         self.queue = []
         self.current_time = 0.0
         self.event_counter = 0
         self.tracker = Metrics()
         self.triggers = TriggerManager()
+        self.verbose = verbose
         from src.swtorsim.settings import is_in_flashpoint_operation
         self.in_flashpoint_operation = (
             bool(in_flashpoint_operation)
@@ -33,5 +34,6 @@ class Simulation:
             self.current_time = timestamp
             event.resolve(self)
             if target is not None and getattr(target, "hp", 1) <= 0:
-                print(f"\n[{timestamp:.2f}s] Rip dummy.")
+                if self.verbose:
+                    print(f"\n[{timestamp:.2f}s] Rip dummy.")
                 break

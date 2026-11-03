@@ -816,13 +816,16 @@
 
   <div class="header-controls">
     <div style="display:inline-flex;align-items:center;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-right:4px;">
-      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--accent-bg);color:var(--accent);" onclick="setEnvironment('live')">Live (7.6)</button>
-      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('pts')">PTS (7.7)</button>
+      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--accent-bg);color:var(--accent);" onclick="setEnvironment('live')">Live (7.9)</button>
+      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('pts')">PTS (8.0)</button>
     </div>
     <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Preset Config:</label>
     <select id="presetConfigSelect" style="min-width:170px;">
       <option value="">-- Select Run Config --</option>
     </select>
+    <button class="btn btn-sm" id="importRunConfigBtn" type="button" title="Import custom run config JSON">📁 Import</button>
+    <button class="btn btn-sm" id="deleteRunConfigBtn" type="button" title="Delete selected custom run config" style="display:none; color:var(--red);">🗑️</button>
+    <input type="file" id="importRunConfigFile" accept=".json" style="display:none;">
     <button class="btn btn-sm" id="saveRunConfigBtn" title="Save current configuration to data/run_config/">Save Config</button>
     <button class="btn btn-sm" id="reloadCatalogBtn" title="Reload files from workspace">Refresh</button>
     <button class="btn btn-purple btn-sm" id="openRotationBuilderBtn" title="Launch or switch to the Web Rotation Builder">Rotation Builder</button>
@@ -913,14 +916,25 @@
         </div>
 
         <div class="form-row">
-          <label class="form-label">Rotation File</label>
+          <div class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Rotation File</span>
+            <div style="display:flex; gap:4px;">
+              <button class="btn btn-sm" id="importRotationBtn" type="button" style="padding:1px 6px; font-size:10px;" title="Import custom rotation JSON">📁 Import</button>
+              <button class="btn btn-sm" id="deleteRotationBtn" type="button" style="padding:1px 6px; font-size:10px; display:none; color:var(--red);" title="Delete selected custom rotation">🗑️</button>
+              <input type="file" id="importRotationFile" accept=".json" style="display:none;">
+            </div>
+          </div>
           <select id="rotationSelect"></select>
         </div>
 
         <div class="form-row">
-          <div class="form-label">
-            <span>Skill Tree Choices</span>
-            <span id="choicesPreviewBadge" style="color:var(--cyan);font-size:10px;"></span>
+          <div class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
+            <span>Skill Tree Choices <span id="choicesPreviewBadge" style="color:var(--cyan);font-size:10px;"></span></span>
+            <div style="display:flex; gap:4px;">
+              <button class="btn btn-sm" id="importChoicesBtn" type="button" style="padding:1px 6px; font-size:10px;" title="Import custom skill tree choices JSON">📁 Import</button>
+              <button class="btn btn-sm" id="deleteChoicesBtn" type="button" style="padding:1px 6px; font-size:10px; display:none; color:var(--red);" title="Delete selected custom choices">🗑️</button>
+              <input type="file" id="importChoicesFile" accept=".json" style="display:none;">
+            </div>
           </div>
           <select id="choicesSelect"></select>
         </div>
@@ -976,6 +990,9 @@
           <div class="form-label">
             <span>Build Stat Preset</span>
             <div style="display:flex;gap:4px;">
+              <button type="button" class="btn btn-sm" id="importBuildBtn" style="padding:1px 6px; font-size:10px;" title="Import custom build JSON">📁 Import</button>
+              <button type="button" class="btn btn-sm" id="deleteBuildBtn" style="padding:1px 6px; font-size:10px; display:none; color:var(--red);" title="Delete selected custom build">🗑️</button>
+              <input type="file" id="importBuildFile" accept=".json" style="display:none;">
               <button type="button" class="btn btn-sm" onclick="refreshComputedStats()">Calc Sheet</button>
               <button type="button" class="btn btn-sm" onclick="openSaveBuildModal()">Save Build</button>
             </div>
@@ -1387,48 +1404,67 @@
       if (!res.ok) throw new Error(data.error || "Failed to load catalog");
       CATALOG = data;
 
+      function populateSelectWithOptions(selectElem, items, defaultPlaceholder, defaultGroupLabel) {
+        const prevVal = selectElem.value;
+        selectElem.innerHTML = defaultPlaceholder ? `<option value="">${defaultPlaceholder}</option>` : "";
+
+        const customItems = (items || []).filter(it => it.path && it.path.includes("/custom/"));
+        const presetItems = (items || []).filter(it => !it.path || !it.path.includes("/custom/"));
+
+        if (customItems.length > 0) {
+          const cGroup = document.createElement("optgroup");
+          cGroup.label = "★ My Custom Files";
+          customItems.forEach(it => {
+            const opt = document.createElement("option");
+            opt.value = it.path;
+            opt.textContent = `★ ${it.name || it.label}`;
+            cGroup.appendChild(opt);
+          });
+          selectElem.appendChild(cGroup);
+        }
+
+        if (presetItems.length > 0) {
+          const pGroup = document.createElement("optgroup");
+          pGroup.label = defaultGroupLabel || "Built-In Presets";
+          presetItems.forEach(it => {
+            const opt = document.createElement("option");
+            opt.value = it.path;
+            opt.textContent = it.label || it.name;
+            pGroup.appendChild(opt);
+          });
+          selectElem.appendChild(pGroup);
+        }
+
+        if (prevVal && Array.from(selectElem.options).some(o => o.value === prevVal)) {
+          selectElem.value = prevVal;
+        }
+      }
+
       // Preset Run Configs
       const rcSel = document.getElementById("presetConfigSelect");
       const prevRc = rcSel.value;
-      rcSel.innerHTML = '<option value="">-- Select Run Config --</option>';
-      (data.run_configs || []).forEach(rc => {
-        const opt = document.createElement("option");
-        opt.value = rc.path;
-        opt.textContent = rc.label;
-        rcSel.appendChild(opt);
-      });
+      populateSelectWithOptions(rcSel, data.run_configs || [], "-- Select Run Config --", "Preset Configurations");
 
       // Builds
       const bSel = document.getElementById("buildSelect");
-      bSel.innerHTML = "";
-      (data.builds || []).forEach(b => {
-        const opt = document.createElement("option");
-        opt.value = b.path;
-        opt.textContent = b.label;
-        bSel.appendChild(opt);
-      });
+      const prevB = bSel.value;
+      populateSelectWithOptions(bSel, data.builds || [], "", "Preset Builds");
 
       // Rotations
       const rotSel = document.getElementById("rotationSelect");
-      rotSel.innerHTML = "";
-      (data.rotations || []).forEach(r => {
-        const opt = document.createElement("option");
-        opt.value = r.path;
-        opt.textContent = r.label;
-        rotSel.appendChild(opt);
-      });
+      const prevRot = rotSel.value;
+      populateSelectWithOptions(rotSel, data.rotations || [], "", "Preset Rotations");
 
       // Choices
       const chSel = document.getElementById("choicesSelect");
-      chSel.innerHTML = "";
-      (data.choices_files || []).forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c.path;
-        opt.textContent = c.label;
-        chSel.appendChild(opt);
-      });
+      const prevCh = chSel.value;
+      populateSelectWithOptions(chSel, data.choices_files || [], "", "Preset Choices");
+
+      syncDeleteButtons();
 
       // Relics
+      const prevRel1 = document.getElementById("relic1Select")?.value;
+      const prevRel2 = document.getElementById("relic2Select")?.value;
       ["relic1Select", "relic2Select"].forEach(id => {
         const sel = document.getElementById(id);
         sel.innerHTML = '<option value="">-- None --</option>';
@@ -1474,6 +1510,16 @@
         } else if (currentEnvironment === "live" && mappedSpec.includes("data/extractor/pts/")) {
           mappedSpec = mappedSpec.replace("data/extractor/pts/", "data/extractor/");
         }
+        if (prevB && Array.from(bSel.options).some(o => o.value === prevB)) bSel.value = prevB;
+        if (prevRot && Array.from(rotSel.options).some(o => o.value === prevRot)) rotSel.value = prevRot;
+        if (prevCh && Array.from(chSel.options).some(o => o.value === prevCh)) chSel.value = prevCh;
+        if (prevRel1 && Array.from(document.getElementById("relic1Select").options).some(o => o.value === prevRel1)) {
+          document.getElementById("relic1Select").value = prevRel1;
+        }
+        if (prevRel2 && Array.from(document.getElementById("relic2Select").options).some(o => o.value === prevRel2)) {
+          document.getElementById("relic2Select").value = prevRel2;
+        }
+
         populateSpecsForClass(clsSel.value, mappedSpec);
         await updateClassGearOptions(document.getElementById("specSelect").value, prevTac, [prevLeg1, prevLeg2]);
         await refreshComputedStats();
@@ -1514,7 +1560,11 @@
       opt.textContent = `${t.name}`;
       tacSel.appendChild(opt);
     });
-    if (selectedTactical) tacSel.value = selectedTactical;
+    if (selectedTactical && Array.from(tacSel.options).some(o => o.value === selectedTactical)) {
+      tacSel.value = selectedTactical;
+    } else if (tacSel.options.length > 0) {
+      tacSel.selectedIndex = 0;
+    }
 
     ["legendary1Select", "legendary2Select"].forEach((id, idx) => {
       const sel = document.getElementById(id);
@@ -1525,10 +1575,10 @@
         opt.textContent = `${leg.name}`;
         sel.appendChild(opt);
       });
-      if (selectedLegs[idx]) {
+      if (selectedLegs[idx] && Array.from(sel.options).some(o => o.value === selectedLegs[idx])) {
         sel.value = selectedLegs[idx];
-      } else if (data.legendaries && data.legendaries.length > idx) {
-        sel.value = data.legendaries[idx].fqn;
+      } else if (sel.options.length > idx) {
+        sel.selectedIndex = idx;
       }
     });
   }
@@ -1773,7 +1823,7 @@
         progressTimer = null;
       }
       const result = await res.json();
-      if (!res.ok) {
+      if (!res.ok || (result && result.error)) {
         throw new Error(result.error || "Simulation failed");
       }
 
@@ -2444,7 +2494,14 @@
 
   document.getElementById("buildSelect").addEventListener("change", async e => {
     if (!e.target.value) return;
-    const res = await fetch(`/api/build_stats?path=${encodeURIComponent(e.target.value)}`);
+    const selectedPath = e.target.value;
+    const cachedBuild = (CATALOG && CATALOG.builds) ? CATALOG.builds.find(b => b.path === selectedPath) : null;
+    if (cachedBuild && cachedBuild.stats && Object.keys(cachedBuild.stats).length > 0) {
+      applyStatsToInputs(cachedBuild.stats);
+      await refreshComputedStats();
+      return;
+    }
+    const res = await fetch(`/api/build_stats?path=${encodeURIComponent(selectedPath)}`);
     const data = await res.json();
     if (res.ok && data.stats) {
       applyStatsToInputs(data.stats);
@@ -2546,6 +2603,186 @@
       runSimulation();
     }
   });
+
+  function syncDeleteButtons() {
+    const check = (selId, btnId) => {
+      const sel = document.getElementById(selId);
+      const btn = document.getElementById(btnId);
+      if (sel && btn) {
+        btn.style.display = (sel.value && sel.value.includes("/custom/")) ? "inline-block" : "none";
+      }
+    };
+    check("presetConfigSelect", "deleteRunConfigBtn");
+    check("rotationSelect", "deleteRotationBtn");
+    check("choicesSelect", "deleteChoicesBtn");
+    check("buildSelect", "deleteBuildBtn");
+  }
+
+  ["presetConfigSelect", "rotationSelect", "choicesSelect", "buildSelect"].forEach(id => {
+    const sel = document.getElementById(id);
+    if (sel) sel.addEventListener("change", () => syncDeleteButtons());
+  });
+
+  async function deleteCustomFile(selectElemId) {
+    const sel = document.getElementById(selectElemId);
+    const path = sel ? sel.value : "";
+    if (!path || !path.includes("/custom/")) return;
+    const filename = path.split("/").pop();
+    if (!confirm(`Are you sure you want to delete custom file "${filename}"?`)) return;
+
+    try {
+      const res = await fetch("/api/custom_file/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete file");
+      await loadCatalog(false);
+    } catch (err) {
+      alert("Error deleting file: " + err.message);
+    }
+  }
+
+  document.getElementById("deleteRunConfigBtn").addEventListener("click", () => deleteCustomFile("presetConfigSelect"));
+  document.getElementById("deleteRotationBtn").addEventListener("click", () => deleteCustomFile("rotationSelect"));
+  document.getElementById("deleteChoicesBtn").addEventListener("click", () => deleteCustomFile("choicesSelect"));
+  document.getElementById("deleteBuildBtn").addEventListener("click", () => deleteCustomFile("buildSelect"));
+
+  function setupFileImporter(btnId, fileInputId, category, selectElemId, validatorFn, afterImportCallback) {
+    const btn = document.getElementById(btnId);
+    const fileInput = document.getElementById(fileInputId);
+    if (!btn || !fileInput) return;
+
+    btn.addEventListener("click", () => {
+      fileInput.value = "";
+      fileInput.click();
+    });
+
+    fileInput.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (jsonErr) {
+          throw new Error("File is not valid JSON: " + jsonErr.message);
+        }
+
+        if (validatorFn) {
+          const valErr = validatorFn(parsed);
+          if (valErr) throw new Error(valErr);
+        }
+
+        const res = await fetch("/api/custom_file/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category,
+            filename: file.name,
+            content: parsed
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Import failed");
+
+        await loadCatalog(true);
+
+        const sel = document.getElementById(selectElemId);
+        if (sel) {
+          sel.value = data.path;
+          sel.dispatchEvent(new Event("change"));
+        }
+
+        if (afterImportCallback) {
+          await afterImportCallback(data.path, parsed);
+        }
+
+      } catch (err) {
+        alert(`Import Error: ${err.message}`);
+      }
+    });
+  }
+
+  // Set up the 4 file importers with schema validation
+  setupFileImporter(
+    "importRotationBtn",
+    "importRotationFile",
+    "rotations",
+    "rotationSelect",
+    (obj) => {
+      if (Array.isArray(obj)) {
+        if (obj.length === 0) return "Rotation array cannot be empty.";
+        return null;
+      }
+      if (obj && typeof obj === "object") {
+        if (Array.isArray(obj.rotation) || Array.isArray(obj.steps) || Array.isArray(obj.priority)) return null;
+      }
+      return "Rotation JSON must be an array of steps or contain a 'steps' / 'rotation' list.";
+    }
+  );
+
+  setupFileImporter(
+    "importChoicesBtn",
+    "importChoicesFile",
+    "choices",
+    "choicesSelect",
+    (obj) => {
+      if (Array.isArray(obj)) return null;
+      if (obj && typeof obj === "object") {
+        if (Array.isArray(obj.choices) || Array.isArray(obj.selected_choices) || obj.choices) return null;
+      }
+      return "Choices JSON must contain talent definitions or a 'choices' array.";
+    }
+  );
+
+  setupFileImporter(
+    "importBuildBtn",
+    "importBuildFile",
+    "builds",
+    "buildSelect",
+    (obj) => {
+      if (!obj || typeof obj !== "object") return "Build JSON must be an object.";
+      const stats = obj.stats || obj;
+      const recognized = ["Mastery", "Power", "Critical Rating", "Alacrity Rating", "Accuracy Rating"];
+      const hasAny = recognized.some(k => stats[k] !== undefined);
+      if (!hasAny) {
+        return "Build JSON must contain character stat attributes (e.g. Mastery, Power, Critical Rating).";
+      }
+      return null;
+    },
+    async (path, parsed) => {
+      const stats = parsed.stats || parsed;
+      applyStatsToInputs(stats);
+      await refreshComputedStats();
+    }
+  );
+
+  setupFileImporter(
+    "importRunConfigBtn",
+    "importRunConfigFile",
+    "run_config",
+    "presetConfigSelect",
+    (obj) => {
+      if (!obj || typeof obj !== "object") return "Run Config must be a JSON object.";
+      if (!obj.spec && !obj.spec_path && !obj.class_name && !obj.rotation_path && !obj.stats_path) {
+        return "Run Config must specify class/spec or rotation/stats configuration.";
+      }
+      return null;
+    },
+    async (path) => {
+      await applyPresetRunConfig(path);
+    }
+  );
+
+  // Cross-tab synchronization hook
+  window.onSwtorCustomFilesChanged = () => {
+    loadCatalog(true);
+  };
 
   // Initialize
   loadCatalog(false);

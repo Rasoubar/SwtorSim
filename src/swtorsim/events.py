@@ -78,7 +78,8 @@ class ApplyDamageLand(Event):
                 sim.triggers.dispatch("on_pre_death", sim, death_ctx)
                 sim.triggers.dispatch("on_death", sim, death_ctx)
                 sim.triggers.dispatch("on_kill", sim, death_ctx)
-        print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
+        if getattr(sim, "verbose", True):
+            print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
 
 class DamageHit(Event):
     """ Represents a hit execution. Holds the data needed to calculate damage, and trigger procs."""
@@ -174,7 +175,8 @@ class PeriodicProcTick(Event):
         """Executes tic and schedules next one, all according to tic's action data"""
         from src.swtorsim.abilities import execute_single_action
         for action in getattr(self.proc, 'actions', []):
-            print(f'[{sim.current_time}] Temporary Proc test')
+            if getattr(sim, "verbose", True):
+                print(f'[{sim.current_time}] Temporary Proc test')
             execute_single_action(sim, self.player, self.target, action, self.proc.name)
         is_affected = getattr(self.proc, 'affected_by_cdr', False)
         interval = self.player.scale_time_modifier(self.proc.icd) if is_affected else self.proc.icd
@@ -235,7 +237,8 @@ class EffectExpire(Event):
 
         self.entity.cleanup_expired_effects([self.effect_name])
 
-        print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.effect_name}")
+        if getattr(sim, "verbose", True):
+            print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.effect_name}")
 
 class DotTick(Event):
     """Represents a Dot Tick. Handles action execution, tick's value decrease and following tick scheduling."""
@@ -300,7 +303,8 @@ class DotTick(Event):
                     )
                 )
                 label = "DoT" if is_dot else "Buff"
-                print(f"[{sim.current_time:.2f}s] {label} expired and cleared: {dot_name}")
+                if getattr(sim, "verbose", True):
+                    print(f"[{sim.current_time:.2f}s] {label} expired and cleared: {dot_name}")
             return
 
         # Legacy fallback without blueprint
@@ -317,7 +321,8 @@ class DotTick(Event):
             sim.schedule_absolute(next_tick_time, self)
         else:
             self.target.cleanup_expired_effects([dot_name])
-            print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
+            if getattr(sim, "verbose", True):
+                print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
 
 class ChannelTickEvent(Event):
     """Represents a single tick of a channeled ability.
@@ -387,7 +392,8 @@ class ChannelTickEvent(Event):
             self.channel.is_finished = True
             self.source.active_channel = None
             self.source.is_channeling = False
-            print(f"[{sim.current_time:.3f}] {self.channel.name} channel over.")
+            if getattr(sim, "verbose", True):
+                print(f"[{sim.current_time:.3f}] {self.channel.name} channel over.")
             ability = getattr(self.channel, "ability", None)
             if ability is not None:
                 for eff in getattr(ability, "effects", {}).values():
@@ -435,7 +441,8 @@ class CastFinishEvent(Event):
 
         self.caster.active_cast = None
         self.caster.is_casting = False
-        print(f"[{sim.current_time:.3f}s] {self.caster.name} finished casting {self.ability.name}")
+        if getattr(sim, "verbose", True):
+            print(f"[{sim.current_time:.3f}s] {self.caster.name} finished casting {self.ability.name}")
 
         for entry_id in self.entry_effect_ids:
             self.ability.execute_effect(entry_id, self.caster, self.target, sim)

@@ -174,6 +174,8 @@ def load_complete_loadout(
     blueprints: Dict[str, AbilityBlueprint] = {}
 
     for fqn in selected_fqns:
+        if not fqn or not isinstance(fqn, str) or not fqn.strip():
+            continue
         rel_path = fqn_to_relative_path(fqn)
         full_path = base_parsed_path / rel_path
 
@@ -195,7 +197,28 @@ def load_complete_loadout(
 def load_json_file(filepath: str) -> Any:
     """Helper to open, load, and validate JSON files safely."""
     if not os.path.exists(filepath):
-        raise FileNotFoundError(f"Configuration file not found at: {filepath}")
+        p = Path(filepath)
+        if not p.is_absolute():
+            parts = p.parts
+            curr = Path(".")
+            matched = True
+            for part in parts:
+                found = False
+                try:
+                    for child in curr.iterdir():
+                        if child.name.lower() == part.lower():
+                            curr = child
+                            found = True
+                            break
+                except Exception:
+                    pass
+                if not found:
+                    matched = False
+                    break
+            if matched and curr.is_file():
+                filepath = str(curr)
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Configuration file not found at: {filepath}")
 
     with open(filepath, "r", encoding="utf-8") as f:
         raw_data = json.load(f)
