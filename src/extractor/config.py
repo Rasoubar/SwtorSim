@@ -117,19 +117,31 @@ class ExtractorConfig:
     keep_work_files: bool = False
     item_rating: int = DEFAULT_ITEM_RATING
     extract_icons: bool = False
+    parsed_only: bool = False
+    output_dir_override: Path | None = None
 
     @property
     def data_dir(self) -> Path:
+        if self.output_dir_override:
+            return self.output_dir_override
+        if self.pts:
+            return Path("data/extractor/pts")
         return DATA_DIR
 
     @property
     def work_dir(self) -> Path:
+        if self.pts:
+            return Path("data/extractor/pts/extract_work")
         return WORK_DIR
 
     @property
     def icons_dir(self) -> Path:
+        if self.pts:
+            return Path("data/extractor/pts/icons")
         return ICONS_DIR
 
     @property
     def output_dir(self) -> Path:
+        if self.pts:
+            return Path("data/extractor/pts/extracted")
         return OUTPUT_DIR

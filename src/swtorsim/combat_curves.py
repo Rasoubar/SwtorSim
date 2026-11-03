@@ -3,6 +3,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from src.swtorsim.settings import get_extractor_data_dir, get_data_environment
+
 CURVES_PATH = Path("data/extractor/combat_curves.json")
 
 ALACRITY_RATING = "STAT_rtg_spell_haste"
@@ -16,21 +18,29 @@ _ARMOR_ADDITIVE = "dcvArmorDamageReductionAdditive"
 _ARMOR_MULTIPLIER = "dcvArmorDamageReductionLevelMultiplier"
 
 
-@lru_cache(maxsize=1)
-def _curves() -> dict[str, Any]:
-    with CURVES_PATH.open(encoding="utf-8") as handle:
+@lru_cache(maxsize=4)
+def _load_curves(env: str) -> dict[str, Any]:
+    curves_path = get_extractor_data_dir(env) / "combat_curves.json"
+    if not curves_path.exists():
+        curves_path = Path("data/extractor/combat_curves.json")
+    with curves_path.open(encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def player_standard_health(level: int) -> int:
+def _curves(env: str | None = None) -> dict[str, Any]:
+    active_env = env or get_data_environment()
+    return _load_curves(active_env)
+
+
+def player_standard_health(level: int, env: str | None = None) -> int:
     """Player standard health from cbtStandardDamage at this level."""
-    table = _curves()["cbtStandardDamage"]["player"]
+    table = _curves(env)["cbtStandardDamage"]["player"]
     return int(_level_row(table, level, "player standard health"))
 
 
-def derived_stat(source: str, level: int, target: str | None = None) -> tuple[float, float]:
+def derived_stat(source: str, level: int, target: str | None = None, env: str | None = None) -> tuple[float, float]:
     """Returns (divisor, cap) for a derived-stat source at this level."""
-    groups = _curves()["modDerivedStatModifiers"].get(source)
+    groups = _curves(env)["modDerivedStatModifiers"].get(source)
     if not groups:
         raise KeyError(f"No derived-stat curve for '{source}'.")
 
@@ -48,10 +58,10 @@ def derived_stat(source: str, level: int, target: str | None = None) -> tuple[fl
     return float(row["divisor"]), float(row["cap"])
 
 
-def armor_constants(level: int) -> tuple[float, float]:
+def armor_constants(level: int, env: str | None = None) -> tuple[float, float]:
     """Returns (level multiplier, additive) for armor damage reduction."""
     row = _level_row(
-        _curves()["dcvCombatSystemsPerLevel"],
+        _curves(env)["dcvCombatSystemsPerLevel"],
         level,
         "armor constants",
     )
@@ -60,6 +70,14 @@ def armor_constants(level: int) -> tuple[float, float]:
 
 def _level_row(table: dict, level: int, label: str) -> Any:
     key = str(level)
-    if key not in table:
-        raise KeyError(f"No {label} for level {level}.")
-    return table[key]
+    if key in table:
+        return table[key]
+    numeric_keys = [int(k) for k in table.keys() if k.isdigit()]
+    if numeric_keys:
+        max_lvl = max(numeric_keys)
+        if level > max_lvl:
+            return table[str(max_lvl)]
+        min_lvl = min(numeric_keys)
+        if level < min_lvl:
+            return table[str(min_lvl)]
+    raise KeyError(f"No {label} for level {level}.")

@@ -1,5 +1,16 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
+
+from src.swtorsim.settings import (
+    get_extractor_data_dir,
+    get_data_environment,
+    set_data_environment,
+    set_stem_matching,
+    set_projectile_flight_time,
+    set_default_combat_distance,
+    set_in_flashpoint_operation,
+)
 
 DISCIPLINES_DIR = "data/extractor/disciplines"
 BUILDS_DIR = "data/builds"
@@ -11,6 +22,30 @@ TRAINING_DUMMY_ARMOR_DEBUFF_PATH = (
     "data/extractor/parsed/abl/npc/ability/utility/training_dummy_armor_debuff.json"
 )
 TRAINING_DUMMY_ARMOR_DEBUFF_LABEL = "Training Dummy Armor Debuff"
+
+
+def get_disciplines_dir(env: str | None = None) -> str:
+    return str(get_extractor_data_dir(env) / "disciplines")
+
+
+def get_gear_path(env: str | None = None) -> str:
+    return str(get_extractor_data_dir(env) / "gear_abilities_talents.json")
+
+
+def get_relics_path(env: str | None = None) -> str:
+    return str(get_extractor_data_dir(env) / "relics.json")
+
+
+def get_training_dummy_armor_debuff_path(env: str | None = None) -> str:
+    return str(
+        get_extractor_data_dir(env)
+        / "parsed"
+        / "abl"
+        / "npc"
+        / "ability"
+        / "utility"
+        / "training_dummy_armor_debuff.json"
+    )
 
 TACTICAL_PREFIX = "abl.itm.tactical."
 LEGENDARY_PREFIX = "abl.itm.legendary."
@@ -70,9 +105,10 @@ class RunConfig:
     combat_distance: float = 30.0
     level: int = 85
     seed: int = 42
+    environment: str = "live"
 
 
-def load_run_config(path: str) -> RunConfig:
+def load_run_config(path: str, environment: str | None = None) -> RunConfig:
     """Loads a run config JSON, fills class and spec from the discipline file, and validates it."""
     raw = _load_json(path)
     if not isinstance(raw, dict):
@@ -84,7 +120,12 @@ def load_run_config(path: str) -> RunConfig:
             f"Run config '{path}' is missing: {', '.join(missing)}."
         )
 
+    active_env = (environment or raw.get("environment") or "live").lower().strip()
     spec_path = _require_config_str(raw, "spec_path")
+    if active_env == "pts" and "data/extractor/" in spec_path and "data/extractor/pts/" not in spec_path:
+        pts_cand = spec_path.replace("data/extractor/", "data/extractor/pts/", 1)
+        if Path(pts_cand).exists():
+            spec_path = pts_cand
     spec_data = _load_json(spec_path)
     class_name, spec = discipline_names(spec_data, spec_path)
 
@@ -119,13 +160,9 @@ def load_run_config(path: str) -> RunConfig:
         ),
         level=_optional_config_int(raw, "level", 85),
         seed=_optional_config_int(raw, "seed", 42),
+        environment=active_env,
     )
-    from src.swtorsim.settings import (
-        set_stem_matching,
-        set_projectile_flight_time,
-        set_default_combat_distance,
-        set_in_flashpoint_operation,
-    )
+    set_data_environment(config.environment)
     set_stem_matching(config.enable_stem_matching)
     set_projectile_flight_time(config.enable_projectile_flight_time)
     set_default_combat_distance(config.combat_distance)
@@ -136,10 +173,14 @@ def load_run_config(path: str) -> RunConfig:
 
 def validate_run_config(
     config: RunConfig,
-    gear_path: str = GEAR_PATH,
-    relics_path: str = RELICS_PATH,
+    gear_path: str | None = None,
+    relics_path: str | None = None,
 ) -> None:
     """Checks paths, skill-tree choices, class-filtered gear, and unique legendaries and relics."""
+    env = getattr(config, "environment", "live")
+    actual_gear = gear_path or get_gear_path(env)
+    actual_relics = relics_path or get_relics_path(env)
+    actual_debuff = get_training_dummy_armor_debuff_path(env)
     errors: list[str] = []
 
     for label, path in (
@@ -147,8 +188,8 @@ def validate_run_config(
         ("stats_path", config.stats_path),
         ("rotation_path", config.rotation_path),
         ("choices_path", config.choices_path),
-        ("gear catalog", gear_path),
-        ("relic catalog", relics_path),
+        ("gear catalog", actual_gear),
+        ("relic catalog", actual_relics),
     ):
         if not isinstance(path, str) or not path.strip():
             errors.append(f"{label} must be a non-empty path.")
@@ -170,10 +211,10 @@ def validate_run_config(
         errors.append("seed must be an integer.")
     if not isinstance(config.training_dummy_armor_debuff, bool):
         errors.append("training_dummy_armor_debuff must be true or false.")
-    elif config.training_dummy_armor_debuff and not _is_file(TRAINING_DUMMY_ARMOR_DEBUFF_PATH):
+    elif config.training_dummy_armor_debuff and not _is_file(actual_debuff):
         errors.append(
             "Training Dummy Armor Debuff file not found: "
-            + TRAINING_DUMMY_ARMOR_DEBUFF_PATH
+            + actual_debuff
         )
 
     if errors:
@@ -197,13 +238,13 @@ def validate_run_config(
     except ValueError as exc:
         errors.extend(str(exc).splitlines())
 
-    gear_data = _load_json(gear_path)
-    relic_catalog = _load_json(relics_path)
+    gear_data = _load_json(actual_gear)
+    relic_catalog = _load_json(actual_relics)
     if not isinstance(gear_data, dict):
-        errors.append(f"Gear catalog '{gear_path}' must be a JSON object.")
+        errors.append(f"Gear catalog '{actual_gear}' must be a JSON object.")
         gear_data = {}
     if not isinstance(relic_catalog, list):
-        errors.append(f"Relic catalog '{relics_path}' must be a JSON array.")
+        errors.append(f"Relic catalog '{actual_relics}' must be a JSON array.")
         relic_catalog = []
 
     errors.extend(_validate_gear_fqn(

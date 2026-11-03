@@ -190,6 +190,11 @@ def main():
         help="Max duration cutoff in seconds (default 1000s or until dummy dies).",
     )
     parser.add_argument(
+        "--pts",
+        action="store_true",
+        help="Use PTS extracted data (data/extractor/pts/) instead of Live.",
+    )
+    parser.add_argument(
         "--web",
         "-w",
         action="store_true",
@@ -227,8 +232,9 @@ def main():
             launch_web_simulator(port=args.port, open_browser=not args.no_browser)
             return
 
-    config = load_run_config(str(config_path))
-    print(f"\n[OK] Loaded config: {config_path.name}")
+    active_env = "pts" if args.pts else "live"
+    config = load_run_config(str(config_path), environment=active_env)
+    print(f"\n[OK] Loaded config: {config_path.name} (Environment: {config.environment.upper()})")
 
     # 2. Resolve Dummy HP
     if args.hp is not None:

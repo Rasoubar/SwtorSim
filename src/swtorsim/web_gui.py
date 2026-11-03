@@ -157,9 +157,11 @@ def _write_json_crlf(target_path: Path, data: Any) -> None:
     target_path.write_bytes(formatted_crlf.encode("utf-8"))
 
 
-def get_simulator_catalog() -> dict[str, Any]:
+def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
     """Discovers all run configs, disciplines, builds, choices, rotations, and relics."""
-    disc_dir = _resolve_workspace_path(DISCIPLINES_DIR)
+    active_env = str(env).lower().strip()
+    disc_dir_rel = "data/extractor/pts/disciplines" if active_env == "pts" else DISCIPLINES_DIR
+    disc_dir = _resolve_workspace_path(disc_dir_rel)
     disciplines_raw = index_disciplines(str(disc_dir))
     disciplines: dict[str, dict[str, str]] = {}
     for cls_name, specs in disciplines_raw.items():
@@ -201,16 +203,18 @@ def get_simulator_catalog() -> dict[str, Any]:
     choices_files = _scan_dir(CHOICES_DIR)
     rotations_files = _scan_dir(ROTATIONS_DIR)
 
-    relics_path = _resolve_workspace_path(RELICS_PATH)
+    relics_path_rel = "data/extractor/pts/relics.json" if active_env == "pts" else RELICS_PATH
+    relics_path = _resolve_workspace_path(relics_path_rel)
     relics_raw = load_json_file(str(relics_path)) if relics_path.is_file() else []
     relics_list: list[dict[str, str]] = []
+    parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
     for fqn in relics_raw:
         if not isinstance(fqn, str) or not fqn.strip():
             continue
         short_lbl = relic_menu_label(fqn)
         r_name = short_lbl
         r_type = "active" if ".onuse." in fqn else "passive"
-        bp_file = PARSED_DIR / fqn_to_relative_path(fqn)
+        bp_file = parsed_dir / fqn_to_relative_path(fqn)
         if bp_file.is_file():
             try:
                 bp_doc = load_json_file(str(bp_file))
@@ -230,6 +234,7 @@ def get_simulator_catalog() -> dict[str, Any]:
         )
 
     return {
+        "environment": active_env,
         "run_configs": run_configs,
         "disciplines": disciplines,
         "builds": builds,
@@ -241,8 +246,13 @@ def get_simulator_catalog() -> dict[str, Any]:
     }
 
 
-def get_class_gear_options(spec_path: str) -> dict[str, Any]:
+def get_class_gear_options(spec_path: str, env: str = "live") -> dict[str, Any]:
     """Returns class-filtered tacticals, legendaries, and discipline skill-tree metadata."""
+    active_env = str(env).lower().strip()
+    if active_env == "pts" and "data/extractor/" in spec_path and "data/extractor/pts/" not in spec_path:
+        pts_cand = spec_path.replace("data/extractor/", "data/extractor/pts/", 1)
+        if _resolve_workspace_path(pts_cand).is_file():
+            spec_path = pts_cand
     resolved_spec = _resolve_workspace_path(spec_path)
     if not resolved_spec.is_file():
         raise FileNotFoundError(f"Discipline file not found: {spec_path}")
@@ -250,7 +260,8 @@ def get_class_gear_options(spec_path: str) -> dict[str, Any]:
     spec_data = load_json_file(str(resolved_spec))
     class_name, spec_name = discipline_names(spec_data, str(resolved_spec))
 
-    gear_file = _resolve_workspace_path(GEAR_PATH)
+    gear_path_rel = "data/extractor/pts/gear_abilities_talents.json" if active_env == "pts" else GEAR_PATH
+    gear_file = _resolve_workspace_path(gear_path_rel)
     gear_data = load_json_file(str(gear_file)) if gear_file.is_file() else {}
 
     tacticals_map = filter_gear_for_class(gear_data, TACTICAL_PREFIX, class_name)
@@ -278,20 +289,31 @@ def get_class_gear_options(spec_path: str) -> dict[str, Any]:
     }
 
 
-def load_run_config_bundle(rel_path: str) -> dict[str, Any]:
+def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
     """Loads a run_config JSON along with its referenced stats and choices dictionaries."""
+    active_env = str(env).lower().strip()
     target = _resolve_workspace_path(rel_path)
     if not target.is_file():
         raise FileNotFoundError(f"Run config not found: {rel_path}")
 
-    raw_rc = load_json_file(str(target))
-    spec_path = raw_rc.get("spec_path", "")
+    raw_rc = dict(load_json_file(str(target)))
+    spec_path = str(raw_rc.get("spec_path", "")).replace("\\", "/")
+    if spec_path and active_env == "pts" and "data/extractor/" in spec_path and "data/extractor/pts/" not in spec_path:
+        pts_cand = spec_path.replace("data/extractor/", "data/extractor/pts/", 1)
+        if _resolve_workspace_path(pts_cand).is_file():
+            spec_path = pts_cand
+            raw_rc["spec_path"] = pts_cand
+    elif spec_path and active_env == "live" and "data/extractor/pts/" in spec_path:
+        live_cand = spec_path.replace("data/extractor/pts/", "data/extractor/", 1)
+        if _resolve_workspace_path(live_cand).is_file():
+            spec_path = live_cand
+            raw_rc["spec_path"] = live_cand
     class_name = ""
     spec_name = ""
     gear_opts = {"tacticals": [], "legendaries": [], "skill_tree_levels": []}
     if spec_path:
         try:
-            gear_opts = get_class_gear_options(spec_path)
+            gear_opts = get_class_gear_options(spec_path, env=active_env)
             class_name = gear_opts["class_name"]
             spec_name = gear_opts["spec"]
         except Exception:
@@ -356,7 +378,17 @@ def _extract_computed_player_stats(player: Any) -> dict[str, Any]:
 
 def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[RunConfig, dict[str, Any]]:
     """Validates and resolves a simulation request payload into RunConfig and prepared inputs."""
-    spec_path = str(_resolve_workspace_path(payload.get("spec_path") or ""))
+    env = (payload.get("environment") or payload.get("env") or ("pts" if payload.get("pts") else "live")).lower().strip()
+    raw_spec = str(payload.get("spec_path") or "").replace("\\", "/")
+    if env == "pts" and "data/extractor/" in raw_spec and "data/extractor/pts/" not in raw_spec:
+        pts_cand = raw_spec.replace("data/extractor/", "data/extractor/pts/", 1)
+        if _resolve_workspace_path(pts_cand).is_file():
+            raw_spec = pts_cand
+    elif env == "live" and "data/extractor/pts/" in raw_spec:
+        live_cand = raw_spec.replace("data/extractor/pts/", "data/extractor/", 1)
+        if _resolve_workspace_path(live_cand).is_file():
+            raw_spec = live_cand
+    spec_path = str(_resolve_workspace_path(raw_spec))
     stats_path = str(_resolve_workspace_path(payload.get("stats_path") or ""))
     rotation_path = str(_resolve_workspace_path(payload.get("rotation_path") or ""))
     choices_path = str(_resolve_workspace_path(payload.get("choices_path") or ""))
@@ -411,7 +443,10 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         combat_distance=combat_distance,
         level=level,
         seed=seed,
+        environment=env,
     )
+    from src.swtorsim.settings import set_data_environment
+    set_data_environment(env)
 
     # Apply global simulation toggles
     set_stem_matching(config.enable_stem_matching)
@@ -439,10 +474,11 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     ]
 
     with redirect_stdout(io.StringIO()):
-        loadout_key = tuple(selected_fqns)
+        active_parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if env == "pts" else "data/extractor/parsed")
+        loadout_key = (env, tuple(selected_fqns))
         if loadout_key not in _BLUEPRINT_LOADOUT_CACHE:
             _BLUEPRINT_LOADOUT_CACHE[loadout_key] = load_complete_loadout(
-                selected_fqns, parsed_dir=str(PARSED_DIR)
+                selected_fqns, parsed_dir=str(active_parsed_dir)
             )
         loadout_blueprints = _BLUEPRINT_LOADOUT_CACHE[loadout_key]
 
@@ -754,6 +790,7 @@ def _run_single_test_detailed(
 
     return {
         "mode": "TEST",
+        "environment": config.environment,
         "class_name": config.class_name,
         "spec": config.spec,
         "level": config.level,
@@ -1136,6 +1173,7 @@ def _run_batch_monte_carlo_detailed(
 
     return {
         "mode": "BATCH",
+        "environment": config.environment,
         "iterations": iterations,
         "class_name": config.class_name,
         "spec": config.spec,
@@ -1248,8 +1286,9 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(html_bytes)
                 return
 
+            env = (qs.get("env") or ["live"])[0]
             if route == "/api/catalog":
-                self._send_json(get_simulator_catalog())
+                self._send_json(get_simulator_catalog(env=env))
                 return
 
             if route == "/api/progress":
@@ -1261,7 +1300,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 if not spec_path:
                     self._send_json({"error": "Missing spec_path parameter."}, status=400)
                     return
-                self._send_json(get_class_gear_options(spec_path))
+                self._send_json(get_class_gear_options(spec_path, env=env))
                 return
 
             if route == "/api/run_config":
@@ -1269,7 +1308,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 if not rel_path:
                     self._send_json({"error": "Missing path parameter."}, status=400)
                     return
-                self._send_json(load_run_config_bundle(rel_path))
+                self._send_json(load_run_config_bundle(rel_path, env=env))
                 return
 
             if route == "/api/build_stats":

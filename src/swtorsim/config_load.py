@@ -31,10 +31,18 @@ class SimulationInputs(NamedTuple):
 def load_from_run_config(config: RunConfig) -> SimulationInputs:
     """Resolves a run config into rotation, stats, blueprints, and debuffs."""
     validate_run_config(config)
-    loadout_blueprints = load_complete_loadout(selected_fqns_from_config(config))
+    env = getattr(config, "environment", "live")
+    from src.swtorsim.settings import get_extractor_data_dir, set_data_environment
+    set_data_environment(env)
+    parsed_dir = str(get_extractor_data_dir(env) / "parsed")
+    loadout_blueprints = load_complete_loadout(
+        selected_fqns_from_config(config), parsed_dir=parsed_dir
+    )
     debuff_module: dict[str, Any] = {}
     if config.training_dummy_armor_debuff:
-        debuff_module.update(load_training_dummy_armor_debuffs())
+        from src.swtorsim.run_config import get_training_dummy_armor_debuff_path
+        debuff_path = get_training_dummy_armor_debuff_path(env)
+        debuff_module.update(load_training_dummy_armor_debuffs(debuff_path=debuff_path))
     return SimulationInputs(
         rotation_config=load_rotation_from_json(config.rotation_path),
         stats_config=load_character_stats_from_json(
@@ -87,9 +95,10 @@ _DUMMY_DEBUFF_ROUTING = (
 )
 
 
-def load_training_dummy_armor_debuff() -> ParsedEffect:
+def load_training_dummy_armor_debuff(debuff_path: str | None = None) -> ParsedEffect:
     """Loads the operation dummy armor debuff as a permanent target effect."""
-    data = load_json_file(TRAINING_DUMMY_ARMOR_DEBUFF_PATH)
+    target_path = debuff_path or TRAINING_DUMMY_ARMOR_DEBUFF_PATH
+    data = load_json_file(target_path)
     fqn = data.get("fqn") or ""
     parsed = None
     for node in data.get("effects") or []:
@@ -101,15 +110,15 @@ def load_training_dummy_armor_debuff() -> ParsedEffect:
             break
     if parsed is None:
         raise ValueError(
-            f"'{TRAINING_DUMMY_ARMOR_DEBUFF_PATH}' has no stat modifiers to apply."
+            f"'{target_path}' has no stat modifiers to apply."
         )
     parsed.name = TRAINING_DUMMY_ARMOR_DEBUFF_LABEL
     return parsed
 
 
-def load_training_dummy_armor_debuffs() -> Dict[str, ParsedEffect]:
+def load_training_dummy_armor_debuffs(debuff_path: str | None = None) -> Dict[str, ParsedEffect]:
     """Decomposes the operation dummy armor debuff into the 7 canonical permanent raid debuffs."""
-    base_effect = load_training_dummy_armor_debuff()
+    base_effect = load_training_dummy_armor_debuff(debuff_path=debuff_path)
     debuffs: Dict[str, ParsedEffect] = {}
     for debuff_name, stat_keys, tags in _DUMMY_DEBUFF_ROUTING:
         matched_mods = [m for m in base_effect.modifiers if str(m.stat) in stat_keys]
@@ -154,10 +163,14 @@ def selected_fqns_from_config(config: RunConfig) -> List[str]:
 
 def load_complete_loadout(
     selected_fqns: List[str],
-    parsed_dir: str = "data/extractor/parsed",
+    parsed_dir: str | None = None,
 ) -> Dict[str, AbilityBlueprint]:
     """Resolves ability, talent, gear, and relic FQNs into a unified blueprint dictionary."""
-    base_parsed_path = Path(parsed_dir).resolve()
+    if parsed_dir is None:
+        from src.swtorsim.settings import get_extractor_data_dir
+        base_parsed_path = (get_extractor_data_dir() / "parsed").resolve()
+    else:
+        base_parsed_path = Path(parsed_dir).resolve()
     blueprints: Dict[str, AbilityBlueprint] = {}
 
     for fqn in selected_fqns:

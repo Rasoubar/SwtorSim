@@ -1,9 +1,36 @@
 """Global simulation settings and engine feature toggles."""
 
+from pathlib import Path
+
 ENABLE_STEM_MATCHING: bool = False
 ENABLE_PROJECTILE_FLIGHT_TIME: bool = False
 DEFAULT_COMBAT_DISTANCE: float = 30.0
 IN_FLASHPOINT_OPERATION: bool = True
+DATA_ENVIRONMENT: str = "live"
+
+
+def set_data_environment(env: str) -> None:
+    """Configures the active data environment ('live' or 'pts')."""
+    global DATA_ENVIRONMENT
+    DATA_ENVIRONMENT = "pts" if str(env).lower().strip() == "pts" else "live"
+
+
+def get_data_environment() -> str:
+    """Returns the active data environment ('live' or 'pts')."""
+    return DATA_ENVIRONMENT
+
+
+def is_pts_environment() -> bool:
+    """Returns True if the active environment is PTS."""
+    return DATA_ENVIRONMENT == "pts"
+
+
+def get_extractor_data_dir(env: str | None = None) -> Path:
+    """Returns Path to the extractor directory for the requested or active environment."""
+    selected = (env if env is not None else DATA_ENVIRONMENT).lower().strip()
+    if selected == "pts":
+        return Path("data/extractor/pts")
+    return Path("data/extractor")
 
 
 def set_stem_matching(enabled: bool) -> None:

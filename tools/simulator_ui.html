@@ -815,6 +815,10 @@
   </div>
 
   <div class="header-controls">
+    <div style="display:inline-flex;align-items:center;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-right:4px;">
+      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--accent-bg);color:var(--accent);" onclick="setEnvironment('live')">Live (7.6)</button>
+      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('pts')">PTS (7.7)</button>
+    </div>
     <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Preset Config:</label>
     <select id="presetConfigSelect" style="min-width:170px;">
       <option value="">-- Select Run Config --</option>
@@ -1344,11 +1348,41 @@
     openModal("saveBuildModal");
   }
 
+  let currentEnvironment = "live";
+
+  async function setEnvironment(env) {
+    currentEnvironment = env === "pts" ? "pts" : "live";
+    const liveBtn = document.getElementById("envLiveBtn");
+    const ptsBtn = document.getElementById("envPtsBtn");
+    if (liveBtn && ptsBtn) {
+      if (currentEnvironment === "pts") {
+        liveBtn.style.background = "transparent";
+        liveBtn.style.color = "var(--text-muted)";
+        ptsBtn.style.background = "var(--amber-bg)";
+        ptsBtn.style.color = "var(--amber)";
+      } else {
+        liveBtn.style.background = "var(--accent-bg)";
+        liveBtn.style.color = "var(--accent)";
+        ptsBtn.style.background = "transparent";
+        ptsBtn.style.color = "var(--text-muted)";
+      }
+    }
+    const lvlInp = document.getElementById("levelInput");
+    if (lvlInp) {
+      if (currentEnvironment === "pts" && lvlInp.value === "80") {
+        lvlInp.value = "85";
+      } else if (currentEnvironment === "live" && lvlInp.value === "85") {
+        lvlInp.value = "80";
+      }
+    }
+    await loadCatalog(true);
+  }
+
   // Load workspace catalog
   async function loadCatalog(preserveSelections = false) {
     try {
       setStatus("Loading catalog...", "running");
-      const res = await fetch("/api/catalog");
+      const res = await fetch(`/api/catalog?env=${encodeURIComponent(currentEnvironment)}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to load catalog");
       CATALOG = data;
@@ -1408,6 +1442,12 @@
 
       // Classes
       const clsSel = document.getElementById("classSelect");
+      const prevCls = clsSel.value;
+      const prevSpec = document.getElementById("specSelect").value;
+      const prevTac = document.getElementById("tacticalSelect").value;
+      const prevLeg1 = document.getElementById("legendary1Select").value;
+      const prevLeg2 = document.getElementById("legendary2Select").value;
+
       clsSel.innerHTML = "";
       Object.keys(data.disciplines || {}).sort().forEach(clsName => {
         const opt = document.createElement("option");
@@ -1421,8 +1461,22 @@
         const pref = data.run_configs.find(r => r.label.includes("hatred_14gcd")) || data.run_configs[0];
         rcSel.value = pref.path;
         await applyPresetRunConfig(pref.path);
-      } else if (prevRc) {
-        rcSel.value = prevRc;
+      } else {
+        if (prevRc) {
+          rcSel.value = prevRc;
+        }
+        if (prevCls && data.disciplines && data.disciplines[prevCls]) {
+          clsSel.value = prevCls;
+        }
+        let mappedSpec = prevSpec;
+        if (currentEnvironment === "pts" && mappedSpec.includes("data/extractor/") && !mappedSpec.includes("data/extractor/pts/")) {
+          mappedSpec = mappedSpec.replace("data/extractor/", "data/extractor/pts/");
+        } else if (currentEnvironment === "live" && mappedSpec.includes("data/extractor/pts/")) {
+          mappedSpec = mappedSpec.replace("data/extractor/pts/", "data/extractor/");
+        }
+        populateSpecsForClass(clsSel.value, mappedSpec);
+        await updateClassGearOptions(document.getElementById("specSelect").value, prevTac, [prevLeg1, prevLeg2]);
+        await refreshComputedStats();
       }
       setStatus("Ready", "ready");
     } catch (err) {
@@ -1448,7 +1502,7 @@
 
   async function updateClassGearOptions(specPath, selectedTactical = null, selectedLegs = []) {
     if (!specPath) return;
-    const res = await fetch(`/api/class_gear?spec_path=${encodeURIComponent(specPath)}`);
+    const res = await fetch(`/api/class_gear?spec_path=${encodeURIComponent(specPath)}&env=${encodeURIComponent(currentEnvironment)}`);
     const data = await res.json();
     if (!res.ok) return;
 
@@ -1528,7 +1582,7 @@
     if (!path) return;
     try {
       setStatus("Loading preset...", "running");
-      const res = await fetch(`/api/run_config?path=${encodeURIComponent(path)}`);
+      const res = await fetch(`/api/run_config?path=${encodeURIComponent(path)}&env=${encodeURIComponent(currentEnvironment)}`);
       const bundle = await res.json();
       if (!res.ok) throw new Error(bundle.error || "Failed to load preset");
 
@@ -1593,6 +1647,9 @@
     if (rel2 && rel2 !== rel1) relics.push(rel2);
 
     return {
+      environment: currentEnvironment,
+      env: currentEnvironment,
+      pts: currentEnvironment === "pts",
       spec_path: document.getElementById("specSelect").value,
       stats_path: document.getElementById("buildSelect").value,
       stats_override: getStatsOverrideFromInputs(),
@@ -1605,7 +1662,7 @@
       iterations: parseInt(document.getElementById("iterationsInput").value, 10) || 50,
       dummy_hp: parseInt(document.getElementById("dummyHpInput").value, 10) || 6000000,
       duration: parseFloat(document.getElementById("durationInput").value) || 1000,
-      level: parseInt(document.getElementById("levelInput").value, 10) || 85,
+      level: parseInt(document.getElementById("levelInput").value, 10) || (currentEnvironment === "pts" ? 85 : 80),
       seed: parseInt(document.getElementById("seedInput").value, 10) || 42,
       training_dummy_armor_debuff: document.getElementById("toggleArmorDebuff").checked,
       enable_stem_matching: document.getElementById("toggleStemMatching").checked,
@@ -2458,6 +2515,10 @@
     openModal("saveConfigModal");
   });
 
+  const lvlInp = document.getElementById("levelInput");
+  if (lvlInp) {
+    lvlInp.addEventListener("change", () => refreshComputedStats());
+  }
   document.getElementById("reloadCatalogBtn").addEventListener("click", () => loadCatalog(true));
   document.getElementById("runSimBtn").addEventListener("click", () => runSimulation());
 
