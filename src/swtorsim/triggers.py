@@ -219,6 +219,8 @@ class TriggerManager:
                 "owner_entity": sub["target"],
                 "effect_tags": set(context.get("effect_tags") or ()) | set(sub.get("effect_tags") or ()),
             }
+            if effective_interval > 0.0:
+                sub["next_allowed_time"] = sim.current_time + effective_interval
             ran = sub["ability"].execute_branch(
                 sim,
                 sub["branch"],
@@ -226,6 +228,5 @@ class TriggerManager:
                 sub["target"],
                 context=branch_ctx,
             )
-            if ran:
-                if effective_interval > 0.0:
-                    sub["next_allowed_time"] = sim.current_time + effective_interval
+            if not ran and effective_interval > 0.0:
+                sub["next_allowed_time"] = sim.current_time

@@ -905,3 +905,18 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **Verification**:
   - BasicMaliPS simulations now cast Phantom Stride on cooldown when Bloodletting is on lockout (`1` cast in 1M HP runs at `9.80s`/`9.10s`; `4` casts in 6M HP 14gcd runs; `3` casts in 6M HP 13gcd runs).
   - Enhanced `tests/test_simulation_integration.py` (`test_06` and `test_07`) to assert `player.proc_registry` hydration, `Bloodletting_3` lockout evaluation, and end-to-end `Phantom Stride` execution; 15/15 integration and ability execution unit tests passing.
+
+
+### 32. Trigger Re-entrancy Guard & Pre-Execution ICD Lockout (`src/swtorsim/triggers.py`) - [DONE]
+- **Root Cause**:
+  - When a triggered branch executed an instant damage action (e.g. Volatile Substance detonation triggered by Acid Blade periodic damage), `handle_damage_action` immediately called `hit_event.resolve(sim)`.
+  - In `DamageHit.resolve`, `sim.triggers.dispatch('on_damage_taken')` fired synchronously during the hit.
+  - In `TriggerManager.dispatch`, `sub['next_allowed_time']` was previously updated *after* `sub['ability'].execute_branch(...)` returned.
+  - Because the re-entrant dispatch call occurred while the outer `execute_branch` was still resolving, `sub['next_allowed_time']` remained `0.0`. If the damage inherited a matching tag (e.g. `tag.abl.debuff.poison`), the subscriber immediately matched and executed itself again recursively, causing `RecursionError: maximum recursion depth exceeded`.
+- **Implementation**:
+  - In `src/swtorsim/triggers.py`, updated `TriggerManager.dispatch` to assign `sub['next_allowed_time'] = sim.current_time + effective_interval` immediately *before* executing the branch, locking the ICD against synchronous child actions. If the branch does not run (`not ran`), the lockout is rolled back.
+  - Added an active execution flag `sub['is_executing'] = True` inside a `try...finally` block to protect subscribers against any zero-ICD re-entrancy.
+  - Rebuilt standalone web release bundle via `tools/build_web_release.py`.
+- **Verification**:
+  - Verified Concealment Operative rotation with Level 39 Choice 2 (Best Defense / Crippling Slice) and `Recursion.json` runs cleanly without recursion errors, successfully detonating Volatile Substance once at `t = 1.86s` and casting Crippling Slice on GCD at `t = 2.70s`.
+  - 15/15 integration and ability execution unit tests passing in `tests/test_simulation_integration.py` and `tests/test_ability_execution.py`.
