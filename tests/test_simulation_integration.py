@@ -248,16 +248,24 @@ class SimulationIntegrationTests(unittest.TestCase):
 
     def test_06_passive_registration_and_proc_icd_tracking(self):
         """[TODO #6] Verifies passives/procs (e.g. Bloodletting) are registered and proc_cooldown_above works."""
-        with self.subTest("bloodletting_proc_cooldown_check_does_not_crash"):
+        with self.subTest("proc_registry_populated"):
+            self.assertIn("Bloodletting", self.player.proc_registry)
+            self.assertEqual(self.player.proc_registry["Bloodletting"]["kind"], "lockout_effect")
+            self.assertEqual(self.player.proc_registry["Bloodletting"]["effect_name"], "Bloodletting_3")
+            self.assertIn("Languishing Lashes", self.player.proc_registry)
+            self.assertEqual(self.player.proc_registry["Languishing Lashes"]["kind"], "trigger_icd")
+
+        with self.subTest("bloodletting_proc_cooldown_check_evaluates_lockout"):
             rule = {"proc_cooldown_above": {"name": "Bloodletting", "value": 1.5}}
-            try:
-                result = validate_all(rule, self.player, self.target, sim=self.sim)
-            except AttributeError as exc:
-                self.fail(
-                    f"validate_all crashed on 'proc_cooldown_above' for 'Bloodletting': {exc}. "
-                    f"Passives/procs in player.passive_blueprints need to populate player.procs or handle missing procs."
-                )
-            self.assertIsInstance(result, bool)
+            result_initial = validate_all(rule, self.player, self.target, sim=self.sim)
+            self.assertFalse(result_initial, "Should be False before Bloodletting lockout is applied")
+
+            # Apply Bloodletting_3 lockout effect directly via the Bloodletting passive ability
+            bl_passive = self.player.passive_db["bloodletting"]
+            bl_passive.execute_effect(3, self.player, self.player, self.sim)
+            self.assertIn("Bloodletting_3", self.player.effects)
+            result_locked = validate_all(rule, self.player, self.target, sim=self.sim)
+            self.assertTrue(result_locked, "Should be True when Bloodletting_3 lockout has >1.5s remaining and buff is absent")
 
     def test_07_full_hatred_rotation_simulation_run(self):
         """[End-to-End] Runs a 30-second Hatred Assassin simulation and validates rotational execution."""
@@ -295,6 +303,14 @@ class SimulationIntegrationTests(unittest.TestCase):
         with self.subTest("total_dps_is_positive"):
             dps = self.sim.tracker.total_damage / max(1.0, self.sim.current_time)
             self.assertGreater(dps, 5000.0, f"Expected meaningful DPS (>5,000), got {dps:.1f}")
+
+        with self.subTest("phantom_stride_cast_via_proc_cooldown_above"):
+            history_names = {name for (_entity, name) in self.sim.tracker.effect_history}
+            self.assertIn(
+                "Phantom Stride",
+                history_names,
+                "Expected Phantom Stride to be cast during BasicMaliPS rotation once Bloodletting lockout is active",
+            )
 
     def test_08_permanent_and_proper_named_effects_logged_in_metrics(self):
         """Verifies permanent passives/debuffs with proper names are tracked in metrics while _x effects are excluded."""

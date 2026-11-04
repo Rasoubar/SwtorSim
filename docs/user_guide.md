@@ -259,7 +259,7 @@ All conditions inside a `"rules"` dictionary must evaluate to `True` (logical `A
 | `caster_energy_above` | `60` | True if caster primary resource `>= threshold`. |
 | `caster_energy_below` | `40` | True if caster primary resource `< threshold`. |
 | `ability_cooldown_under` | `{"name": "eradicate", "value": 1.5}` | True if the remaining cooldown of `name` is `< value` seconds. |
-| `proc_cooldown_above` | `{"name": "Lightning Barrage", "value": 4.0}` | True if the named proc is not active and its remaining ICD is `> value` seconds. |
+| `proc_cooldown_above` | `{"name": "Bloodletting", "value": 1.5}` | True if the named proc is not active and its remaining ICD/lockout (resolved via `player.proc_registry`) is `> value` seconds. |
 
 ---
 

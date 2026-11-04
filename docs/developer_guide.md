@@ -32,16 +32,16 @@ Before searching across multiple files, use this routing table (see [`ARCHITECTU
 | Subsystem | Target File | Key Symbols |
 | :--- | :--- | :--- |
 | **Event Queue & Clock** | [`src/swtorsim/engine.py`](../src/swtorsim/engine.py) | `SimulationEngine`, `schedule_relative`, `schedule_absolute`, `run_timed` |
-| **Simulation Hydration** | [`src/swtorsim/setup.py`](../src/swtorsim/setup.py) | `prepare_simulation`, `schedule_periodic` |
+| **Simulation Hydration** | [`src/swtorsim/setup.py`](../src/swtorsim/setup.py) | `prepare_simulation`, `build_proc_registry`, `schedule_periodic` |
 | **Loadout & Raid Debuffs** | [`src/swtorsim/config_load.py`](../src/swtorsim/config_load.py) | `load_from_run_config`, `load_training_dummy_armor_debuffs`, `_DUMMY_DEBUFF_ROUTING` |
-| **Character Stats & Time Scaling** | [`src/swtorsim/entities.py`](../src/swtorsim/entities.py) | `Entity`, `Player`, `Dummy`, `recalculate_stats`, `scale_time_modifier`, `apply_effect` |
+| **Character Stats & Time Scaling** | [`src/swtorsim/entities.py`](../src/swtorsim/entities.py) | `Entity`, `Player`, `Dummy`, `recalculate_stats`, `scale_time_modifier`, `apply_effect`, `proc_registry` |
 | **Combat Math & 6 Buckets** | [`src/swtorsim/combat_math.py`](../src/swtorsim/combat_math.py) | `calculate_hit`, `handle_modifiers`, `handle_caster_buffs`, `handle_target_debuffs`, `calculate_base_damage`, `handle_mitigation`, `calculate_crit`, `accuracy_roll` |
 | **Stat Modifier Normalization** | [`src/swtorsim/modifiers.py`](../src/swtorsim/modifiers.py) | `Modifier`, `normalize_stat_name`, `applies_to`, `_ability_stem` |
 | **Abilities, Effects & Actions** | [`src/swtorsim/abilities.py`](../src/swtorsim/abilities.py) | `AbilityBlueprint`, `Effect`, `Branch`, `Ability`, `execute_single_action`, `handle_*` |
 | **Runtime Buffs, DoTs, Channels** | [`src/swtorsim/effects.py`](../src/swtorsim/effects.py) | `ActiveEffect`, `ActiveDot`, `ActiveChannel` |
 | **Timeline Events** | [`src/swtorsim/events.py`](../src/swtorsim/events.py) | `PlayerReady`, `DamageHit`, `DotTick`, `ChannelTickEvent`, `CastFinishEvent`, `EffectExpire`, `ProjectileImpactEvent`, `DelayedBranchEvent` |
-| **Conditions & Requirements** | [`src/swtorsim/requirements.py`](../src/swtorsim/requirements.py) | `validate_all`, `CONDITION_DISPATCH`, `check_*` |
-| **Reactive Proc Event Bus** | [`src/swtorsim/triggers.py`](../src/swtorsim/triggers.py) | `TriggerManager`, `subscribe`, `dispatch` |
+| **Conditions & Requirements** | [`src/swtorsim/requirements.py`](../src/swtorsim/requirements.py) | `validate_all`, `CONDITION_REGISTRY`, `check_proc_cooldown_above`, `check_*` |
+| **Reactive Proc Event Bus** | [`src/swtorsim/triggers.py`](../src/swtorsim/triggers.py) | `TriggerManager`, `subscribe`, `get_remaining_icd`, `dispatch` |
 | **Primary Resource Pools** | [`src/swtorsim/resources.py`](../src/swtorsim/resources.py) | `ResourcePool`, `StandardPool`, `HeatPool`, `EnergyPool`, `BuilderPool` |
 | **Rotation Evaluator** | [`src/swtorsim/rotation.py`](../src/swtorsim/rotation.py) | `Rotation`, `FixedAbilityStep`, `PriorityBlockStep`, `OptionalAbilityStep` |
 

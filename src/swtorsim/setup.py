@@ -2,6 +2,8 @@
 
 import copy
 import random
+import re
+from typing import Any
 from src.swtorsim.engine import Simulation
 from src.swtorsim.abilities import Ability
 from src.swtorsim.entities import Player, Dummy
@@ -10,6 +12,88 @@ from src.swtorsim.combat_curves import player_standard_health
 from src.swtorsim.rotation import Rotation
 from src.swtorsim.class_buffs import apply_class_buffs
 from src.swtorsim.resources import resource_type_for_class
+
+
+def _strip_effect_number_suffix(effect_name: str, parent_name: str) -> str:
+    """Normalizes internal effect names like 'Bloodletting_3' back to 'Bloodletting' when appropriate."""
+    if not effect_name:
+        return parent_name
+    m = re.match(r"^(.+)_\d+$", effect_name)
+    if m:
+        prefix = m.group(1)
+        if not parent_name or prefix.lower() == parent_name.lower():
+            return parent_name or prefix
+        return prefix
+    return effect_name
+
+
+def build_proc_registry(loadout_blueprints: dict) -> dict[str, dict[str, Any]]:
+    """Builds an authoritative registry mapping canonical proc names to their lockout/ICD implementation."""
+    procs_map: dict[str, dict[str, Any]] = {}
+    for fqn, bp in (loadout_blueprints or {}).items():
+        if str(fqn).startswith("tal."):
+            continue
+        parent_name = str(getattr(bp, "name", None) or fqn).strip()
+        ability_type = getattr(bp, "type", "passive") or "passive"
+        effects = getattr(bp, "effects", {}) or {}
+        eff_iter = effects.values() if isinstance(effects, dict) else effects
+
+        for eff in eff_iter:
+            raw_eff_name = str(getattr(eff, "name", None) or parent_name).strip()
+            eff_tags = [str(t) for t in (getattr(eff, "tags", None) or [])]
+            initializers = getattr(eff, "initializers", None) or []
+            init_types = {
+                init.get("initializer_type")
+                for init in initializers
+                if isinstance(init, dict)
+            }
+            is_proc_init = "eff_initializer__set_effect_procs" in init_types
+            duration = float(getattr(eff, "duration", 0.0) or 0.0)
+
+            # 1. Explicit ICD lockout effects (e.g. Bloodletting_3, Raze_4, Mastery Surge_3)
+            if any("lockout" in t.lower() for t in eff_tags):
+                proc_label = _strip_effect_number_suffix(raw_eff_name, parent_name)
+                procs_map[proc_label] = {
+                    "name": proc_label,
+                    "effect_name": raw_eff_name,
+                    "source_name": parent_name,
+                    "source_fqn": fqn,
+                    "icd": duration,
+                    "kind": "lockout_effect",
+                }
+                continue
+
+            # 2. Branch trigger ICDs (interval_61) on passive/proc abilities
+            if ability_type == "passive":
+                for branch in getattr(eff, "branches", None) or []:
+                    for trig in getattr(branch, "triggers", None) or []:
+                        intervals = trig.get("intervals") or {}
+                        icd_val = float(intervals.get("interval_61") or 0.0)
+                        if icd_val > 0.0:
+                            proc_label = _strip_effect_number_suffix(raw_eff_name, parent_name)
+                            procs_map[proc_label] = {
+                                "name": proc_label,
+                                "source_name": parent_name,
+                                "source_fqn": fqn,
+                                "icd": icd_val,
+                                "kind": "trigger_icd",
+                            }
+
+            # 3. Proc buff effects
+            if is_proc_init and duration > 0.0:
+                clean_name = _strip_effect_number_suffix(raw_eff_name, parent_name)
+                if clean_name not in procs_map:
+                    procs_map[clean_name] = {
+                        "name": clean_name,
+                        "effect_name": raw_eff_name,
+                        "source_name": parent_name,
+                        "source_fqn": fqn,
+                        "icd": duration,
+                        "kind": "proc_buff",
+                    }
+
+    return procs_map
+
 
 def schedule_periodic(player, target, sim):
     """Schedules the randomized initial tick for periodic proc effects."""
@@ -40,6 +124,7 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
         passives=passive_blueprints,
         resource=resource_type_for_class(stats_config.get("class_name")),
     )
+    player.proc_registry = build_proc_registry(loadout_blueprints)
 
     # Set up player base stats. Standard health comes from the level curve.
     player.level = stats_config.get("level", player.level)

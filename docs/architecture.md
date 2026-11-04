@@ -78,7 +78,8 @@ flowchart TD
      1. Full FQN (`"abl.sith_inquisitor.skill.hatred.assassinate_plus"`)
      2. Display Name (`"Assassinate+"`)
      3. Normalized Slug (`"assassinate+"`, lowercase with spaces replaced by `_`)
-3. **Passive Hydration & Trigger Subscription**:
+3. **Passive Hydration, Proc Registry, & Trigger Subscription**:
+   - `build_proc_registry(loadout_blueprints)` populates `player.proc_registry`, mapping canonical proc names (e.g. `"Bloodletting"`, `"Raze"`, `"Languishing Lashes"`) to their exact runtime lockout effect name (`"Bloodletting_3"`, `"Raze_4"`) or `trigger_icd` source FQN, sharing the exact classification rules used by the Rotation Builder catalog.
    - For every blueprint in `loadout_blueprints`:
      - If `blueprint.type == "passive"`, applies its top-level `stat_changes` and persistent sub-effects as permanent `ActiveEffect` instances on `player` (`expires_at=None`) and calls `player.recalculate_stats()`.
      - Subscribes all event-bus triggers (`on_damage_dealt`, `on_ability_activate`, `on_enter_combat`, etc.) from passive branches into `sim.triggers`.
@@ -248,7 +249,7 @@ When `Entity.apply_effect(sim, ability, effect_blueprint, caster)` is called:
 
 When `sim.triggers.dispatch(event_name, sim, context)` is called, each subscribed listener checks:
 1. **Actor Match**: Matches caster or target according to the trigger category, plus `from_actor` / `to_actor` checks.
-2. **Internal Cooldown (ICD)**: Checks `sim.current_time >= listener["next_available_time"]` (where `min_interval` is parsed from GOM `intervals["interval_61"]`).
+2. **Internal Cooldown (ICD)**: Checks `sim.current_time >= listener["next_allowed_time"]` (where `min_interval` is parsed from GOM `intervals["interval_61"]`). Rotation conditions (`check_proc_cooldown_above`) can also query remaining trigger ICDs via `TriggerManager.get_remaining_icd(source_fqn, current_time, caster)`.
 3. **Weapon Mode / Periodic / Spell Type / Damage Type / Crit Filters**:
    - `weapon_mode`: Ensures weapon-only procs only fire on direct Melee/Ranged hits (`is_weapon_attack`).
    - `spell_types`: Filters by Weapon (`1`), Tech (`2`), or Force (`3`).

@@ -278,6 +278,7 @@ class Player(Entity):
         self.next_gcd = 0.0
         self.cooldowns = {}
         self.procs = {}
+        self.proc_registry: dict[str, dict[str, Any]] = {}
         self.passive_blueprints = passives or {}
         self.passive_db = {}
         self.ability_db = self.build_ability_db(abilities or {})

@@ -5,8 +5,8 @@
 | Module | Responsibility | Primary Classes & Functions |
 |---|---|---|
 | `swtorsim/engine.py` | Event heap & simulation clock | `Simulation :: schedule_relative, schedule_absolute, run_timed` |
-| `swtorsim/setup.py` | Loadout wiring & passive init | `prepare_simulation, schedule_periodic` |
-| `swtorsim/entities.py` | Actors, stats, timers, immunities | `Entity :: apply_effect, cleanup_expired_effects, has_immunity`; `Player :: recalculate_stats, calculate_gcd, calculate_cast_time, calculate_channel_duration, calculate_cooldown, calculate_resource_cost, calculate_resource_regen, calculate_effect_duration, calculate_effect_tick, break_stealth`; `Dummy :: recalculate_stats, hp_ratio` |
+| `swtorsim/setup.py` | Loadout wiring, passive init & proc registry | `prepare_simulation, build_proc_registry, schedule_periodic` |
+| `swtorsim/entities.py` | Actors, stats, timers, immunities | `Entity :: apply_effect, cleanup_expired_effects, has_immunity`; `Player :: recalculate_stats, calculate_gcd, calculate_cast_time, calculate_channel_duration, calculate_cooldown, calculate_resource_cost, calculate_resource_regen, calculate_effect_duration, calculate_effect_tick, break_stealth, proc_registry`; `Dummy :: recalculate_stats, hp_ratio` |
 | `swtorsim/class_buffs.py` | Universal class buffs & hidden permanent bonus (+1% acc/crit chance/crit mult) | `apply_class_buffs, load_class_buff_effects, HIDDEN_BONUSES` |
 | `swtorsim/abilities.py` | Cast lifecycle, targeting, actions | `Ability :: can_cast, cast, _start_channel, apply_cooldown_locks, schedule_recharge`; `Effect :: execute, execute_triggered_branches`; `Branch :: execute`; `execute_single_action, handle_*` |
 | `swtorsim/effects.py` | Buff, DoT, and channel state | `ActiveEffect :: from_effect, get_effective_modifiers, modify_stacks, set_stacks`; `ActiveChannel, ActiveDot` |
@@ -14,8 +14,8 @@
 | `swtorsim/combat_math.py` | Hit math, DR curves, buckets, crits | `calculate_hit, calculate_base_damage, handle_modifiers, handle_caster_buffs, handle_target_debuffs, handle_mitigation, calculate_crit, accuracy_roll, calc_dr` |
 | `swtorsim/combat_curves.py` | Level 80 curves & armor constants | `player_standard_health, derived_stat, armor_constants` |
 | `swtorsim/modifiers.py` | Stat ID mapping & target filters | `Modifier :: applies_to, from_stat_change, from_modify_stat, from_modify_meta_stat, from_conditional_stat_mod`; `resolve_stat` |
-| `swtorsim/requirements.py` | Condition evaluation (36/36 types) | `validate_all, evaluate_extracted_conditions, evaluate_logic, evaluate_single_extracted_condition, entity_has_effect, get_entity_effect_stacks` |
-| `swtorsim/triggers.py` | Proc subscriptions, ICDs, dispatch | `TriggerManager :: subscribe, unsubscribe, dispatch` |
+| `swtorsim/requirements.py` | Condition evaluation (36/36 types) | `validate_all, evaluate_extracted_conditions, evaluate_logic, evaluate_single_extracted_condition, check_proc_cooldown_above, entity_has_effect, get_entity_effect_stacks` |
+| `swtorsim/triggers.py` | Proc subscriptions, ICDs, dispatch | `TriggerManager :: subscribe, unsubscribe, get_remaining_icd, dispatch` |
 | `swtorsim/resources.py` | Resource pools & passive regen | `ResourcePool, StandardPool, HeatPool, EnergyPool, BuilderPool :: can_afford, spend, generate, tick_passive_regen` |
 | `swtorsim/rotation.py` | Priority list & step evaluation | `Rotation, PriorityBlockStep, FixedAbilityStep :: evaluate` |
 | `swtorsim/config_load.py` | Loadout & JSON hydration | `load_from_run_config, load_complete_loadout` |
@@ -62,7 +62,7 @@
 
 - **Effects**: `entities.py :: Entity.apply_effect` builds `effects.py :: ActiveEffect.from_effect`, scales stacks (`60`/`61`), duration (`44`), and tick rate (`45`), subscribes triggers (`TriggerManager.subscribe`), runs `on_apply`/`on_refresh`, and schedules `events.py :: DotTick` & `EffectExpire`.
 - **Stacks & Immunities**: `ActiveEffect.modify_stacks` (dispatches `on_stack_charge_increased/decreased`) vs `ActiveEffect.set_stacks` (silent cap); `Entity.immunities` unions `_base_immunities` and effect `immunities`.
-- **Conditions & Triggers**: `requirements.py :: evaluate_single_extracted_condition` & `evaluate_logic` evaluate 36 conditions; `triggers.py :: TriggerManager.dispatch` filters `spell_type, attack_type, weapon_mode`, tags, ICD (`229`), and proc chance (`228`).
+- **Conditions & Triggers**: `requirements.py :: evaluate_single_extracted_condition` & `evaluate_logic` evaluate 36 conditions; `check_proc_cooldown_above` queries `Player.proc_registry` (built by `setup.py :: build_proc_registry`) for authoritative `lockout_effect` and `trigger_icd` mappings; `triggers.py :: TriggerManager.dispatch` filters `spell_type, attack_type, weapon_mode`, tags, ICD (`229`), and proc chance (`228`).
 
 ## 5. "Where to Look" Quick-Reference Routing Table
 

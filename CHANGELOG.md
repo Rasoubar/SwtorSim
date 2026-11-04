@@ -890,3 +890,18 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Applied Mudkip Body Blue (`--bg-panel: #58abdf`) to outer chrome (Header, Sidebar, and Navigation Tab Bars), Soft Blue (`--bg-base: #c2e4f6`) to the main workspace canvas, Crisp White (`--bg-card: #ffffff`) to inner metric/table/config boxes, and Mudkip Gill Orange (`--accent: #ff7818`, `#e65c00`) to primary CTAs, badges, active states, and DPS highlights.
   - Added `[data-theme="dark"]` Matte Mudkip Night CSS variable overrides (`--bg-base: #0e121a`, `--bg-panel: #141a24`, `--bg-card: #1c2331`, `--border: #263144`, `--accent: #ff7818`, `--cyan: #58abdf`) and a header theme toggle button (`#themeToggleBtn`) with `localStorage` persistence (`swtorsim_theme`) and cross-tab `storage` synchronization.
   - Rebuilt standalone web release bundle in `dist/` via `tools/build_web_release.py`.
+
+### 31. Authoritative Loadout Proc Registry & Phantom Stride Activation Fix - [DONE]
+- **Root Cause**:
+  - In `BasicMaliPS.json`, `phantom_stride` steps are gated by `"proc_cooldown_above": {"name": "Bloodletting", "value": ...}`.
+  - In extracted SWTOR GOM data, the internal lockout sub-effect for Bloodletting is named `"Bloodletting_3"` (`tag.abl.sith_inquisitor.bloodletting_lockout`), while the Rotation Builder UI normalizes it to `"Bloodletting"`.
+  - Previously, `requirements.py :: check_proc_cooldown_above` only checked `eff.name == name`, which evaluated `"Bloodletting_3" == "Bloodletting"` as `False`, causing `remaining_cooldown` to always equal `0.0s` and preventing Phantom Stride from ever being cast.
+- **Implementation**:
+  - Added `build_proc_registry(loadout_blueprints)` in `src/swtorsim/setup.py` and `player.proc_registry` on `Player` (`src/swtorsim/entities.py`), using the exact blueprint proc classification logic from `data/rotation_builder.py` (`lockout_effect`, `trigger_icd`, `proc_buff`).
+  - Added `TriggerManager.get_remaining_icd(source_fqn, current_time, caster)` in `src/swtorsim/triggers.py` to query active `interval_61` rate-limit lockouts on event-bus triggers.
+  - Updated `check_proc_cooldown_above` in `src/swtorsim/requirements.py` to resolve canonical proc names against `caster.proc_registry` (looking up the exact mapped lockout effect `effect_name` or querying `sim.triggers.get_remaining_icd`), while preserving fallback lookup on `caster.procs` and `caster.effects` for custom fixtures.
+  - Updated `ARCHITECTURE.md`, `docs/architecture.md`, `docs/user_guide.md`, and `docs/developer_guide.md`.
+  - Rebuilt standalone web release bundle in `dist/` via `tools/build_web_release.py`.
+- **Verification**:
+  - BasicMaliPS simulations now cast Phantom Stride on cooldown when Bloodletting is on lockout (`1` cast in 1M HP runs at `9.80s`/`9.10s`; `4` casts in 6M HP 14gcd runs; `3` casts in 6M HP 13gcd runs).
+  - Enhanced `tests/test_simulation_integration.py` (`test_06` and `test_07`) to assert `player.proc_registry` hydration, `Bloodletting_3` lockout evaluation, and end-to-end `Phantom Stride` execution; 15/15 integration and ability execution unit tests passing.

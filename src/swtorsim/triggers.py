@@ -76,6 +76,20 @@ class TriggerManager:
         for event, entries in self._listeners.items():
             self._listeners[event] = [sub for sub in entries if sub["owner_id"] != owner_id]
 
+    def get_remaining_icd(self, source_fqn: str, current_time: float, caster=None) -> float:
+        """Returns the maximum remaining trigger rate-limit lockout for the given ability FQN."""
+        max_rem = 0.0
+        for entries in self._listeners.values():
+            for sub in entries:
+                if caster is not None and sub.get("caster") is not caster:
+                    continue
+                abl = sub.get("ability")
+                if getattr(abl, "fqn", None) == source_fqn:
+                    next_time = float(sub.get("next_allowed_time", 0.0) or 0.0)
+                    if next_time > current_time:
+                        max_rem = max(max_rem, next_time - current_time)
+        return max_rem
+
     def dispatch(self, event_name: str, sim, context: dict):
         """Filters incoming combat events and delegates execution to the ability."""
         entries = self._listeners.get(event_name)

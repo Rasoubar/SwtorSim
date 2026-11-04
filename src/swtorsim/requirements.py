@@ -51,6 +51,25 @@ def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", si
 
     current_time = sim.current_time if sim is not None else 0.0
     remaining_cooldown = 0.0
+
+    proc_info = getattr(caster, "proc_registry", {}).get(name)
+    if proc_info is not None:
+        kind = proc_info.get("kind")
+        if kind == "lockout_effect":
+            target_eff_name = proc_info.get("effect_name", name)
+            for eff in getattr(caster, "effects", {}).values():
+                if getattr(eff, "is_expired", False):
+                    continue
+                if getattr(eff, "name", None) == target_eff_name and any("lockout" in t for t in getattr(eff, "tags", ())):
+                    if getattr(eff, "expires_at", None) is not None:
+                        remaining_cooldown = max(remaining_cooldown, eff.expires_at - current_time)
+            return remaining_cooldown > data["value"]
+        elif kind == "trigger_icd":
+            if sim is not None and hasattr(sim, "triggers"):
+                source_fqn = proc_info.get("source_fqn", "")
+                remaining_cooldown = sim.triggers.get_remaining_icd(source_fqn, current_time, caster=caster)
+            return remaining_cooldown > data["value"]
+
     proc = getattr(caster, "procs", {}).get(name)
     if proc is not None and hasattr(proc, "next_possible_proc"):
         remaining_cooldown = max(0.0, proc.next_possible_proc - current_time)
