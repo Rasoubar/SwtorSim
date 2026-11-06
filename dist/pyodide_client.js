@@ -60,7 +60,34 @@
   function loadCustomFilesFromStorage() {
     try {
       const raw = localStorage.getItem("swtor_custom_files");
-      return raw ? JSON.parse(raw) : {};
+      if (!raw) return {};
+      const files = JSON.parse(raw);
+      const sanitized = {};
+      let changed = false;
+      for (const [k, content] of Object.entries(files)) {
+        if (!k.includes("/custom/")) {
+          changed = true;
+          let newKey = k;
+          if (k.startsWith("data/rotations/")) {
+            newKey = k.replace("data/rotations/", "data/rotations/custom/");
+          } else if (k.startsWith("data/Choices/") || k.startsWith("data/choices/")) {
+            newKey = k.replace(/^data\/[Cc]hoices\//, "data/Choices/custom/");
+          } else if (k.startsWith("data/builds/")) {
+            newKey = k.replace("data/builds/", "data/builds/custom/");
+          } else if (k.startsWith("data/run_config/")) {
+            newKey = k.replace("data/run_config/", "data/run_config/custom/");
+          }
+          if (!files[newKey]) {
+            sanitized[newKey] = content;
+          }
+        } else {
+          sanitized[k] = content;
+        }
+      }
+      if (changed) {
+        localStorage.setItem("swtor_custom_files", JSON.stringify(sanitized));
+      }
+      return sanitized;
     } catch (_e) {
       return {};
     }
@@ -381,7 +408,7 @@
       rejectWorkerReady(err);
     };
 
-    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1793958196" });
+    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1793958531" });
     return wState;
   }
 
@@ -668,10 +695,8 @@
 
         const contentStr = JSON.stringify(payload.steps || [], null, 4);
 
-        const standardPath = `data/rotations/${classFolder}/${specFolder}/${filename}`;
-        const customPath = `data/rotations/custom/${filename}`;
+        const customPath = `data/rotations/custom/${classFolder}/${specFolder}/${filename}`;
 
-        state.customFiles[standardPath] = contentStr;
         state.customFiles[customPath] = contentStr;
         saveCustomFilesToStorage(state.customFiles);
 
@@ -737,10 +762,17 @@
         if (!filename.endsWith(".json")) filename += ".json";
         filename = filename.replace(/^.*[\\\/]/, "");
 
+        const classFolder = String(payload.class_folder || "").trim().toLowerCase();
+        const specFolder = String(payload.spec_folder || "").trim().toLowerCase();
+
         let relFolder = "data/rotations/custom";
         if (category === "choices") relFolder = "data/Choices/custom";
         else if (category === "builds") relFolder = "data/builds/custom";
         else if (category === "run_config") relFolder = "data/run_config/custom";
+
+        if (classFolder && specFolder && (category === "rotations" || category === "choices")) {
+          relFolder += `/${classFolder}/${specFolder}`;
+        }
 
         const vPath = `${relFolder}/${filename}`;
         const contentStr = typeof payload.content === "string" ? payload.content : JSON.stringify(payload.content, null, 2);
