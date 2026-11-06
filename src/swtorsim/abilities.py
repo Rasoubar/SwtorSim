@@ -536,7 +536,8 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
         handle_grant_immunity(sim, caster, target, action, context=context)
     elif action_type == "call_effect":
         if ability and "effect" in action:
-            call_target = caster if action.get("to_actor") == "caster" else target
+            to_act = str(action.get("to_actor", "")).lower()
+            call_target = caster if to_act in ("caster", "actor_1", "self", "1") else target
             ability.execute_effect(action["effect"], caster, call_target, sim, context=context)
     elif action_type in NOOP_ACTION_TYPES:
         pass
@@ -1008,38 +1009,72 @@ def handle_set_effect_stack_charge(sim, caster, target, action, ability=None, co
 
     owner_entity = (context or {}).get("owner_entity") or target
     owner_key = (context or {}).get("owner_effect_key")
-    eff = getattr(owner_entity, "effects", {}).get(owner_key) if owner_key else None
 
-    # Search by tag or ability_spec if owner_key not resolved or if action specifies tags/spec
     search_tags = set(action.get("tags") or [])
     tag_str = (action.get("strings") or {}).get("tag")
     if tag_str:
         search_tags.add(tag_str)
-    spec = (action.get("ints") or {}).get("ability_spec") or action.get("ability_spec")
-    if spec == 0:
-        spec = None
 
-    if (eff is None or getattr(eff, "is_expired", False)) and (search_tags or spec):
-        for k, e in getattr(owner_entity, "effects", {}).items():
-            if getattr(e, "is_expired", False):
-                continue
-            eff_tags = set(getattr(e, "tags", ()))
-            eff_spec = getattr(e, "fqn", "") or getattr(getattr(e, "ability_ref", None), "fqn", "")
-            if (search_tags and eff_tags & search_tags) or (spec and spec == eff_spec):
-                eff = e
-                owner_key = k
-                break
-        if eff is None and caster is not None and caster is not owner_entity:
-            for k, e in getattr(caster, "effects", {}).items():
-                if getattr(e, "is_expired", False):
-                    continue
-                eff_tags = set(getattr(e, "tags", ()))
-                eff_spec = getattr(e, "fqn", "") or getattr(getattr(e, "ability_ref", None), "fqn", "")
-                if (search_tags and eff_tags & search_tags) or (spec and spec == eff_spec):
+    ints = action.get("ints") or {}
+    ability_spec = ints.get("ability_spec") or action.get("ability_spec")
+    if ability_spec in (0, "0"):
+        ability_spec = None
+
+    eff = None
+
+    # 1. Explicit tag target search
+    if search_tags:
+        entities = [owner_entity]
+        if caster is not None and caster is not owner_entity:
+            entities.append(caster)
+        if target is not None and target not in entities:
+            entities.append(target)
+
+        for ent in entities:
+            for k, e in getattr(ent, "effects", {}).items():
+                if not getattr(e, "is_expired", False) and (set(getattr(e, "tags", ())) & search_tags):
                     eff = e
                     owner_key = k
-                    owner_entity = caster
+                    owner_entity = ent
                     break
+            if eff is not None:
+                break
+
+    # 2. Explicit ability_spec target search
+    elif ability_spec:
+        entities = [owner_entity]
+        if caster is not None and caster is not owner_entity:
+            entities.append(caster)
+        if target is not None and target not in entities:
+            entities.append(target)
+
+        base_stem = str(ability_spec).split(".")[-1]
+        from src.swtorsim.settings import is_stem_matching_enabled
+        stem_enabled = is_stem_matching_enabled()
+
+        for ent in entities:
+            for k, e in getattr(ent, "effects", {}).items():
+                if not getattr(e, "is_expired", False):
+                    e_fqn = getattr(e, "fqn", "") or ""
+                    abl_ref = getattr(e, "ability_ref", None)
+                    abl_fqn = getattr(abl_ref, "fqn", "") or ""
+                    matches = (e_fqn == ability_spec or abl_fqn == ability_spec)
+                    if not matches and stem_enabled and (
+                        e_fqn.endswith(f".{base_stem}_plus") or abl_fqn.endswith(f".{base_stem}_plus")
+                    ):
+                        matches = True
+                    if matches:
+                        eff = e
+                        owner_key = k
+                        owner_entity = ent
+                        break
+            if eff is not None:
+                break
+
+    # 3. Fallback to origin/triggering effect
+    else:
+        if owner_key:
+            eff = getattr(owner_entity, "effects", {}).get(owner_key)
 
     if eff is None or getattr(eff, "is_expired", False):
         return
@@ -1104,7 +1139,8 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
             effects_dict = getattr(actor, "effects", {})
             to_remove = []
             for k, eff in effects_dict.items():
-                if spec and spec != 0 and getattr(eff, "ability_fqn", None) == spec:
+                eff_fqn = getattr(eff, "fqn", None) or getattr(getattr(eff, "ability_ref", None), "fqn", None)
+                if spec and spec != 0 and (eff_fqn == spec or getattr(eff, "name", None) == spec):
                     to_remove.append(k)
                 elif dispel_tags and (dispel_tags & set(getattr(eff, "tags", ()))):
                     to_remove.append(k)

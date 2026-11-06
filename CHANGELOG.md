@@ -1007,3 +1007,13 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Updated populateSpecsForClass() to perform case-insensitive key lookup in CATALOG.disciplines and match discipline filenames/slugs case-insensitively.
   - load_run_config_bundle now prefers canonical capitalized discipline blueprint names from gear_opts.
   - Rebuilt dist/ web release.
+
+## [Unreleased] - 2026-11-06: Cooldown Alacrity & Action Handler Engine Fixes (`entities.py`, `abilities.py`)
+### Fixed
+- **Cooldown Scaling with Stat 274 (`src/swtorsim/entities.py`)**:
+  - Fixed `Player.calculate_cooldown` omitting `stat_cbt_instant_reduction_percentage` (`274`), which is how GOM blueprints represent instant cooldown reductions (such as Berserk's 30% reduction).
+  - Ability cooldowns cast under Berserk (like *Ferocity*) now scale accurately from 11.5s down to 8.1s, allowing Ferocity to come off cooldown on time at 13.00s.
+- **Audited Action Handler Repairs (`src/swtorsim/abilities.py`)**:
+  - `handle_set_effect_stack_charge`: Replaced legacy 1-tier `owner_key` resolution with standard 3-tier target resolution (`tags` -> `ability_spec` with stem matching -> `owner_key` fallback).
+  - `handle_buff_remove_action` (`dispel`): Fixed matching on non-existent `eff.ability_fqn` to check `eff.fqn` and `ability_ref.fqn`.
+  - `execute_single_action` (`call_effect`): Added support for GOM actor enum `"actor_1"` (`"caster"`), preventing 307 caster-targeted effect calls from erroneously routing to enemy target dummies.

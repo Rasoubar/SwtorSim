@@ -530,12 +530,17 @@ class Player(Entity):
                 if getattr(effect, "is_expired", False):
                     continue
                 for mod in _effect_modifiers(effect):
-                    if str(mod.stat) in ("64", "STAT_abl_time_cooldown"):
+                    stat = str(mod.stat)
+                    val = float(mod.value)
+                    if stat in ("64", "STAT_abl_time_cooldown"):
                         if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
                             if mod.is_percent:
                                 pct_mod += mod.value
                             else:
                                 flat_mod += mod.value
+                    elif stat in ("274", "stat_cbt_instant_reduction_percentage", "STAT_cbt_instant_reduction_percentage"):
+                        if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                            pct_mod -= val
 
         adjusted_base = max(0.0, (base_cooldown * pct_mod) + flat_mod)
         cdr = self.stats.get("Alacrity", 0.0)
