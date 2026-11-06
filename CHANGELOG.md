@@ -920,3 +920,26 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **Verification**:
   - Verified Concealment Operative rotation with Level 39 Choice 2 (Best Defense / Crippling Slice) and `Recursion.json` runs cleanly without recursion errors, successfully detonating Volatile Substance once at `t = 1.86s` and casting Crippling Slice on GCD at `t = 2.70s`.
   - 15/15 integration and ability execution unit tests passing in `tests/test_simulation_integration.py` and `tests/test_ability_execution.py`.
+
+## [Spec-Aware Rotations & Custom Hierarchy Refactor] - 2026-11-06
+
+### Summary of Changes
+- **Backend Catalog Discovery (`src/swtorsim/web_gui.py` & `data/rotation_builder.py`)**:
+  - Implemented `_scan_rotations()` to extract authoritative `class`, `spec`, and `is_custom` properties for all discovered rotation files.
+  - Discerned preset files (`data/rotations/<class>/<spec>/<name>.json`) from user custom files (`data/rotations/custom/<class>/<spec>/<name>.json`).
+  - Added spec-aware folder targeting in `/api/custom_file/import` (`data/rotations/custom/<class>/<spec>/`).
+  - Hardened `/api/custom_file/delete` to strictly reject paths outside `/custom/`.
+- **Eliminated Dual-Write in Rotation Builder (`data/rotation_builder.py`)**:
+  - Saving custom rotations via `/api/rotation/save` now saves strictly to `data/rotations/custom/<class_folder>/<spec_folder>/<filename>.json`.
+  - Removed write operation into preset `data/rotations/<class_folder>/<spec_folder>/` folder, preventing duplicate entries and ghost presets.
+- **Dynamic Spec-Aware WebUI Filtering (`tools/simulator_ui.html` & `tools/rotation_builder_ui.html`)**:
+  - Added `getActiveSpecInfo()` to reliably parse class and discipline slugs from the active discipline selection.
+  - Implemented `updateRotationOptionsForCurrentSpec()` to dynamically filter the Rotation dropdown on `#classSelect` and `#specSelect` changes:
+    - Primary optgroups: `★ My Custom Files` (matching active spec) and `Preset Rotations` (matching active spec).
+    - Secondary optgroups: Other disciplines placed at the bottom to avoid dropdown pollution while maintaining access.
+    - Automatic fallback/selection of the active spec's standard preset when available.
+  - Updated `setupFileImporter` to pass active `class_folder` and `spec_folder` on rotation import.
+  - Preserved strict CRLF line endings across all files per Rule #6.
+- **Web Release Bundler Isolation (`tools/bundle_pyodide_assets.py`)**:
+  - Added `"custom"` to `EXCLUDE_PATTERNS` so that user/developer scratch files in `data/rotations/custom/`, `data/Choices/custom/`, `data/builds/custom/`, and `data/run_config/custom/` are strictly excluded from `dist/swtorsim_assets.zip`.
+  - Promoted `BasicMaliPS PTS.json` to `data/rotations/assassin/hatred/` as an official built-in preset.

@@ -786,20 +786,55 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
                 rel_p = str(sp_path)
             rel_disciplines[cls_name][sp_name] = rel_p
 
-    def _scan_json_dir(dir_rel: str) -> list[dict[str, str]]:
+    def _scan_json_dir(dir_rel: str) -> list[dict[str, Any]]:
         base = _resolve_workspace_path(dir_rel)
-        items: list[dict[str, str]] = []
+        items: list[dict[str, Any]] = []
         if not base.is_dir():
             return items
         for path in sorted(base.rglob("*.json")):
             if not path.is_file():
                 continue
-            label = path.relative_to(base).with_suffix("").as_posix()
+            rel = path.relative_to(base)
+            is_custom = any(p.lower() == "custom" for p in rel.parts)
+            label = rel.with_suffix("").as_posix()
             try:
                 rel_path = path.resolve().relative_to(SWTORSIM_ROOT).as_posix()
             except ValueError:
                 rel_path = str(path)
-            items.append({"label": label, "path": rel_path})
+            items.append({"label": label, "path": rel_path, "name": path.name, "is_custom": is_custom})
+        return items
+
+    def _scan_rotations(dir_rel: str) -> list[dict[str, Any]]:
+        base = _resolve_workspace_path(dir_rel)
+        items: list[dict[str, Any]] = []
+        if not base.is_dir():
+            return items
+        for path in sorted(base.rglob("*.json")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(base)
+            parts = rel.parts
+            is_custom = len(parts) > 0 and parts[0].lower() == "custom"
+            if is_custom:
+                cls = parts[1].lower() if len(parts) >= 3 else ""
+                sp = parts[2].lower() if len(parts) >= 4 else ""
+                clean_label = "/".join(parts[1:]).removesuffix(".json") if len(parts) >= 2 else rel.with_suffix("").as_posix()
+            else:
+                cls = parts[0].lower() if len(parts) >= 2 else ""
+                sp = parts[1].lower() if len(parts) >= 3 else ""
+                clean_label = rel.with_suffix("").as_posix()
+            try:
+                rel_path = path.resolve().relative_to(SWTORSIM_ROOT).as_posix()
+            except ValueError:
+                rel_path = str(path)
+            items.append({
+                "label": clean_label,
+                "name": path.name,
+                "path": rel_path,
+                "class": cls,
+                "spec": sp,
+                "is_custom": is_custom,
+            })
         return items
 
     choices_files_raw = _scan_json_dir(CHOICES_DIR)
@@ -814,7 +849,7 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
                     choices_files.append(cf)
             except Exception:
                 pass
-    rotations_files = _scan_json_dir(ROTATIONS_DIR)
+    rotations_files = _scan_rotations(ROTATIONS_DIR)
     run_configs = _scan_json_dir("data/run_config")
     builds_files = _scan_json_dir(BUILDS_DIR)
 
@@ -1109,21 +1144,17 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                     filename += ".json"
                 # Sanitize filename
                 filename = Path(filename).name
-                target_dir = SWTORSIM_ROOT / "data" / "rotations" / class_folder / spec_folder
-                target_dir.mkdir(parents=True, exist_ok=True)
-                full_path = target_dir / filename
+                custom_dir = SWTORSIM_ROOT / "data" / "rotations" / "custom" / class_folder / spec_folder
+                custom_dir.mkdir(parents=True, exist_ok=True)
+                full_path = custom_dir / filename
 
                 formatted = json.dumps(steps, indent=4, ensure_ascii=False)
                 # Write with Windows CRLF line endings per Rule #6
                 formatted_crlf = formatted.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n"
                 full_path.write_bytes(formatted_crlf.encode("utf-8"))
 
-                custom_dir = SWTORSIM_ROOT / "data" / "rotations" / "custom"
-                custom_dir.mkdir(parents=True, exist_ok=True)
-                (custom_dir / filename).write_bytes(formatted_crlf.encode("utf-8"))
-
-                rel_saved = (custom_dir / filename).relative_to(SWTORSIM_ROOT).as_posix()
-                print(f"[OK] Saved rotation to {rel_saved}")
+                rel_saved = full_path.relative_to(SWTORSIM_ROOT).as_posix()
+                print(f"[OK] Saved custom rotation to {rel_saved}")
                 self._send_json({"ok": True, "path": rel_saved, "filename": filename})
                 return
 

@@ -739,7 +739,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1793775464"></script>
+  <script src="pyodide_client.js?v=1793958196"></script>
 </head>
 <body>
 
@@ -1121,8 +1121,8 @@ function populateExistingRotationsSelect() {
   const cur = rotSel.value;
   rotSel.innerHTML = '<option value="">-- Open Existing Rotation JSON --</option>';
 
-  const customRots = (workspaceCatalog.rotations || []).filter(r => r.path && r.path.includes("/custom/"));
-  const presetRots = (workspaceCatalog.rotations || []).filter(r => !r.path || !r.path.includes("/custom/"));
+  const customRots = (workspaceCatalog.rotations || []).filter(r => r.is_custom || (r.path && r.path.includes("/custom/")));
+  const presetRots = (workspaceCatalog.rotations || []).filter(r => !r.is_custom && (!r.path || !r.path.includes("/custom/")));
 
   if (customRots.length > 0) {
     const cGroup = document.createElement("optgroup");

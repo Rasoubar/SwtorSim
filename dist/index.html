@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1793775464"></script>
+  <script src="pyodide_client.js?v=1793958196"></script>
 </head>
 <body>
 
@@ -1567,8 +1567,8 @@
         const prevVal = selectElem.value;
         selectElem.innerHTML = defaultPlaceholder ? `<option value="">${defaultPlaceholder}</option>` : "";
 
-        const customItems = (items || []).filter(it => it.path && it.path.includes("/custom/"));
-        const presetItems = (items || []).filter(it => !it.path || !it.path.includes("/custom/"));
+        const customItems = (items || []).filter(it => it.is_custom || (it.path && it.path.includes("/custom/")));
+        const presetItems = (items || []).filter(it => !it.is_custom && (!it.path || !it.path.includes("/custom/")));
 
         if (customItems.length > 0) {
           const cGroup = document.createElement("optgroup");
@@ -1609,10 +1609,10 @@
       const prevB = bSel.value;
       populateSelectWithOptions(bSel, data.builds || [], "", "Preset Builds");
 
-      // Rotations
+      // Rotations (Spec-aware)
       const rotSel = document.getElementById("rotationSelect");
       const prevRot = rotSel.value;
-      populateSelectWithOptions(rotSel, data.rotations || [], "", "Preset Rotations");
+      updateRotationOptionsForCurrentSpec(prevRot);
 
       // Choices
       const chSel = document.getElementById("choicesSelect");
@@ -1681,6 +1681,7 @@
         }
 
         populateSpecsForClass(clsSel.value, mappedSpec);
+        updateRotationOptionsForCurrentSpec(prevRot);
         await updateClassGearOptions(document.getElementById("specSelect").value, prevTac, [prevLeg1, prevLeg2]);
         await refreshComputedStats();
       }
@@ -1689,6 +1690,103 @@
       console.error(err);
       setStatus("Catalog Error", "error");
     }
+  }
+
+  function getActiveSpecInfo() {
+    const specSel = document.getElementById("specSelect");
+    const specPath = specSel ? specSel.value : "";
+    if (!specPath) return { classSlug: "", specSlug: "" };
+    const parts = specPath.replace(/\\/g, "/").split("/");
+    const fileWithExt = parts[parts.length - 1] || "";
+    const specSlug = fileWithExt.replace(/\.json$/i, "").toLowerCase();
+    const classSlug = (parts[parts.length - 2] || "").toLowerCase();
+    return { classSlug, specSlug };
+  }
+
+  function updateRotationOptionsForCurrentSpec(preferredRotationPath = null) {
+    const rotSel = document.getElementById("rotationSelect");
+    if (!rotSel) return;
+    const prevVal = preferredRotationPath || rotSel.value;
+    const { classSlug, specSlug } = getActiveSpecInfo();
+
+    rotSel.innerHTML = "";
+    const allRots = CATALOG.rotations || [];
+
+    // Presets for this active class and discipline
+    const specPresets = allRots.filter(r => !r.is_custom && (
+      (!r.class && !r.spec) ||
+      (r.class === classSlug && (!r.spec || r.spec === specSlug))
+    ));
+
+    // Custom rotations for this active class and discipline (or unassigned custom rotations)
+    const specCustom = allRots.filter(r => r.is_custom && (
+      (!r.class && !r.spec) ||
+      (r.class === classSlug && (!r.spec || r.spec === specSlug))
+    ));
+
+    // Other disciplines
+    const otherCustom = allRots.filter(r => r.is_custom && !specCustom.includes(r));
+    const otherPresets = allRots.filter(r => !r.is_custom && !specPresets.includes(r));
+
+    if (specCustom.length > 0) {
+      const cGroup = document.createElement("optgroup");
+      cGroup.label = "★ My Custom Files";
+      specCustom.forEach(it => {
+        const opt = document.createElement("option");
+        opt.value = it.path;
+        opt.textContent = `★ ${it.name || it.label}`;
+        cGroup.appendChild(opt);
+      });
+      rotSel.appendChild(cGroup);
+    }
+
+    if (specPresets.length > 0) {
+      const pGroup = document.createElement("optgroup");
+      pGroup.label = "Preset Rotations";
+      specPresets.forEach(it => {
+        const opt = document.createElement("option");
+        opt.value = it.path;
+        opt.textContent = it.name ? it.name.replace(/\.json$/i, "") : it.label;
+        pGroup.appendChild(opt);
+      });
+      rotSel.appendChild(pGroup);
+    }
+
+    if (otherCustom.length > 0) {
+      const ocGroup = document.createElement("optgroup");
+      ocGroup.label = "★ Custom Files (Other Disciplines)";
+      otherCustom.forEach(it => {
+        const opt = document.createElement("option");
+        opt.value = it.path;
+        opt.textContent = `★ ${it.label || it.name}`;
+        ocGroup.appendChild(opt);
+      });
+      rotSel.appendChild(ocGroup);
+    }
+
+    if (otherPresets.length > 0) {
+      const opGroup = document.createElement("optgroup");
+      opGroup.label = "Presets (Other Disciplines)";
+      otherPresets.forEach(it => {
+        const opt = document.createElement("option");
+        opt.value = it.path;
+        opt.textContent = it.label || it.name;
+        opGroup.appendChild(opt);
+      });
+      rotSel.appendChild(opGroup);
+    }
+
+    if (prevVal && Array.from(rotSel.options).some(o => o.value === prevVal)) {
+      rotSel.value = prevVal;
+    } else if (specPresets.length > 0) {
+      rotSel.value = specPresets[0].path;
+    } else if (specCustom.length > 0) {
+      rotSel.value = specCustom[0].path;
+    } else if (rotSel.options.length > 0) {
+      rotSel.selectedIndex = 0;
+    }
+
+    syncDeleteButtons();
   }
 
   function populateSpecsForClass(clsName, targetSpecPath = null) {
@@ -1879,7 +1977,7 @@
       );
 
       if (rc.stats_path) document.getElementById("buildSelect").value = rc.stats_path;
-      if (rc.rotation_path) document.getElementById("rotationSelect").value = rc.rotation_path;
+      updateRotationOptionsForCurrentSpec(rc.rotation_path);
       if (rc.choices_path) document.getElementById("choicesSelect").value = rc.choices_path;
 
       const relics = rc.relic_fqns || [];
@@ -2717,11 +2815,13 @@
   document.getElementById("classSelect").addEventListener("change", async e => {
     populateSpecsForClass(e.target.value);
     const specPath = document.getElementById("specSelect").value;
+    updateRotationOptionsForCurrentSpec();
     await updateClassGearOptions(specPath);
     await refreshComputedStats();
   });
 
   document.getElementById("specSelect").addEventListener("change", async e => {
+    updateRotationOptionsForCurrentSpec();
     await updateClassGearOptions(e.target.value);
     await refreshComputedStats();
   });
@@ -2932,13 +3032,16 @@
           if (valErr) throw new Error(valErr);
         }
 
+        const { classSlug, specSlug } = getActiveSpecInfo();
         const res = await fetch("/api/custom_file/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             category,
             filename: file.name,
-            content: parsed
+            content: parsed,
+            class_folder: classSlug,
+            spec_folder: specSlug
           })
         });
 

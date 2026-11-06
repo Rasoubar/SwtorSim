@@ -21,6 +21,7 @@ EXCLUDE_PATTERNS = {
     ".idea",
     ".venv",
     ".git",
+    "custom",  # Never bundle user custom rotations, builds, choices, or run configs
     "extracted",  # data/extractor/extracted (~400MB)
     "hashes.bin",  # GOM string table cache (137MB)
     "fnv1a64.js",

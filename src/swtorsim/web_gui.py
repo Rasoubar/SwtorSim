@@ -202,20 +202,55 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
         for sp_name, sp_path in specs.items():
             disciplines[cls_name][sp_name] = _to_workspace_rel(sp_path)
 
-    def _scan_dir(dir_rel: str) -> list[dict[str, str]]:
+    def _scan_dir(dir_rel: str) -> list[dict[str, Any]]:
         base = _resolve_workspace_path(dir_rel)
-        items: list[dict[str, str]] = []
+        items: list[dict[str, Any]] = []
         if not base.is_dir():
             return items
         for path in sorted(base.rglob("*.json")):
             if not path.is_file():
                 continue
-            label = path.relative_to(base).with_suffix("").as_posix()
+            rel = path.relative_to(base)
+            is_custom = any(p.lower() == "custom" for p in rel.parts)
+            label = rel.with_suffix("").as_posix()
             items.append(
                 {
                     "label": label,
                     "name": path.name,
                     "path": _to_workspace_rel(path),
+                    "is_custom": is_custom,
+                }
+            )
+        return items
+
+    def _scan_rotations(dir_rel: str) -> list[dict[str, Any]]:
+        base = _resolve_workspace_path(dir_rel)
+        items: list[dict[str, Any]] = []
+        if not base.is_dir():
+            return items
+        for path in sorted(base.rglob("*.json")):
+            if not path.is_file():
+                continue
+            rel = path.relative_to(base)
+            parts = rel.parts
+            is_custom = len(parts) > 0 and parts[0].lower() == "custom"
+            if is_custom:
+                cls = parts[1].lower() if len(parts) >= 3 else ""
+                sp = parts[2].lower() if len(parts) >= 4 else ""
+                clean_label = "/".join(parts[1:]).removesuffix(".json") if len(parts) >= 2 else rel.with_suffix("").as_posix()
+            else:
+                cls = parts[0].lower() if len(parts) >= 2 else ""
+                sp = parts[1].lower() if len(parts) >= 3 else ""
+                clean_label = rel.with_suffix("").as_posix()
+
+            items.append(
+                {
+                    "label": clean_label,
+                    "name": path.name,
+                    "path": _to_workspace_rel(path),
+                    "class": cls,
+                    "spec": sp,
+                    "is_custom": is_custom,
                 }
             )
         return items
@@ -234,7 +269,7 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
         builds.append({**b, "stats": stats_dict})
 
     choices_files = _scan_dir(CHOICES_DIR)
-    rotations_files = _scan_dir(ROTATIONS_DIR)
+    rotations_files = _scan_rotations(ROTATIONS_DIR)
 
     relics_path_rel = "data/extractor/pts/relics.json" if active_env == "pts" else RELICS_PATH
     relics_path = _resolve_workspace_path(relics_path_rel)
@@ -1531,11 +1566,17 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     filename += ".json"
                 filename = Path(filename).name
                 content = payload.get("content")
+                class_folder = str(payload.get("class_folder") or "").strip().lower()
+                spec_folder = str(payload.get("spec_folder") or "").strip().lower()
 
                 if category == "rotations":
                     folder = SWTORSIM_ROOT / "data" / "rotations" / "custom"
+                    if class_folder and spec_folder:
+                        folder = folder / class_folder / spec_folder
                 elif category == "choices":
                     folder = SWTORSIM_ROOT / "data" / "Choices" / "custom"
+                    if class_folder and spec_folder:
+                        folder = folder / class_folder / spec_folder
                 elif category == "builds":
                     folder = SWTORSIM_ROOT / "data" / "builds" / "custom"
                 elif category == "run_config":
@@ -1554,10 +1595,15 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
 
             if route == "/api/custom_file/delete":
                 rel_path = str(payload.get("path") or "").strip()
-                if not rel_path or "custom" not in rel_path:
+                target_file = _resolve_workspace_path(rel_path)
+                try:
+                    rel_to_root = target_file.resolve().relative_to(SWTORSIM_ROOT).as_posix()
+                except ValueError:
+                    self._send_json({"error": "Invalid file path."}, status=400)
+                    return
+                if "/custom/" not in f"/{rel_to_root}":
                     self._send_json({"error": "Only custom files can be deleted."}, status=400)
                     return
-                target_file = _resolve_workspace_path(rel_path)
                 if target_file.is_file():
                     try:
                         target_file.unlink()
