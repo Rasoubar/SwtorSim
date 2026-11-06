@@ -997,3 +997,8 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **Standalone Web Release (dist/)**:
   - Rebuilt standalone Web release via build_web_release.py keeping dist/index.html and dist/pyodide_client.js in complete sync.
   - All unit tests and integration tests passing cleanly.
+- **Case-Insensitive Class & Spec Select Matching on Import**:
+  - Implemented setSelectValueCaseInsensitive() to ensure lowercase values from JSON configs (e.g. 'marauder', 'carnage') properly select uppercase DOM option elements (e.g. 'Marauder', 'Carnage').
+  - Updated populateSpecsForClass() to perform case-insensitive key lookup in CATALOG.disciplines and match discipline filenames/slugs case-insensitively.
+  - load_run_config_bundle now prefers canonical capitalized discipline blueprint names from gear_opts.
+  - Rebuilt dist/ web release.

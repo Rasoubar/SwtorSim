@@ -198,6 +198,10 @@ def load_complete_loadout(
 
 def load_json_file(filepath: str) -> Any:
     """Helper to open, load, and validate JSON files safely."""
+    if not filepath or not str(filepath).strip():
+        raise FileNotFoundError("Configuration file path is empty.")
+    if os.path.isdir(filepath):
+        raise FileNotFoundError(f"Configuration file path is a directory: {filepath}")
     if not os.path.exists(filepath):
         p = Path(filepath)
         if not p.is_absolute():

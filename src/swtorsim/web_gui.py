@@ -145,11 +145,13 @@ def get_simulation_progress() -> dict[str, Any]:
 
 def _resolve_workspace_path(rel_or_abs: str | Path) -> Path:
     """Resolves a path relative to SWTORSIM_ROOT if it is not already absolute/existing."""
+    if not rel_or_abs or not str(rel_or_abs).strip():
+        return Path("")
     p = Path(rel_or_abs)
-    if p.exists():
+    if p.exists() and p != Path("."):
         return p.resolve()
     candidate = SWTORSIM_ROOT / p
-    if candidate.exists():
+    if candidate.exists() and candidate != SWTORSIM_ROOT:
         return candidate.resolve()
     # Case-insensitive resolution fallback for Linux/WASM virtual filesystems
     parts = p.parts
@@ -406,9 +408,9 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
     if spec_path:
         try:
             gear_opts = get_class_gear_options(spec_path, env=active_env)
-            if not class_name:
+            if gear_opts.get("class_name"):
                 class_name = gear_opts["class_name"]
-            if not spec_name:
+            if gear_opts.get("spec"):
                 spec_name = gear_opts["spec"]
         except Exception:
             pass
@@ -560,7 +562,9 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     validate_run_config(config)
 
     # Resolve choices and FQNs
-    choices_data = load_json_file(choices_path)
+    choices_data = {}
+    if choices_path and Path(choices_path).is_file():
+        choices_data = load_json_file(choices_path)
     if isinstance(payload.get("choices_override"), dict) and payload["choices_override"]:
         choices_data = payload["choices_override"]
 

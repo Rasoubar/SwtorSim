@@ -2,6 +2,7 @@
 
 ## 1. Active Roadmap & Backlog
 - [ ] **Additional Class Disciplines Verification**: Continue verifying and testing combat parses across additional classes and disciplines (e.g. Deception Assassin, Sorcerer, Operative).
+- [ ] **Stack Modification Target Resolution Optimization**: Investigate whether effect target type (`Target Type: Self` per Jedipedia / GOM ability/effect root targeting rules) can be extracted directly into blueprints to bypass participant fallback iteration (`caster`/`target`) in `handle_modify_stack_charge`.
 - [ ] **Unit Test Suite Round-Trip Fix**: Investigate pre-existing assertion in `tests/test_extracted_load.py::test_every_parsed_file_round_trips` (`saw_requires_tag`).
 
 ## 2. Current Architectural State

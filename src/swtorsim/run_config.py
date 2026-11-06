@@ -197,6 +197,8 @@ def validate_run_config(
         ("gear catalog", actual_gear),
         ("relic catalog", actual_relics),
     ):
+        if label == "choices_path" and (not path or not str(path).strip()):
+            continue
         if not isinstance(path, str) or not path.strip():
             errors.append(f"{label} must be a non-empty path.")
             continue

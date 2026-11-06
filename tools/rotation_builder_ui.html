@@ -1397,13 +1397,13 @@ async function onSelectRunConfig(rcPath) {
     return;
   }
   const rc = data.run_config || {};
-  const targetClass = data.class_name || rc.class_name || rc.class || "";
-  const targetSpec = data.spec_name || data.spec || rc.spec || rc.spec_name || "";
+  const targetClass = (data.class_name || rc.class_name || rc.class || "").toLowerCase().trim();
+  const targetSpec = (data.spec_name || data.spec || rc.spec || rc.spec_name || "").toLowerCase().trim();
   let matched = false;
   // Find matching class and spec for rc.spec_path or class/spec names
   for (const [cls, specs] of Object.entries(workspaceCatalog.disciplines || {})) {
     for (const [sp, p] of Object.entries(specs)) {
-      if (p === rc.spec_path || (targetClass && cls.toLowerCase() === targetClass.toLowerCase() && targetSpec && sp.toLowerCase() === targetSpec.toLowerCase())) {
+      if (p === rc.spec_path || (targetClass && cls.toLowerCase() === targetClass && targetSpec && sp.toLowerCase() === targetSpec)) {
         document.getElementById("classSelect").value = cls;
         await onClassChange(sp);
         matched = true;

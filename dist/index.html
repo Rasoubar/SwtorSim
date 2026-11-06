@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1793986747"></script>
+  <script src="pyodide_client.js?v=1793987574"></script>
 </head>
 <body>
 
@@ -1791,10 +1791,36 @@
     syncDeleteButtons();
   }
 
+  function setSelectValueCaseInsensitive(selectEl, val) {
+    if (!selectEl || !val) return false;
+    const lower = String(val).toLowerCase().trim();
+    for (const opt of selectEl.options) {
+      if (opt.value.toLowerCase().trim() === lower || opt.textContent.toLowerCase().trim() === lower) {
+        selectEl.value = opt.value;
+        return true;
+      }
+    }
+    return false;
+  }
+
   function populateSpecsForClass(clsName, targetSpecPath = null, targetSpecName = null) {
     const specSel = document.getElementById("specSelect");
     specSel.innerHTML = "";
-    const specs = (CATALOG && CATALOG.disciplines && CATALOG.disciplines[clsName]) || {};
+    let specs = {};
+    if (CATALOG && CATALOG.disciplines) {
+      if (CATALOG.disciplines[clsName]) {
+        specs = CATALOG.disciplines[clsName];
+      } else {
+        const clsLower = String(clsName).toLowerCase().trim();
+        for (const [k, v] of Object.entries(CATALOG.disciplines)) {
+          if (k.toLowerCase() === clsLower) {
+            specs = v;
+            clsName = k;
+            break;
+          }
+        }
+      }
+    }
     Object.keys(specs).sort().forEach(spName => {
       const opt = document.createElement("option");
       opt.value = specs[spName];
@@ -1804,10 +1830,15 @@
 
     if (targetSpecPath && Array.from(specSel.options).some(o => o.value === targetSpecPath)) {
       specSel.value = targetSpecPath;
+    } else if (targetSpecPath && Array.from(specSel.options).some(o => o.value.toLowerCase() === targetSpecPath.toLowerCase())) {
+      const match = Array.from(specSel.options).find(o => o.value.toLowerCase() === targetSpecPath.toLowerCase());
+      specSel.value = match.value;
     } else if (targetSpecName) {
-      const targetLower = String(targetSpecName).toLowerCase();
+      const targetLower = String(targetSpecName).toLowerCase().trim();
       const matchOpt = Array.from(specSel.options).find(o =>
-        o.textContent.toLowerCase() === targetLower ||
+        o.textContent.toLowerCase().trim() === targetLower ||
+        o.value.toLowerCase().endsWith("/" + targetLower + ".json") ||
+        o.value.toLowerCase().includes("/" + targetLower + ".") ||
         o.value.toLowerCase().includes(targetLower)
       );
       if (matchOpt) {
@@ -1980,11 +2011,13 @@
       if (!res.ok) throw new Error(bundle.error || "Failed to load preset");
 
       const rc = bundle.run_config || (fallbackParsed || {});
-      const clsName = bundle.class_name || rc.class_name || rc.class;
-      const spName = bundle.spec_name || bundle.spec || rc.spec || rc.spec_name;
-      if (clsName) {
-        document.getElementById("classSelect").value = clsName;
-        populateSpecsForClass(clsName, rc.spec_path, spName);
+      const rawCls = bundle.class_name || rc.class_name || rc.class;
+      const rawSpec = bundle.spec_name || bundle.spec || rc.spec || rc.spec_name;
+      const clsSel = document.getElementById("classSelect");
+      if (rawCls) {
+        setSelectValueCaseInsensitive(clsSel, rawCls);
+        const resolvedCls = clsSel.value || rawCls;
+        populateSpecsForClass(resolvedCls, rc.spec_path, rawSpec);
       }
 
       await updateClassGearOptions(
@@ -3133,11 +3166,12 @@
         const sel = document.getElementById(selectElemId);
         if (sel) {
           sel.value = data.path;
-          sel.dispatchEvent(new Event("change"));
         }
 
         if (afterImportCallback) {
           await afterImportCallback(data.path, parsed);
+        } else if (sel) {
+          sel.dispatchEvent(new Event("change"));
         }
 
       } catch (err) {

@@ -75,11 +75,13 @@ def ability_name_to_slug(name: str, fqn: str = "") -> str:
 
 def _resolve_workspace_path(rel_or_abs: str | Path) -> Path:
     """Resolves a path relative to SWTORSIM_ROOT if it is not already absolute/existing."""
+    if not rel_or_abs or not str(rel_or_abs).strip():
+        return Path("")
     p = Path(rel_or_abs)
-    if p.exists():
+    if p.exists() and p != Path("."):
         return p.resolve()
     candidate = SWTORSIM_ROOT / p
-    if candidate.exists():
+    if candidate.exists() and candidate != SWTORSIM_ROOT:
         return candidate.resolve()
     return candidate
 
@@ -135,9 +137,11 @@ def build_castable_catalog(
     spec_data = load_json_file(str(resolved_spec))
     if isinstance(choices_path, dict):
         choices = choices_path
-    else:
+    elif choices_path and Path(choices_path).is_file():
         resolved_choices = _resolve_workspace_path(choices_path)
         choices = load_json_file(str(resolved_choices))
+    else:
+        choices = {}
 
     actives: list[CastableAbility] = []
     passive_count = 0
