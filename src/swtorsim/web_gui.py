@@ -400,16 +400,25 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
         if _resolve_workspace_path(live_cand).is_file():
             spec_path = live_cand
             raw_rc["spec_path"] = live_cand
-    class_name = ""
-    spec_name = ""
+    class_name = str(raw_rc.get("class_name") or raw_rc.get("class") or "").strip()
+    spec_name = str(raw_rc.get("spec") or raw_rc.get("spec_name") or "").strip()
     gear_opts = {"tacticals": [], "legendaries": [], "skill_tree_levels": []}
     if spec_path:
         try:
             gear_opts = get_class_gear_options(spec_path, env=active_env)
-            class_name = gear_opts["class_name"]
-            spec_name = gear_opts["spec"]
+            if not class_name:
+                class_name = gear_opts["class_name"]
+            if not spec_name:
+                spec_name = gear_opts["spec"]
         except Exception:
             pass
+
+    if class_name:
+        raw_rc.setdefault("class", class_name)
+        raw_rc.setdefault("class_name", class_name)
+    if spec_name:
+        raw_rc.setdefault("spec", spec_name)
+        raw_rc.setdefault("spec_name", spec_name)
 
     stats_data = {}
     if raw_rc.get("stats_path"):
@@ -1525,6 +1534,19 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     self._send_json({"error": "run_config must be a JSON object."}, status=400)
                     return
 
+                spec_path = str(rc_obj.get("spec_path") or "")
+                if spec_path and (not rc_obj.get("class_name") or not rc_obj.get("spec")):
+                    try:
+                        g_opts = get_class_gear_options(spec_path, env=payload.get("env") or "live")
+                        if not rc_obj.get("class_name") and not rc_obj.get("class"):
+                            rc_obj["class"] = g_opts.get("class_name", "")
+                            rc_obj["class_name"] = g_opts.get("class_name", "")
+                        if not rc_obj.get("spec") and not rc_obj.get("spec_name"):
+                            rc_obj["spec"] = g_opts.get("spec", "")
+                            rc_obj["spec_name"] = g_opts.get("spec", "")
+                    except Exception:
+                        pass
+
                 target_file = RUN_CONFIG_DIR / filename
                 _write_json_crlf(target_file, rc_obj)
                 rel_saved = _to_workspace_rel(target_file)
@@ -1581,6 +1603,21 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     folder = SWTORSIM_ROOT / "data" / "builds" / "custom"
                 elif category == "run_config":
                     folder = SWTORSIM_ROOT / "data" / "run_config" / "custom"
+                    if isinstance(content, dict):
+                        if not content.get("spec_path") and (content.get("run_config") or content.get("config")):
+                            content = content.get("run_config") or content.get("config")
+                        spec_path = str(content.get("spec_path") or "")
+                        if spec_path and (not content.get("class_name") or not content.get("spec")):
+                            try:
+                                g_opts = get_class_gear_options(spec_path)
+                                if not content.get("class_name") and not content.get("class"):
+                                    content["class"] = g_opts.get("class_name", "")
+                                    content["class_name"] = g_opts.get("class_name", "")
+                                if not content.get("spec") and not content.get("spec_name"):
+                                    content["spec"] = g_opts.get("spec", "")
+                                    content["spec_name"] = g_opts.get("spec", "")
+                            except Exception:
+                                pass
                 else:
                     self._send_json({"error": f"Invalid category: {category}"}, status=400)
                     return

@@ -947,7 +947,8 @@
     <button class="btn btn-sm" id="importRunConfigBtn" type="button" title="Import custom run config JSON">📁 Import</button>
     <button class="btn btn-sm" id="deleteRunConfigBtn" type="button" title="Delete selected custom run config" style="display:none; color:var(--red);">🗑️</button>
     <input type="file" id="importRunConfigFile" accept=".json" style="display:none;">
-    <button class="btn btn-sm" id="saveRunConfigBtn" title="Save current configuration to data/run_config/">Save Config</button>
+    <button class="btn btn-sm" id="saveRunConfigBtn" title="Save current configuration to workspace or export JSON">Save Config</button>
+    <button class="btn btn-sm" id="exportRunConfigBtn" type="button" title="Export current configuration to JSON file" onclick="exportRunConfigDirectly()">Export Config</button>
     <button class="btn btn-sm" id="reloadCatalogBtn" title="Reload files from workspace">Refresh</button>
     <button class="btn btn-purple btn-sm" id="openRotationBuilderBtn" title="Launch or switch to the Web Rotation Builder">Rotation Builder</button>
     <button class="btn btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">🌙 Dark</button>
@@ -1399,13 +1400,14 @@
 <!-- SAVE RUN CONFIG MODAL -->
 <div class="modal-backdrop" id="saveConfigModal">
   <div class="modal-box">
-    <div class="modal-title">Save Run Configuration (`data/run_config/`)</div>
+    <div class="modal-title">Save / Export Run Configuration</div>
     <div class="form-row">
       <label class="form-label">Filename (.json)</label>
       <input type="text" id="saveConfigFilenameInput" value="custom_config.json">
     </div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
       <button class="btn" onclick="closeModal('saveConfigModal')">Cancel</button>
+      <button class="btn" onclick="exportRunConfigDirectly()" title="Download config JSON file directly">Export .JSON</button>
       <button class="btn btn-primary" onclick="confirmSaveRunConfig()">Save JSON</button>
     </div>
   </div>
@@ -1788,7 +1790,7 @@
     syncDeleteButtons();
   }
 
-  function populateSpecsForClass(clsName, targetSpecPath = null) {
+  function populateSpecsForClass(clsName, targetSpecPath = null, targetSpecName = null) {
     const specSel = document.getElementById("specSelect");
     specSel.innerHTML = "";
     const specs = (CATALOG && CATALOG.disciplines && CATALOG.disciplines[clsName]) || {};
@@ -1798,7 +1800,21 @@
       opt.textContent = spName;
       specSel.appendChild(opt);
     });
-    if (targetSpecPath) {
+
+    if (targetSpecPath && Array.from(specSel.options).some(o => o.value === targetSpecPath)) {
+      specSel.value = targetSpecPath;
+    } else if (targetSpecName) {
+      const targetLower = String(targetSpecName).toLowerCase();
+      const matchOpt = Array.from(specSel.options).find(o =>
+        o.textContent.toLowerCase() === targetLower ||
+        o.value.toLowerCase().includes(targetLower)
+      );
+      if (matchOpt) {
+        specSel.value = matchOpt.value;
+      } else if (targetSpecPath) {
+        specSel.value = targetSpecPath;
+      }
+    } else if (targetSpecPath) {
       specSel.value = targetSpecPath;
     }
   }
@@ -1954,7 +1970,7 @@
     return out;
   }
 
-  async function applyPresetRunConfig(path) {
+  async function applyPresetRunConfig(path, fallbackParsed = null) {
     if (!path) return;
     try {
       setStatus("Loading preset...", "running");
@@ -1962,15 +1978,16 @@
       const bundle = await res.json();
       if (!res.ok) throw new Error(bundle.error || "Failed to load preset");
 
-      const rc = bundle.run_config || {};
-      const clsName = bundle.class_name;
+      const rc = bundle.run_config || (fallbackParsed || {});
+      const clsName = bundle.class_name || rc.class_name || rc.class;
+      const spName = bundle.spec_name || bundle.spec || rc.spec || rc.spec_name;
       if (clsName) {
         document.getElementById("classSelect").value = clsName;
-        populateSpecsForClass(clsName, rc.spec_path);
+        populateSpecsForClass(clsName, rc.spec_path, spName);
       }
 
       await updateClassGearOptions(
-        rc.spec_path,
+        document.getElementById("specSelect").value || rc.spec_path,
         rc.tactical_fqn,
         rc.legendary_fqns || []
       );
@@ -2025,10 +2042,26 @@
     if (rel1) relics.push(rel1);
     if (rel2 && rel2 !== rel1) relics.push(rel2);
 
+    const clsSel = document.getElementById("classSelect");
+    const specSel = document.getElementById("specSelect");
+    let clsName = clsSel ? clsSel.value : "";
+    let specName = (specSel && specSel.selectedIndex >= 0 && specSel.options[specSel.selectedIndex])
+      ? specSel.options[specSel.selectedIndex].textContent.trim()
+      : "";
+    if (!clsName || !specName) {
+      const specInfo = getActiveSpecInfo();
+      if (!clsName) clsName = specInfo.classSlug || "";
+      if (!specName) specName = specInfo.specSlug || "";
+    }
+
     return {
       environment: currentEnvironment,
       env: currentEnvironment,
       pts: currentEnvironment === "pts",
+      class: clsName,
+      class_name: clsName,
+      spec: specName,
+      spec_name: specName,
       spec_path: document.getElementById("specSelect").value,
       stats_path: document.getElementById("buildSelect").value,
       stats_override: getStatsOverrideFromInputs(),
@@ -2748,10 +2781,25 @@
     compContainer.innerHTML = cHtml;
   }
 
-  async function confirmSaveRunConfig() {
-    const filename = document.getElementById("saveConfigFilenameInput").value.trim() || "custom_config.json";
+  function buildExportRunConfigObject() {
     const p = buildPayloadFromForm();
-    const rcObj = {
+    const clsSel = document.getElementById("classSelect");
+    const specSel = document.getElementById("specSelect");
+    let clsName = (clsSel && clsSel.value) ? clsSel.value : "";
+    let specName = (specSel && specSel.selectedIndex >= 0 && specSel.options[specSel.selectedIndex])
+      ? specSel.options[specSel.selectedIndex].textContent.trim()
+      : "";
+    if (!clsName || !specName) {
+      const specInfo = getActiveSpecInfo();
+      if (!clsName) clsName = specInfo.classSlug || "";
+      if (!specName) specName = specInfo.specSlug || "";
+    }
+
+    return {
+      class: clsName,
+      class_name: clsName,
+      spec: specName,
+      spec_name: specName,
       spec_path: p.spec_path,
       stats_path: p.stats_path,
       rotation_path: p.rotation_path,
@@ -2772,6 +2820,28 @@
       in_flashpoint_operation: p.in_flashpoint_operation,
       combat_distance: p.combat_distance,
     };
+  }
+
+  function exportRunConfigDirectly() {
+    const rcObj = buildExportRunConfigObject();
+    const specSlug = rcObj.spec || "config";
+    const defaultName = `${rcObj.class || "custom"}_${specSlug}_config.json`.toLowerCase().replace(/\s+/g, "_");
+    const entered = prompt("Enter filename to export run config:", defaultName);
+    if (!entered) return;
+    const filename = entered.trim().endsWith(".json") ? entered.trim() : (entered.trim() + ".json");
+    const blob = new Blob([JSON.stringify(rcObj, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    closeModal("saveConfigModal");
+  }
+
+  async function confirmSaveRunConfig() {
+    const filename = document.getElementById("saveConfigFilenameInput").value.trim() || "custom_config.json";
+    const rcObj = buildExportRunConfigObject();
 
     const res = await fetch("/api/run_config/save", {
       method: "POST",
@@ -2922,6 +2992,10 @@
     if (cur) {
       const parts = cur.split("/");
       document.getElementById("saveConfigFilenameInput").value = parts[parts.length - 1];
+    } else {
+      const specInfo = getActiveSpecInfo();
+      const defName = `${specInfo.classSlug || "custom"}_${specInfo.specSlug || "spec"}_config.json`.toLowerCase().replace(/\s+/g, "_");
+      document.getElementById("saveConfigFilenameInput").value = defName;
     }
     openModal("saveConfigModal");
   });
@@ -3026,12 +3100,18 @@
           throw new Error("File is not valid JSON: " + jsonErr.message);
         }
 
+        if (category === "run_config" && parsed && typeof parsed === "object" && !parsed.spec_path && (parsed.run_config || parsed.config)) {
+          parsed = parsed.run_config || parsed.config;
+        }
+
         if (validatorFn) {
           const valErr = validatorFn(parsed);
           if (valErr) throw new Error(valErr);
         }
 
         const { classSlug, specSlug } = getActiveSpecInfo();
+        const itemClass = (parsed && (parsed.class || parsed.class_name)) || classSlug;
+        const itemSpec = (parsed && (parsed.spec || parsed.spec_name)) || specSlug;
         const res = await fetch("/api/custom_file/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -3039,8 +3119,8 @@
             category,
             filename: file.name,
             content: parsed,
-            class_folder: classSlug,
-            spec_folder: specSlug
+            class_folder: itemClass,
+            spec_folder: itemSpec
           })
         });
 
@@ -3126,13 +3206,13 @@
     "presetConfigSelect",
     (obj) => {
       if (!obj || typeof obj !== "object") return "Run Config must be a JSON object.";
-      if (!obj.spec && !obj.spec_path && !obj.class_name && !obj.rotation_path && !obj.stats_path) {
+      if (!obj.spec && !obj.spec_name && !obj.spec_path && !obj.class_name && !obj.class && !obj.rotation_path && !obj.stats_path) {
         return "Run Config must specify class/spec or rotation/stats configuration.";
       }
       return null;
     },
-    async (path) => {
-      await applyPresetRunConfig(path);
+    async (path, parsed) => {
+      await applyPresetRunConfig(path, parsed);
     }
   );
 

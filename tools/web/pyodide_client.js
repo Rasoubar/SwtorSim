@@ -774,8 +774,15 @@
           relFolder += `/${classFolder}/${specFolder}`;
         }
 
+        let importContent = payload.content;
+        if (category === "run_config" && typeof importContent === "object" && importContent !== null) {
+          if (!importContent.spec_path && (importContent.run_config || importContent.config)) {
+            importContent = importContent.run_config || importContent.config;
+          }
+        }
+
         const vPath = `${relFolder}/${filename}`;
-        const contentStr = typeof payload.content === "string" ? payload.content : JSON.stringify(payload.content, null, 2);
+        const contentStr = typeof importContent === "string" ? importContent : JSON.stringify(importContent, null, 2);
 
         state.customFiles[vPath] = contentStr;
         saveCustomFilesToStorage(state.customFiles);
@@ -821,7 +828,8 @@
       if (pathname === "/api/run_config/save" || pathname === "/api/build_stats/save") {
         const payload = JSON.parse(options.body || "{}");
         const filename = payload.filename || "custom_config.json";
-        const blob = new Blob([JSON.stringify(payload.config || payload.stats || payload, null, 2)], {
+        const content = payload.run_config || payload.config || payload.stats || payload;
+        const blob = new Blob([JSON.stringify(content, null, 2)], {
           type: "application/json"
         });
         const downloadUrl = URL.createObjectURL(blob);

@@ -943,3 +943,57 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **Web Release Bundler Isolation (`tools/bundle_pyodide_assets.py`)**:
   - Added `"custom"` to `EXCLUDE_PATTERNS` so that user/developer scratch files in `data/rotations/custom/`, `data/Choices/custom/`, `data/builds/custom/`, and `data/run_config/custom/` are strictly excluded from `dist/swtorsim_assets.zip`.
   - Promoted `BasicMaliPS PTS.json` to `data/rotations/assassin/hatred/` as an official built-in preset.
+
+## [Unreleased] - 2026-11-06: Empirical Modifier Bucketing — Test 8 (Assailable Elemental & Susceptible Tech)
+### Added / Verified
+- **Test 8 Empirically Proven (`docs/modifier_bucketing_log.md`)**:
+  - Tested **Target Elemental Type Vulnerability (*Assailable Elemental* `+7%` / GOM `370`)** and **Target Tech Channel Vulnerability (*Susceptible* `+5%` / GOM `388`)** using Innovative Ordnance Mercenary `Incendiary Missile` (`Burning` DoT tick).
+  - Target: Operations Training Dummy with All Debuffs Module active.
+  - Calculated exact additive prediction in `BUCKET_1`: $3,411.3242 \times (1.0 + 0.07 + 0.05) = \mathbf{3,820.68} \implies \mathbf{3,821}$.
+  - Calculated multiplicative prediction: $3,411.3242 \times 1.07 \times 1.05 = \mathbf{3,832.62} \implies \mathbf{3,833}$.
+  - Observed in-game hit: **`3,821`** (exact match to Option A).
+  - Definitively established that `370` (*Assailable Elemental*) and `388` (*Susceptible Tech*) are **ADDITIVE in `BUCKET_1`** alongside Attacker Damage Done (`79`), Force Vulnerability (`386`), Melee Vulnerability (`384`), and Internal Vulnerability (`376`).
+- **Codebase & Master Checklist Sync**:
+  - Updated `_TARGET_DEBUFF_BUCKETS` in `src/swtorsim/combat_math_unbucketed.py` with `"channel_tech": BUCKET_1` and `"type_elemental": BUCKET_1`.
+  - Checked off IDs `370` and `388` in `docs/modifier_bucketing_master_checklist.md`.
+  - Enforced strict Windows CRLF line endings across all files per Rule 6.
+
+## [Unreleased] - 2026-11-06: Empirical Modifier Bucketing — Test 9 (Marked Ranged Vulnerability)
+### Added / Verified
+- **Test 9 Empirically Proven (`docs/modifier_bucketing_log.md`)**:
+  - Tested **Target Ranged Channel Vulnerability (*Marked* `+5%` / GOM `382`)** on Arsenal Mercenary using `Priming Shot` (`abl.bounty_hunter.skill.arsenal.priming_shot`) against the Operations Training Dummy with All Debuffs Module active (*Sundered* `-20%` armor, *Marked* `+5%` ranged vulnerability).
+  - Verified Energy armor mitigation with *High Velocity Gas Cylinder* (`+35%` armor penetration $\implies 21.8697\%$ effective DR), *Target Tracking* (`+35%` ranged crit damage), *Advanced Targeting* (`+10%` crit damage proc on crit), and *Supercharge* stacks (`+0.1%` damage done per stack, `+1.0%` at 10 stacks).
+  - At 10 stacks of *Supercharge* (`+11%` total caster `BUCKET_1` from *Ironsights* `+10%` + *Supercharge* `+1%`), Option A (Additive in `BUCKET_1`, $1.160	imes$) predicted **`18,245 – 20,153`** non-crit and **`36,480 – 40,294`** crit, whereas Option B (Multiplicative, $1.11 	imes 1.05 = 1.1655	imes$) predicted a strict minimum floor of **`18,331`** non-crit and **`36,653`** crit.
+  - Observed in-game hits of **`18,261`** (non-crit) and **`36,604`** (crit) sit strictly below Option B's mathematical floor, definitively proving that **`382` (*Marked*) is ADDITIVE in `BUCKET_1`**.
+- **Codebase & Master Checklist Sync**:
+  - Locked `"channel_ranged": BUCKET_1` and `"382": (BUCKET_1, None)` in `src/swtorsim/combat_math_unbucketed.py`.
+  - Checked off ID `382` in `docs/modifier_bucketing_master_checklist.md`.
+  - Enforced strict Windows CRLF line endings across all modified files per Rule 6.
+
+
+## [Unreleased] - 2026-11-06: Stack Modification Targeting & Tag Resolution Fix (`abilities.py`)
+### Fixed
+- **`handle_modify_stack_charge` Targeting Priority (`src/swtorsim/abilities.py`)**:
+  - Fixed a critical precedence bug where an active `owner_effect_key` in the trigger context caused `(eff is None or getattr(eff, "is_expired", False)) and search_tags` to evaluate to `False`, silently bypassing explicit action `tags` (such as `tag.abl.sith_warrior.fury_stacks`).
+  - Re-architected `handle_modify_stack_charge` to strictly follow 3-tier targeting priority:
+    1. **Explicit Tag Search**: Searches `owner_entity`, `caster`, and `target` for active effects matching `search_tags`.
+    2. **Explicit Ability Spec Search**: Resolves active effects matching `ints.ability_spec` (respecting `is_stem_matching_enabled()` per Rule #7).
+    3. **Trigger Origin Fallback**: Defaults to `owner_key` on `owner_entity` only when no explicit tags or specs are defined.
+  - Verified that Marauder **Frenzy** now immediately grants the full 30/30 stacks of `Fury`, enabling **Berserk** to pass requirements and successfully activate Ataru Berserk buff while properly dispelling the Fury stacks.
+  - Enforced strict Windows CRLF line endings across all files per Rule #6.
+
+## [Unreleased] - 2026-11-06: WebUI Export / Import Config Class & Spec Preservation (simulator_ui.html, web_gui.py, pyodide_client.js, rotation_builder_ui.html)
+### Added / Fixed
+- **Class & Spec Preservation on Config Export / Save (tools/simulator_ui.html)**:
+  - buildPayloadFromForm() and buildExportRunConfigObject() now explicitly capture class, class_name, spec, and spec_name from active dropdown selections or getActiveSpecInfo().
+  - Added dedicated Export Config action button in the simulator header and Export .JSON in the Save/Export modal for immediate direct JSON download.
+  - Automatically suggests clean, spec-aware filenames (e.g. assassin_hatred_config.json) when saving or exporting.
+- **Robust Class & Discipline Resolution on Import (tools/simulator_ui.html, src/swtorsim/web_gui.py, tools/web/pyodide_client.js)**:
+  - populateSpecsForClass(clsName, targetSpecPath, targetSpecName) now intelligently matches by targetSpecPath or falls back to targetSpecName, resolving discipline selections across different environments (Live vs PTS) or file paths.
+  - setupFileImporter now unwraps nested { run_config: ... } / { config: ... } structures and permits schemas with class, class_name, spec, or spec_name.
+  - load_run_config_bundle in src/swtorsim/web_gui.py extracts class_name and spec_name directly from the imported run config JSON and populates them into both bundle and raw_rc.
+  - Endpoints /api/run_config/save and /api/custom_file/import ensure class and spec metadata are permanently persisted into saved/imported JSON files on disk.
+  - In tools/web/pyodide_client.js, fixed /api/run_config/save to export payload.run_config directly without extraneous outer payload wrapper.
+- **Standalone Web Release (dist/)**:
+  - Rebuilt standalone Web release via build_web_release.py keeping dist/index.html and dist/pyodide_client.js in complete sync.
+  - All unit tests and integration tests passing cleanly.

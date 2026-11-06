@@ -739,7 +739,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1793959186"></script>
+  <script src="pyodide_client.js?v=1793986747"></script>
 </head>
 <body>
 
@@ -1397,16 +1397,21 @@ async function onSelectRunConfig(rcPath) {
     showToast(data.error, true);
     return;
   }
-  const rc = data.run_config;
-  // Find matching class and spec for rc.spec_path
+  const rc = data.run_config || {};
+  const targetClass = data.class_name || rc.class_name || rc.class || "";
+  const targetSpec = data.spec_name || data.spec || rc.spec || rc.spec_name || "";
+  let matched = false;
+  // Find matching class and spec for rc.spec_path or class/spec names
   for (const [cls, specs] of Object.entries(workspaceCatalog.disciplines || {})) {
     for (const [sp, p] of Object.entries(specs)) {
-      if (p === rc.spec_path) {
+      if (p === rc.spec_path || (targetClass && cls.toLowerCase() === targetClass.toLowerCase() && targetSpec && sp.toLowerCase() === targetSpec.toLowerCase())) {
         document.getElementById("classSelect").value = cls;
         await onClassChange(sp);
+        matched = true;
         break;
       }
     }
+    if (matched) break;
   }
   if (rc.choices_path) {
     document.getElementById("choicesFileSelect").value = rc.choices_path;
