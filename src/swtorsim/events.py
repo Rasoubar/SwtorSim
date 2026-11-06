@@ -294,6 +294,21 @@ class DotTick(Event):
                 next_tick_time = sim.current_time + self.instance_ref.tick_interval
                 sim.schedule_absolute(next_tick_time, self)
             else:
+                if effect_blueprint and hasattr(effect_blueprint, "execute_triggered_branches"):
+                    expire_ctx = {
+                        "stack_multiplier": getattr(self.instance_ref, "stacks", 1),
+                        "current_stacks": getattr(self.instance_ref, "stacks", 1),
+                        "active_effect": self.instance_ref,
+                        "owner_entity": self.target,
+                    }
+                    effect_blueprint.execute_triggered_branches(
+                        "on_pre_remove",
+                        sim,
+                        self.source,
+                        self.target,
+                        context=expire_ctx,
+                        ability=getattr(self.instance_ref, "ability_ref", None),
+                    )
                 self.target.cleanup_expired_effects([dot_name])
                 is_dot = (
                     "tag.abl.debuff.damage_over_time" in getattr(self.instance_ref, "tags", ())

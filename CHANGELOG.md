@@ -2,6 +2,11 @@
 
 ## Completed Fixes
 
+### 38. DotTick Expiration on_pre_remove Lifecycle Execution (src/swtorsim/events.py) - [DONE]
+- Fixed DotTick.resolve in src/swtorsim/events.py omitting lueprint.execute_triggered_branches('on_pre_remove', ...) when a ticking effect reaches expiration (	icks_remaining <= 0).
+- This caused sub-effects with tick intervals (such as Ferocity_2 with 0.3s duration and 0.3s tick interval) to expire silently without firing their on_pre_remove action (modify_stack_charge -1 on 	ag.abl.sith_warrior.ferocity). As a result, Massacre, Gore, Smash, and Sweeping Slash were failing to decrement Ferocity stacks, allowing subsequent attacks during the 10-second buff window to retain 100% armor penetration and inflating damage output by ~2,100 DPS.
+- DotTick.resolve now executes on_pre_remove branches before cleanup, matching EffectExpire.resolve and ensuring accurate dual-wield multi-hit stack consumption.
+
 
 
 ### 1. Upgrade Condition Validation (`src/swtorsim/requirements.py`) - [DONE]
