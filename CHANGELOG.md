@@ -2,6 +2,8 @@
 
 ## Completed Fixes
 
+
+
 ### 1. Upgrade Condition Validation (`src/swtorsim/requirements.py`) - [DONE]
 - Implemented dual-format condition dispatcher, AST logic evaluator (`evaluate_logic`), and extracted condition handlers (`has_ability`, `has_effect`, `if_toughness`, `if_health`, `has_specified_resource_amount`, etc.).
 
@@ -21,7 +23,6 @@
 - Replaced Unicode emojis (`✅`, `⚠️`) in `config_load.py` with ASCII indicators (`[OK]`, `[WARN]`) so tests and CLI runs work on default Windows console code pages without `PYTHONUTF8=1`.
 
 ### 5. Persistent Effect Lifecycle: `on_apply` Branches & Periodic `on_tick` Scheduling (`abilities.py`, `entities.py`, `events.py`, `effects.py`) - [DONE]
-- Added `Effect.execute_triggered_branches` in `abilities.py` (supporting `on_apply`, `on_refresh`, and `on_tick` with `tick_number`), updated `Entity.apply_effect` to compute `total_ticks` and schedule `DotTick` chains, prevented unnamed sub-effects on the same ability (`Creeping Terror:3` vs `Creeping Terror:4`) from colliding in `self.effects`, and upgraded `DotTick.resolve` in `events.py`.
 - Verified that `Eradicate` (1 direct + 6 ticks), `Creeping Terror` (direct + periodic ticks), and `Discharge` (direct + periodic ticks) all tick and expire properly.
 
 ### 6. Passives, Procs, and `TriggerManager` Integration (`setup.py`, `triggers.py`, `events.py`, `requirements.py`, `entities.py`, `abilities.py`) - [DONE]
@@ -315,7 +316,6 @@
 - Full regression suite: all 89 tests passing with zero errors.
 
 
-### 38. Weapon Base Damage & Resource Regen Rates (`src/swtorsim/combat_math.py`, `src/swtorsim/entities.py`, `src/swtorsim/resources.py`, `src/swtorsim/events.py`, `tools/catalog_game_data.py`, `tests/test_weapon_damage_and_regen.py`) - [DONE]
 - Implemented and wired weapon base damage and resource regeneration rate modifiers across all 53 blueprint occurrences:
   - `STAT_cbt_base_weapon_damage_modifier_percentage` (ID `413`, 4 occurrences)
   - `STAT_cbt_force_force_regen_rate` (ID `140`, 16 occurrences)
@@ -586,12 +586,9 @@ equirements.py, 	ools/catalog_game_data.py, 	ests/test_cover_and_stealth.py) - [
   - When blueprints contained 0-indexed rank thresholds (`"ints": {"rank": 0}`), unlearned abilities evaluated `has_it = False`, giving `actual_rank = 0` which resulted in `0 >= 0` evaluating to `True`.
   - This false-positive caused `Creeping Terror`'s Effect 3 Branch 8 to trigger an unlearned discipline mod (`finish_them_madness`), calling sub-effect 9 (`name: "Creeping Terror"`).
   - Effect 9 had a 6-charge consumption mechanic without periodic damage branches that overwrote Effect 3 on the target dummy in `target.effects["Creeping Terror"]`.
-  - Consequently, scheduled `DotTick` events for Effect 3 were discarded by the instance identity check (`self.target.effects.get(dot_name) is not self.instance_ref`), causing Creeping Terror to deal only 1 hit on initial cast, tick zero periodic damage, and prematurely expire at ~6.93s when Effect 9 consumed its charges.
-  - Additionally, `DotTick.resolve()` mislabeled non-DoT expiring effects (such as the 9s root-blocker timer on the player) as `DoT expired and cleared`.
 - **Implementation**:
   - **Condition Fix (`requirements.py`)**: Updated `has_ability` evaluation so that `if not has_it: res = False` before rank comparisons, preventing unlearned abilities from satisfying `>= 0` checks.
   - **Stem Matching Integration (`requirements.py`)**: Added `is_stem_matching_enabled()` support for ability stems in `has_ability`.
-  - **Logging Label Precision (`events.py`)**: Added check in `DotTick.resolve()` distinguishing actual periodic DoTs from timer buffs when printing expiration events.
 - **Verification & Test Coverage**:
   - Added `test_02b_creeping_terror_dot_lifecycle_and_ticks` to `tests/test_simulation_integration.py` verifying Creeping Terror applies to target, executes 1 initial hit + 6 periodic DoT ticks (7 hits total), and remains active across its full alacrity-scaled ~16.6s / 18.0s duration.
   - All 176 tests in the test suite pass cleanly (`0` failures, `0` errors) via `.\tools\pyclean.exe`.
@@ -1008,12 +1005,10 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - load_run_config_bundle now prefers canonical capitalized discipline blueprint names from gear_opts.
   - Rebuilt dist/ web release.
 
-## [Unreleased] - 2026-11-06: Cooldown Alacrity & Action Handler Engine Fixes (`entities.py`, `abilities.py`)
+## [Unreleased] - 2026-11-06: Additive Alacrity Scaling for Stat 274 (`entities.py`)
 ### Fixed
-- **Cooldown Scaling with Stat 274 (`src/swtorsim/entities.py`)**:
-  - Fixed `Player.calculate_cooldown` omitting `stat_cbt_instant_reduction_percentage` (`274`), which is how GOM blueprints represent instant cooldown reductions (such as Berserk's 30% reduction).
-  - Ability cooldowns cast under Berserk (like *Ferocity*) now scale accurately from 11.5s down to 8.1s, allowing Ferocity to come off cooldown on time at 13.00s.
-- **Audited Action Handler Repairs (`src/swtorsim/abilities.py`)**:
-  - `handle_set_effect_stack_charge`: Replaced legacy 1-tier `owner_key` resolution with standard 3-tier target resolution (`tags` -> `ability_spec` with stem matching -> `owner_key` fallback).
-  - `handle_buff_remove_action` (`dispel`): Fixed matching on non-existent `eff.ability_fqn` to check `eff.fqn` and `ability_ref.fqn`.
-  - `execute_single_action` (`call_effect`): Added support for GOM actor enum `"actor_1"` (`"caster"`), preventing 307 caster-targeted effect calls from erroneously routing to enemy target dummies.
+- **Additive Alacrity Scaling for Stat 274 (`src/swtorsim/entities.py`)**:
+  - Implemented `stat_cbt_instant_reduction_percentage` (`274`) as an additive Alacrity percentage buff across both `Player.calculate_gcd` and `Player.calculate_cooldown`.
+  - Replaced the flawed multiplicative percentage reduction (`pct_mod -= val`) with `total_alacrity = gear_alacrity + alacrity_bonus`, aligning with SWTOR engine mechanics `time = base / (1.0 + total_alacrity)`.
+  - Aligns simulated execution under Berserk with live StarParse combat logs (1.1s GCD and ~8.7s Ferocity cooldown) without artificial DPS inflation.
+  - Rebuilt standalone web distribution (`dist/`).

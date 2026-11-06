@@ -375,6 +375,7 @@ class Player(Entity):
 
         flat_mod = 0.0
         pct_mod = 1.0
+        alacrity_bonus = 0.0
 
         if ability is not None:
             if isinstance(ability, str):
@@ -402,7 +403,7 @@ class Player(Entity):
                             flat_mod += mod.value
                 elif stat in ("274", "stat_cbt_instant_reduction_percentage", "STAT_cbt_instant_reduction_percentage"):
                     if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
-                        pct_mod -= val
+                        alacrity_bonus += val
 
         adjusted_base = max(0.0, (base_gcd * pct_mod) + flat_mod)
         if adjusted_base <= 0.0:
@@ -412,7 +413,8 @@ class Player(Entity):
         if ability is not None:
             ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
 
-        gcd = adjusted_base if ignore_alacrity else self.scale_time_modifier(adjusted_base)
+        total_alacrity = self.stats.get("Alacrity", 0.0) + alacrity_bonus
+        gcd = adjusted_base if ignore_alacrity else (adjusted_base / (1.0 + total_alacrity))
         scaled_gcd = math.ceil(round(gcd * 10, 6)) / 10
         return round(scaled_gcd, 2)
 
@@ -516,6 +518,7 @@ class Player(Entity):
         """Calculates ability cooldown after flat/percentage modifiers and scaled by current Alacrity CDR."""
         flat_mod = 0.0
         pct_mod = 1.0
+        alacrity_bonus = 0.0
 
         if ability is not None:
             if isinstance(ability, str):
@@ -540,10 +543,10 @@ class Player(Entity):
                                 flat_mod += mod.value
                     elif stat in ("274", "stat_cbt_instant_reduction_percentage", "STAT_cbt_instant_reduction_percentage"):
                         if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
-                            pct_mod -= val
+                            alacrity_bonus += val
 
         adjusted_base = max(0.0, (base_cooldown * pct_mod) + flat_mod)
-        cdr = self.stats.get("Alacrity", 0.0)
+        cdr = self.stats.get("Alacrity", 0.0) + alacrity_bonus
         cooldown = adjusted_base / (1.0 + cdr)
         scaled_cooldown = math.ceil(cooldown * 10) / 10
         return round(scaled_cooldown, 2)
