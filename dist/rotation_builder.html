@@ -739,7 +739,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1793958757"></script>
+  <script src="pyodide_client.js?v=1793959186"></script>
 </head>
 <body>
 
@@ -1116,39 +1116,94 @@ async function loadWorkspaceCatalog() {
   }
 }
 
-function populateExistingRotationsSelect() {
+function getActiveBuilderSpecInfo() {
+  const cls = (document.getElementById("classSelect")?.value || "").toLowerCase().trim();
+  const spec = (document.getElementById("specSelect")?.value || "").toLowerCase().trim();
+  const specPath = ((workspaceCatalog.disciplines || {})[document.getElementById("classSelect")?.value] || {})[document.getElementById("specSelect")?.value] || "";
+  let classSlug = cls;
+  let specSlug = spec;
+  if (specPath) {
+    const parts = specPath.replace(/\\/g, "/").split("/");
+    const fileWithExt = parts[parts.length - 1] || "";
+    specSlug = fileWithExt.replace(/\.json$/i, "").toLowerCase();
+    classSlug = (parts[parts.length - 2] || "").toLowerCase();
+  }
+  return { classSlug, specSlug };
+}
+
+function populateExistingRotationsSelect(preferredPath = null) {
   const rotSel = document.getElementById("existingRotationSelect");
-  const cur = rotSel.value;
+  if (!rotSel) return;
+  const cur = preferredPath || rotSel.value;
   rotSel.innerHTML = '<option value="">-- Open Existing Rotation JSON --</option>';
 
-  const customRots = (workspaceCatalog.rotations || []).filter(r => r.is_custom || (r.path && r.path.includes("/custom/")));
-  const presetRots = (workspaceCatalog.rotations || []).filter(r => !r.is_custom && (!r.path || !r.path.includes("/custom/")));
+  const { classSlug, specSlug } = getActiveBuilderSpecInfo();
+  const allRots = workspaceCatalog.rotations || [];
 
-  if (customRots.length > 0) {
+  const specCustom = allRots.filter(r => (r.is_custom || (r.path && r.path.includes("/custom/"))) && (
+    (!r.class && !r.spec) ||
+    (r.class === classSlug && (!r.spec || r.spec === specSlug))
+  ));
+
+  const specPresets = allRots.filter(r => !r.is_custom && (!r.path || !r.path.includes("/custom/")) && (
+    (!r.class && !r.spec) ||
+    (r.class === classSlug && (!r.spec || r.spec === specSlug))
+  ));
+
+  const otherCustom = allRots.filter(r => (r.is_custom || (r.path && r.path.includes("/custom/"))) && !specCustom.includes(r));
+  const otherPresets = allRots.filter(r => (!r.is_custom && (!r.path || !r.path.includes("/custom/"))) && !specPresets.includes(r));
+
+  if (specCustom.length > 0) {
     const cGroup = document.createElement("optgroup");
     cGroup.label = "★ My Custom Files";
-    for (const rot of customRots) {
+    for (const rot of specCustom) {
       const opt = document.createElement("option");
       opt.value = rot.path;
-      opt.textContent = `★ ${rot.label}`;
+      opt.textContent = `★ ${rot.name || rot.label}`;
       cGroup.appendChild(opt);
     }
     rotSel.appendChild(cGroup);
   }
 
-  if (presetRots.length > 0) {
+  if (specPresets.length > 0) {
     const pGroup = document.createElement("optgroup");
     pGroup.label = "Built-In Rotations";
-    for (const rot of presetRots) {
+    for (const rot of specPresets) {
       const opt = document.createElement("option");
       opt.value = rot.path;
-      opt.textContent = rot.label;
+      opt.textContent = rot.name ? rot.name.replace(/\.json$/i, "") : rot.label;
       pGroup.appendChild(opt);
     }
     rotSel.appendChild(pGroup);
   }
 
-  if (cur) rotSel.value = cur;
+  if (otherCustom.length > 0) {
+    const ocGroup = document.createElement("optgroup");
+    ocGroup.label = "★ Custom Files (Other Disciplines)";
+    for (const rot of otherCustom) {
+      const opt = document.createElement("option");
+      opt.value = rot.path;
+      opt.textContent = `★ ${rot.label || rot.name}`;
+      ocGroup.appendChild(opt);
+    }
+    rotSel.appendChild(ocGroup);
+  }
+
+  if (otherPresets.length > 0) {
+    const opGroup = document.createElement("optgroup");
+    opGroup.label = "Presets (Other Disciplines)";
+    for (const rot of otherPresets) {
+      const opt = document.createElement("option");
+      opt.value = rot.path;
+      opt.textContent = rot.label || rot.name;
+      opGroup.appendChild(opt);
+    }
+    rotSel.appendChild(opGroup);
+  }
+
+  if (cur && Array.from(rotSel.options).some(o => o.value === cur)) {
+    rotSel.value = cur;
+  }
 }
 
 async function onClassChange(preferredSpec = null) {
@@ -1191,6 +1246,7 @@ async function onSpecChange() {
   document.getElementById("legendary2Select").value = "";
 
   await refreshLoadoutCatalog(chSel.value || {});
+  populateExistingRotationsSelect();
 }
 
 async function onChoicesPresetChange() {
@@ -1367,8 +1423,11 @@ async function onSelectRunConfig(rcPath) {
   });
 
   if (rc.rotation_path) {
+    populateExistingRotationsSelect(rc.rotation_path);
     document.getElementById("existingRotationSelect").value = rc.rotation_path;
     await onSelectExistingRotation(rc.rotation_path);
+  } else {
+    populateExistingRotationsSelect();
   }
   showToast(`Loaded loadout & rotation from ${rcPath}`);
 }
@@ -2643,8 +2702,7 @@ async function saveRotationToDisk() {
     return;
   }
   await loadWorkspaceCatalog();
-  const existingSel = document.getElementById("existingRotationSelect");
-  if (existingSel) existingSel.value = data.path;
+  populateExistingRotationsSelect(data.path);
 
   const isWebMode = window.PYODIDE_BRIDGE || window.location.port === "8080" || !window.location.port;
   if (isWebMode) {
