@@ -982,6 +982,11 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Verified that Marauder **Frenzy** now immediately grants the full 30/30 stacks of `Fury`, enabling **Berserk** to pass requirements and successfully activate Ataru Berserk buff while properly dispelling the Fury stacks.
   - Enforced strict Windows CRLF line endings across all files per Rule #6.
 
+- **Stack-Building Effect Accumulation (`src/swtorsim/entities.py`)**:
+  - Fixed stack accumulation in `Entity.apply_effect` where effects without scaling stat modifiers (`scales_with_stack_charge == False`) were permanently clamped at 1 stack.
+  - Added `can_accumulate_stacks = effect_instance.max_stacks > 1 and (effect_instance.scales_with_stacks or effect_instance.initial_stacks < effect_instance.max_stacks)` to properly distinguish stack-building buffs (`initial < max`) from charge-consuming buffs (`initial == max`).
+  - Verified natural Fury accumulation on Marauder through rage spenders: gains +4 Fury per attack (+2 base + +2 from Short Fuse), cleanly accumulating to 30 stacks and enabling Berserk.
+
 ## [Unreleased] - 2026-11-06: WebUI Export / Import Config Class & Spec Preservation (simulator_ui.html, web_gui.py, pyodide_client.js, rotation_builder_ui.html)
 ### Added / Fixed
 - **Class & Spec Preservation on Config Export / Save (tools/simulator_ui.html)**:

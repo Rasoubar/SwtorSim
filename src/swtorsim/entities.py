@@ -129,7 +129,11 @@ class Entity:
 
         existing = self.effects.get(effect_key)
         if existing is not None and not getattr(existing, "is_expired", False):
-            if effect_instance.scales_with_stacks:
+            can_accumulate_stacks = effect_instance.max_stacks > 1 and (
+                effect_instance.scales_with_stacks
+                or effect_instance.initial_stacks < effect_instance.max_stacks
+            )
+            if can_accumulate_stacks:
                 effect_instance.stacks = min(
                     effect_instance.max_stacks,
                     getattr(existing, "stacks", 1) + 1,
