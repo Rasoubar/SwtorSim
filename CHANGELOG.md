@@ -1017,3 +1017,16 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Replaced the flawed multiplicative percentage reduction (`pct_mod -= val`) with `total_alacrity = gear_alacrity + alacrity_bonus`, aligning with SWTOR engine mechanics `time = base / (1.0 + total_alacrity)`.
   - Aligns simulated execution under Berserk with live StarParse combat logs (1.1s GCD and ~8.7s Ferocity cooldown) without artificial DPS inflation.
   - Rebuilt standalone web distribution (`dist/`).
+
+## [Unreleased] - 2026-11-06: Off-Hand Scope Correction for Dual Wield Mastery (Stat 127) (`combat_math.py`, `combat_math_unbucketed.py`)
+### Fixed
+- **Off-Hand Attack Scoping for Stat 127 (`src/swtorsim/combat_math.py`, `src/swtorsim/combat_math_unbucketed.py`)**:
+  - Corrected `STAT_cbt_dual_wield_damage_done_modifier_percentage` (`127`) from erroneously applying a universal x1.25 (+25%) damage multiplier across all hits (including main-hand melee and Force attacks like *Devastating Blast* and *Gore* whenever an off-hand was equipped).
+  - Wired `hand = action_data.get("hand", "main")` into `handle_modifiers` and `handle_caster_buffs`, scoping Stat 127 strictly to attacks executed with the off-hand weapon (`hand == "off"`).
+  - Scoped `STAT_cbt_dual_wield_accuracy_modifier_fixed` (`126`) in `accuracy_roll` strictly to off-hand attacks (`hand == "off"`).
+  - Benchmarked simulated peak hits against live StarParse combat logs on 10M Operations Dummy, showing near 1:1 match across all abilities:
+    - *Gore*: 53,123 dmg (Sim) vs 53,013 dmg (Live, 99.8% match)
+    - *Dual Saber Throw*: 20,468 dmg (Sim) vs 20,283 dmg (Live, 99.1% match)
+    - *Ravage*: 17,029 dmg (Sim) vs 17,264 dmg (Live, 98.6% match)
+    - *Vicious Throw*: 91,101 dmg (Sim) vs 95,311 dmg (Live peak crit / 85,128 avg crit)
+    - *Devastating Blast*: 79,498 dmg (Sim) vs 86,370 dmg (Live peak crit / 70,641 avg crit)

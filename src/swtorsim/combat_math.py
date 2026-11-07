@@ -54,10 +54,11 @@ def handle_modifiers(caster, target, action_data, damage_type=None):
     action_tags = frozenset(action_data.get("tags") or ())
     ability_fqn = action_data.get("ability_fqn")
     attack_type = action_data.get("attack_type", 1)
+    hand = action_data.get("hand", "main")
     if damage_type is None:
         damage_type = action_data.get("resolved_damage_type") or action_data.get("damage_type", 1)
 
-    handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers)
+    handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, hand=hand)
     handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, caster=caster)
 
     for bucket_value in buckets.values():
@@ -154,8 +155,6 @@ _CASTER_DAMAGE_DISPATCH = {
     "250": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "burn") or _entity_has_tag(target, "fire")),
     "STAT_cbt_damage_done_if_target_accuracy_reduced_modifier_percentage": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "accuracy_reduced")),
     "389": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "accuracy_reduced")),
-    "STAT_cbt_dual_wield_damage_done_modifier_percentage": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: getattr(caster, "stats", {}).get("Off_hand_max", 0.0) > 0),
-    "127": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: getattr(caster, "stats", {}).get("Off_hand_max", 0.0) > 0),
 }
 
 _CRIT_CHANCE_DISPATCH = {
@@ -203,7 +202,7 @@ _SKIP_BASE_STATS = frozenset({
 })
 
 
-def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers):
+def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, hand: str = "main"):
     """ Alters modifiers dict according to active effects and buffs on caster."""
     is_melee = attack_type in (1, "melee", "Melee")
     is_ranged = attack_type in (2, "ranged", "Ranged")
@@ -291,6 +290,12 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
             # 5. Base Weapon Damage Modifier
             if stat in ("STAT_cbt_base_weapon_damage_modifier_percentage", "413"):
                 modifiers['base_weapon_damage_modifier'] = modifiers.get('base_weapon_damage_modifier', 0.0) + val
+                continue
+
+            # 6. Dual Wield Damage Done Modifier (Stat 127) - applies strictly to off-hand weapon attacks
+            if stat in ("STAT_cbt_dual_wield_damage_done_modifier_percentage", "127"):
+                if hand == "off":
+                    buckets[BUCKET_NORMAL] = buckets.get(BUCKET_NORMAL, 0.0) + val
                 continue
 
 _ATTACK_TYPE_CHANNELS = {
@@ -717,7 +722,7 @@ def accuracy_roll(
                 elif stat in ("STAT_cbtAccuracy", "11"):
                     bonus_accuracy += val
                 elif stat in ("STAT_cbt_dual_wield_accuracy_modifier_fixed", "126"):
-                    if hand == "off" or getattr(source, "stats", {}).get("Off_hand_max", 0.0) > 0:
+                    if hand == "off":
                         bonus_accuracy += val
 
     bonus_defense = 0.0
