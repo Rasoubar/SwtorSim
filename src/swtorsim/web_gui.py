@@ -1659,7 +1659,9 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
 
             if route == "/api/launch_rotation_builder":
                 url = ensure_rotation_builder_running()
-                self._send_json({"ok": True, "url": url})
+                sim_port = self.server.server_address[1]
+                url_with_port = f"{url}?sim_port={sim_port}"
+                self._send_json({"ok": True, "url": url_with_port})
                 return
 
             self._send_json({"error": f"Unknown endpoint: {route}"}, status=404)

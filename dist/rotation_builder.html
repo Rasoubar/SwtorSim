@@ -739,7 +739,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1794057391"></script>
+  <script src="pyodide_client.js?v=1794060798"></script>
 </head>
 <body>
 
@@ -990,10 +990,24 @@ let ruleModalContext = null; // { stepIndex, poolIndex (optional), editKey (opti
 // Initialization & API Calls
 // ---------------------------------------------------------------------------
 window.addEventListener("DOMContentLoaded", async () => {
+  // Capture dynamic simulator port if passed via query parameter
+  const urlParams = new URLSearchParams(window.location.search);
+  const passedPort = urlParams.get("sim_port");
+  if (passedPort) {
+    try { localStorage.setItem("swtor_simulator_port", passedPort); } catch (_) {}
+  }
+
   document.getElementById("simulatorReturnBtn")?.addEventListener("click", (e) => {
-    if (window.location.port === "8765") {
+    const portNum = parseInt(window.location.port, 10);
+    const isLocalServer = portNum >= 8765 && portNum <= 8785;
+    if (isLocalServer) {
       e.preventDefault();
-      window.open("http://127.0.0.1:8000/", "_blank");
+      let targetPort = "8787";
+      try {
+        targetPort = urlParams.get("sim_port") || localStorage.getItem("swtor_simulator_port") || "8787";
+      } catch (_) {}
+      const host = window.location.hostname || "127.0.0.1";
+      window.open(`http://${host}:${targetPort}/`, "_blank");
     }
     // In web mode, the native <a href="index.html" target="_blank"> opens a clean new tab without reload
   });

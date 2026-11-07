@@ -2,6 +2,13 @@
 
 ## Completed Fixes
 
+### 43. Dynamic Combat Simulator Navigation Link in Rotation Builder UI (tools/rotation_builder_ui.html, dist/rotation_builder.html, src/swtorsim/web_gui.py) - [DONE]
+- Replaced the hardcoded `http://127.0.0.1:8000/` return link on the Rotation Builder's "Combat Simulator" navigation button with dynamic port resolution.
+- Updated `SimulatorRequestHandler` in `src/swtorsim/web_gui.py` to pass the active Combat Simulator port as `?sim_port=<port>` when launching the Rotation Builder.
+- Updated `tools/rotation_builder_ui.html` to capture `sim_port` (persisted in `localStorage`), auto-detect local server ports (`8765..8785`), and open the actual active Combat Simulator instance (defaulting to `8787`), while preserving clean relative `index.html` navigation in static WebAssembly (`dist/`) builds.
+- Rebuilt `dist/rotation_builder.html` via `tools/build_web_release.py`.
+
+
 ### 42. Consolidation of Unified Simulation Runner into main.py (main.py, run_sim.py, web_gui.py, README.md, docs/user_guide.md) - [DONE]
 - Consolidated all simulator execution workflows into `main.py` as the authoritative root entry point:
   - Web GUI mode: `python main.py --web` (opens default port 8787).
