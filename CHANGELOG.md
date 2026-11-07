@@ -1,6 +1,16 @@
 # Next Steps & Simulation Fixes
 
-## Completed Fixes
+## Completed Fixes
+
+### 42. Consolidation of Unified Simulation Runner into main.py (main.py, run_sim.py, web_gui.py, README.md, docs/user_guide.md) - [DONE]
+- Consolidated all simulator execution workflows into `main.py` as the authoritative root entry point:
+  - Web GUI mode: `python main.py --web` (opens default port 8787).
+  - Interactive selection menu: `python main.py` (lists saved configs, HP presets, and mode selection with option `[0]` opening the Web GUI).
+  - Fast CLI execution: `python main.py <config> --hp <hp> --mode <mode> --iterations <n>`.
+  - Step-by-step loadout builder wizard: `python main.py --wizard` (or `--interactive`).
+- Replaced redundant implementation in `run_sim.py` with a lightweight, backward-compatible alias directing calls to `main.py`.
+- Synchronized documentation in `README.md` and `docs/user_guide.md`.
+
 
 ### 41. Mutually Exclusive Branch Resolution & Conditional Evaluation in Passive Effect Hydration (effects.py, setup.py) - [DONE]
 - Unified branch modifier extraction across `ActiveEffect.from_effect_node` and `ActiveEffect.from_effect` via `_resolve_branch_modifiers` in `src/swtorsim/effects.py`, evaluating both `branch.conditions` (`validate_all`) and `run_if_none_ran` fallback chains against `executed_branches` and current stack context (`stack_multiplier`, `current_stacks`, `stacks`, `charges`).

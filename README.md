@@ -118,8 +118,8 @@ To package the simulator and all game data into a static `dist/` folder that run
 
 ```text
 SwtorSim/
-├── main.py                      # Primary CLI & Web GUI entry point (--config, --interactive, --web)
-├── run_sim.py                   # Convenience runner for run_config.json
+├── run_sim.py                   # Primary CLI & Web GUI simulation runner (--web, --config, --hp, interactive menu)
+├── main.py                      # Standalone CLI runner & interactive wizard entry point (--web, --config, --interactive)
 ├── run_extractor.py             # Interactive CLI wrapper for the SWTOR game data extractor
 ├── run_config.json              # Default simulation run configuration
 ├── ARCHITECTURE.md              # Fast file/symbol routing table for developers

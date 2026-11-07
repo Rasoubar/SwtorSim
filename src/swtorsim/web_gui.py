@@ -1669,7 +1669,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
 
 def launch_web_simulator(
     host: str = "127.0.0.1",
-    port: int = 8766,
+    port: int = 8787,
     open_browser: bool = True,
 ) -> None:
     """Starts the local SwtorSim Web GUI server."""

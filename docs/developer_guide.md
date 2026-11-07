@@ -104,7 +104,7 @@ Because all disciplines, abilities, talents, tacticals, and legendary implants a
 4. **Build a Rotation (`data/rotations/<spec>_rotation.json`)**:
    - Launch `.\.venv\Scripts\python.exe data/rotation_builder.py --ui`, select the new discipline and choices, and construct the opener and priority list.
 5. **Validate Against a Live Combat Log**:
-   - Run a single `TEST` simulation (`main.py --config ...`) and compare hit sizes, tick counts, and buff uptimes against a live StarParse log using `tools/parse_combat_log.py` and `tools/validate_modifiers_vs_log.py`.
+   - Run a single `TEST` simulation (`run_sim.py --config ...`) and compare hit sizes, tick counts, and buff uptimes against a live StarParse log using `tools/parse_combat_log.py` and `tools/validate_modifiers_vs_log.py`.
 
 ---
 
