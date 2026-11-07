@@ -1978,6 +1978,11 @@ function formatRulePillText(key, val) {
         return `<strong>Ability CD &lt; ${escapeHtml(String(val.value))}s:</strong> ${escapeHtml(String(val.name))}`;
       }
       return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+    case "ability_cooldown_above":
+      if (val && typeof val === "object") {
+        return `<strong>Ability CD &gt; ${escapeHtml(String(val.value))}s:</strong> ${escapeHtml(String(val.name))}`;
+      }
+      return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
     case "caster_buff_stacks":
     case "caster_has_buff_stacks":
     case "caster_buff_charges":
@@ -2453,7 +2458,8 @@ function renderRuleValueForm(existingVal = null) {
     return;
   }
 
-  if (key === "ability_cooldown_under") {
+  if (key === "ability_cooldown_under" || key === "ability_cooldown_above") {
+    const isAbove = key === "ability_cooldown_above";
     const curName = (existingVal && existingVal.name) ? existingVal.name : (abilityItems[0]?.name || "");
     const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 1.5;
     container.innerHTML = `
@@ -2462,7 +2468,7 @@ function renderRuleValueForm(existingVal = null) {
         ${buildDatalistOrSelect("ruleAblCdNameInput", abilityItems, curName, "Ability")}
       </div>
       <div class="form-group">
-        <label>Remaining Cooldown Under (seconds)</label>
+        <label>Remaining Cooldown ${isAbove ? "Above" : "Under"} (seconds)</label>
         <input type="number" id="ruleAblCdSecInput" min="0" max="180" step="0.1" value="${curVal}" style="width:100%;">
       </div>
     `;
@@ -2501,7 +2507,7 @@ function commitRuleFromModal() {
     const sec = parseFloat(document.getElementById("ruleProcSecInput").value) || 0.5;
     if (!name) return showToast("Please select or enter a proc name.", true);
     value = { name, value: sec };
-  } else if (key === "ability_cooldown_under") {
+  } else if (key === "ability_cooldown_under" || key === "ability_cooldown_above") {
     const name = document.getElementById("ruleAblCdNameInput").value.trim();
     const sec = parseFloat(document.getElementById("ruleAblCdSecInput").value) || 1.5;
     if (!name) return showToast("Please select or enter an ability name.", true);

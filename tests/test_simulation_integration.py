@@ -267,6 +267,36 @@ class SimulationIntegrationTests(unittest.TestCase):
             result_locked = validate_all(rule, self.player, self.target, sim=self.sim)
             self.assertTrue(result_locked, "Should be True when Bloodletting_3 lockout has >1.5s remaining and buff is absent")
 
+        with self.subTest("ability_cooldown_above_and_under_evaluation"):
+            # When Eradicate is off cooldown (cooldown remaining <= 0)
+            self.assertTrue(
+                validate_all({"ability_cooldown_under": {"name": "Eradicate", "value": 2.0}}, self.player, self.target, sim=self.sim),
+                "ability_cooldown_under should be True when ability is off cooldown",
+            )
+            self.assertFalse(
+                validate_all({"ability_cooldown_above": {"name": "Eradicate", "value": 2.0}}, self.player, self.target, sim=self.sim),
+                "ability_cooldown_above should be False when ability is off cooldown",
+            )
+
+            # When Eradicate has 5.0 seconds remaining on cooldown
+            self.player.cooldowns["Eradicate"] = self.sim.current_time + 5.0
+            self.assertTrue(
+                validate_all({"ability_cooldown_above": {"name": "Eradicate", "value": 2.0}}, self.player, self.target, sim=self.sim),
+                "ability_cooldown_above should be True when 5.0s > 2.0s",
+            )
+            self.assertFalse(
+                validate_all({"ability_cooldown_above": {"name": "Eradicate", "value": 6.0}}, self.player, self.target, sim=self.sim),
+                "ability_cooldown_above should be False when 5.0s < 6.0s",
+            )
+            self.assertFalse(
+                validate_all({"ability_cooldown_under": {"name": "Eradicate", "value": 2.0}}, self.player, self.target, sim=self.sim),
+                "ability_cooldown_under should be False when 5.0s > 2.0s",
+            )
+            self.assertTrue(
+                validate_all({"ability_cooldown_under": {"name": "Eradicate", "value": 6.0}}, self.player, self.target, sim=self.sim),
+                "ability_cooldown_under should be True when 5.0s < 6.0s",
+            )
+
     def test_07_full_hatred_rotation_simulation_run(self):
         """[End-to-End] Runs a 30-second Hatred Assassin simulation and validates rotational execution."""
         try:

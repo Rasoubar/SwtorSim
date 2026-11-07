@@ -2,6 +2,12 @@
 
 ## Completed Fixes
 
+### 44. Integration of ability_cooldown_above Condition & Rotation Builder Tooling (requirements.py, rotation_builder.py, rotation_builder_ui.html, dist/rotation_builder.html, user_guide.md) - [DONE]
+- Fixed docstring on `check_ability_cooldown_above` in `src/swtorsim/requirements.py` to correctly indicate strictly above.
+- Integrated `ability_cooldown_above` into `data/rotation_builder.py` (`CONDITION_METADATA` and `KNOWN_RULE_KEYS`).
+- Added full UI support for `ability_cooldown_above` in `tools/rotation_builder_ui.html` and rebuilt `dist/rotation_builder.html` and `swtorsim_assets.zip` via `tools/build_web_release.py`.
+- Added documentation in `docs/user_guide.md` and added unit test assertions in `tests/test_simulation_integration.py`.
+
 ### 43. Dynamic Combat Simulator Navigation Link in Rotation Builder UI (tools/rotation_builder_ui.html, dist/rotation_builder.html, src/swtorsim/web_gui.py) - [DONE]
 - Replaced the hardcoded `http://127.0.0.1:8000/` return link on the Rotation Builder's "Combat Simulator" navigation button with dynamic port resolution.
 - Updated `SimulatorRequestHandler` in `src/swtorsim/web_gui.py` to pass the active Combat Simulator port as `?sim_port=<port>` when launching the Rotation Builder.

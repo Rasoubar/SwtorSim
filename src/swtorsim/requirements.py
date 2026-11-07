@@ -100,6 +100,13 @@ def check_ability_cooldown_under(data: dict, caster: "Player", _target: "Dummy",
 
     return remaining_cooldown < data["value"]
 
+def check_ability_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
+    """Returns True if the remaining cooldown of ``data['name']`` is strictly above ``data['value']`` seconds."""
+    cooldown = caster.cooldowns.get(data["name"], 0)
+    remaining_cooldown = cooldown - sim.current_time
+
+    return remaining_cooldown > data["value"]
+
 
 def compare_values(actual: float, comparison: str, expected: float) -> bool:
     """Evaluates comparison operators used in extracted game data and rotation rules."""
@@ -307,6 +314,7 @@ CONDITION_REGISTRY = {
     "proc_cooldown_above": check_proc_cooldown_above,
     "caster_does_not_have_buff": check_caster_does_not_have_buff,
     "ability_cooldown_under": check_ability_cooldown_under,
+    "ability_cooldown_above": check_ability_cooldown_above,
     "caster_buff_stacks": check_caster_buff_stacks,
     "caster_has_buff_stacks": check_caster_buff_stacks,
     "caster_buff_charges": check_caster_buff_stacks,

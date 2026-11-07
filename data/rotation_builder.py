@@ -687,6 +687,13 @@ CONDITION_METADATA = [
         "value_type": "ability_cooldown",
         "description": "True if the specified ability's remaining cooldown is < value seconds.",
     },
+    {
+        "key": "ability_cooldown_above",
+        "label": "Ability Cooldown Above (sec)",
+        "category": "Cooldowns & Procs",
+        "value_type": "ability_cooldown",
+        "description": "True if the specified ability's remaining cooldown is > value seconds.",
+    },
 ]
 
 KNOWN_RULE_KEYS = {item["key"] for item in CONDITION_METADATA} | {
