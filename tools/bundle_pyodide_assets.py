@@ -43,7 +43,6 @@ INCLUDE_DIRS = [
 
 INCLUDE_FILES = [
     ("data/__init__.py", "data/__init__.py"),
-    ("data/DebuffModule.json", "data/DebuffModule.json"),
     ("data/rotation_builder.py", "data/rotation_builder.py"),
     ("data/extractor/combat_curves.json", "data/extractor/combat_curves.json"),
     ("data/extractor/adrenals.json", "data/extractor/adrenals.json"),

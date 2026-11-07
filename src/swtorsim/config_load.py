@@ -5,12 +5,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple
 from src.swtorsim.abilities import AbilityBlueprint
-from src.swtorsim.effects import ActiveEffect
 from src.swtorsim.effects import ActiveEffect as ParsedEffect
 from src.swtorsim.run_config import (
     TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
-    TRAINING_DUMMY_ARMOR_DEBUFF_PATH,
     RunConfig,
+    get_training_dummy_armor_debuff_path,
     resolve_skill_tree_fqns,
     validate_run_config,
 )
@@ -42,7 +41,6 @@ def load_from_run_config(config: RunConfig) -> SimulationInputs:
     )
     debuff_module: dict[str, Any] = {}
     if config.training_dummy_armor_debuff:
-        from src.swtorsim.run_config import get_training_dummy_armor_debuff_path
         debuff_path = get_training_dummy_armor_debuff_path(env)
         debuff_module.update(load_training_dummy_armor_debuffs(debuff_path=debuff_path))
     return SimulationInputs(
@@ -99,7 +97,7 @@ _DUMMY_DEBUFF_ROUTING = (
 
 def load_training_dummy_armor_debuff(debuff_path: str | None = None) -> ParsedEffect:
     """Loads the operation dummy armor debuff as a permanent target effect."""
-    target_path = debuff_path or TRAINING_DUMMY_ARMOR_DEBUFF_PATH
+    target_path = debuff_path or get_training_dummy_armor_debuff_path()
     data = load_json_file(target_path)
     fqn = data.get("fqn") or ""
     parsed = None
@@ -233,21 +231,6 @@ def load_json_file(filepath: str) -> Any:
         raw_data = json.loads(raw_data)
 
     return raw_data
-
-
-def load_permanent_effects_from_dict(raw_data: dict) -> Dict[str, ActiveEffect]:
-    """Converts raw debuff configs into ActiveEffect instances."""
-    registry = {}
-    for k, v in raw_data.items():
-        buff = ActiveEffect.from_dict(v, k)
-        registry[buff.effect_name] = buff
-    return registry
-
-
-def load_permanent_effects_from_json(filepath: str) -> Dict[str, ActiveEffect]:
-    """Loads permanent debuff module definitions from JSON into ActiveEffect instances."""
-    raw_data = load_json_file(filepath)
-    return load_permanent_effects_from_dict(raw_data)
 
 
 def load_character_stats_from_json(class_name: str, filepath: str, level: int) -> dict:

@@ -1113,3 +1113,9 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Pre-test predictions for single bleed tick: Option A (additive +30%) = `3,578` non-crit / `6,441` crit; Option B (multiplicative BUCKET_5, 1.27 * 1.03 = 1.3081x) = `3,601` (`3,600.8`) non-crit / `6,482` (`6,481.7`) crit.
   - Observed in-game hits: Non-crit tick **`3,601`**, Crit tick **`6,482`** — achieving 100.00% exact integer match to the single unit.
   - Formally locked `221` as verified independent multiplicative layer `BUCKET_5` across both Sith Warrior (Test 11) and Bounty Hunter (Test 13).
+
+
+## 2026-11-07 — Remove Redundant `TRAINING_DUMMY_ARMOR_DEBUFF_PATH` Constant
+- **`src/swtorsim/run_config.py`**: Removed the redundant hardcoded `TRAINING_DUMMY_ARMOR_DEBUFF_PATH` constant in favor of the environment-aware helper `get_training_dummy_armor_debuff_path(env)`.
+- **`src/swtorsim/config_load.py`**: Updated top-level imports and `load_training_dummy_armor_debuff()` fallback to call `get_training_dummy_armor_debuff_path()` directly, eliminating duplicate inner imports and ensuring default debuff loading respects the active environment (`live` vs. `pts`).
+- **Legacy DebuffModule Cleanup (`data/DebuffModule.json`, `src/swtorsim/config_load.py`, `tools/bundle_pyodide_assets.py`)**: Removed the unused legacy `data/DebuffModule.json` file, dead `load_permanent_effects_from_dict` / `load_permanent_effects_from_json` loaders in `config_load.py`, and its entry in `bundle_pyodide_assets.py`.

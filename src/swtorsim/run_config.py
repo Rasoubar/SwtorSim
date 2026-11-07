@@ -20,9 +20,6 @@ ROTATIONS_DIR = "data/rotations"
 CHOICES_DIR = "data/choices"
 GEAR_PATH = "data/extractor/gear_abilities_talents.json"
 RELICS_PATH = "data/extractor/relics.json"
-TRAINING_DUMMY_ARMOR_DEBUFF_PATH = (
-    "data/extractor/parsed/abl/npc/ability/utility/training_dummy_armor_debuff.json"
-)
 TRAINING_DUMMY_ARMOR_DEBUFF_LABEL = "Training Dummy Armor Debuff"
 
 
