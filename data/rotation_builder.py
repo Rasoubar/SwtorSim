@@ -37,11 +37,16 @@ from src.swtorsim.run_config import (
     TACTICAL_PREFIX,
     discipline_names,
     filter_gear_for_class,
+    get_disciplines_dir,
+    get_gear_path,
+    get_relics_path,
     relic_menu_label,
+    resolve_env_extractor_path,
     resolve_skill_tree_fqns,
 )
+from src.swtorsim.settings import get_extractor_data_dir
 
-PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "parsed"
+PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "live" / "parsed"
 UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
 
 
@@ -132,7 +137,7 @@ def build_castable_catalog(
     """Returns active abilities for a discipline, skill-tree selection, and optional gear/relics, sorted by name."""
     active_env = str(env).lower().strip()
     if parsed_dir is None or parsed_dir == PARSED_DIR:
-        parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
+        parsed_dir = SWTORSIM_ROOT / get_extractor_data_dir(active_env) / "parsed"
     resolved_spec = _resolve_workspace_path(spec_path)
     spec_data = load_json_file(str(resolved_spec))
     if isinstance(choices_path, dict):
@@ -227,16 +232,11 @@ def discover_loadout_catalog(
     env: str = "live",
 ) -> dict[str, Any]:
     active_env = str(env).lower().strip()
-    if active_env == "pts" and "data/extractor/disciplines/" in spec_path and "data/extractor/pts/" not in spec_path:
-        cand = spec_path.replace("data/extractor/disciplines/", "data/extractor/pts/disciplines/", 1)
-        if _resolve_workspace_path(cand).is_file():
-            spec_path = cand
-    elif active_env == "live" and "data/extractor/pts/disciplines/" in spec_path:
-        cand = spec_path.replace("data/extractor/pts/disciplines/", "data/extractor/disciplines/", 1)
-        if _resolve_workspace_path(cand).is_file():
-            spec_path = cand
+    cand = resolve_env_extractor_path(spec_path, active_env)
+    if _resolve_workspace_path(cand).is_file():
+        spec_path = cand
     if parsed_dir is None or parsed_dir == PARSED_DIR:
-        parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
+        parsed_dir = SWTORSIM_ROOT / get_extractor_data_dir(active_env) / "parsed"
     """
     Inspects all blueprints in a loadout (discipline + skill tree + tactical + legendaries + relics)
     and auto-discovers:
@@ -567,8 +567,7 @@ def discover_loadout_catalog(
     procs_list = sorted(procs_map.values(), key=lambda p: p["name"].lower())
 
     # Class-filtered gear options
-    gear_path_rel = "data/extractor/pts/gear_abilities_talents.json" if active_env == "pts" else GEAR_PATH
-    gear_path = _resolve_workspace_path(gear_path_rel)
+    gear_path = _resolve_workspace_path(get_gear_path(active_env))
     gear_data = load_json_file(str(gear_path)) if gear_path.is_file() else {}
     try:
         tacticals_map = filter_gear_for_class(gear_data, TACTICAL_PREFIX, class_name)
@@ -790,9 +789,9 @@ def normalize_rotation_steps(raw_steps: list[Any]) -> tuple[list[dict[str, Any]]
 def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
     """Returns available disciplines, choices files, run configs, existing rotations, and relics."""
     active_env = str(env).lower().strip()
-    disc_dir_rel = "data/extractor/pts/disciplines" if active_env == "pts" else DISCIPLINES_DIR
-    parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
-    relics_path_rel = "data/extractor/pts/relics.json" if active_env == "pts" else RELICS_PATH
+    disc_dir_rel = get_disciplines_dir(active_env)
+    parsed_dir = SWTORSIM_ROOT / get_extractor_data_dir(active_env) / "parsed"
+    relics_path_rel = get_relics_path(active_env)
     disc_dir = _resolve_workspace_path(disc_dir_rel)
     disciplines = index_disciplines(str(disc_dir))
     # Convert absolute discipline paths back to workspace-relative POSIX paths
@@ -917,7 +916,7 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     """Runs a quick single-iteration simulation preview for the current rotation and loadout."""
     env = payload.get("env") or payload.get("environment") or "live"
     active_env = str(env).lower().strip()
-    parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
+    parsed_dir = SWTORSIM_ROOT / get_extractor_data_dir(active_env) / "parsed"
     level = int(payload.get("level") or (85 if active_env == "pts" else 80))
     import random
     from src.swtorsim.config_load import (

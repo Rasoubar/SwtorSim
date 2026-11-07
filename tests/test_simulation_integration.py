@@ -384,11 +384,13 @@ class SimulationIntegrationTests(unittest.TestCase):
         from src.swtorsim.effects import ActiveEffect
         from src.swtorsim.entities import Player
 
+        parsed_base = (
+            ROOT / "data" / "extractor" / "live" / "parsed"
+            if (ROOT / "data" / "extractor" / "live" / "parsed").exists()
+            else ROOT / "data" / "extractor" / "parsed"
+        )
         hegc_path = (
-            ROOT
-            / "data"
-            / "extractor"
-            / "parsed"
+            parsed_base
             / "abl"
             / "bounty_hunter"
             / "skill"
@@ -396,10 +398,7 @@ class SimulationIntegrationTests(unittest.TestCase):
             / "high_energy_gas_cylinder.json"
         )
         bt_path = (
-            ROOT
-            / "data"
-            / "extractor"
-            / "parsed"
+            parsed_base
             / "tal"
             / "bounty_hunter"
             / "skill"

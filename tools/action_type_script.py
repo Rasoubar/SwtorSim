@@ -4,7 +4,7 @@ from collections import defaultdict
 from pathlib import Path
 
 # Target directory relative to the parent of 'tools'
-RELATIVE_PATH = "data/extractor/parsed/abl/sith_inquisitor"
+RELATIVE_PATH = "data/extractor/live/parsed/abl/sith_inquisitor"
 
 
 def extract_key_values(obj, target_key="action_type"):

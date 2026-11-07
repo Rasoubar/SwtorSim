@@ -19,8 +19,8 @@ from src.swtorsim.run_config import (
 )
 from src.swtorsim.setup import prepare_simulation
 
-PARSED_DIR = ROOT / "data" / "extractor" / "parsed"
-ADRENALS_PATH = ROOT / "data" / "extractor" / "adrenals.json"
+PARSED_DIR = ROOT / "data" / "extractor" / "live" / "parsed"
+ADRENALS_PATH = ROOT / "data" / "extractor" / "live" / "adrenals.json"
 RUN_CONFIG_PATH = (
     ROOT / "data" / "run_config" / "hatred_14gcd.json"
     if (ROOT / "data" / "run_config" / "hatred_14gcd.json").exists()

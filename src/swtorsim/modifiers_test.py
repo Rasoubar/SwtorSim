@@ -21,8 +21,8 @@ PROJECT_ROOT = find_project_root()
 CSV_PATH = PROJECT_ROOT / "data" / "modifier_id_mapping.csv"
 
 SCAN_TARGETS = [
-    PROJECT_ROOT / "data" / "extractor" / "parsed" / "abl" / "sith_inquisitor",
-    PROJECT_ROOT / "data" / "extractor" / "parsed" / "tal" / "sith_inquisitor",
+    PROJECT_ROOT / "data" / "extractor" / "live" / "parsed" / "abl" / "sith_inquisitor",
+    PROJECT_ROOT / "data" / "extractor" / "live" / "parsed" / "tal" / "sith_inquisitor",
 ]
 
 

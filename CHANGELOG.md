@@ -2,6 +2,18 @@
 
 ## Completed Fixes
 
+### 45. Rotation Stall & Deadlock Telemetry with RNG Seed Tracking (events.py, metrics.py, engine.py, setup.py, tester.py, web_gui.py, test_rotation_stall.py) - [DONE]
+- Implemented rotation stall detection in `PlayerReady.resolve` (`src/swtorsim/events.py`):
+  - Differentiates early off-GCD lead-time polling (`sim.current_time < player.next_gcd`) from true rotation stalls (`sim.current_time >= player.next_gcd` with `acted is False`).
+  - Automatically captures diagnostic context: step index, step class and target ability/priority-block label (`_get_step_diagnostic`), player resource state, and simulation RNG seed.
+  - Automatically ends and records the stall duration once any rotational action resolves.
+- Added comprehensive stall tracking to `Metrics` (`src/swtorsim/metrics.py`):
+  - Added `log_rotation_stall_start`, `log_rotation_stall_end`, and `finalize_stalls` to record transient gaps as well as fight-ending permanent deadlocks.
+  - Integrated ASCII status reports (`[WARN] ROTATION STALLS DETECTED`, `[FAIL] ROTATION PERMANENT DEADLOCK`) in `print_metrics`.
+- Propagated authoritative `seed` across `Simulation` (`src/swtorsim/engine.py`), `prepare_simulation` (`src/swtorsim/setup.py`), `Tester` (`src/swtorsim/tester.py`), and `src/swtorsim/web_gui.py`.
+- Integrated Monte Carlo batch reporting in `Tester._aggregate_results` and `produce_monte_carlo_report`, reporting stalled run percentages, average stalled time per run, and deterministic seeds of any deadlocked runs for immediate reproduction.
+- Added 3 unit tests in `tests/test_rotation_stall.py` covering smooth runs, transient gaps, and permanent deadlocks. All 26 engine regression tests passing.
+
 ### 44. Integration of ability_cooldown_above Condition & Rotation Builder Tooling (requirements.py, rotation_builder.py, rotation_builder_ui.html, dist/rotation_builder.html, user_guide.md) - [DONE]
 - Fixed docstring on `check_ability_cooldown_above` in `src/swtorsim/requirements.py` to correctly indicate strictly above.
 - Integrated `ability_cooldown_above` into `data/rotation_builder.py` (`CONDITION_METADATA` and `KNOWN_RULE_KEYS`).
@@ -1119,3 +1131,11 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **`src/swtorsim/run_config.py`**: Removed the redundant hardcoded `TRAINING_DUMMY_ARMOR_DEBUFF_PATH` constant in favor of the environment-aware helper `get_training_dummy_armor_debuff_path(env)`.
 - **`src/swtorsim/config_load.py`**: Updated top-level imports and `load_training_dummy_armor_debuff()` fallback to call `get_training_dummy_armor_debuff_path()` directly, eliminating duplicate inner imports and ensuring default debuff loading respects the active environment (`live` vs. `pts`).
 - **Legacy DebuffModule Cleanup (`data/DebuffModule.json`, `src/swtorsim/config_load.py`, `tools/bundle_pyodide_assets.py`)**: Removed the unused legacy `data/DebuffModule.json` file, dead `load_permanent_effects_from_dict` / `load_permanent_effects_from_json` loaders in `config_load.py`, and its entry in `bundle_pyodide_assets.py`.
+
+
+## 2026-11-07 — Symmetric `data/extractor/live/` and `data/extractor/pts/` Directory Layout
+- **Filesystem Layout (`data/extractor/`)**: Moved Live extracted game data (`parsed/`, `disciplines/`, `extracted/`, `combat_curves.json`, `adrenals.json`, `gear_abilities_talents.json`, `relics.json`) into `data/extractor/live/` as a symmetric peer to `data/extractor/pts/`, while keeping shared Jedipedia caches (`hashes.bin`, `gom.js`, `fnv1a64.js`) at `data/extractor/`.
+- **Extractor & Engine Routing (`src/extractor/config.py`, `src/swtorsim/settings.py`, `src/swtorsim/run_config.py`, `src/swtorsim/combat_curves.py`, `src/swtorsim/class_buffs.py`)**:
+  - Updated `get_extractor_data_dir()` to return `Path("data/extractor/live")` for `"live"` and `Path("data/extractor/pts")` for `"pts"`.
+  - Added `resolve_env_extractor_path(path_str, env)` in `run_config.py` to cleanly map between `data/extractor/live/` and `data/extractor/pts/` (while maintaining backwards compatibility with legacy `data/extractor/disciplines/` paths).
+- **Web GUI, Rotation Builder, & WebAssembly Release (`src/swtorsim/web_gui.py`, `data/rotation_builder.py`, `tools/bundle_pyodide_assets.py`, `tools/simulator_ui.html`, `tools/rotation_builder_ui.html`)**: Replaced asymmetric ternary path branches with `get_extractor_data_dir(env)`, `get_disciplines_dir(env)`, `get_gear_path(env)`, `get_relics_path(env)`, and `resolve_env_extractor_path()`, and rebuilt `dist/swtorsim_assets.zip`.

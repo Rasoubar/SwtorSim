@@ -1,5 +1,5 @@
 {
-  "spec_path": "data/extractor/disciplines/assassin/hatred.json",
+  "spec_path": "data/extractor/live/disciplines/assassin/hatred.json",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
   "rotation_path": "data/rotations/assassin/hatred/BasicMaliPS.json",
   "choices_path": "data/choices/assassin/hatred/mali.json",

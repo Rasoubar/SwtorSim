@@ -52,6 +52,56 @@ class Metrics:
         self.execute_start_time = None
         self.active_effects = {}
         self.effect_history = {}
+        self.seed = None
+        self.stall_events = []
+        self._active_stall = None
+        self.total_stalled_time = 0.0
+        self.permanent_stall = False
+
+    def log_rotation_stall_start(
+        self,
+        timestamp: float,
+        seed: int | None,
+        step_index: int,
+        step_info: str,
+        resource_current: float | None = None,
+    ):
+        """Records the beginning of an idle rotation stall (player ready to act off-GCD, but rotation cannot cast)."""
+        if self._active_stall is None:
+            self._active_stall = {
+                "start": timestamp,
+                "seed": seed,
+                "step_index": step_index,
+                "step_info": step_info,
+                "resource": resource_current,
+            }
+
+    def log_rotation_stall_end(self, timestamp: float):
+        """Records the resolution of a rotation stall once an action is cast."""
+        if self._active_stall is not None:
+            duration = max(0.0, timestamp - self._active_stall["start"])
+            self.total_stalled_time += duration
+            self.stall_events.append({
+                **self._active_stall,
+                "end": timestamp,
+                "duration": duration,
+                "recovered": True,
+            })
+            self._active_stall = None
+
+    def finalize_stalls(self, current_time: float):
+        """Closes any open stall window at fight completion, marking permanent deadlocks if unrecovered."""
+        if self._active_stall is not None:
+            duration = max(0.0, current_time - self._active_stall["start"])
+            self.total_stalled_time += duration
+            self.permanent_stall = True
+            self.stall_events.append({
+                **self._active_stall,
+                "end": current_time,
+                "duration": duration,
+                "recovered": False,
+            })
+            self._active_stall = None
 
     def log_damage(
         self,
@@ -209,6 +259,22 @@ class Metrics:
 
         if show_buffs:
             self.print_buff_breakdown(duration)
+
+        if self.stall_events:
+            print("\n" + "=" * 75)
+            status_tag = "[FAIL] ROTATION PERMANENT DEADLOCK" if self.permanent_stall else "[WARN] ROTATION STALLS DETECTED"
+            print(f"{status_tag}")
+            pct = (self.total_stalled_time / duration * 100.0) if duration > 0 else 0.0
+            print(f"Total Stalled Time: {self.total_stalled_time:,.2f}s ({pct:.1f}% of fight)")
+            print(f"Stall Count: {len(self.stall_events)}")
+            if self.seed is not None:
+                print(f"RNG Seed: {self.seed}")
+            longest = max(self.stall_events, key=lambda s: s["duration"])
+            print(f"Longest Stall: {longest['duration']:.2f}s (from {longest['start']:.2f}s to {longest['end']:.2f}s) on step #{longest['step_index']}: {longest['step_info']}")
+            if self.permanent_stall:
+                last_stall = self.stall_events[-1]
+                print(f"Deadlock Detail: Stopped at {last_stall['start']:.2f}s on step #{last_stall['step_index']}: {last_stall['step_info']} (Resource: {last_stall['resource']})")
+            print("=" * 75)
 
 
 def print_ability_breakdown(duration, sorted_abilities):

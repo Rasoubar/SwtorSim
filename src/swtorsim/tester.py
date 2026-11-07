@@ -13,7 +13,7 @@ from src.swtorsim.metrics import format_type_descriptor
 class Tester:
     """Orchestrates single-fight verbose runs and multi-core Monte Carlo batch simulations."""
 
-    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False):
+    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False, seed: int = 42):
         self.rotation_config = rotation_config
         self.stats_config = stats_config
         self.loadout_blueprints = loadout_blueprints
@@ -21,6 +21,7 @@ class Tester:
         self.dummy_hp = dummy_hp
         self.debuff_module = debuff_module
         self.enable_stem_matching = enable_stem_matching
+        self.seed = seed
 
     def run_test(self, show_buffs: bool = True):
         """Orchestrates a single simulation."""
@@ -30,7 +31,8 @@ class Tester:
             self.stats_config,
             self.loadout_blueprints,
             self.dummy_hp,
-            self.debuff_module
+            self.debuff_module,
+            seed=self.seed,
         )
         sim.run_timed(duration=self.duration, target=target)
         sim.tracker.print_metrics(sim.current_time, show_buffs=show_buffs)
@@ -49,7 +51,7 @@ class Tester:
 
         task_payloads = [
             (i, self.duration, self.dummy_hp, self.rotation_config, self.stats_config,
-             self.loadout_blueprints, self.debuff_module, self.enable_stem_matching)
+             self.loadout_blueprints, self.debuff_module, self.enable_stem_matching, self.seed + i)
             for i in range(iterations)
         ]
 
@@ -64,7 +66,11 @@ class Tester:
     @staticmethod
     def execute_single_worker_task(args):
         """Single simulation worker for monte carlo."""
-        run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module, enable_stem_matching = args
+        if len(args) == 9:
+            run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module, enable_stem_matching, worker_seed = args
+        else:
+            run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module, enable_stem_matching = args
+            worker_seed = 42 + run_id
         from src.swtorsim.settings import set_stem_matching
         set_stem_matching(enable_stem_matching)
 
@@ -73,7 +79,7 @@ class Tester:
 
         try:
             sim, player, target = prepare_simulation(
-                rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False
+                rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False, seed=worker_seed
             )
             sim.run_timed(duration, target)
 
@@ -111,7 +117,12 @@ class Tester:
                 "abilities": ability_data_summary,
                 "total_execute_damage": getattr(sim.tracker, 'total_execute_damage', 0.0),
                 "execute_duration": execute_dur,
-                "execute_abilities": execute_data_summary
+                "execute_abilities": execute_data_summary,
+                "stall_count": len(getattr(sim.tracker, 'stall_events', [])),
+                "total_stalled_time": getattr(sim.tracker, 'total_stalled_time', 0.0),
+                "permanent_stall": getattr(sim.tracker, 'permanent_stall', False),
+                "seed": worker_seed,
+                "stall_events": getattr(sim.tracker, 'stall_events', []),
             }
         finally:
             sys.stdout.close()
@@ -163,6 +174,12 @@ class Tester:
                 macro_exec_breakdown[name]["damage_types"].update(data.get("damage_types", ()))
 
         avg_dps = sum(all_dps) / len(all_dps)
+        stalled_runs = [r for r in harvested_results if r.get("stall_count", 0) > 0]
+        deadlocked_runs = [r for r in harvested_results if r.get("permanent_stall", False)]
+        stalled_seeds = [r["seed"] for r in stalled_runs if r.get("seed") is not None]
+        deadlocked_seeds = [r["seed"] for r in deadlocked_runs if r.get("seed") is not None]
+        total_stalled_time_all = sum(float(r.get("total_stalled_time", 0.0)) for r in harvested_results)
+
         summary = {
             "all_dps": all_dps,
             "avg_dps": avg_dps,
@@ -174,7 +191,12 @@ class Tester:
             "total_exec_damage": total_exec_damage,
             "total_exec_duration": total_exec_duration,
             "macro_breakdown": macro_breakdown,
-            "macro_exec_breakdown": macro_exec_breakdown
+            "macro_exec_breakdown": macro_exec_breakdown,
+            "stalled_runs_count": len(stalled_runs),
+            "deadlocked_runs_count": len(deadlocked_runs),
+            "stalled_seeds": stalled_seeds,
+            "deadlocked_seeds": deadlocked_seeds,
+            "avg_stalled_time": total_stalled_time_all / len(harvested_results) if harvested_results else 0.0,
         }
         return summary
 
@@ -222,6 +244,22 @@ class Tester:
             )
 
             Tester._plot_dps_histogram(summary["all_dps"], avg_dps, summary["std_dev"], iterations)
+
+        if summary.get("stalled_runs_count", 0) > 0:
+            print("=" * 65)
+            status_tag = (
+                "[FAIL] ROTATION PERMANENT DEADLOCKS DETECTED"
+                if summary.get("deadlocked_runs_count", 0) > 0
+                else "[WARN] ROTATION STALLS DETECTED"
+            )
+            print(f"  {status_tag}")
+            print("=" * 65)
+            print(f"Stalled Runs        : {summary['stalled_runs_count']} / {iterations} ({summary['stalled_runs_count'] / iterations * 100:.1f}%)")
+            print(f"Avg Stalled Time    : {summary['avg_stalled_time']:.2f}s per run")
+            if summary.get("deadlocked_runs_count", 0) > 0:
+                print(f"Deadlocked Runs     : {summary['deadlocked_runs_count']} / {iterations} ({summary['deadlocked_runs_count'] / iterations * 100:.1f}%)")
+                print(f"Deadlocked Seeds    : {summary['deadlocked_seeds'][:10]}" + ("..." if len(summary['deadlocked_seeds']) > 10 else ""))
+            print("=" * 65)
 
     @staticmethod
     def _plot_dps_histogram(all_dps, avg_dps, std_dev, iterations):

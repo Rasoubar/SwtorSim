@@ -739,7 +739,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1794062799"></script>
+  <script src="pyodide_client.js?v=1794066800"></script>
 </head>
 <body>
 
@@ -1318,10 +1318,12 @@ async function refreshLoadoutCatalog(choicesSource = null, gearOverrides = null)
     : getSelectedRelics();
 
   let mappedSpec = specPath;
-  if (currentEnvironment === "pts" && mappedSpec.includes("data/extractor/disciplines/") && !mappedSpec.includes("data/extractor/pts/")) {
-    mappedSpec = mappedSpec.replace("data/extractor/disciplines/", "data/extractor/pts/disciplines/");
-  } else if (currentEnvironment === "live" && mappedSpec.includes("data/extractor/pts/disciplines/")) {
-    mappedSpec = mappedSpec.replace("data/extractor/pts/disciplines/", "data/extractor/disciplines/");
+  if (mappedSpec.includes("data/extractor/disciplines/")) {
+    mappedSpec = mappedSpec.replace("data/extractor/disciplines/", `data/extractor/${currentEnvironment}/disciplines/`);
+  } else if (currentEnvironment === "pts" && mappedSpec.includes("data/extractor/live/")) {
+    mappedSpec = mappedSpec.replace("data/extractor/live/", "data/extractor/pts/");
+  } else if (currentEnvironment === "live" && mappedSpec.includes("data/extractor/pts/")) {
+    mappedSpec = mappedSpec.replace("data/extractor/pts/", "data/extractor/live/");
   }
 
   const payload = {

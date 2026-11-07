@@ -46,7 +46,7 @@ goto menu
 :extract_live_parsed
 echo.
 echo [INFO] Running LIVE extraction (--parsed-only)...
-echo [INFO] Target dir: data\extractor\
+echo [INFO] Target dir: data\extractor\live\
 echo.
 %RUNNER% src\extractor\main.py --assets "%LIVE_ASSETS%" --parsed-only
 if errorlevel 1 goto error

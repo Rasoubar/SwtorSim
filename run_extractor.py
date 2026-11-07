@@ -37,7 +37,7 @@ def run_extractor(assets_path: Path, is_pts: bool = False, parsed_only: bool = T
     """Executes the extractor subprocess for the given assets."""
     label = "PTS" if is_pts else "LIVE"
     mode_str = " (Parsed Only - Fast)" if parsed_only else " (Full with Raw Dumps)"
-    target_dir = "data/extractor/pts" if is_pts else "data/extractor"
+    target_dir = "data/extractor/pts" if is_pts else "data/extractor/live"
 
     print("\n" + "=" * 56)
     print(f" [INFO] Starting {label} Data Extraction{mode_str}")

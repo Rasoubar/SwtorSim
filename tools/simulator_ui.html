@@ -1666,10 +1666,12 @@
           clsSel.value = prevCls;
         }
         let mappedSpec = prevSpec;
-        if (currentEnvironment === "pts" && mappedSpec.includes("data/extractor/") && !mappedSpec.includes("data/extractor/pts/")) {
-          mappedSpec = mappedSpec.replace("data/extractor/", "data/extractor/pts/");
+        if (mappedSpec.includes("data/extractor/disciplines/")) {
+          mappedSpec = mappedSpec.replace("data/extractor/disciplines/", `data/extractor/${currentEnvironment}/disciplines/`);
+        } else if (currentEnvironment === "pts" && mappedSpec.includes("data/extractor/live/")) {
+          mappedSpec = mappedSpec.replace("data/extractor/live/", "data/extractor/pts/");
         } else if (currentEnvironment === "live" && mappedSpec.includes("data/extractor/pts/")) {
-          mappedSpec = mappedSpec.replace("data/extractor/pts/", "data/extractor/");
+          mappedSpec = mappedSpec.replace("data/extractor/pts/", "data/extractor/live/");
         }
         if (prevB && Array.from(bSel.options).some(o => o.value === prevB)) bSel.value = prevB;
         if (prevRot && Array.from(rotSel.options).some(o => o.value === prevRot)) rotSel.value = prevRot;

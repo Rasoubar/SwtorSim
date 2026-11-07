@@ -7,7 +7,7 @@ from typing import Any
 
 from src.swtorsim.settings import get_extractor_data_dir, get_data_environment
 
-CURVES_PATH = Path("data/extractor/combat_curves.json")
+CURVES_PATH = Path("data/extractor/live/combat_curves.json")
 
 ALACRITY_RATING = "STAT_rtg_spell_haste"
 ACCURACY_RATING = "STAT_rtg_accuracy"
@@ -25,7 +25,7 @@ def _load_curves(env: str) -> dict[str, Any]:
     """Loads and caches combat_curves.json for the specified data environment."""
     curves_path = get_extractor_data_dir(env) / "combat_curves.json"
     if not curves_path.exists():
-        curves_path = Path("data/extractor/combat_curves.json")
+        curves_path = CURVES_PATH
     with curves_path.open(encoding="utf-8") as handle:
         return json.load(handle)
 

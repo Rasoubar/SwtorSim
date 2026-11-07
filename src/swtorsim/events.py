@@ -190,6 +190,25 @@ class PlayerReady(Event):
         self.player = player
         self.target = target
 
+    def _get_step_diagnostic(self) -> str:
+        """Extracts human-readable identifier of the rotation step currently being evaluated."""
+        rot = getattr(self.player, "rotation", None)
+        if rot is None:
+            return "No rotation"
+        seq = getattr(rot, "sequence", [])
+        curr = getattr(rot, "current_step", 0)
+        if curr >= len(seq):
+            return f"End of sequence ({curr}/{len(seq)})"
+        step = seq[curr]
+        step_cls = step.__class__.__name__
+        if hasattr(step, "ability_id"):
+            abl = getattr(self.player, "ability_db", {}).get(step.ability_id)
+            abl_name = getattr(abl, "name", step.ability_id)
+            return f"{step_cls}:{abl_name}"
+        if hasattr(step, "name"):
+            return f"{step_cls}:{step.name}"
+        return f"{step_cls}"
+
     def resolve(self, sim):
         """Evaluates the rotation. If successful, evaluate again on next possible gcd (can be same one). If not,
          tries again 0.1seconds later."""
@@ -197,6 +216,11 @@ class PlayerReady(Event):
             return
         acted = self.player.rotation.evaluate(self.player, self.target, sim)
         if acted:
+            if getattr(self.player, "_is_stalled", False):
+                if hasattr(sim, "tracker"):
+                    sim.tracker.log_rotation_stall_end(sim.current_time)
+                self.player._is_stalled = False
+
             target_time = (
                 self.player.get_next_action_time(sim.current_time)
                 if hasattr(self.player, "get_next_action_time")
@@ -208,6 +232,17 @@ class PlayerReady(Event):
                 target_time = max(sim.current_time, self.player.next_gcd)
                 sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
             else:
+                if not getattr(self.player, "_is_stalled", False):
+                    self.player._is_stalled = True
+                    if hasattr(sim, "tracker"):
+                        resource_val = getattr(getattr(self.player, "resource", None), "current", None)
+                        sim.tracker.log_rotation_stall_start(
+                            timestamp=sim.current_time,
+                            seed=getattr(sim, "seed", None),
+                            step_index=getattr(self.player.rotation, "current_step", 0),
+                            step_info=self._get_step_diagnostic(),
+                            resource_current=resource_val,
+                        )
                 sim.schedule_relative(0.1, PlayerReady(self.player, self.target))
 
 class EffectExpire(Event):

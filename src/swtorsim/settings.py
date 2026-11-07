@@ -30,7 +30,7 @@ def get_extractor_data_dir(env: str | None = None) -> Path:
     selected = (env if env is not None else DATA_ENVIRONMENT).lower().strip()
     if selected == "pts":
         return Path("data/extractor/pts")
-    return Path("data/extractor")
+    return Path("data/extractor/live")
 
 
 def set_stem_matching(enabled: bool) -> None:

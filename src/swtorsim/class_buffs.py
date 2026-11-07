@@ -15,9 +15,10 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 from src.swtorsim.effects import ActiveEffect
+from src.swtorsim.settings import get_extractor_data_dir
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PARSED_DIR = PROJECT_ROOT / "data" / "extractor" / "parsed"
+PARSED_DIR = PROJECT_ROOT / "data" / "extractor" / "live" / "parsed"
 
 # (effect name, passive blueprint FQN carrying that effect)
 CLASS_BUFF_SOURCES: Tuple[Tuple[str, str], ...] = (
@@ -40,7 +41,9 @@ HIDDEN_BONUSES: Dict[str, float] = {
 
 
 def _blueprint_path(fqn: str) -> Path:
-    return PARSED_DIR.joinpath(*fqn.split(".")).with_suffix(".json")
+    env_parsed = PROJECT_ROOT / get_extractor_data_dir() / "parsed"
+    base_dir = env_parsed if env_parsed.is_dir() else PARSED_DIR
+    return base_dir.joinpath(*fqn.split(".")).with_suffix(".json")
 
 
 def load_class_buff_effects() -> List[ActiveEffect]:

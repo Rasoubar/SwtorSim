@@ -57,11 +57,16 @@ from src.swtorsim.run_config import (
     RunConfig,
     discipline_names,
     filter_gear_for_class,
+    get_disciplines_dir,
+    get_gear_path,
+    get_relics_path,
     relic_menu_label,
+    resolve_env_extractor_path,
     resolve_skill_tree_fqns,
     validate_run_config,
 )
 from src.swtorsim.settings import (
+    get_extractor_data_dir,
     set_default_combat_distance,
     set_in_flashpoint_operation,
     set_projectile_flight_time,
@@ -69,7 +74,7 @@ from src.swtorsim.settings import (
 )
 from src.swtorsim.setup import prepare_simulation
 
-PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "parsed"
+PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "live" / "parsed"
 SIM_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
 RUN_CONFIG_DIR = SWTORSIM_ROOT / "data" / "run_config"
 
@@ -195,8 +200,7 @@ def _write_json_crlf(target_path: Path, data: Any) -> None:
 def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
     """Discovers all run configs, disciplines, builds, choices, rotations, and relics."""
     active_env = str(env).lower().strip()
-    disc_dir_rel = "data/extractor/pts/disciplines" if active_env == "pts" else DISCIPLINES_DIR
-    disc_dir = _resolve_workspace_path(disc_dir_rel)
+    disc_dir = _resolve_workspace_path(get_disciplines_dir(active_env))
     disciplines_raw = index_disciplines(str(disc_dir))
     disciplines: dict[str, dict[str, str]] = {}
     for cls_name, specs in disciplines_raw.items():
@@ -273,11 +277,10 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
     choices_files = _scan_dir(CHOICES_DIR)
     rotations_files = _scan_rotations(ROTATIONS_DIR)
 
-    relics_path_rel = "data/extractor/pts/relics.json" if active_env == "pts" else RELICS_PATH
-    relics_path = _resolve_workspace_path(relics_path_rel)
+    relics_path = _resolve_workspace_path(get_relics_path(active_env))
     relics_raw = load_json_file(str(relics_path)) if relics_path.is_file() else []
     relics_list: list[dict[str, str]] = []
-    parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if active_env == "pts" else "data/extractor/parsed")
+    parsed_dir = SWTORSIM_ROOT / get_extractor_data_dir(active_env) / "parsed"
     for fqn in relics_raw:
         if not isinstance(fqn, str) or not fqn.strip():
             continue
@@ -319,10 +322,9 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
 def get_class_gear_options(spec_path: str, env: str = "live") -> dict[str, Any]:
     """Returns class-filtered tacticals, legendaries, and discipline skill-tree metadata."""
     active_env = str(env).lower().strip()
-    if active_env == "pts" and "data/extractor/" in spec_path and "data/extractor/pts/" not in spec_path:
-        pts_cand = spec_path.replace("data/extractor/", "data/extractor/pts/", 1)
-        if _resolve_workspace_path(pts_cand).is_file():
-            spec_path = pts_cand
+    cand_spec = resolve_env_extractor_path(spec_path, active_env)
+    if _resolve_workspace_path(cand_spec).is_file():
+        spec_path = cand_spec
     resolved_spec = _resolve_workspace_path(spec_path)
     if not resolved_spec.is_file():
         raise FileNotFoundError(f"Discipline file not found: {spec_path}")
@@ -330,8 +332,7 @@ def get_class_gear_options(spec_path: str, env: str = "live") -> dict[str, Any]:
     spec_data = load_json_file(str(resolved_spec))
     class_name, spec_name = discipline_names(spec_data, str(resolved_spec))
 
-    gear_path_rel = "data/extractor/pts/gear_abilities_talents.json" if active_env == "pts" else GEAR_PATH
-    gear_file = _resolve_workspace_path(gear_path_rel)
+    gear_file = _resolve_workspace_path(get_gear_path(active_env))
     gear_data = load_json_file(str(gear_file)) if gear_file.is_file() else {}
 
     tacticals_map = filter_gear_for_class(gear_data, TACTICAL_PREFIX, class_name)
@@ -346,7 +347,7 @@ def get_class_gear_options(spec_path: str, env: str = "live") -> dict[str, Any]:
         for name, fqn in sorted(legendaries_map.items(), key=lambda x: x[0].lower())
     ]
 
-    parsed_dir = SWTORSIM_ROOT / "data" / "extractor" / ("pts/parsed" if active_env == "pts" else "parsed")
+    parsed_dir = SWTORSIM_ROOT / get_extractor_data_dir(active_env) / "parsed"
     skill_tree_raw = spec_data.get("skill_tree", {})
     skill_tree_info: dict[str, dict[str, list[dict[str, str]]]] = {}
     for lvl, slots in sorted(skill_tree_raw.items(), key=lambda item: int(item[0]) if str(item[0]).isdigit() else 999):
@@ -392,16 +393,11 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
 
     raw_rc = dict(load_json_file(str(target)))
     spec_path = str(raw_rc.get("spec_path", "")).replace("\\", "/")
-    if spec_path and active_env == "pts" and "data/extractor/" in spec_path and "data/extractor/pts/" not in spec_path:
-        pts_cand = spec_path.replace("data/extractor/", "data/extractor/pts/", 1)
-        if _resolve_workspace_path(pts_cand).is_file():
-            spec_path = pts_cand
-            raw_rc["spec_path"] = pts_cand
-    elif spec_path and active_env == "live" and "data/extractor/pts/" in spec_path:
-        live_cand = spec_path.replace("data/extractor/pts/", "data/extractor/", 1)
-        if _resolve_workspace_path(live_cand).is_file():
-            spec_path = live_cand
-            raw_rc["spec_path"] = live_cand
+    if spec_path:
+        cand_spec = resolve_env_extractor_path(spec_path, active_env)
+        if _resolve_workspace_path(cand_spec).is_file():
+            spec_path = cand_spec
+            raw_rc["spec_path"] = cand_spec
     class_name = str(raw_rc.get("class_name") or raw_rc.get("class") or "").strip()
     spec_name = str(raw_rc.get("spec") or raw_rc.get("spec_name") or "").strip()
     gear_opts = {"tacticals": [], "legendaries": [], "skill_tree_levels": []}
@@ -483,14 +479,9 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     """Validates and resolves a simulation request payload into RunConfig and prepared inputs."""
     env = (payload.get("environment") or payload.get("env") or ("pts" if payload.get("pts") else "live")).lower().strip()
     raw_spec = str(payload.get("spec_path") or "").replace("\\", "/")
-    if env == "pts" and "data/extractor/" in raw_spec and "data/extractor/pts/" not in raw_spec:
-        pts_cand = raw_spec.replace("data/extractor/", "data/extractor/pts/", 1)
-        if _resolve_workspace_path(pts_cand).is_file():
-            raw_spec = pts_cand
-    elif env == "live" and "data/extractor/pts/" in raw_spec:
-        live_cand = raw_spec.replace("data/extractor/pts/", "data/extractor/", 1)
-        if _resolve_workspace_path(live_cand).is_file():
-            raw_spec = live_cand
+    cand_spec = resolve_env_extractor_path(raw_spec, env)
+    if _resolve_workspace_path(cand_spec).is_file():
+        raw_spec = cand_spec
     spec_path = str(_resolve_workspace_path(raw_spec))
     stats_path = str(_resolve_workspace_path(payload.get("stats_path") or ""))
     rotation_path = str(_resolve_workspace_path(payload.get("rotation_path") or ""))
@@ -579,7 +570,7 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     ]
 
     with redirect_stdout(io.StringIO()):
-        active_parsed_dir = SWTORSIM_ROOT / ("data/extractor/pts/parsed" if env == "pts" else "data/extractor/parsed")
+        active_parsed_dir = SWTORSIM_ROOT / get_extractor_data_dir(env) / "parsed"
         loadout_key = (env, tuple(selected_fqns))
         if loadout_key not in _BLUEPRINT_LOADOUT_CACHE:
             _BLUEPRINT_LOADOUT_CACHE[loadout_key] = load_complete_loadout(
@@ -701,6 +692,7 @@ def _run_single_test_detailed(
             sim_inputs["loadout_blueprints"],
             config.dummy_hp,
             sim_inputs["debuff_module"],
+            seed=config.seed,
         )
         player.combat_distance = config.combat_distance
         target.combat_distance = config.combat_distance
@@ -916,6 +908,12 @@ def _run_single_test_detailed(
         "execute_breakdown": exec_rows,
         "buffs": buff_rows,
         "combat_log": combat_events,
+        "stalls": {
+            "total_stalled_time": round(sim.tracker.total_stalled_time, 2),
+            "stall_count": len(sim.tracker.stall_events),
+            "permanent_stall": sim.tracker.permanent_stall,
+            "events": sim.tracker.stall_events,
+        },
     }
 
 
@@ -997,14 +995,15 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
     set_default_combat_distance(settings_dict["combat_distance"])
     set_in_flashpoint_operation(settings_dict["in_flashpoint_operation"])
 
-    if base_seed is not None:
-        random.seed(int(base_seed) + int(run_id))
+    worker_seed = (int(base_seed) + int(run_id)) if base_seed is not None else None
+    if worker_seed is not None:
+        random.seed(worker_seed)
 
     old_stdout = sys.stdout
     sys.stdout = open(os.devnull, "w")
     try:
         sim, player, target = prepare_simulation(
-            rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False
+            rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False, seed=worker_seed
         )
         player.combat_distance = settings_dict["combat_distance"]
         target.combat_distance = settings_dict["combat_distance"]
@@ -1051,6 +1050,10 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
         "total_execute_damage": float(getattr(sim.tracker, "total_execute_damage", 0.0)),
         "execute_duration": float(execute_dur),
         "execute_abilities": execute_data_summary,
+        "stall_count": len(getattr(sim.tracker, "stall_events", [])),
+        "total_stalled_time": float(getattr(sim.tracker, "total_stalled_time", 0.0)),
+        "permanent_stall": bool(getattr(sim.tracker, "permanent_stall", False)),
+        "seed": worker_seed,
     }
 
 
@@ -1287,6 +1290,12 @@ def _aggregate_batch_results(
     total_crits = sum(int(d.get("crit_count", 0)) for d in macro_breakdown.values())
     overall_crit_pct = (total_crits / total_hits * 100.0) if total_hits > 0 else 0.0
 
+    stalled_runs = [r for r in harvested if r.get("stall_count", 0) > 0]
+    deadlocked_runs = [r for r in harvested if r.get("permanent_stall", False)]
+    stalled_seeds = [r["seed"] for r in stalled_runs if r.get("seed") is not None]
+    deadlocked_seeds = [r["seed"] for r in deadlocked_runs if r.get("seed") is not None]
+    total_stalled_time = sum(float(r.get("total_stalled_time", 0.0)) for r in harvested)
+
     return {
         "mode": "BATCH",
         "environment": config.environment,
@@ -1321,6 +1330,13 @@ def _aggregate_batch_results(
         "execute_breakdown": exec_rows,
         "buffs": [],
         "combat_log": [],
+        "stalls": {
+            "stalled_runs_count": len(stalled_runs),
+            "deadlocked_runs_count": len(deadlocked_runs),
+            "stalled_seeds": stalled_seeds[:50],
+            "deadlocked_seeds": deadlocked_seeds[:50],
+            "avg_stalled_time": round(total_stalled_time / len(harvested), 2) if harvested else 0.0,
+        },
     }
 
 

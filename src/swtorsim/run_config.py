@@ -14,13 +14,27 @@ from src.swtorsim.settings import (
     set_in_flashpoint_operation,
 )
 
-DISCIPLINES_DIR = "data/extractor/disciplines"
+DISCIPLINES_DIR = "data/extractor/live/disciplines"
 BUILDS_DIR = "data/builds"
 ROTATIONS_DIR = "data/rotations"
 CHOICES_DIR = "data/choices"
-GEAR_PATH = "data/extractor/gear_abilities_talents.json"
-RELICS_PATH = "data/extractor/relics.json"
+GEAR_PATH = "data/extractor/live/gear_abilities_talents.json"
+RELICS_PATH = "data/extractor/live/relics.json"
 TRAINING_DUMMY_ARMOR_DEBUFF_LABEL = "Training Dummy Armor Debuff"
+
+
+def resolve_env_extractor_path(path_str: str, env: str | None = None) -> str:
+    """Normalizes an extractor path to the specified or active environment ('live' or 'pts')."""
+    if not path_str:
+        return path_str
+    target_env = "pts" if (env or get_data_environment()).lower().strip() == "pts" else "live"
+    other_env = "live" if target_env == "pts" else "pts"
+    norm = path_str.replace("\\", "/")
+    if "data/extractor/disciplines/" in norm:
+        norm = norm.replace("data/extractor/disciplines/", f"data/extractor/{target_env}/disciplines/", 1)
+    elif f"data/extractor/{other_env}/" in norm:
+        norm = norm.replace(f"data/extractor/{other_env}/", f"data/extractor/{target_env}/", 1)
+    return norm
 
 
 def get_disciplines_dir(env: str | None = None) -> str:
@@ -125,10 +139,9 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
 
     active_env = (environment or raw.get("environment") or "live").lower().strip()
     spec_path = _require_config_str(raw, "spec_path")
-    if active_env == "pts" and "data/extractor/" in spec_path and "data/extractor/pts/" not in spec_path:
-        pts_cand = spec_path.replace("data/extractor/", "data/extractor/pts/", 1)
-        if Path(pts_cand).exists():
-            spec_path = pts_cand
+    cand_spec = resolve_env_extractor_path(spec_path, active_env)
+    if Path(cand_spec).exists():
+        spec_path = cand_spec
     spec_data = _load_json(spec_path)
     class_name, spec = discipline_names(spec_data, spec_path)
 

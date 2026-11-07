@@ -4,7 +4,7 @@ from collections import defaultdict
 
 # Path setup
 SCRIPT_DIR = Path(__file__).resolve().parent
-DATA_DIR = SCRIPT_DIR.parent / "data" / "extractor" / "parsed"
+DATA_DIR = SCRIPT_DIR.parent / "data" / "extractor" / "live" / "parsed"
 OUTPUT_CATALOG = SCRIPT_DIR / "layer1_catalog.json"
 
 
