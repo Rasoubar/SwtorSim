@@ -716,12 +716,14 @@ def normalize_rotation_steps(raw_steps: list[Any]) -> tuple[list[dict[str, Any]]
         if step_type == "loop_anchor":
             normalized.append({"type": "loop_anchor"})
         elif step_type == "fixed":
-            normalized.append(
-                {
-                    "type": "fixed",
-                    "ability_id": str(step.get("ability_id") or ""),
-                }
-            )
+            lead_val = step.get("lead_time") if "lead_time" in step else step.get("pre_cast_offset")
+            norm_fixed = {
+                "type": "fixed",
+                "ability_id": str(step.get("ability_id") or ""),
+            }
+            if lead_val is not None:
+                norm_fixed["lead_time"] = float(lead_val)
+            normalized.append(norm_fixed)
         elif step_type == "optional":
             rules = dict(step.get("rules") or {})
             lead_time = float(step.get("lead_time") or step.get("pre_cast_offset") or 0.0)
@@ -731,13 +733,14 @@ def normalize_rotation_steps(raw_steps: list[Any]) -> tuple[list[dict[str, Any]]
                     warnings.append(
                         f"Step #{idx + 1} (Optional '{step.get('ability_id')}'): moved misplaced rule '{k}' into 'rules'."
                     )
+            lead_val = step.get("lead_time") if "lead_time" in step else step.get("pre_cast_offset")
             norm_step = {
                 "type": "optional",
                 "ability_id": str(step.get("ability_id") or ""),
                 "rules": rules,
             }
-            if lead_time > 0.0:
-                norm_step["lead_time"] = lead_time
+            if lead_val is not None:
+                norm_step["lead_time"] = float(lead_val)
             normalized.append(norm_step)
         elif step_type == "priority_block":
             block_name = str(step.get("name") or f"Priority Block {idx + 1}")
@@ -754,19 +757,23 @@ def normalize_rotation_steps(raw_steps: list[Any]) -> tuple[list[dict[str, Any]]
                             f"Block '{block_name}' row #{row_idx + 1} ('{item.get('ability_id')}'): "
                             f"moved misplaced rule '{k}' into 'rules'."
                         )
-                clean_pool.append(
-                    {
-                        "ability_id": str(item.get("ability_id") or ""),
-                        "rules": rules,
-                    }
-                )
-            normalized.append(
-                {
-                    "type": "priority_block",
-                    "name": block_name,
-                    "pool": clean_pool,
+                entry: dict[str, Any] = {
+                    "ability_id": str(item.get("ability_id") or ""),
+                    "rules": rules,
                 }
-            )
+                lead_val = item.get("lead_time") if "lead_time" in item else item.get("pre_cast_offset")
+                if lead_val is not None:
+                    entry["lead_time"] = float(lead_val)
+                clean_pool.append(entry)
+            norm_block: dict[str, Any] = {
+                "type": "priority_block",
+                "name": block_name,
+                "pool": clean_pool,
+            }
+            block_lead = step.get("lead_time") if "lead_time" in step else step.get("pre_cast_offset")
+            if block_lead is not None:
+                norm_block["lead_time"] = float(block_lead)
+            normalized.append(norm_block)
         else:
             warnings.append(f"Step #{idx + 1}: unknown step type '{step_type}'.")
 

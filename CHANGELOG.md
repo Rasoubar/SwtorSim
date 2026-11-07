@@ -2,13 +2,17 @@
 
 ## Completed Fixes
 
-### 39. Optional Off-GCD Ability Pre-Cast Lead Time (`rotation.py`, `entities.py`, `abilities.py`, `events.py`, `rotation_builder.py`) - [DONE]
-- Implemented optional off-GCD ability pre-cast timing (`lead_time` / `pre_cast_offset`) in `OptionalAbilityStep` and `Rotation`.
-- Added `Player.get_next_action_time(current_time)` in `entities.py` and `Rotation.get_next_lead_time()` in `rotation.py`, allowing the engine to schedule `PlayerReady` at `max(sim.current_time, player.next_gcd - lead_time)` during active GCD windows.
-- Fixed `Ability.apply_cooldown_locks` in `abilities.py` so off-GCD abilities (`triggers_gcd == False`) do not overwrite or reset an active GCD (`caster.next_gcd = max(getattr(caster, 'next_gcd', 0.0), round(sim.current_time, 4))`).
-- Updated `OptionalAbilityStep.evaluate` so that early evaluation (before `next_gcd`) resolves and advances if ready to cast, but defers and retries at `next_gcd` if on cooldown or if condition rules fail, preserving rotational non-blocking semantics without skipping abilities prematurely.
-- Updated `data/rotation_builder.py` normalizer and CLI prompt to preserve and configure `lead_time`.
-- Added regression test suite `tests/test_optional_lead_time.py` verifying pre-cast timing, GCD preservation, and cooldown retry behavior.
+### 39. Universal Off-GCD Early Weave & Web Rotation Builder Integration (`rotation.py`, `entities.py`, `abilities.py`, `events.py`, `rotation_builder.py`, `tools/rotation_builder_ui.html`) - [DONE]
+- Generalized off-GCD pre-cast timing across all rotational step types (`FixedAbilityStep`, `OptionalAbilityStep`, and `PriorityBlockStep`), decoupling early weave detection from step optionality. Any upcoming off-GCD ability (`triggers_gcd == False`) is automatically evaluated early during the preceding GCD window (defaulting to 0.25s lead time unless customized or disabled with 0.0s).
+- Added `DEFAULT_OFF_GCD_LEAD_TIME: float = 0.25` in `src/swtorsim/rotation.py`. Updated `Rotation.get_next_lead_time` to inspect `player.ability_db` across fixed ability steps, optional steps, and priority block pools.
+- Enhanced `FixedAbilityStep.evaluate` and `PriorityBlockStep.evaluate` with early-window safety guards so on-GCD abilities are never cast before GCD while off-GCD abilities can weave early.
+- Updated `tools/rotation_builder_ui.html` and compiled release `dist/rotation_builder.html` via `tools/build_web_release.py`:
+  - Added visual `Off-GCD (Early Weave)` badges on Fixed and Optional step headers when off-GCD abilities are selected.
+  - Added inline `Lead: [ 0.25 ] s` numeric controls to configure or disable lead time per step.
+  - Added `Off-GCD (Early Weave)` badges to priority block pool rows.
+  - Updated rotation linter to clarify that off-GCD fixed steps pre-cast early and only block if remaining on cooldown.
+- Expanded `tests/test_optional_lead_time.py` with 5 targeted tests covering default lead time, explicit zero-lead time, fixed steps, optional steps, and on-GCD safety invariants.
+
 
 ### 38. DotTick Expiration on_pre_remove Lifecycle Execution (src/swtorsim/events.py) - [DONE]
 - Fixed DotTick.resolve in src/swtorsim/events.py omitting lueprint.execute_triggered_branches('on_pre_remove', ...) when a ticking effect reaches expiration (	icks_remaining <= 0).
