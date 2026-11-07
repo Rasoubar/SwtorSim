@@ -6,6 +6,97 @@ from typing import Any, Dict, List, Optional
 from src.swtorsim.modifiers import Modifier
 
 
+def _resolve_branch_modifiers(
+    raw_branches: List[Any],
+    caster: Any = None,
+    target: Any = None,
+    sim: Any = None,
+    stacks: int = 1,
+) -> tuple[List[Modifier], List[Dict[str, Any]]]:
+    """Evaluates branch conditions and ``run_if_none_ran`` rules in index order to collect active ``Modifier`` instances and serialized branches.
+
+    Args:
+        raw_branches: Sequence of raw branch dicts (from JSON) or ``abilities.Branch`` objects.
+        caster: Source entity applying or owning the effect.
+        target: Target entity receiving the effect (defaults to ``caster`` when ``None``).
+        sim: Optional ``Simulation`` instance for time/cooldown condition checks.
+        stacks: Initial stack/charge count passed into the condition evaluation context.
+
+    Returns:
+        A ``(parsed_modifiers, serialized_branches)`` tuple containing only the modifiers
+        and branch dicts from branches whose conditions and ``run_if_none_ran`` gates passed.
+    """
+    parsed_modifiers: List[Modifier] = []
+    serialized_branches: List[Dict[str, Any]] = []
+    executed_branches: set[int] = set()
+    branch_ctx = {
+        "stack_multiplier": stacks,
+        "current_stacks": stacks,
+        "stacks": stacks,
+        "charges": stacks,
+    }
+    actual_target = target if target is not None else caster
+
+    for idx, branch in enumerate(raw_branches or ()):
+        if isinstance(branch, dict):
+            b_index = branch.get("index", idx + 1)
+            branch_conditions = branch.get("conditions")
+            run_if_none = branch.get("run_if_none_ran") or []
+            actions = branch.get("actions") or []
+            target_overrides = branch.get("target_overrides") or []
+            serialized_branch = branch
+        else:
+            b_index = getattr(branch, "index", idx + 1)
+            branch_conditions = getattr(branch, "conditions", None)
+            run_if_none = getattr(branch, "run_if_none_ran", None) or []
+            actions = getattr(branch, "actions", None) or []
+            target_overrides = getattr(branch, "target_overrides", None) or []
+            serialized_branch = {
+                "index": b_index,
+                "triggers": getattr(branch, "triggers", []),
+                "conditions": branch_conditions,
+                "actions": actions,
+                "target_overrides": target_overrides,
+                "run_if_none_ran": run_if_none,
+                "is_attack": getattr(branch, "is_attack", False),
+            }
+
+        if run_if_none and any(b in executed_branches for b in run_if_none):
+            continue
+
+        if branch_conditions:
+            from src.swtorsim.requirements import validate_all
+            if not validate_all(
+                branch_conditions,
+                caster,
+                actual_target,
+                sim=sim,
+                context=branch_ctx,
+            ):
+                continue
+
+        executed_branches.add(b_index)
+        serialized_branches.append(serialized_branch)
+
+        for action in actions:
+            if not isinstance(action, dict):
+                continue
+            action_type = action.get("action_type")
+            if action_type == "modify_stat":
+                parsed_modifiers.append(Modifier.from_modify_stat(action))
+            elif action_type == "modify_meta_stat":
+                parsed_modifiers.append(Modifier.from_modify_meta_stat(action))
+            elif action_type in (
+                "apply_conditional_meta_stat_mod",
+                "apply_conditional_stat_mod",
+            ):
+                parsed_modifiers.append(
+                    Modifier.from_conditional_stat_mod(action)
+                )
+
+    return parsed_modifiers, serialized_branches
+
+
 class ActiveDot:
     """Tracks tick timing and state for active Damage-over-Time (DoT) effects."""
     __slots__ = ['name', 'interval', 'ticks_remaining', 'action_data']
@@ -160,8 +251,11 @@ class ActiveEffect:
         effect_node: Dict[str, Any],
         current_time: Optional[float] = None,
         expires_at: Optional[float] = None,
+        caster: Any = None,
+        target: Any = None,
+        sim: Any = None,
     ) -> "ActiveEffect":
-        """Constructs an active or passive effect from a blueprint effect node dict."""
+        """Constructs an active or passive ``ActiveEffect`` from a parsed blueprint effect node dict, evaluating branch conditions and ``run_if_none_ran`` rules against ``caster`` and ``target``."""
         is_passive = any(
             init.get("initializer_type") == "eff_initializer__set_passive"
             and init.get("bools", {}).get("is_passive", False)
@@ -189,30 +283,14 @@ class ActiveEffect:
             or effect_node.get("scales_with_stacks", False)
         )
 
-        # Collect modifiers directly from action nodes
-        branches = effect_node.get("branches") or []
-        parsed_modifiers: List[Modifier] = []
-
-        for branch in branches:
-            if not isinstance(branch, dict):
-                continue
-            for action in branch.get("actions", []):
-                if not isinstance(action, dict):
-                    continue
-                action_type = action.get("action_type")
-                if action_type == "modify_stat":
-                    parsed_modifiers.append(Modifier.from_modify_stat(action))
-                elif action_type == "modify_meta_stat":
-                    parsed_modifiers.append(
-                        Modifier.from_modify_meta_stat(action)
-                    )
-                elif action_type in (
-                    "apply_conditional_meta_stat_mod",
-                    "apply_conditional_stat_mod",
-                ):
-                    parsed_modifiers.append(
-                        Modifier.from_conditional_stat_mod(action)
-                    )
+        raw_branches = effect_node.get("branches") or []
+        parsed_modifiers, serialized_branches = _resolve_branch_modifiers(
+            raw_branches,
+            caster=caster,
+            target=target if target is not None else caster,
+            sim=sim,
+            stacks=initial_stacks,
+        )
 
         return cls(
             fqn=parent_fqn,
@@ -227,7 +305,10 @@ class ActiveEffect:
             initial_stacks=initial_stacks,
             scales_with_stacks=scales_with_stacks,
             modifiers=parsed_modifiers,
-            branches=branches,
+            branches=serialized_branches,
+            is_passive=is_passive,
+            effect_blueprint=effect_node,
+            caster_ref=caster,
         )
 
     @classmethod
@@ -241,7 +322,7 @@ class ActiveEffect:
         target: Any = None,
         sim: Any = None,
     ) -> "ActiveEffect":
-        """Constructs an ActiveEffect from a runtime Ability and abilities.Effect instance."""
+        """Constructs an ``ActiveEffect`` from a runtime ``Ability`` and ``abilities.Effect`` instance, evaluating branch conditions and ``run_if_none_ran`` rules against ``caster`` and ``target``."""
         blueprint = getattr(ability, "blueprint", None)
         parent_fqn = getattr(blueprint, "fqn", "") or getattr(ability, "name", "")
         parent_name = getattr(ability, "name", parent_fqn)
@@ -296,49 +377,13 @@ class ActiveEffect:
         )
 
         raw_branches = getattr(effect, "branches", None) or []
-        parsed_modifiers: List[Modifier] = []
-        serialized_branches: List[Dict[str, Any]] = []
-
-        for branch in raw_branches:
-            branch_conditions = getattr(branch, "conditions", None) if not isinstance(branch, dict) else branch.get("conditions")
-            if branch_conditions and caster is not None:
-                from src.swtorsim.requirements import validate_all
-                if not validate_all(branch_conditions, caster, target or caster, sim=sim):
-                    continue
-
-            if isinstance(branch, dict):
-                actions = branch.get("actions", [])
-                serialized_branches.append(branch)
-            else:
-                actions = getattr(branch, "actions", []) or []
-                serialized_branches.append(
-                    {
-                        "index": getattr(branch, "index", 0),
-                        "triggers": getattr(branch, "triggers", []),
-                        "conditions": getattr(branch, "conditions", None),
-                        "actions": actions,
-                        "target_overrides": getattr(branch, "target_overrides", []),
-                        "run_if_none_ran": getattr(branch, "run_if_none_ran", []),
-                        "is_attack": getattr(branch, "is_attack", False),
-                    }
-                )
-            for action in actions:
-                if not isinstance(action, dict):
-                    continue
-                action_type = action.get("action_type")
-                if action_type == "modify_stat":
-                    parsed_modifiers.append(Modifier.from_modify_stat(action))
-                elif action_type == "modify_meta_stat":
-                    parsed_modifiers.append(
-                        Modifier.from_modify_meta_stat(action)
-                    )
-                elif action_type in (
-                    "apply_conditional_meta_stat_mod",
-                    "apply_conditional_stat_mod",
-                ):
-                    parsed_modifiers.append(
-                        Modifier.from_conditional_stat_mod(action)
-                    )
+        parsed_modifiers, serialized_branches = _resolve_branch_modifiers(
+            raw_branches,
+            caster=caster,
+            target=target if target is not None else caster,
+            sim=sim,
+            stacks=initial_stacks,
+        )
 
         tick_interval = getattr(effect, "tick_interval", None)
         if tick_interval is not None and float(tick_interval) <= 0.0:
@@ -361,6 +406,7 @@ class ActiveEffect:
             is_passive=is_passive,
             effect_blueprint=effect,
             ability_ref=ability,
+            caster_ref=caster,
         )
 
 

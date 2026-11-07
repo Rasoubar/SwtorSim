@@ -347,6 +347,88 @@ class SimulationIntegrationTests(unittest.TestCase):
                 f"Unnamed or _x suffixed effect '{name}' should not be stored in effect_history",
             )
 
+    def test_09_high_energy_gas_cylinder_conditional_branch_hydration(self):
+        """Verifies mutually exclusive branch resolution (conditions + run_if_none_ran) on High Energy Gas Cylinder."""
+        import json
+        from src.swtorsim.abilities import Ability, AbilityBlueprint
+        from src.swtorsim.effects import ActiveEffect
+        from src.swtorsim.entities import Player
+
+        hegc_path = (
+            ROOT
+            / "data"
+            / "extractor"
+            / "parsed"
+            / "abl"
+            / "bounty_hunter"
+            / "skill"
+            / "advanced_prototype"
+            / "high_energy_gas_cylinder.json"
+        )
+        bt_path = (
+            ROOT
+            / "data"
+            / "extractor"
+            / "parsed"
+            / "tal"
+            / "bounty_hunter"
+            / "skill"
+            / "advanced_prototype"
+            / "blood_tracker.json"
+        )
+        hegc_raw = json.loads(hegc_path.read_text(encoding="utf-8"))
+        eff1_node = hegc_raw["effects"][0]
+        hegc_bp = AbilityBlueprint.from_file(hegc_path)
+        bt_bp = AbilityBlueprint.from_file(bt_path)
+        energy_stat = "stat_cbt_damage_dealt_scale_type_energy_modifier_percentage"
+
+        with self.subTest("case_a_player_has_blood_tracker"):
+            player_with_bt = Player(
+                name="Powertech",
+                passives={hegc_bp.fqn: hegc_bp, bt_bp.fqn: bt_bp},
+            )
+            player_with_bt.passive_db[bt_bp.fqn] = Ability(bt_bp)
+
+            eff_from_node = ActiveEffect.from_effect_node(
+                hegc_bp.fqn,
+                hegc_bp.name,
+                eff1_node,
+                caster=player_with_bt,
+            )
+            energy_mods_node = [m for m in eff_from_node.modifiers if m.stat == energy_stat]
+            self.assertEqual(len(energy_mods_node), 1)
+            self.assertAlmostEqual(energy_mods_node[0].value, 0.07, places=5)
+
+            hegc_abl = Ability(hegc_bp)
+            hegc_abl.execute_effect(1, player_with_bt, player_with_bt, self.sim)
+            active_eff = player_with_bt.effects["High Energy Gas Cylinder_1"]
+            energy_mods_live = [m for m in active_eff.modifiers if m.stat == energy_stat]
+            self.assertEqual(len(energy_mods_live), 1)
+            self.assertAlmostEqual(energy_mods_live[0].value, 0.07, places=5)
+
+        with self.subTest("case_b_player_does_not_have_blood_tracker"):
+            player_no_bt = Player(
+                name="Powertech",
+                passives={hegc_bp.fqn: hegc_bp},
+            )
+
+            eff_from_node = ActiveEffect.from_effect_node(
+                hegc_bp.fqn,
+                hegc_bp.name,
+                eff1_node,
+                caster=player_no_bt,
+            )
+            energy_mods_node = [m for m in eff_from_node.modifiers if m.stat == energy_stat]
+            self.assertEqual(len(energy_mods_node), 1)
+            self.assertAlmostEqual(energy_mods_node[0].value, 0.05, places=5)
+
+            hegc_abl = Ability(hegc_bp)
+            hegc_abl.execute_effect(1, player_no_bt, player_no_bt, self.sim)
+            active_eff = player_no_bt.effects["High Energy Gas Cylinder_1"]
+            energy_mods_live = [m for m in active_eff.modifiers if m.stat == energy_stat]
+            self.assertEqual(len(energy_mods_live), 1)
+            self.assertAlmostEqual(energy_mods_live[0].value, 0.05, places=5)
+
 
 if __name__ == "__main__":
     unittest.main()

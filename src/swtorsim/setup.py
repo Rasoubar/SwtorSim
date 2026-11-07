@@ -152,13 +152,17 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
             is_passive=getattr(eff, "is_passive", False),
         )
 
-    # Instantiate and activate passive blueprints (skill tree passives, tacticals, legendaries, relics)
+    # Pass 1: Register all passive blueprints in `player.passive_db` and apply flat `stat_changes`
+    # before executing any `entry_effect_ids` so cross-passive `has_ability` checks (e.g. Blood Tracker)
+    # are independent of dictionary iteration order. After Pass 1 completes, Pass 2 runs `entry_effect_ids`.
     from src.swtorsim.effects import ActiveEffect
+    instantiated_passives = []
     for fqn, bp in passive_blueprints.items():
         passive_abl = Ability(bp)
         player.passive_db[fqn] = passive_abl
         if passive_abl.name:
             player.passive_db[passive_abl.name.lower().replace(" ", "_")] = passive_abl
+        instantiated_passives.append(passive_abl)
         if getattr(bp, "stat_changes", None):
             eff = ActiveEffect.from_stat_changes(
                 {
@@ -178,6 +182,8 @@ def prepare_simulation(rotation_config, stats_config, loadout_blueprints, dummy_
                 stacks=getattr(eff, "stacks", 1),
                 is_passive=True,
             )
+
+    for passive_abl in instantiated_passives:
         for entry_id in passive_abl.entry_effect_ids:
             passive_abl.execute_effect(entry_id, player, player, sim)
 
