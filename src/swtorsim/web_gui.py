@@ -794,8 +794,54 @@ def _run_single_test_detailed(
 
         sim.tracker.log_damage = _wrapped_log_damage
 
+        # Wrap stall logging to record structured stall & deadlock events in the combat log
+        orig_stall_end = sim.tracker.log_rotation_stall_end
+        def _wrapped_stall_end(timestamp: float):
+            active = sim.tracker._active_stall
+            if active:
+                dur = round(max(0.0, timestamp - active["start"]), 2)
+                res_val = round(float(getattr(player.resource, "current_value", 0.0)), 1)
+                hp_pct = round(float(target.hp_ratio) * 100.0, 1)
+                combat_events.append({
+                    "time": round(float(timestamp), 2),
+                    "category": "stall",
+                    "ability": active.get("step_info", "Rotation Stall"),
+                    "damage": 0.0,
+                    "is_crit": False,
+                    "damage_type": "",
+                    "target_hp": round(float(target.hp), 0),
+                    "target_hp_pct": hp_pct,
+                    "resource": res_val,
+                    "text": f"Rotation stalled for {dur:.2f}s (from {active['start']:.2f}s) on step #{active['step_index']}: {active['step_info']}",
+                })
+            orig_stall_end(timestamp)
+        sim.tracker.log_rotation_stall_end = _wrapped_stall_end
+
+        orig_finalize_stalls = sim.tracker.finalize_stalls
+        def _wrapped_finalize_stalls(current_time: float):
+            active = sim.tracker._active_stall
+            if active:
+                dur = round(max(0.0, current_time - active["start"]), 2)
+                res_val = round(float(getattr(player.resource, "current_value", 0.0)), 1)
+                hp_pct = round(float(target.hp_ratio) * 100.0, 1)
+                combat_events.append({
+                    "time": round(float(current_time), 2),
+                    "category": "deadlock",
+                    "ability": active.get("step_info", "Rotation Deadlock"),
+                    "damage": 0.0,
+                    "is_crit": False,
+                    "damage_type": "",
+                    "target_hp": round(float(target.hp), 0),
+                    "target_hp_pct": hp_pct,
+                    "resource": res_val,
+                    "text": f"Rotation permanently deadlocked at {active['start']:.2f}s (stalled for {dur:.2f}s) on step #{active['step_index']}: {active['step_info']}",
+                })
+            orig_finalize_stalls(current_time)
+        sim.tracker.finalize_stalls = _wrapped_finalize_stalls
+
         sim.run_timed(duration=config.duration, target=target)
         sim.tracker.finalize_effects(sim.current_time)
+        combat_events.sort(key=lambda ev: ev["time"])
 
     wall_ms = round((time.perf_counter() - t0) * 1000.0, 1)
     fight_duration = float(sim.current_time)

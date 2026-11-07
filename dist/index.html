@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794066800"></script>
+  <script src="pyodide_client.js?v=1794067270"></script>
 </head>
 <body>
 
@@ -1294,6 +1294,12 @@
         <div class="kpi-sub" id="kpiBaselineSub">Pin any run to compare deltas</div>
       </div>
     </section>
+
+    <!-- Rotation Stall Alert Banner (hidden when no stalls) -->
+    <div id="stallAlertBanner" style="display:none;margin-bottom:12px;padding:10px 16px;border-radius:6px;font-size:13px;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div id="stallAlertText"></div>
+      <div id="stallAlertAction" style="display:flex;align-items:center;gap:4px;"></div>
+    </div>
 
     <!-- Navigation Tabs -->
     <nav class="tabs-bar">
@@ -2311,11 +2317,90 @@
     document.getElementById("badgeLog").textContent = (res.combat_log || []).length;
     document.getElementById("badgeHistory").textContent = RUN_HISTORY.length;
 
+    renderStallAlert(res);
     renderAbilityBreakdown();
     renderMonteCarloTab();
     renderBuffsTab();
     renderCombatLog();
     renderHistoryAndComparison();
+  }
+
+  function renderStallAlert(res) {
+    const banner = document.getElementById("stallAlertBanner");
+    const textEl = document.getElementById("stallAlertText");
+    const actionEl = document.getElementById("stallAlertAction");
+    if (!banner || !textEl || !actionEl) return;
+
+    const stalls = res.stalls;
+    if (!stalls) {
+      banner.style.display = "none";
+      return;
+    }
+
+    const isBatch = res.mode === "BATCH";
+    if (isBatch) {
+      const deadlockedCount = stalls.deadlocked_runs_count || 0;
+      const stalledCount = stalls.stalled_runs_count || 0;
+      if (deadlockedCount > 0) {
+        banner.style.display = "flex";
+        banner.style.background = "var(--red-bg)";
+        banner.style.border = "1px solid var(--red)";
+        banner.style.color = "var(--red)";
+        const deadSeeds = (stalls.deadlocked_seeds || []).slice(0, 8);
+        const seedsHtml = deadSeeds.map(s =>
+          `<button class="btn btn-sm" style="margin-left:4px;padding:2px 8px;border-color:var(--red);color:var(--red);" onclick="applySeedAndRun(${s})">Seed ${s}</button>`
+        ).join("");
+        textEl.innerHTML = `<b>[FAIL] Rotation Deadlock Detected!</b> ${deadlockedCount} of ${res.iterations} fights (${((deadlockedCount / res.iterations) * 100).toFixed(1)}%) completely stopped before fight conclusion (Avg stall: ${stalls.avg_stalled_time}s).`;
+        actionEl.innerHTML = `<span style="font-size:12px;font-weight:600;">Reproduce seed:</span> ${seedsHtml}`;
+      } else if (stalledCount > 0) {
+        banner.style.display = "flex";
+        banner.style.background = "var(--amber-bg)";
+        banner.style.border = "1px solid var(--amber)";
+        banner.style.color = "var(--amber)";
+        const stallSeeds = (stalls.stalled_seeds || []).slice(0, 5);
+        const seedsHtml = stallSeeds.map(s =>
+          `<button class="btn btn-sm" style="margin-left:4px;padding:2px 8px;border-color:var(--amber);color:var(--amber);" onclick="applySeedAndRun(${s})">Seed ${s}</button>`
+        ).join("");
+        textEl.innerHTML = `<b>[WARN] Rotation Gaps Detected:</b> ${stalledCount} of ${res.iterations} fights experienced idle wait gaps (Avg stall: ${stalls.avg_stalled_time}s).`;
+        actionEl.innerHTML = `<span style="font-size:12px;font-weight:600;">Inspect seed:</span> ${seedsHtml}`;
+      } else {
+        banner.style.display = "none";
+      }
+    } else {
+      const count = stalls.stall_count || 0;
+      const isDeadlock = stalls.permanent_stall || false;
+      const totalTime = stalls.total_stalled_time || 0;
+      if (isDeadlock) {
+        banner.style.display = "flex";
+        banner.style.background = "var(--red-bg)";
+        banner.style.border = "1px solid var(--red)";
+        banner.style.color = "var(--red)";
+        const lastEv = (stalls.events && stalls.events.length > 0) ? stalls.events[stalls.events.length - 1] : null;
+        const detailStr = lastEv ? ` Stopped at ${lastEv.start.toFixed(2)}s on step #${lastEv.step_index} (<code>${lastEv.step_info}</code>).` : "";
+        textEl.innerHTML = `<b>[FAIL] Rotation Permanent Deadlock!</b> Rotation stopped casting and stalled for ${totalTime.toFixed(2)}s until fight conclusion.${detailStr}`;
+        actionEl.innerHTML = `<span class="chip" style="border-color:var(--red);color:var(--red);">Seed: ${res.seed}</span>`;
+      } else if (count > 0) {
+        banner.style.display = "flex";
+        banner.style.background = "var(--amber-bg)";
+        banner.style.border = "1px solid var(--amber)";
+        banner.style.color = "var(--amber)";
+        const longest = (stalls.events && stalls.events.length > 0)
+          ? stalls.events.reduce((max, ev) => ev.duration > max.duration ? ev : max, stalls.events[0])
+          : null;
+        const longestStr = longest ? ` Longest gap: ${longest.duration.toFixed(2)}s on step #${longest.step_index} (<code>${longest.step_info}</code>).` : "";
+        textEl.innerHTML = `<b>[WARN] Rotation Gaps Detected:</b> Rotation was idle waiting for ${totalTime.toFixed(2)}s across ${count} stall(s).${longestStr}`;
+        actionEl.innerHTML = `<span class="chip" style="border-color:var(--amber);color:var(--amber);">Seed: ${res.seed}</span>`;
+      } else {
+        banner.style.display = "none";
+      }
+    }
+  }
+
+  function applySeedAndRun(seedVal) {
+    const input = document.getElementById("seedInput");
+    if (input) input.value = seedVal;
+    if (typeof setSimMode === "function") setSimMode("TEST");
+    triggerSimulation();
   }
 
   function setBreakdownPhase(phase) {
@@ -2660,9 +2745,16 @@
     `;
 
     for (const ev of displayEvents) {
-      const catBadge = ev.category === "cast"
-        ? `<span class="cast-tag">CAST</span>`
-        : (ev.is_crit ? `<span class="crit-tag">CRIT HIT</span>` : `<span>HIT</span>`);
+      let catBadge;
+      if (ev.category === "deadlock") {
+        catBadge = `<span class="tag" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red);font-weight:700;padding:1px 5px;border-radius:3px;">DEADLOCK</span>`;
+      } else if (ev.category === "stall") {
+        catBadge = `<span class="tag" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);font-weight:700;padding:1px 5px;border-radius:3px;">STALL</span>`;
+      } else if (ev.category === "cast") {
+        catBadge = `<span class="cast-tag">CAST</span>`;
+      } else {
+        catBadge = ev.is_crit ? `<span class="crit-tag">CRIT HIT</span>` : `<span>HIT</span>`;
+      }
       html += `
         <tr>
           <td style="color:var(--text-muted);">${ev.time.toFixed(2)}s</td>
