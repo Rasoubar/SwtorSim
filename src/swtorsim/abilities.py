@@ -1316,7 +1316,8 @@ class Ability:
 
     def apply_cooldown_locks(self, caster, sim):
         """Deducts charges or sets cooldown, and sets GCD lockouts."""
-        caster.next_gcd = round(sim.current_time, 4)
+        if not self.triggers_gcd:
+            caster.next_gcd = max(getattr(caster, "next_gcd", 0.0), round(sim.current_time, 4))
         if self.triggers_gcd:
             caster.next_gcd = round(sim.current_time + caster.calculate_gcd(self.base_gcd, ability=self), 4)
 
@@ -1517,7 +1518,11 @@ class Ability:
             cleanup_channel_effects(channel, sim)
             if sim is not None:
                 from src.swtorsim.events import PlayerReady
-                target_time = max(sim.current_time, getattr(caster, "next_gcd", sim.current_time))
+                target_time = (
+                    caster.get_next_action_time(sim.current_time)
+                    if hasattr(caster, "get_next_action_time")
+                    else max(sim.current_time, getattr(caster, "next_gcd", sim.current_time))
+                )
                 sim.schedule_absolute(target_time, PlayerReady(caster, ability_target))
             return
 

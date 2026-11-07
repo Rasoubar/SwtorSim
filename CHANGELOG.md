@@ -2,6 +2,14 @@
 
 ## Completed Fixes
 
+### 39. Optional Off-GCD Ability Pre-Cast Lead Time (`rotation.py`, `entities.py`, `abilities.py`, `events.py`, `rotation_builder.py`) - [DONE]
+- Implemented optional off-GCD ability pre-cast timing (`lead_time` / `pre_cast_offset`) in `OptionalAbilityStep` and `Rotation`.
+- Added `Player.get_next_action_time(current_time)` in `entities.py` and `Rotation.get_next_lead_time()` in `rotation.py`, allowing the engine to schedule `PlayerReady` at `max(sim.current_time, player.next_gcd - lead_time)` during active GCD windows.
+- Fixed `Ability.apply_cooldown_locks` in `abilities.py` so off-GCD abilities (`triggers_gcd == False`) do not overwrite or reset an active GCD (`caster.next_gcd = max(getattr(caster, 'next_gcd', 0.0), round(sim.current_time, 4))`).
+- Updated `OptionalAbilityStep.evaluate` so that early evaluation (before `next_gcd`) resolves and advances if ready to cast, but defers and retries at `next_gcd` if on cooldown or if condition rules fail, preserving rotational non-blocking semantics without skipping abilities prematurely.
+- Updated `data/rotation_builder.py` normalizer and CLI prompt to preserve and configure `lead_time`.
+- Added regression test suite `tests/test_optional_lead_time.py` verifying pre-cast timing, GCD preservation, and cooldown retry behavior.
+
 ### 38. DotTick Expiration on_pre_remove Lifecycle Execution (src/swtorsim/events.py) - [DONE]
 - Fixed DotTick.resolve in src/swtorsim/events.py omitting lueprint.execute_triggered_branches('on_pre_remove', ...) when a ticking effect reaches expiration (	icks_remaining <= 0).
 - This caused sub-effects with tick intervals (such as Ferocity_2 with 0.3s duration and 0.3s tick interval) to expire silently without firing their on_pre_remove action (modify_stack_charge -1 on 	ag.abl.sith_warrior.ferocity). As a result, Massacre, Gore, Smash, and Sweeping Slash were failing to decrement Ferocity stacks, allowing subsequent attacks during the 10-second buff window to retain 100% armor penetration and inflating damage output by ~2,100 DPS.

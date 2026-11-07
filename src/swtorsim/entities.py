@@ -368,6 +368,16 @@ class Player(Entity):
         if stealth_keys:
             self.cleanup_expired_effects(stealth_keys)
 
+    def get_next_action_time(self, current_time: float) -> float:
+        """Calculates the timestamp for the next rotation evaluation, honoring lead_time on upcoming optional off-GCD steps."""
+        base_time = max(current_time, getattr(self, "next_gcd", current_time))
+        rotation = getattr(self, "rotation", None)
+        if rotation is not None and hasattr(rotation, "get_next_lead_time"):
+            lead = rotation.get_next_lead_time(self, current_time)
+            if lead > 0.0:
+                return round(max(current_time, getattr(self, "next_gcd", current_time) - lead), 4)
+        return round(base_time, 4)
+
     def calculate_gcd(self, base_gcd: float = 1.5, ability: Any = None) -> float:
         """Calculates GCD duration scaled by Alacrity, rounded up to the nearest tenth of a second as ingame"""
         if base_gcd <= 0.0:

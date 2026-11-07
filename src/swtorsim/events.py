@@ -197,10 +197,18 @@ class PlayerReady(Event):
             return
         acted = self.player.rotation.evaluate(self.player, self.target, sim)
         if acted:
-            target_time = max(sim.current_time, self.player.next_gcd) #to prevent any accidental past scheduling
+            target_time = (
+                self.player.get_next_action_time(sim.current_time)
+                if hasattr(self.player, "get_next_action_time")
+                else max(sim.current_time, self.player.next_gcd)
+            )
             sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
         else:
-            sim.schedule_relative(0.1, PlayerReady(self.player, self.target))
+            if sim.current_time < self.player.next_gcd:
+                target_time = max(sim.current_time, self.player.next_gcd)
+                sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
+            else:
+                sim.schedule_relative(0.1, PlayerReady(self.player, self.target))
 
 class EffectExpire(Event):
     """Handles the expiration of player buffs."""
@@ -397,7 +405,11 @@ class ChannelTickEvent(Event):
                 self.source.is_channeling = False
             from src.swtorsim.abilities import cleanup_channel_effects
             cleanup_channel_effects(self.channel, sim)
-            target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
+            target_time = (
+                self.source.get_next_action_time(sim.current_time)
+                if hasattr(self.source, "get_next_action_time")
+                else max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
+            )
             sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
             return
 
@@ -437,7 +449,11 @@ class ChannelTickEvent(Event):
                 )
             from src.swtorsim.abilities import cleanup_channel_effects
             cleanup_channel_effects(self.channel, sim)
-            target_time = max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
+            target_time = (
+                self.source.get_next_action_time(sim.current_time)
+                if hasattr(self.source, "get_next_action_time")
+                else max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
+            )
             sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
 
 class CastFinishEvent(Event):
@@ -478,7 +494,11 @@ class CastFinishEvent(Event):
                 },
             )
 
-        target_time = max(sim.current_time, getattr(self.caster, "next_gcd", sim.current_time))
+        target_time = (
+            self.caster.get_next_action_time(sim.current_time)
+            if hasattr(self.caster, "get_next_action_time")
+            else max(sim.current_time, getattr(self.caster, "next_gcd", sim.current_time))
+        )
         sim.schedule_absolute(target_time, PlayerReady(self.caster, getattr(self.caster, "current_target", self.target)))
 
 class ResourceTick(Event):

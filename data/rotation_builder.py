@@ -724,19 +724,21 @@ def normalize_rotation_steps(raw_steps: list[Any]) -> tuple[list[dict[str, Any]]
             )
         elif step_type == "optional":
             rules = dict(step.get("rules") or {})
+            lead_time = float(step.get("lead_time") or step.get("pre_cast_offset") or 0.0)
             for k, v in step.items():
-                if k not in ("type", "ability_id", "rules") and k in KNOWN_RULE_KEYS:
+                if k not in ("type", "ability_id", "rules", "lead_time", "pre_cast_offset") and k in KNOWN_RULE_KEYS:
                     rules[k] = v
                     warnings.append(
                         f"Step #{idx + 1} (Optional '{step.get('ability_id')}'): moved misplaced rule '{k}' into 'rules'."
                     )
-            normalized.append(
-                {
-                    "type": "optional",
-                    "ability_id": str(step.get("ability_id") or ""),
-                    "rules": rules,
-                }
-            )
+            norm_step = {
+                "type": "optional",
+                "ability_id": str(step.get("ability_id") or ""),
+                "rules": rules,
+            }
+            if lead_time > 0.0:
+                norm_step["lead_time"] = lead_time
+            normalized.append(norm_step)
         elif step_type == "priority_block":
             block_name = str(step.get("name") or f"Priority Block {idx + 1}")
             raw_pool = step.get("pool") or []
@@ -1365,7 +1367,10 @@ def cli_main():
             ability_id = pick_ability(catalog)
             rules = build_rules()
 
+            lead_time = get_input("  Lead time before next GCD in seconds (e.g., 0.2, 0.0 for instant at GCD):", float, 0.0)
             step_dict = {"type": "optional", "ability_id": ability_id, "rules": rules}
+            if lead_time > 0.0:
+                step_dict["lead_time"] = lead_time
             rotation.append(step_dict)
             print(f"[OK] Optional step '{ability_id}' added.")
 
