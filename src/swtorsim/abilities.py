@@ -537,7 +537,7 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
     elif action_type == "call_effect":
         if ability and "effect" in action:
             to_act = str(action.get("to_actor", "")).lower()
-            call_target = caster if to_act in ("caster", "actor_1", "self", "1") else target
+            call_target = caster if to_act in ("caster", "self", "2") else target
             ability.execute_effect(action["effect"], caster, call_target, sim, context=context)
     elif action_type in NOOP_ACTION_TYPES:
         pass

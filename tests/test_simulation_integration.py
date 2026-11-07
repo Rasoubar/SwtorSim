@@ -459,5 +459,23 @@ class SimulationIntegrationTests(unittest.TestCase):
             self.assertAlmostEqual(energy_mods_live[0].value, 0.05, places=5)
 
 
+    def test_10_call_effect_actor_1_routes_to_target(self):
+        """Verifies call_effect with to_actor='actor_1' routes to the target, not the caster."""
+        action = {
+            "action_type": "call_effect",
+            "effect": 2,
+            "from_actor": "caster",
+            "to_actor": "actor_1",
+        }
+        called_targets = []
+
+        class MockAbility:
+            def execute_effect(self, eff_id, c, t, sim, context=None):
+                called_targets.append(t)
+
+        execute_single_action(self.sim, self.player, self.target, action, "test_action", ability=MockAbility())
+        self.assertEqual(called_targets, [self.target], "to_actor='actor_1' must route to target, not caster")
+
+
 if __name__ == "__main__":
     unittest.main()

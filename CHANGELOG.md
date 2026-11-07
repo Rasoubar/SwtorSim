@@ -2,6 +2,13 @@
 
 ## Completed Fixes
 
+### 46. GOM Actor 1 Target Routing Repair in call_effect (abilities.py, test_simulation_integration.py) - [DONE]
+- Repaired actor routing in `execute_single_action` for `call_effect` (`src/swtorsim/abilities.py`):
+  - Fixed an issue where GOM actor enum `"actor_1"` / `"1"` was erroneously mapped to `"caster"`, causing 307 offensive debuffs and target-directed effect branches (such as *Enraged Slash*'s *Beat Down (Physical)* 5% melee vulnerability debuff, *Leg Shot*, *Cover Pulse*, and *Shatter Shot*) to override the branch's resolved enemy target and apply to the player instead.
+  - Updated line 540 to restrict caster override strictly to authoritative caster identifiers (`"caster"`, `"self"`, `"2"`), properly preserving the target entity already resolved by `Branch.target_overrides` (`actual_target`).
+- Added unit test `test_10_call_effect_actor_1_routes_to_target` in `tests/test_simulation_integration.py` validating that `to_actor="actor_1"` routes effects strictly to the target and not the caster.
+- Verified in Carnage Marauder combat simulation that *Beat Down (Physical)* is applied exclusively to the target dummy and never to the player. All 27 regression tests passing.
+
 ### 45. Rotation Stall & Deadlock Telemetry with RNG Seed Tracking (events.py, metrics.py, engine.py, setup.py, tester.py, web_gui.py, test_rotation_stall.py) - [DONE]
 - Implemented rotation stall detection in `PlayerReady.resolve` (`src/swtorsim/events.py`):
   - Differentiates early off-GCD lead-time polling (`sim.current_time < player.next_gcd`) from true rotation stalls (`sim.current_time >= player.next_gcd` with `acted is False`).
