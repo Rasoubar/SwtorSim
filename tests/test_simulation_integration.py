@@ -492,6 +492,48 @@ class SimulationIntegrationTests(unittest.TestCase):
         self.assertIn("FATAL: UNPREDICTED DAMAGE MODIFIER", str(ctx.exception))
         self.assertIn("STAT_unmapped_mystery_stat", str(ctx.exception))
 
+    def test_12_agitating_energies_refreshes_dot_and_triggers_damage(self):
+        """Verifies Agitating Energies tactical refreshes Corrosive Dart duration and ticks extra damage on Followthrough."""
+        from src.swtorsim.config_load import load_complete_loadout
+        from src.swtorsim.effects import ActiveEffect
+
+        loadout = load_complete_loadout([
+            "abl.agent.corrosive_dart",
+            "abl.agent.skill.marksmanship.followthrough",
+            "abl.itm.tactical.sow.age_smu.sni_gun.mark_sharp.dmg_sust_01",
+        ])
+        stats_config = {"class_name": "sniper", "level": 80, "stats": {}}
+        sim, player, target = prepare_simulation([], stats_config, loadout, 1000000, {}, verbose=False)
+        player.stats["Ranged Accuracy"] = 1.10
+        player.stats["Main Accuracy"] = 1.10
+        player.stats["Tech Accuracy"] = 1.10
+        player.stats["Ranged Damage Min"] = 2000
+        player.stats["Ranged Damage Max"] = 2000
+        player.stats["Bonus Damage (Ranged)"] = 3000
+        player.stats["Bonus Damage (Tech)"] = 3000
+
+        cd = player.ability_db["abl.agent.corrosive_dart"]
+        ft = player.ability_db["abl.agent.skill.marksmanship.followthrough"]
+
+        cd.cast(player, target, sim)
+        sim.run_timed(duration=5.0, target=target)
+
+        cd_eff = target.effects.get("Corrosive Dart") or list(target.effects.values())[0]
+        self.assertEqual(cd_eff.expires_at, 18.0)
+        hits_before = sim.tracker.breakdown["Corrosive Dart"]["hit_count"]
+
+        # Followthrough requires tag.abl.agent.follow_through proc
+        player.effects["follow_through_proc"] = ActiveEffect(
+            fqn="mock", name="mock", number=1, tags=frozenset(["tag.abl.agent.follow_through"])
+        )
+        ft.cast(player, target, sim)
+        sim.run_timed(duration=6.0, target=target)
+
+        # Duration should be refreshed to 5.0 + 18.0 = 23.0s
+        self.assertEqual(cd_eff.expires_at, 23.0)
+        hits_after = sim.tracker.breakdown["Corrosive Dart"]["hit_count"]
+        self.assertGreater(hits_after, hits_before, "Followthrough must trigger an extra tick of Corrosive Dart")
+
 
 if __name__ == "__main__":
     unittest.main()

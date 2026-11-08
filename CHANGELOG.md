@@ -4,6 +4,14 @@
 
 ## Completed Fixes
 
+### 53. Agitating Energies Tactical Parity & In-Place Effect Expiration Fix (events.py, test_simulation_integration.py) - [DONE]
+- Located and audited the Agitating Energies tactical across GOM blueprints and engine dispatch:
+  - Mapped public item name 'Agitating Energies' to internal GOM ability FQN 'abl.itm.tactical.sow.age_smu.sni_gun.mark_sharp.dmg_sust_01' (parsed blueprint named 'Corrosive Followthrough').
+  - Fixed premature DoT expiration in 'EffectExpire.resolve' by guarding against stale expiration events when 'sim.current_time < active_effect.expires_at - 1e-6'.
+  - Fixed DoT tick termination in 'DotTick.resolve' when 'ticks_remaining <= 0' by recomputing remaining ticks when 'expires_at' was extended in the future by a timer reset.
+  - Verified dual-class mechanic parity: passive +20% damage done (Stat 79) to Corrosive Dart and Vital Shot, and reactive timer reset + extra tick damage on dummy on Followthrough/Penetrating Blasts (Sniper) and Trickshot/Penetrating Rounds (Gunslinger).
+  - Added regression test 'test_12_agitating_energies_refreshes_dot_and_triggers_damage' to 'tests/test_simulation_integration.py'.
+
 ### 52. Proportional Channel Tick Interval Scaling & Followthrough Proc Fix (abilities.py) - [DONE]
 - Fixed an issue where channeled abilities with reduced duration (such as Penetrating Blasts under Sniper Volley's 10% channeling reduction) truncated total ticks from 5 to 4 due to banker's rounding (
 ound(1.8 / 0.4) == 4).

@@ -260,6 +260,10 @@ class EffectExpire(Event):
         if active_buff is not self.instance_ref:
             return
 
+        if getattr(self.instance_ref, "expires_at", None) is not None:
+            if sim.current_time < self.instance_ref.expires_at - 1e-6:
+                return
+
         blueprint = getattr(self.instance_ref, "effect_blueprint", None)
         ability = getattr(self.instance_ref, "ability_ref", None)
         caster = getattr(self.instance_ref, "caster_ref", self.entity)
@@ -334,6 +338,16 @@ class DotTick(Event):
             )
             self.instance_ref.ticks_remaining -= 1
             if self.instance_ref.ticks_remaining > 0 and self.instance_ref.tick_interval:
+                next_tick_time = sim.current_time + self.instance_ref.tick_interval
+                sim.schedule_absolute(next_tick_time, self)
+            elif (
+                getattr(self.instance_ref, "expires_at", None) is not None
+                and sim.current_time < self.instance_ref.expires_at - 1e-6
+                and self.instance_ref.tick_interval
+                and self.instance_ref.tick_interval > 0
+            ):
+                rem_time = self.instance_ref.expires_at - sim.current_time
+                self.instance_ref.ticks_remaining = max(1, int(round(rem_time / self.instance_ref.tick_interval)))
                 next_tick_time = sim.current_time + self.instance_ref.tick_interval
                 sim.schedule_absolute(next_tick_time, self)
             else:
