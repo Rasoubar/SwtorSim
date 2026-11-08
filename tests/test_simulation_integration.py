@@ -477,5 +477,21 @@ class SimulationIntegrationTests(unittest.TestCase):
         self.assertEqual(called_targets, [self.target], "to_actor='actor_1' must route to target, not caster")
 
 
+    def test_11_unpredicted_damage_modifier_raises_runtime_error(self):
+        """Verifies that any damage modifier lacking an authoritative bucket raises an immediate RuntimeError."""
+        from src.swtorsim.combat_math import _add_to_bucket
+        test_buckets = {}
+        with self.assertRaises(RuntimeError) as ctx:
+            _add_to_bucket(
+                test_buckets,
+                None,
+                0.15,
+                stat_identifier="STAT_unmapped_mystery_stat",
+                context_desc="Test Mock Buff",
+            )
+        self.assertIn("FATAL: UNPREDICTED DAMAGE MODIFIER", str(ctx.exception))
+        self.assertIn("STAT_unmapped_mystery_stat", str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,4 +1,4 @@
-"""Core SWTOR combat math: base damage, mitigation, multiplicative damage buckets, accuracy, and critical hits."""
+"""Core SWTOR combat math: base damage, mitigation, verified empirical damage buckets, accuracy, and critical hits."""
 
 import random
 from typing import Any, Optional
@@ -46,6 +46,7 @@ def handle_modifiers(caster, target, action_data, damage_type=None):
         'bonus_crit_modifier': 0.0,
         'bonus_armor_pen': 0.0,
         'base_weapon_damage_modifier': 0.0,
+        'dual_wield_damage_modifier': 0.0,
 
         'total_multiplier': 1.0
     }
@@ -66,125 +67,338 @@ def handle_modifiers(caster, target, action_data, damage_type=None):
 
     return modifiers
 
-# Multiplicative Damage Buckets
-BUCKET_NORMAL = "normal_percentage"
-BUCKET_EXECUTE = "sub_30"
-BUCKET_CHANNEL = "channel_scaling"
-BUCKET_DAMAGE_TYPE = "damage_type_scaling"
-BUCKET_TAG = "tag_scaling"
-BUCKET_TARGET_STATE = "target_state"
 
+def _add_to_bucket(buckets: dict, bucket_key: Optional[str], val: float, stat_identifier: str = "", context_desc: str = ""):
+    """Adds a modifier value to its assigned bucket. Raises RuntimeError if unpredicted/unassigned."""
+    if not bucket_key:
+        raise RuntimeError(
+            f"[FATAL: UNPREDICTED DAMAGE MODIFIER] Stat '{stat_identifier}' (value: {val}) "
+            f"encountered in {context_desc} has no verified bucket assignment! "
+            f"Empirically verify its bucketing layer before running simulations."
+        )
+    buckets[bucket_key] = buckets.get(bucket_key, 0.0) + val
+
+
+# Verified Multiplicative Damage Buckets
+BUCKET_1 = "bucket_1"  # Test 1: STAT_cbt_damage_done_modifier_percentage (79), Test 2: Vulnerable (386), Assailable (376), Test 6: Beat Down (384), Test 8: Assailable Elemental (370), Susceptible (388), Test 9: Marked (382), Test 11: Caster Channel Dealt Scale Melee (407), Test 13: Caster Type Dealt Scale Energy/Kinetic (395, 397), Test 15: Caster Channel Dealt Scale Force (409)
+BUCKET_2 = "bucket_2"  # Test 3: Target damage received percentage / Overwhelmed AoE vulnerability (46)
+BUCKET_3 = "bucket_3"  # Test 4: Low-health execute (220 Inevitable Demise)
+BUCKET_4 = "bucket_4"  # Test 7: Target state accuracy reduced conditional (389 Torment)
+BUCKET_5 = "bucket_5"  # Test 12 & 14: Target state bleeding (221 Bloodbath / Blood Tracker)
+BUCKET_6 = "bucket_6"  # Test 16: Target state on fire / burning (250 Burning Storm)
+
+# 1. Caster Offensive Damage Dispatch Table: (bucket_key, filter_fn)
+# Governs outgoing damage-done / damage-dealt buffs on the attacker (caster.effects).
+# Strictly ordered by numeric GOM Stat ID.
 _CASTER_DAMAGE_DISPATCH = {
-    # 1. Base / General Damage Done (Additive with base pool & vulnerabilities)
-    "STAT_cbt_damage_done_modifier_percentage": (BUCKET_NORMAL, None),
-    "79": (BUCKET_NORMAL, None),
-    "STAT_cbt_damage_done_modifier_fixed": (BUCKET_NORMAL, None),
-    "78": (BUCKET_NORMAL, None),
-    "386": (BUCKET_NORMAL, None),
-    "384": (BUCKET_NORMAL, None),
-    "370": (BUCKET_NORMAL, None),
-    "376": (BUCKET_NORMAL, None),
-    "46": (BUCKET_NORMAL, None),
+    # Stat 78: STAT_cbt_damage_done_modifier_fixed (Verified no-op in percentage bucketing; Test 17: Pull and Pummel)
+    "78": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: False),
+    "STAT_cbt_damage_done_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: False),
 
-    # 2. Low-Health Execute (sub-30)
-    "STAT_cbt_damage_done_if_target_health_low_modifier_percentage": (
-        BUCKET_EXECUTE,
-        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: getattr(target, "hp_ratio", 1.0) <= 0.30,
-    ),
+    # Stat 79: STAT_cbt_damage_done_modifier_percentage (Base / General Damage Done; Test 1)
+    "79": (BUCKET_1, None),
+    "STAT_cbt_damage_done_modifier_percentage": (BUCKET_1, None),
+
+    # Stat 220: STAT_cbt_damage_done_if_target_health_low_modifier_percentage (Execute sub-30%; Test 4)
     "220": (
-        BUCKET_EXECUTE,
+        BUCKET_3,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: getattr(target, "hp_ratio", 1.0) <= 0.30,
+    ),
+    "STAT_cbt_damage_done_if_target_health_low_modifier_percentage": (
+        BUCKET_3,
         lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: getattr(target, "hp_ratio", 1.0) <= 0.30,
     ),
 
-    # 3. Channel (Attack Type) Damage Dealt
-    "stat_cbt_damage_dealt_scale_channel_melee_modifier_percentage": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
-    "stat_cbt_damage_dealt_scale_channel_melee": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
-    "stat_cbt_damage_dealt_scale_channel_melee_modifier_fixed": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
-    "408": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
-    "407": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+    # Stat 221: STAT_cbt_damage_done_if_target_bleeding_modifier_percentage (Conditional Bleeding; Test 12 & 14)
+    "221": (
+        BUCKET_5,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "bleed"),
+    ),
+    "STAT_cbt_damage_done_if_target_bleeding_modifier_percentage": (
+        BUCKET_5,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "bleed"),
+    ),
 
-    "stat_cbt_damage_dealt_scale_channel_ranged_modifier_percentage": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
-    "stat_cbt_damage_dealt_scale_channel_ranged": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
-    "stat_cbt_damage_dealt_scale_channel_ranged_modifier_fixed": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
-    "406": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
-    "405": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+    # Stat 222: STAT_cbt_damage_done_if_target_stunned_modifier_percentage
+    "222": (
+        None,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "stun") or _entity_has_tag(target, "incapacitate"),
+    ),
+    "STAT_cbt_damage_done_if_target_stunned_modifier_percentage": (
+        None,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "stun") or _entity_has_tag(target, "incapacitate"),
+    ),
 
-    "stat_cbt_damage_dealt_scale_channel_force_modifier_percentage": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
-    "stat_cbt_damage_dealt_scale_channel_force": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
-    "409": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
-    "stat_cbt_force_damage_dealt_modifier": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
-    "stat_cbt_damage_dealt_scale_channel_force_modifier_fixed": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
-    "410": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
-    "451": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    # Stat 250: STAT_cbt_damage_done_if_target_on_fire_modifier_percentage (Conditional Burning/Fire; Test 16)
+    "250": (
+        BUCKET_6,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "burn") or _entity_has_tag(target, "fire"),
+    ),
+    "STAT_cbt_damage_done_if_target_on_fire_modifier_percentage": (
+        BUCKET_6,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "burn") or _entity_has_tag(target, "fire"),
+    ),
 
-    "stat_cbt_damage_dealt_scale_channel_tech_modifier_percentage": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
-    "stat_cbt_damage_dealt_scale_channel_tech": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
-    "411": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
-    "stat_cbt_tech_damage_dealt_modifier": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
-    "stat_cbt_damage_dealt_scale_channel_tech_modifier_fixed": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
-    "412": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
-    "449": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    # Stat 389: STAT_cbt_damage_done_if_target_accuracy_reduced_modifier_percentage (Conditional Accuracy Reduced; Test 7)
+    "389": (
+        BUCKET_4,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "accuracy_reduced"),
+    ),
+    "STAT_cbt_damage_done_if_target_accuracy_reduced_modifier_percentage": (
+        BUCKET_4,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "accuracy_reduced"),
+    ),
 
-    "stat_cbt_damage_dealt_scale_channel_weapon_modifier": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
-    "462": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
-    "stat_cbt_weapon_damage_dealt_modifier": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
-    "450": (BUCKET_CHANNEL, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+    # Stat 393: stat_cbt_damage_dealt_scale_type_elemental_modifier_percentage
+    "393": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
+    "stat_cbt_damage_dealt_scale_type_elemental_modifier_percentage": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
 
-    # 4. Damage Type Specific Dealt Modifiers
-    "stat_cbt_damage_dealt_scale_type_kinetic_modifier_percentage": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
-    "397": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
-    "stat_cbt_damage_dealt_scale_type_energy_modifier_percentage": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
-    "395": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
-    "stat_cbt_damage_dealt_scale_type_elemental_modifier_percentage": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
-    "393": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
-    "stat_cbt_damage_dealt_scale_type_internal_modifier_percentage": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
-    "399": (BUCKET_DAMAGE_TYPE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
+    # Stat 395: stat_cbt_damage_dealt_scale_type_energy_modifier_percentage (Energy Type Dealt; Test 13)
+    "395": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
+    "stat_cbt_damage_dealt_scale_type_energy_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
 
-    # 5. Tag-Specific Dealt Modifiers (AoE, DoT)
-    "stat_cbt_damage_dealt_scale_tag_aoe_modifier": (BUCKET_TAG, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
-    "464": (BUCKET_TAG, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
-    "stat_cbt_aoe_damage_dealt_modifier": (BUCKET_TAG, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
-    "454": (BUCKET_TAG, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
-    "stat_cbt_damage_dealt_scale_tag_dot_modifier": (BUCKET_TAG, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
-    "466": (BUCKET_TAG, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
+    # Stat 397: stat_cbt_damage_dealt_scale_type_kinetic_modifier_percentage (Kinetic Type Dealt; Test 13)
+    "397": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
+    "stat_cbt_damage_dealt_scale_type_kinetic_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
 
-    # 6. Target-State Conditional Damage Modifiers
-    "STAT_cbt_damage_done_if_target_bleeding_modifier_percentage": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "bleed")),
-    "221": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "bleed")),
-    "STAT_cbt_damage_done_if_target_on_fire_modifier_percentage": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "burn") or _entity_has_tag(target, "fire")),
-    "250": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "burn") or _entity_has_tag(target, "fire")),
-    "STAT_cbt_damage_done_if_target_accuracy_reduced_modifier_percentage": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "accuracy_reduced")),
-    "389": (BUCKET_TARGET_STATE, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "accuracy_reduced")),
+    # Stat 399: stat_cbt_damage_dealt_scale_type_internal_modifier_percentage
+    "399": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
+    "stat_cbt_damage_dealt_scale_type_internal_modifier_percentage": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
+
+    # Stat 405: stat_cbt_damage_dealt_scale_channel_ranged_modifier_percentage
+    "405": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+    "stat_cbt_damage_dealt_scale_channel_ranged_modifier_percentage": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+    "stat_cbt_damage_dealt_scale_channel_ranged": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+
+    # Stat 406: stat_cbt_damage_dealt_scale_channel_ranged_modifier_fixed
+    "406": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+    "stat_cbt_damage_dealt_scale_channel_ranged_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+
+    # Stat 407: stat_cbt_damage_dealt_scale_channel_melee_modifier_percentage (Melee Channel Dealt; Test 11)
+    "407": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+    "stat_cbt_damage_dealt_scale_channel_melee_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+    "stat_cbt_damage_dealt_scale_channel_melee": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+
+    # Stat 408: stat_cbt_damage_dealt_scale_channel_melee_modifier_fixed
+    "408": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+    "stat_cbt_damage_dealt_scale_channel_melee_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+
+    # Stat 409: stat_cbt_damage_dealt_scale_channel_force_modifier_percentage (Force Channel Dealt; Test 15)
+    "409": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_damage_dealt_scale_channel_force_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_damage_dealt_scale_channel_force": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+
+    # Stat 410: stat_cbt_damage_dealt_scale_channel_force_modifier_fixed
+    "410": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_damage_dealt_scale_channel_force_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+
+    # Stat 411: stat_cbt_damage_dealt_scale_channel_tech_modifier_percentage
+    "411": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_damage_dealt_scale_channel_tech_modifier_percentage": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_damage_dealt_scale_channel_tech": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+
+    # Stat 412: stat_cbt_damage_dealt_scale_channel_tech_modifier_fixed
+    "412": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_damage_dealt_scale_channel_tech_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+
+    # Stat 449: stat_cbt_tech_damage_dealt_modifier
+    "449": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_tech_damage_dealt_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+
+    # Stat 450: stat_cbt_weapon_damage_dealt_modifier
+    "450": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+    "stat_cbt_weapon_damage_dealt_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+
+    # Stat 451: stat_cbt_force_damage_dealt_modifier
+    "451": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_force_damage_dealt_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+
+    # Stat 454: stat_cbt_aoe_damage_dealt_modifier
+    "454": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+    "stat_cbt_aoe_damage_dealt_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+
+    # Stat 462: stat_cbt_damage_dealt_scale_channel_weapon_modifier
+    "462": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+    "stat_cbt_damage_dealt_scale_channel_weapon_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+
+    # Stat 464: stat_cbt_damage_dealt_scale_tag_aoe_modifier
+    "464": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+    "stat_cbt_damage_dealt_scale_tag_aoe_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+
+    # Stat 466: stat_cbt_damage_dealt_scale_tag_dot_modifier
+    "466": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
+    "stat_cbt_damage_dealt_scale_tag_dot_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
 }
 
+# 2. Target Vulnerability Damage Dispatch Table: (bucket_key, filter_fn)
+# Governs incoming damage-received / damage-taken debuffs on the victim (target.effects).
+# Strictly ordered by numeric GOM Stat ID.
+_TARGET_DAMAGE_DISPATCH = {
+    # Stat 46: STAT_cbt_damage_received_modifier_percentage (Damage Received / Overwhelmed AoE; Test 3)
+    "46": (BUCKET_2, None),
+    "STAT_cbt_damage_received_modifier_percentage": (BUCKET_2, None),
+
+    # Stat 47: STAT_cbt_damage_received_modifier_fixed
+    "47": (None, None),
+    "STAT_cbt_damage_received_modifier_fixed": (None, None),
+
+    # Stat 223: STAT_cbt_damage_received_if_target_stunned_modifier_percentage
+    "223": (
+        None,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "stun") or _entity_has_tag(target, "incapacitate"),
+    ),
+    "STAT_cbt_damage_received_if_target_stunned_modifier_percentage": (
+        None,
+        lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _entity_has_tag(target, "stun") or _entity_has_tag(target, "incapacitate"),
+    ),
+
+    # Stat 369: stat_cbt_damage_taken_scale_type_elemental_modifier_fixed
+    "369": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
+    "stat_cbt_damage_taken_scale_type_elemental_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
+
+    # Stat 370: stat_cbt_damage_taken_scale_type_elemental_modifier_percentage (Assailable Elemental; Test 8)
+    "370": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
+    "stat_cbt_damage_taken_scale_type_elemental_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 3),
+
+    # Stat 371: stat_cbt_damage_taken_scale_type_energy_modifier_fixed
+    "371": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
+    "stat_cbt_damage_taken_scale_type_energy_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
+
+    # Stat 372: stat_cbt_damage_taken_scale_type_energy_modifier_percentage
+    "372": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
+    "stat_cbt_damage_taken_scale_type_energy_modifier_percentage": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 2),
+
+    # Stat 373: stat_cbt_damage_taken_scale_type_kinetic_modifier_fixed
+    "373": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
+    "stat_cbt_damage_taken_scale_type_kinetic_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
+
+    # Stat 374: stat_cbt_damage_taken_scale_type_kinetic_modifier_percentage
+    "374": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
+    "stat_cbt_damage_taken_scale_type_kinetic_modifier_percentage": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 1),
+
+    # Stat 375: stat_cbt_damage_taken_scale_type_internal_modifier_fixed
+    "375": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
+    "stat_cbt_damage_taken_scale_type_internal_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
+
+    # Stat 376: stat_cbt_damage_taken_scale_type_internal_modifier_percentage (Assailable Internal; Test 2)
+    "376": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
+    "stat_cbt_damage_taken_scale_type_internal_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: dmg_type == 4),
+
+    # Stat 381: stat_cbt_damage_taken_scale_channel_ranged_modifier_fixed
+    "381": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+    "stat_cbt_damage_taken_scale_channel_ranged_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+
+    # Stat 382: stat_cbt_damage_taken_scale_channel_ranged_modifier_percentage (Marked Ranged; Test 9)
+    "382": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+    "stat_cbt_damage_taken_scale_channel_ranged_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_r),
+
+    # Stat 383: stat_cbt_damage_taken_scale_channel_melee_modifier_fixed
+    "383": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+    "stat_cbt_damage_taken_scale_channel_melee_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+
+    # Stat 384: stat_cbt_damage_taken_scale_channel_melee_modifier_percentage (Beat Down Melee; Test 6)
+    "384": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+    "stat_cbt_damage_taken_scale_channel_melee_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m),
+
+    # Stat 385: stat_cbt_damage_taken_scale_channel_force_modifier_fixed
+    "385": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_damage_taken_scale_channel_force_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+
+    # Stat 386: stat_cbt_damage_taken_scale_channel_force_modifier_percentage (Vulnerable Force; Test 2)
+    "386": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_damage_taken_scale_channel_force_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+
+    # Stat 387: stat_cbt_damage_taken_scale_channel_tech_modifier_fixed
+    "387": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_damage_taken_scale_channel_tech_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+
+    # Stat 388: stat_cbt_damage_taken_scale_channel_tech_modifier_percentage (Susceptible Tech; Test 8)
+    "388": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_damage_taken_scale_channel_tech_modifier_percentage": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+
+    # Stat 456: stat_cbt_force_damage_taken_modifier
+    "456": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_force_damage_taken_modifier": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+
+    # Stat 457: stat_cbt_dot_amount_taken_modifier
+    "457": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
+    "stat_cbt_dot_amount_taken_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
+
+    # Stat 458: stat_cbt_weapon_damage_taken_modifier
+    "458": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+    "stat_cbt_weapon_damage_taken_modifier": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+
+    # Stat 459: stat_cbt_tech_damage_taken_modifier
+    "459": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_tech_damage_taken_modifier": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+
+    # Stat 460: stat_cbt_aoe_damage_taken_modifier
+    "460": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+    "stat_cbt_aoe_damage_taken_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+
+    # Stat 463: stat_cbt_damage_taken_scale_channel_weapon_modifier
+    "463": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+    "stat_cbt_damage_taken_scale_channel_weapon_modifier": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+
+    # Stat 465: stat_cbt_damage_taken_scale_tag_aoe_modifier
+    "465": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+    "stat_cbt_damage_taken_scale_tag_aoe_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
+
+    # Stat 467: stat_cbt_damage_taken_scale_tag_dot_modifier
+    "467": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
+    "stat_cbt_damage_taken_scale_tag_dot_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in tags)),
+}
+
+# 3. Critical Chance Dispatch Table
+# Strictly ordered by numeric GOM Stat ID.
 _CRIT_CHANCE_DISPATCH = {
-    "STAT_cbt_force_critical_chance": lambda is_m, is_r, is_f, is_t: is_f,
-    "133": lambda is_m, is_r, is_f, is_t: is_f,
-    "STAT_cbt_melee_critical_chance": lambda is_m, is_r, is_f, is_t: is_m,
+    # Stat 116: Melee Critical Chance
     "116": lambda is_m, is_r, is_f, is_t: is_m,
-    "STAT_cbt_ranged_critical_chance": lambda is_m, is_r, is_f, is_t: is_r,
+    "STAT_cbt_melee_critical_chance": lambda is_m, is_r, is_f, is_t: is_m,
+
+    # Stat 122: Ranged Critical Chance
     "122": lambda is_m, is_r, is_f, is_t: is_r,
-    "STAT_cbt_tech_critical_chance": lambda is_m, is_r, is_f, is_t: is_t,
+    "STAT_cbt_ranged_critical_chance": lambda is_m, is_r, is_f, is_t: is_r,
+
+    # Stat 133: Force Critical Chance
+    "133": lambda is_m, is_r, is_f, is_t: is_f,
+    "STAT_cbt_force_critical_chance": lambda is_m, is_r, is_f, is_t: is_f,
+
+    # Stat 135: Tech Critical Chance
     "135": lambda is_m, is_r, is_f, is_t: is_t,
+    "STAT_cbt_tech_critical_chance": lambda is_m, is_r, is_f, is_t: is_t,
+
+    # Generic Critical Chance
     "Critical Chance": lambda is_m, is_r, is_f, is_t: True,
 }
 
+# 4. Critical Damage Dispatch Table
+# Strictly ordered by numeric GOM Stat ID.
 _CRIT_DAMAGE_DISPATCH = {
-    "STAT_cbt_force_critical_damage": lambda is_m, is_r, is_f, is_t: is_f,
-    "134": lambda is_m, is_r, is_f, is_t: is_f,
-    "STAT_cbt_melee_critical_damage": lambda is_m, is_r, is_f, is_t: is_m,
+    # Stat 117: Melee Critical Damage
     "117": lambda is_m, is_r, is_f, is_t: is_m,
-    "STAT_cbt_ranged_critical_damage": lambda is_m, is_r, is_f, is_t: is_r,
+    "STAT_cbt_melee_critical_damage": lambda is_m, is_r, is_f, is_t: is_m,
+
+    # Stat 123: Ranged Critical Damage
     "123": lambda is_m, is_r, is_f, is_t: is_r,
-    "STAT_cbt_tech_critical_damage": lambda is_m, is_r, is_f, is_t: is_t,
+    "STAT_cbt_ranged_critical_damage": lambda is_m, is_r, is_f, is_t: is_r,
+
+    # Stat 134: Force Critical Damage
+    "134": lambda is_m, is_r, is_f, is_t: is_f,
+    "STAT_cbt_force_critical_damage": lambda is_m, is_r, is_f, is_t: is_f,
+
+    # Stat 136: Tech Critical Damage
     "136": lambda is_m, is_r, is_f, is_t: is_t,
+    "STAT_cbt_tech_critical_damage": lambda is_m, is_r, is_f, is_t: is_t,
+
+    # Generic Critical Damage
     "Critical Damage": lambda is_m, is_r, is_f, is_t: True,
 }
 
 _SKIP_BASE_STATS = frozenset({
     "STAT_att_mastery", "414", "4140",
     "STAT_rtg_attack_power", "155", "STAT_att_power",
-    "STAT_rtg_crit", "156",
+    "STAT_rtg_crit", "156", "STAT_rtg_critical_chance",
     "STAT_rtg_alacrity", "Alacrity Rating", "STAT_rtg_spell_haste", "255",
     "STAT_rtg_accuracy", "154", "Accuracy",
     "STAT_cbt_melee_accuracy", "114",
@@ -197,6 +411,7 @@ _SKIP_BASE_STATS = frozenset({
     "STAT_cbt_force_damage_bonus", "129",
     "STAT_cbt_tech_damage_bonus", "130",
     "STAT_cbt_damage_bonus",
+    "STAT_cbt_armor_penetration", "166",
     "STAT_att_endurance",
     "STAT_cbtStealthEffectiveLevel",
 })
@@ -265,7 +480,7 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
             if entry is not None:
                 bucket_key, filter_fn = entry
                 if filter_fn is None or filter_fn(target, is_melee, is_ranged, is_force, is_tech, damage_type, action_tags, caster):
-                    buckets[bucket_key] = buckets.get(bucket_key, 0.0) + val
+                    _add_to_bucket(buckets, bucket_key, val, stat_identifier=stat, context_desc=f"Caster Buff '{buff.name}'")
                 continue
 
             # 2. Critical Chance Modifiers (Table Dispatch)
@@ -292,10 +507,10 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 modifiers['base_weapon_damage_modifier'] = modifiers.get('base_weapon_damage_modifier', 0.0) + val
                 continue
 
-            # 6. Dual Wield Damage Done Modifier (Stat 127) - applies strictly to off-hand weapon attacks
+            # 6. Dual Wield Damage Done Modifier (Stat 127) - modifies off-hand weapon damage scalar (0.30 + val)
             if stat in ("STAT_cbt_dual_wield_damage_done_modifier_percentage", "127"):
                 if hand == "off":
-                    buckets[BUCKET_NORMAL] = buckets.get(BUCKET_NORMAL, 0.0) + val
+                    modifiers['dual_wield_damage_modifier'] = modifiers.get('dual_wield_damage_modifier', 0.0) + val
                 continue
 
 _ATTACK_TYPE_CHANNELS = {
@@ -342,8 +557,6 @@ def _entity_has_tag(entity, tag_substr: str) -> bool:
 
 def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, caster=None):
     """ Alters modifiers dict according to active debuffs on target."""
-    channel = _channel_for_hit(action_tags, attack_type)
-    type_name = _DAMAGE_TYPE_NAMES.get(damage_type)
     aoe = _hit_is_aoe(action_tags)
     is_melee = attack_type in (1, "melee", "Melee")
     is_ranged = attack_type in (2, "ranged", "Ranged")
@@ -364,7 +577,7 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
             val = float(mod.value)
 
             # Skip target armor debuffs (handled by Dummy/entity armor recalculation)
-            if stat == "STAT_rtg_armor":
+            if stat in ("STAT_rtg_armor", "48"):
                 continue
 
             # Conditional tag check
@@ -397,109 +610,29 @@ def handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_
                 if not has_tag:
                     continue
 
-            stat_lower = stat.lower()
-
-            # 1. Channel vulnerabilities (Melee, Ranged, Force, Tech, Weapon)
-            matched = False
-            if is_force and stat in (
-                "stat_cbt_damage_taken_scale_channel_force_modifier_percentage", "386",
-                "stat_cbt_force_damage_taken_modifier", "456",
+            # Check ability FQN / tags matching (including AoE tag equivalence for Overwhelmed)
+            if not (
+                not mod.targets
+                or mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags)
+                or (aoe and any(str(tt).endswith("is_aoe") for tt in mod.targets))
             ):
-                matched = True
-            elif is_tech and stat in (
-                "stat_cbt_damage_taken_scale_channel_tech_modifier_percentage", "388",
-                "stat_cbt_tech_damage_taken_modifier", "459",
-            ):
-                matched = True
-            elif is_melee and stat in (
-                "stat_cbt_damage_taken_scale_channel_melee_modifier_percentage", "384",
-                "stat_cbt_damage_taken_scale_channel_weapon_modifier", "463",
-                "stat_cbt_weapon_damage_taken_modifier", "458",
-            ):
-                matched = True
-            elif is_ranged and stat in (
-                "stat_cbt_damage_taken_scale_channel_ranged_modifier_percentage", "382",
-                "stat_cbt_damage_taken_scale_channel_weapon_modifier", "463",
-                "stat_cbt_weapon_damage_taken_modifier", "458",
-            ):
-                matched = True
-
-            if matched:
-                buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
                 continue
 
-            # 2. Damage type vulnerabilities (Kinetic, Energy, Elemental, Internal)
-            if "damage_taken_scale_type_" in stat_lower or stat in (
-                "369", "370", "371", "372", "373", "374", "375", "376"
-            ):
-                matched = False
-                if type_name and f"type_{type_name}_" in stat_lower:
-                    matched = True
-                elif damage_type == 1 and (
-                    stat in ("stat_cbt_damage_taken_scale_type_kinetic_modifier_percentage", "374")
-                    or "type_kinetic_" in stat_lower
-                ):
-                    matched = True
-                elif damage_type == 2 and (
-                    stat in ("stat_cbt_damage_taken_scale_type_energy_modifier_percentage", "372")
-                    or "type_energy_" in stat_lower
-                ):
-                    matched = True
-                elif damage_type == 3 and (
-                    stat in ("stat_cbt_damage_taken_scale_type_elemental_modifier_percentage", "370")
-                    or "type_elemental_" in stat_lower
-                ):
-                    matched = True
-                elif damage_type == 4 and (
-                    stat in ("stat_cbt_damage_taken_scale_type_internal_modifier_percentage", "376")
-                    or "type_internal_" in stat_lower
-                ):
-                    matched = True
-
-                if matched:
-                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
+            # 1. Target Damage Vulnerability Buckets (Table Dispatch)
+            entry = _TARGET_DAMAGE_DISPATCH.get(stat)
+            if entry is not None:
+                bucket_key, filter_fn = entry
+                if filter_fn is None or filter_fn(target, is_melee, is_ranged, is_force, is_tech, damage_type, action_tags, caster):
+                    _add_to_bucket(buckets, bucket_key, val, stat_identifier=stat, context_desc=f"Target Debuff '{debuff.name}'")
                 continue
 
-            # 3. Tag-specific vulnerabilities (AoE, DoT)
-            if stat in ("stat_cbt_damage_taken_scale_tag_aoe_modifier", "465", "stat_cbt_aoe_damage_taken_modifier", "460") or "tag_aoe_" in stat_lower:
-                if aoe:
-                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
-                continue
-
-            if stat in ("stat_cbt_damage_taken_scale_tag_dot_modifier", "467") or "tag_dot_" in stat_lower:
-                if any("dot" in str(t).lower() or "periodic" in str(t).lower() for t in action_tags):
-                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
-                continue
-
-            # 4. General damage received percentage
-            if stat in ("STAT_cbt_damage_received_modifier_percentage", "46"):
-                if not mod.targets or mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags) or (aoe and any(str(tt).endswith("is_aoe") for tt in mod.targets)):
-                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
-                continue
-
-            elif stat in ("STAT_cbt_damage_received_if_target_stunned_modifier_percentage", "223"):
-                if _entity_has_tag(target, "stun") or _entity_has_tag(target, "incapacitate"):
-                    buckets["normal_percentage"] = buckets.get("normal_percentage", 0.0) + val
-                continue
-
-            # 5. Critical Chance on Target
-            if not mod.applies_to(ability_fqn=ability_fqn, ability_tags=action_tags):
-                continue
-
-            if stat in ("STAT_cbt_force_critical_chance", "133"):
-                if is_force:
+            # 2. Target Critical Chance Modifiers (Table Dispatch)
+            crit_fn = _CRIT_CHANCE_DISPATCH.get(stat)
+            if crit_fn is not None:
+                if crit_fn(is_melee, is_ranged, is_force, is_tech):
                     modifiers['bonus_crit_chance'] += val
-            elif stat in ("STAT_cbt_melee_critical_chance", "116"):
-                if is_melee:
-                    modifiers['bonus_crit_chance'] += val
-            elif stat in ("STAT_cbt_ranged_critical_chance", "122"):
-                if is_ranged:
-                    modifiers['bonus_crit_chance'] += val
-            elif stat in ("STAT_cbt_tech_critical_chance", "135"):
-                if is_tech:
-                    modifiers['bonus_crit_chance'] += val
-            elif stat == "Critical Chance":
-                modifiers['bonus_crit_chance'] += val
+                continue
+
 
 def damage_taken_multiplier(target, tags, attack_type, damage_type) -> float:
     """Legacy helper for target vulnerability scaling (now handled in handle_target_debuffs)."""
@@ -574,8 +707,21 @@ def calculate_base_damage(caster, action_data, attack_type, modifiers=None):
         weapon_multiplier = max(0.0, 1.0 + weapon_mod)
 
         if action_data.get("hand") == "off":
-            weapon_min = caster.stats.get("Off_hand_min", 0.0) * 0.3 * weapon_multiplier
-            weapon_max = caster.stats.get("Off_hand_max", 0.0) * 0.3 * weapon_multiplier
+            dual_wield_mod = 0.0
+            if modifiers is not None and "dual_wield_damage_modifier" in modifiers:
+                dual_wield_mod = modifiers["dual_wield_damage_modifier"]
+            elif caster is not None and hasattr(caster, "effects"):
+                for eff in caster.effects.values():
+                    if getattr(eff, "is_expired", False):
+                        continue
+                    getter = getattr(eff, "get_effective_modifiers", None)
+                    eff_mods = getter() if getter is not None else getattr(eff, "modifiers", [])
+                    for mod in eff_mods:
+                        if str(mod.stat) in ("STAT_cbt_dual_wield_damage_done_modifier_percentage", "127"):
+                            dual_wield_mod += float(mod.value)
+            offhand_ratio = 0.30 + dual_wield_mod
+            weapon_min = caster.stats.get("Off_hand_min", 0.0) * offhand_ratio * weapon_multiplier
+            weapon_max = caster.stats.get("Off_hand_max", 0.0) * offhand_ratio * weapon_multiplier
         else:
             weapon_min = caster.stats.get("Main_hand_min", 0.0) * weapon_multiplier
             weapon_max = caster.stats.get("Main_hand_max", 0.0) * weapon_multiplier
@@ -627,41 +773,30 @@ def accuracy_roll(
       - STAT_cbt_tech_accuracy (233)
       - STAT_cbtAccuracy (11)
       - STAT_cbt_dual_wield_accuracy_modifier_fixed (126)
-    And channel-specific defense stats on target:
-      - STAT_cbt_melee_defense (115)
-      - STAT_cbt_ranged_defense (121)
-      - STAT_cbt_force_defense (234)
-      - STAT_cbt_tech_defense (235)
     """
     is_melee = attack_type in (1, "melee", "Melee")
     is_ranged = attack_type in (2, "ranged", "Ranged")
     is_force = attack_type in (3, "force", "Force")
     is_tech = attack_type in (4, "tech", "Tech")
 
-    stats = getattr(source, "stats", {}) or {}
-    main_acc = stats.get("Main Accuracy") or stats.get("Accuracy") or 1.0
-    if is_melee:
-        base_acc = stats.get("Melee Accuracy") or main_acc
-    elif is_ranged:
-        base_acc = stats.get("Ranged Accuracy") or main_acc
+    if hand == "off":
+        base_acc = source.stats.get("Off Accuracy", 0.67)
     elif is_force:
-        base_acc = stats.get("Force Accuracy") or main_acc
+        base_acc = source.stats.get("Force Accuracy", source.stats.get("Main Accuracy", 1.0))
     elif is_tech:
-        base_acc = stats.get("Tech Accuracy") or main_acc
+        base_acc = source.stats.get("Tech Accuracy", source.stats.get("Main Accuracy", 1.0))
+    elif is_ranged:
+        base_acc = source.stats.get("Ranged Accuracy", source.stats.get("Main Accuracy", 1.0))
     else:
-        base_acc = main_acc
+        base_acc = source.stats.get("Melee Accuracy", source.stats.get("Main Accuracy", 1.0))
 
-    if hand == "off" and (is_melee or is_ranged):
-        main_acc = stats.get("Main Accuracy", 1.0)
-        off_acc = stats.get("Off Accuracy", 0.67)
-        base_acc -= max(0.0, main_acc - off_acc)
-
-    # Base target defense / resistance
-    target_stats = getattr(target, "stats", {}) or {} if target else {}
-    if is_force or is_tech:
-        def_chance = float(target_stats.get("Resistance", 0.0))
+    if target is not None and hasattr(target, "stats"):
+        if is_force or is_tech:
+            def_chance = target.stats.get("Resistance", target.stats.get("Defense Chance", 0.10))
+        else:
+            def_chance = target.stats.get("Defense Chance", 0.10)
     else:
-        def_chance = float(target_stats.get("Defense", 0.10))
+        def_chance = 0.10
 
     bonus_accuracy = 0.0
     effects = getattr(source, "effects", None)
@@ -675,8 +810,7 @@ def accuracy_roll(
                 stat = str(mod.stat)
                 val = float(mod.value)
 
-                # Skip untargeted general accuracy rating (already processed in recalculate_stats)
-                if not mod.targets and stat in ("STAT_rtg_accuracy", "154", "Accuracy"):
+                if not mod.targets and stat in _SKIP_BASE_STATS:
                     continue
 
                 cond_tag = getattr(mod, "conditional_tag", None)
