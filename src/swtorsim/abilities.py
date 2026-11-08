@@ -1493,8 +1493,11 @@ class Ability:
         if hasattr(caster, "calculate_effect_tick"):
             base_interval = caster.calculate_effect_tick(base_interval, ability=self)
 
-        scaled_interval = caster.scale_time_modifier(base_interval) if not ignore_alacrity else base_interval
-        total_ticks = max(1, int(round(scaled_duration / scaled_interval)))
+        base_ticks = max(1, int(round(channel_duration / base_interval))) if channel_duration >= base_interval else 1
+        scaled_interval = (scaled_duration / base_ticks) if (base_ticks > 0 and channel_duration > 0.0) else (
+            caster.scale_time_modifier(base_interval) if not ignore_alacrity else base_interval
+        )
+        total_ticks = base_ticks
 
         channel = ActiveChannel(
             name=self.name,

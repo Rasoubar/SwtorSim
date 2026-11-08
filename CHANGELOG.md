@@ -4,6 +4,35 @@
 
 ## Completed Fixes
 
+### 52. Proportional Channel Tick Interval Scaling & Followthrough Proc Fix (abilities.py) - [DONE]
+- Fixed an issue where channeled abilities with reduced duration (such as Penetrating Blasts under Sniper Volley's 10% channeling reduction) truncated total ticks from 5 to 4 due to banker's rounding (
+ound(1.8 / 0.4) == 4).
+- In Ability._start_channel, preserved 	otal_ticks based on channel_duration / base_interval and scaled scaled_interval = scaled_duration / base_ticks proportionally across duration compression.
+- Ensures tick 5 of Penetrating Blasts always executes, successfully applying 	ag.abl.agent.reset_followthrough and granting 	ag.abl.agent.follow_through to prevent rotation stalls on Followthrough.
+
+### 51. Multi-Bucket Hypothesis Completeness Audit for Target-State Conditionals (modifier_bucketing_log.md, modifier_bucketing_master_checklist.md) - [DONE]
+- Audited all empirical tests in docs/modifier_bucketing_log.md to verify whether tests with multiple active buckets explicitly formulated and documented all combinatorial hypotheses:
+  - Identified Tests 7, 12, and 16 (where an AoE ability was tested against a target with both BUCKET_1 baseline buffs and BUCKET_2 Overwhelmed AoE debuff active simultaneously).
+  - Previously, all three test tables omitted Option B (Additive pooling in BUCKET_2 with Overwhelmed), presenting only Option A (Additive in BUCKET_1) vs Option B (Independent Bucket).
+- Updated Test 7 (Darkness Assassin Torment, Stat 389 on Lacerate):
+  - Formulated Option B (Additive in BUCKET_2 with Overwhelmed, 1.56250x, non-crit ceiling 9,047).
+  - Documented that observed hits of 9,151, 9,145, and 9,073 breach the BUCKET_2 ceiling by up to +104 points, mathematically disproving BUCKET_2.
+- Updated Test 12 (Vengeance Juggernaut Bloodbath, Stat 221 on Sweeping Slash):
+  - Formulated Option B (Additive in BUCKET_2 with Overwhelmed, 1.56600x, non-crit ceiling 10,808, crit ceiling 17,871).
+  - Documented that observed hits of 10,892 non-crit and 18,102 crit breach BUCKET_2 ceilings by +84 and +231 points, mathematically disproving BUCKET_2.
+- Updated Test 16 (Vigilance Guardian Burning Storm, Stat 250 on Cyclone Slash):
+  - Formulated Option B (Additive in BUCKET_2 with Overwhelmed, 1.56600x, non-crit ceiling 10,808).
+  - Documented that observed hits of 10,784 and 10,908 breach BUCKET_2 ceiling by +100 points, mathematically disproving BUCKET_2.
+- Re-exported docs/modifier_bucketing_master_checklist.pdf and HTML documentation.
+- All 50 regression tests passing 100% via pyclean.exe.
+
+### 50. Modifier Bucketing Master Checklist Status Resolution (generate_master_bucketing_checklist.py, modifier_bucketing_master_checklist.md) - [DONE]
+- Preserved the full detailed format and class ability profiles of docs/modifier_bucketing_master_checklist.md and 	ools/generate_master_bucketing_checklist.py.
+- Standardized all 10 theoretical GOM enum constants (222, 372, 374, 465, 467, 393, 399, 454, 464, 466) to [-] Unused in Blueprints with explicit notes indicating 0 occurrences across audited player abilities and passives (bl.*, 	al.*).
+- Replaced all remaining pending entries with verified mechanic designations (223 as Defensive Stun DR, 405/411 as Target Output Debuffs, 413 as Base Weapon Dice Multiplier).
+- Replaced technical jargon ('orthogonal') with clear non-overlapping ability tag descriptions and simplified the practical takeaway for conditional cross-bucket exclusivity.
+- Verified 100% test pass rate across all 50 regression tests via pyclean.exe.
+
 ### 49. Cross-Bucket Coexistence & Mutual Exclusivity Audit for Conditional Layers (Buckets 3-6) (modifier_bucketing_master_checklist.md, modifier_bucketing_log.md) - [DONE]
 - Audited all live extracted ability and talent blueprints across all 24 SWTOR combat disciplines to investigate whether stat IDs in Buckets 3 through 6 ever coexist within the same specialization or can affect the same damage event:
   - `BUCKET_3` (Execute < 30% HP / `220`): exclusive to DPS specs.
