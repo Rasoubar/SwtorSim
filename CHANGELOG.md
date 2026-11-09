@@ -4,7 +4,10 @@
 
 ## Completed Fixes
 
-### 59. WebUI Simulation Payload Inline Choices & Path Normalization (web_gui.py, run_config.py, config_load.py, simulator_ui.html) - [DONE]
+### 59. WebUI Simulation Payload Inline Choices & Preset Simulate Button State (web_gui.py, run_config.py, config_load.py, simulator_ui.html) - [DONE]
+- Fixed disabled Simulate button after loading run configuration preset:
+  - In 	ools/simulator_ui.html (pplyPresetRunConfig): added missing call to updateSimulateButtonState(). Previously, programmatic population of class/spec/rotation from presets did not fire DOM change events, leaving the button in its initial disabled state from the clean slate start.
+- Fixed simulation error Invalid run config: - choices_path file not found: . on Web simulator:
 - Fixed simulation error Invalid run config: - choices_path file not found: . on Web simulator:
   - In src/swtorsim/web_gui.py (_resolve_simulation_inputs_from_payload):
     - Extracted inline choices / choices_override before instantiating RunConfig, passing choices=choices_data.

@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794241061"></script>
+  <script src="pyodide_client.js?v=1794241468"></script>
 </head>
 <body>
 
@@ -2079,10 +2079,12 @@
       document.getElementById("combatDistanceInput").value = rc.combat_distance !== undefined ? rc.combat_distance : 30.0;
 
       await refreshComputedStats();
+      updateSimulateButtonState();
       setStatus("Ready", "ready");
     } catch (err) {
       console.error(err);
       setStatus("Load Error", "error");
+      updateSimulateButtonState();
     }
   }
 
