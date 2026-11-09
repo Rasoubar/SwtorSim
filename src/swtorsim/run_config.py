@@ -92,7 +92,6 @@ _REQUIRED_CONFIG_KEYS = (
     "spec_path",
     "stats_path",
     "rotation_path",
-    "choices_path",
     "tactical_fqn",
     "legendary_fqns",
 )
@@ -107,9 +106,10 @@ class RunConfig:
     spec: str
     stats_path: str
     rotation_path: str
-    choices_path: str
     tactical_fqn: str
     legendary_fqns: list[str]
+    choices: dict[str, int] = field(default_factory=dict)
+    choices_path: str = ""
     relic_fqns: list[str] = field(default_factory=list)
     mode: str = "TEST"
     iterations: int = 1000
@@ -137,6 +137,14 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
             f"Run config '{path}' is missing: {', '.join(missing)}."
         )
 
+    raw_choices = raw.get("choices")
+    choices_path = _optional_config_str(raw, "choices_path", "")
+    if raw_choices is None and not choices_path:
+        raise ValueError(
+            f"Run config '{path}' must specify either 'choices' (dict) or 'choices_path' (str)."
+        )
+    parsed_choices = {str(k): int(v) for k, v in raw_choices.items()} if isinstance(raw_choices, dict) else {}
+
     active_env = (environment or raw.get("environment") or "live").lower().strip()
     spec_path = _require_config_str(raw, "spec_path")
     cand_spec = resolve_env_extractor_path(spec_path, active_env)
@@ -151,7 +159,8 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
         spec=spec,
         stats_path=_require_config_str(raw, "stats_path"),
         rotation_path=_require_config_str(raw, "rotation_path"),
-        choices_path=_require_config_str(raw, "choices_path"),
+        choices=parsed_choices,
+        choices_path=choices_path,
         tactical_fqn=_require_config_str(raw, "tactical_fqn"),
         legendary_fqns=_require_config_str_list(raw, "legendary_fqns"),
         relic_fqns=_optional_config_str_list(raw, "relic_fqns"),
@@ -207,7 +216,7 @@ def validate_run_config(
         ("gear catalog", actual_gear),
         ("relic catalog", actual_relics),
     ):
-        if label == "choices_path" and (not path or not str(path).strip()):
+        if label == "choices_path" and (config.choices or not path or not str(path).strip()):
             continue
         if not isinstance(path, str) or not path.strip():
             errors.append(f"{label} must be a non-empty path.")
@@ -250,7 +259,12 @@ def validate_run_config(
         )
 
     try:
-        choices = _load_json(config.choices_path)
+        if config.choices:
+            choices = config.choices
+        elif config.choices_path:
+            choices = _load_json(config.choices_path)
+        else:
+            choices = {}
         skill_tree = spec_data.get("skill_tree", {})
         resolve_skill_tree_fqns(skill_tree, choices)
     except ValueError as exc:

@@ -2403,3 +2403,17 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Applied the identical strict filtering logic to the combat simulator's rotation dropdown, removing foreign-discipline and cross-class rotation clutter.
 - **`dist/rotation_builder.html` & `dist/index.html`**:
   - Recompiled both static web entrypoints via `tools/build_web_release.py`.
+
+## 2026-11-09 -- Clean Slate Simulator Startup & Direct Inline Skill Tree Choices (Proposal A)
+- **`src/swtorsim/run_config.py` & `src/swtorsim/config_load.py`**:
+  - Enhanced `RunConfig` to support `choices: dict[str, int]` directly embedded in the configuration object, eliminating mandatory external `choices_path` file references while retaining backward-compatibility for legacy configs.
+  - Updated `load_run_config()`, `validate_run_config()`, and `load_from_run_config()` to prioritize inline choices.
+- **`data/run_config/*.json`**:
+  - Converted `hatred_14gcd.json`, `hatred_13gcd.json`, and `hatred_14gcd_pts.json` to embed active skill tree choices directly inline, rendering them fully self-contained.
+- **`tools/simulator_ui.html`**:
+  - **Clean Slate on First Load (Option 1)**: Eliminated automatic preloading of `hatred_14gcd` on initial visit. Dropdowns start on `-- Select Class --`, `-- Select Discipline --`, and `-- Load from Run Config --`. Gear, stats, and rotations start clean, and the **Simulate** button is disabled with an explanatory tooltip until a valid spec and rotation are chosen.
+  - **Inline Skill Tree Choices (Proposal A)**: Removed `<select id="choicesSelect">`, `importChoicesBtn`, and `deleteChoicesBtn`. Skill tree choices are now managed directly in memory via `CURRENT_CHOICES` and interactive buttons in the Skill Tree drawer (`#skillTreeRows`), with the live summary badge rendered next to the header.
+- **`tools/rotation_builder_ui.html`**:
+  - Removed the legacy `choicesFileSelect` dropdown and event handlers, routing choices directly to `currentLoadout.choices` and the interactive skill tree drawer.
+- **`dist/index.html` & `dist/rotation_builder.html`**:
+  - Rebuilt static web bundle and runtime assets (`dist/swtorsim_assets.zip`) via `tools/build_web_release.py`.

@@ -739,7 +739,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1794237542"></script>
+  <script src="pyodide_client.js?v=1794240288"></script>
 </head>
 <body>
 
@@ -789,11 +789,7 @@
       </div>
 
       <div class="form-row">
-        <div class="form-group" style="margin-bottom:6px;">
-          <label>Choices Preset</label>
-          <select id="choicesFileSelect" style="width:100%;" onchange="onChoicesPresetChange()"></select>
-        </div>
-        <div class="form-group" style="margin-bottom:6px;">
+        <div class="form-group" style="margin-bottom:6px; width:100%;">
           <label>Tactical</label>
           <select id="tacticalSelect" style="width:100%;" onchange="refreshLoadoutCatalog()">
             <option value="">(None)</option>
@@ -1068,7 +1064,7 @@ async function setEnvironment(env) {
 async function loadWorkspaceCatalog(isInitial = false, preferredSavedPath = null) {
   const prevCls = isInitial ? "" : (document.getElementById("classSelect")?.value || "");
   const prevSpec = isInitial ? "" : (document.getElementById("specSelect")?.value || "");
-  const prevChoices = isInitial ? "" : (document.getElementById("choicesFileSelect")?.value || "");
+  // Choices files eliminated - managed inline via skillTreeDrawer
   const prevTac = isInitial ? "" : (document.getElementById("tacticalSelect")?.value || "");
   const prevLeg1 = isInitial ? "" : (document.getElementById("legendary1Select")?.value || "");
   const prevLeg2 = isInitial ? "" : (document.getElementById("legendary2Select")?.value || "");
@@ -1093,18 +1089,7 @@ async function loadWorkspaceCatalog(isInitial = false, preferredSavedPath = null
   // Populate Existing Rotations dropdown
   populateExistingRotationsSelect(prevRot);
 
-  // Populate Choices Preset dropdown
-  const chSel = document.getElementById("choicesFileSelect");
-  chSel.innerHTML = '<option value="">(Default Class Choices)</option>';
-  for (const ch of workspaceCatalog.choices_files || []) {
-    const opt = document.createElement("option");
-    opt.value = ch.path;
-    opt.textContent = ch.label;
-    chSel.appendChild(opt);
-  }
-  if (prevChoices && Array.from(chSel.options).some(o => o.value === prevChoices)) {
-    chSel.value = prevChoices;
-  }
+  // Choices managed inline in memory
 
   // Populate Relic 1 & Relic 2 dropdowns
   for (const relSelectId of ["relic1Select", "relic2Select"]) {
@@ -1321,30 +1306,16 @@ async function onSpecChange() {
   const specPath = ((workspaceCatalog.disciplines || {})[cls] || {})[spec];
   if (!specPath) return;
 
-  // Pick matching choices file if one matches class/spec
-  const chSel = document.getElementById("choicesFileSelect");
-  const matchChoice = (workspaceCatalog.choices_files || []).find(
-    c => c.path.toLowerCase().includes(spec.toLowerCase()) || c.path.toLowerCase().includes(cls.toLowerCase())
-  );
-  if (matchChoice) {
-    chSel.value = matchChoice.path;
-  } else {
-    chSel.value = "";
-  }
-
   // Clear tactical & legendary selections when switching class/spec
   document.getElementById("tacticalSelect").value = "";
   document.getElementById("legendary1Select").value = "";
   document.getElementById("legendary2Select").value = "";
 
-  await refreshLoadoutCatalog(chSel.value || {});
+  await refreshLoadoutCatalog({});
   populateExistingRotationsSelect();
 }
 
-async function onChoicesPresetChange() {
-  const chPath = document.getElementById("choicesFileSelect").value;
-  await refreshLoadoutCatalog(chPath);
-}
+// onChoicesPresetChange removed - choices handled directly via skill tree clicks
 
 function getSelectedLegendaries() {
   const l1 = document.getElementById("legendary1Select").value || "";
@@ -1407,7 +1378,7 @@ async function refreshLoadoutCatalog(choicesSource = null, gearOverrides = null)
   const payload = {
     env: currentEnvironment,
     spec_path: mappedSpec,
-    choices: choicesSource || (currentLoadout && currentLoadout.class_name === cls ? currentLoadout.choices : "") || document.getElementById("choicesFileSelect").value || {},
+    choices: (choicesSource && typeof choicesSource === "object") ? choicesSource : ((currentLoadout && currentLoadout.class_name === cls && currentLoadout.choices) || {}),
     tactical_fqn: tacticalFqn,
     legendary_fqns: legendaryFqns,
     relic_fqns: relicFqns
@@ -1507,15 +1478,13 @@ async function onSelectRunConfig(rcPath) {
     }
     if (matched) break;
   }
-  if (rc.choices_path) {
-    document.getElementById("choicesFileSelect").value = rc.choices_path;
-  }
+  const rcChoices = (rc.choices || data.choices || {});
   const rcRelics = Array.isArray(rc.relic_fqns) ? rc.relic_fqns : [];
   document.getElementById("relic1Select").value = rcRelics[0] || "";
   document.getElementById("relic2Select").value = rcRelics[1] || "";
 
   const rcLegendaries = Array.isArray(rc.legendary_fqns) ? rc.legendary_fqns : [];
-  await refreshLoadoutCatalog(data.choices || rc.choices_path, {
+  await refreshLoadoutCatalog(rcChoices, {
     tactical_fqn: rc.tactical_fqn || "",
     legendary_fqns: rcLegendaries,
     relic_fqns: rcRelics

@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794237542"></script>
+  <script src="pyodide_client.js?v=1794240288"></script>
 </head>
 <body>
 
@@ -1053,15 +1053,9 @@
 
         <div class="form-row">
           <div class="form-label" style="display:flex; justify-content:space-between; align-items:center;">
-            <span>Skill Tree Choices <span id="choicesPreviewBadge" style="color:var(--cyan);font-size:10px;"></span></span>
-            <div style="display:flex; gap:4px; align-items:center;">
-              <button class="btn btn-sm" id="toggleTreeBtn" type="button" style="padding:1px 6px; font-size:10px; font-weight:600; color:var(--accent);" onclick="toggleSkillTreeDrawer()" title="Toggle interactive skill tree choices grid">Skill Tree</button>
-              <button class="btn btn-sm" id="importChoicesBtn" type="button" style="padding:1px 6px; font-size:10px;" title="Import custom skill tree choices JSON">📁 Import</button>
-              <button class="btn btn-sm" id="deleteChoicesBtn" type="button" style="padding:1px 6px; font-size:10px; display:none; color:var(--red);" title="Delete selected custom choices">🗑️</button>
-              <input type="file" id="importChoicesFile" accept=".json" style="display:none;">
-            </div>
+            <span>Skill Tree Choices <span id="choicesPreviewBadge" style="font-family:monospace;font-size:11px;color:var(--cyan);margin-left:4px;"></span></span>
+            <button class="btn btn-sm" id="toggleTreeBtn" type="button" style="padding:2px 8px; font-size:11px; font-weight:600; color:var(--accent);" onclick="toggleSkillTreeDrawer()" title="Toggle interactive skill tree choices grid">Skill Tree</button>
           </div>
-          <select id="choicesSelect"></select>
           <!-- Interactive Skill Tree Drawer -->
           <div id="skillTreeDrawer" class="skill-tree-drawer" style="display:none;">
             <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
@@ -1622,10 +1616,7 @@
       const prevRot = rotSel.value;
       updateRotationOptionsForCurrentSpec(prevRot);
 
-      // Choices
-      const chSel = document.getElementById("choicesSelect");
-      const prevCh = chSel.value;
-      populateSelectWithOptions(chSel, data.choices_files || [], "", "Preset Choices");
+      // Choices: Handled inline in memory without separate choices files
 
       syncDeleteButtons();
 
@@ -1651,7 +1642,7 @@
       const prevLeg1 = document.getElementById("legendary1Select").value;
       const prevLeg2 = document.getElementById("legendary2Select").value;
 
-      clsSel.innerHTML = "";
+      clsSel.innerHTML = '<option value="">-- Select Class --</option>';
       Object.keys(data.disciplines || {}).sort().forEach(clsName => {
         const opt = document.createElement("option");
         opt.value = clsName;
@@ -1659,12 +1650,21 @@
         clsSel.appendChild(opt);
       });
 
-      if (!preserveSelections && data.run_configs && data.run_configs.length > 0) {
-        const pref = currentEnvironment === "pts"
-          ? (data.run_configs.find(r => r.label.includes("pts") || r.path.includes("pts")) || data.run_configs[0])
-          : (data.run_configs.find(r => !r.label.includes("pts") && !r.path.includes("pts") && r.label.includes("hatred_14gcd")) || data.run_configs[0]);
-        rcSel.value = pref.path;
-        await applyPresetRunConfig(pref.path);
+      if (!preserveSelections) {
+        // Option 1: Clean Slate on 1st load
+        clsSel.value = "";
+        const specSel = document.getElementById("specSelect");
+        if (specSel) specSel.innerHTML = '<option value="">-- Select Discipline --</option>';
+        rcSel.value = "";
+        updateRotationOptionsForCurrentSpec();
+        await updateClassGearOptions("", "", ["", ""]);
+        document.getElementById("tacticalSelect").innerHTML = '<option value="">(None)</option>';
+        document.getElementById("legendary1Select").innerHTML = '<option value="">(None)</option>';
+        document.getElementById("legendary2Select").innerHTML = '<option value="">(None)</option>';
+        CURRENT_CHOICES = {};
+        updateChoicesBadge();
+        renderSkillTreeDrawer();
+        updateSimulateButtonState();
       } else {
         if (prevRc) {
           rcSel.value = prevRc;
@@ -1682,7 +1682,6 @@
         }
         if (prevB && Array.from(bSel.options).some(o => o.value === prevB)) bSel.value = prevB;
         if (prevRot && Array.from(rotSel.options).some(o => o.value === prevRot)) rotSel.value = prevRot;
-        if (prevCh && Array.from(chSel.options).some(o => o.value === prevCh)) chSel.value = prevCh;
         if (prevRel1 && Array.from(document.getElementById("relic1Select").options).some(o => o.value === prevRel1)) {
           document.getElementById("relic1Select").value = prevRel1;
         }
@@ -1692,8 +1691,11 @@
 
         populateSpecsForClass(clsSel.value, mappedSpec);
         updateRotationOptionsForCurrentSpec(prevRot);
-        await updateClassGearOptions(document.getElementById("specSelect").value, prevTac, [prevLeg1, prevLeg2]);
-        await refreshComputedStats();
+        if (document.getElementById("specSelect").value) {
+          await updateClassGearOptions(document.getElementById("specSelect").value, prevTac, [prevLeg1, prevLeg2]);
+          await refreshComputedStats();
+        }
+        updateSimulateButtonState();
       }
       setStatus("Ready", "ready");
     } catch (err) {
@@ -1803,7 +1805,8 @@
 
   function populateSpecsForClass(clsName, targetSpecPath = null, targetSpecName = null) {
     const specSel = document.getElementById("specSelect");
-    specSel.innerHTML = "";
+    specSel.innerHTML = '<option value="">-- Select Discipline --</option>';
+    if (!clsName) return;
     let specs = {};
     if (CATALOG && CATALOG.disciplines) {
       if (CATALOG.disciplines[clsName]) {
@@ -1910,7 +1913,16 @@
   }
 
   async function updateClassGearOptions(specPath, selectedTactical = null, selectedLegs = []) {
-    if (!specPath) return;
+    if (!specPath) {
+      CURRENT_SKILL_TREE = {};
+      CURRENT_CHOICES = {};
+      renderSkillTreeDrawer();
+      updateChoicesBadge();
+      document.getElementById("tacticalSelect").innerHTML = '<option value="">(None)</option>';
+      document.getElementById("legendary1Select").innerHTML = '<option value="">(None)</option>';
+      document.getElementById("legendary2Select").innerHTML = '<option value="">(None)</option>';
+      return;
+    }
     const res = await fetch(`/api/class_gear?spec_path=${encodeURIComponent(specPath)}&env=${encodeURIComponent(currentEnvironment)}`);
     const data = await res.json();
     if (!res.ok) return;
@@ -2026,7 +2038,6 @@
 
       if (rc.stats_path) document.getElementById("buildSelect").value = rc.stats_path;
       updateRotationOptionsForCurrentSpec(rc.rotation_path);
-      if (rc.choices_path) document.getElementById("choicesSelect").value = rc.choices_path;
 
       const relics = rc.relic_fqns || [];
       document.getElementById("relic1Select").value = relics[0] || "";
@@ -2108,7 +2119,7 @@
       stats_path: document.getElementById("buildSelect").value,
       stats_override: getStatsOverrideFromInputs(),
       rotation_path: document.getElementById("rotationSelect").value,
-      choices_path: document.getElementById("choicesSelect").value,
+      choices: CURRENT_CHOICES,
       choices_override: CURRENT_CHOICES,
       tactical_fqn: document.getElementById("tacticalSelect").value,
       legendary_fqns: [leg1, leg2].filter(Boolean),
@@ -3010,40 +3021,41 @@
     if (e.target.value) applyPresetRunConfig(e.target.value);
   });
 
+  function updateSimulateButtonState() {
+    const spec = document.getElementById("specSelect")?.value;
+    const rot = document.getElementById("rotationSelect")?.value;
+    const btn = document.getElementById("runSimBtn");
+    if (!btn) return;
+    if (!spec || !rot) {
+      btn.disabled = true;
+      btn.title = "Select a Class, Discipline, and Rotation to simulate";
+    } else {
+      btn.disabled = false;
+      btn.title = "Run combat simulation";
+    }
+  }
+
   document.getElementById("classSelect").addEventListener("change", async e => {
     populateSpecsForClass(e.target.value);
     const specPath = document.getElementById("specSelect").value;
     updateRotationOptionsForCurrentSpec();
     await updateClassGearOptions(specPath);
     await refreshComputedStats();
+    updateSimulateButtonState();
   });
 
   document.getElementById("specSelect").addEventListener("change", async e => {
     updateRotationOptionsForCurrentSpec();
     await updateClassGearOptions(e.target.value);
     await refreshComputedStats();
+    updateSimulateButtonState();
   });
 
-  document.getElementById("choicesSelect").addEventListener("change", async e => {
-    const val = e.target.value;
-    if (!val) return;
-    try {
-      const res = await fetch(`/api/run_config?path=${encodeURIComponent(val)}`);
-      if (res.ok) {
-        const data = await res.json();
-        const choices = (data && data.choices) || data;
-        if (choices && typeof choices === "object") {
-          Object.entries(choices).forEach(([k, v]) => {
-            if (["23", "27", "39", "43", "51", "64", "68", "73"].includes(String(k))) {
-              CURRENT_CHOICES[String(k)] = parseInt(v, 10) || 1;
-            }
-          });
-          renderSkillTreeDrawer();
-          updateChoicesBadge();
-        }
-      }
-    } catch (_e) {}
+  document.getElementById("rotationSelect").addEventListener("change", () => {
+    updateSimulateButtonState();
   });
+
+// Choices handled inline without choicesSelect listener
 
   document.getElementById("buildSelect").addEventListener("change", async e => {
     if (!e.target.value) return;
@@ -3171,11 +3183,10 @@
     };
     check("presetConfigSelect", "deleteRunConfigBtn");
     check("rotationSelect", "deleteRotationBtn");
-    check("choicesSelect", "deleteChoicesBtn");
     check("buildSelect", "deleteBuildBtn");
   }
 
-  ["presetConfigSelect", "rotationSelect", "choicesSelect", "buildSelect"].forEach(id => {
+  ["presetConfigSelect", "rotationSelect", "buildSelect"].forEach(id => {
     const sel = document.getElementById(id);
     if (sel) sel.addEventListener("change", () => syncDeleteButtons());
   });
@@ -3203,7 +3214,7 @@
 
   document.getElementById("deleteRunConfigBtn").addEventListener("click", () => deleteCustomFile("presetConfigSelect"));
   document.getElementById("deleteRotationBtn").addEventListener("click", () => deleteCustomFile("rotationSelect"));
-  document.getElementById("deleteChoicesBtn").addEventListener("click", () => deleteCustomFile("choicesSelect"));
+// deleteChoicesBtn removed
   document.getElementById("deleteBuildBtn").addEventListener("click", () => deleteCustomFile("buildSelect"));
 
   function setupFileImporter(btnId, fileInputId, category, selectElemId, validatorFn, afterImportCallback) {
@@ -3293,19 +3304,7 @@
     }
   );
 
-  setupFileImporter(
-    "importChoicesBtn",
-    "importChoicesFile",
-    "choices",
-    "choicesSelect",
-    (obj) => {
-      if (Array.isArray(obj)) return null;
-      if (obj && typeof obj === "object") {
-        if (Array.isArray(obj.choices) || Array.isArray(obj.selected_choices) || obj.choices) return null;
-      }
-      return "Choices JSON must contain talent definitions or a 'choices' array.";
-    }
-  );
+// importChoicesBtn removed
 
   setupFileImporter(
     "importBuildBtn",

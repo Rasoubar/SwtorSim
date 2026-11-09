@@ -150,7 +150,12 @@ def selected_fqns_from_config(config: RunConfig) -> List[str]:
     if not isinstance(baseline, list):
         raise ValueError(f"Discipline file '{config.spec_path}' active_abilities must be a list.")
 
-    choices = load_json_file(config.choices_path)
+    if getattr(config, "choices", None):
+        choices = config.choices
+    elif config.choices_path:
+        choices = load_json_file(config.choices_path)
+    else:
+        choices = {}
     tree_fqns = resolve_skill_tree_fqns(spec_data.get("skill_tree", {}), choices)
     return [
         *baseline,
