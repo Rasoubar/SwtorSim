@@ -232,7 +232,11 @@ class PlayerReady(Event):
                 target_time = max(sim.current_time, self.player.next_gcd)
                 sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
             else:
-                if not getattr(self.player, "_is_stalled", False):
+                is_busy_action = (
+                    getattr(self.player, "active_channel", None) is not None
+                    or getattr(self.player, "active_cast", None) is not None
+                )
+                if not is_busy_action and not getattr(self.player, "_is_stalled", False):
                     self.player._is_stalled = True
                     if hasattr(sim, "tracker"):
                         resource_val = getattr(getattr(self.player, "resource", None), "current", None)

@@ -4,6 +4,16 @@
 
 ## Completed Fixes
 
+### 54. Off-GCD Ability Channel & Cast Awareness for Optional Rotation Steps (rotation.py, events.py, test_optional_lead_time.py) - [DONE]
+- Fixed an issue where `OptionalAbilityStep.evaluate` in `src/swtorsim/rotation.py` prematurely resolved and skipped optional off-GCD abilities during active channels or hard casts (e.g. `Sniper Volley` following `Penetrating Blasts`).
+- In `OptionalAbilityStep.evaluate`, expanded the evaluation window with `is_channeling_or_casting` and `should_wait`:
+  - Off-GCD abilities continue to freely weave during instant ability GCDs.
+  - When the character is locked in an active channel or active cast, `OptionalAbilityStep` blocks and waits (`return False`) rather than prematurely skipping at GCD expiration.
+  - Once the channel/cast completes and the character is free, `OptionalAbilityStep` evaluates cleanly: casting if off cooldown, or skipping if on cooldown.
+- In `src/swtorsim/events.py` (`PlayerReady.resolve`), guarded stall detection so that characters actively executing a channel or cast longer than the GCD do not falsely log rotation stalls.
+- Added regression test `test_optional_off_gcd_waits_for_active_channel_and_does_not_skip` to `tests/test_optional_lead_time.py`.
+- Verified Marksmanship Sniper rotation (`marksmanshipv2(1).json`): `Sniper Volley` now casts reliably 4 times across a 180s simulation on its 45s cooldown.
+
 ### 53. Agitating Energies Tactical Parity & In-Place Effect Expiration Fix (events.py, test_simulation_integration.py) - [DONE]
 - Located and audited the Agitating Energies tactical across GOM blueprints and engine dispatch:
   - Mapped public item name 'Agitating Energies' to internal GOM ability FQN 'abl.itm.tactical.sow.age_smu.sni_gun.mark_sharp.dmg_sust_01' (parsed blueprint named 'Corrosive Followthrough').

@@ -154,21 +154,30 @@ class OptionalAbilityStep:
 
     def evaluate(self, player, target, sim) -> bool:
         """Non-blocking step. Tries to cast if rules allow.
-        If evaluated early (before player.next_gcd due to lead_time):
+        If evaluated early (before player.next_gcd due to lead_time) or during an active channel/cast:
             - If it successfully casts, resolves and advances (returns True).
-            - If it cannot cast yet (rules fail or on cooldown), returns False so it retries at next_gcd.
-        If evaluated at or after player.next_gcd:
+            - If it cannot cast yet (rules fail, on cooldown, or busy channeling/casting),
+              returns False so it retries once the character is ready.
+        If evaluated when character is ready (at or after player.next_gcd and not channeling/casting):
             - Always resolves and advances (returns True) even if it did not cast.
         """
         is_early = (getattr(player, "next_gcd", 0.0) - sim.current_time) > 1e-4
+        is_channeling_or_casting = (
+            getattr(player, "active_channel", None) is not None
+            or getattr(player, "active_cast", None) is not None
+        )
+        should_wait = is_early or is_channeling_or_casting
+
         wanna_cast = validate_all(self.rules, player, target, sim=sim)
         if wanna_cast:
             ability = player.ability_db.get(self.ability_id)
+            if is_channeling_or_casting and (not ability or not getattr(ability, "allow_clip", False)):
+                return False
             if is_early and (not ability or getattr(ability, "triggers_gcd", True)):
                 return False
             if ability and ability.can_cast(player, target, sim):
                 ability.cast(player, target, sim)
                 return True
-        if is_early:
+        if should_wait:
             return False
         return True
