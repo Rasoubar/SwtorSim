@@ -4,6 +4,13 @@
 
 ## Completed Fixes
 
+### 61. Talent Extractor: Renamed Tag-Conditional Stat Fields (src/extractor/talents.py) - [DONE]
+- A game patch renamed the GOM schema fields for tag-conditional talent stats: `talTalentStatsIfTagExists` -> `talStatsIfTagExists` (rank block list) and `talTalentStatTag` -> `talStatInfoTag` (per stat entry). The old names no longer exist in the current `gom.js` schema, so the extractor silently dropped every tag-conditional stat entry.
+- This is what broke `tests/test_extracted_load.py::test_every_parsed_file_round_trips` on the `saw_requires_tag` existence assertion (previously tracked in the TODO queue).
+- Fix: `_RANK_STAT_LIST_FIELDS` now accepts both the legacy and current list names; `_parse_stat_change` gained an `in_tag_block` flag and only reads the tag (legacy `talTalentStatTag` or current `talStatInfoTag`) for entries from the if-tag-exists block. The new `talStatInfoTag` field exists (empty) on plain stat entries too, so it must not be read outside the tag block.
+- Verification: full live re-extraction recovers 8 tag-conditional stat entries across 6 talents (Trooper: Incendiary Ignition, Gravitating Bolt x2, Gravitating Compound; Bounty Hunter: Tracing Residue, Signature Shot x2, Incendiary Ignition). Full test suite 26/26 passing.
+- Follow-up: the current schema also has `talStatInfoTagAppliedByCaster` and `talStatInfoTagObject` on stat entries, not captured yet - worth modeling before the engine starts consuming `requires_tag`.
+
 ### 60. Web Rotation Builder Dual-Mode Sub-30 Helper (rotation_builder_ui.html, dist/) - [DONE]
 - Styled .rotation-mode-bar with standard vibrant orange (#ff7818) in light mode with high-contrast inputs and labels and dark theme integration in dark mode.
 - Enforced single-line horizontal layout (white-space: nowrap; flex-wrap: nowrap; overflow-x: auto;) with generous box widths (min-width: 185px for threshold, min-width: 220px for ability select).
