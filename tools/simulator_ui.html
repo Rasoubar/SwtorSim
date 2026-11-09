@@ -1721,21 +1721,27 @@
     rotSel.innerHTML = "";
     const allRots = CATALOG.rotations || [];
 
-    // Presets for this active class and discipline
+    if (!classSlug) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.disabled = true;
+      opt.textContent = "-- Select a Class to view rotations --";
+      rotSel.appendChild(opt);
+      syncDeleteButtons();
+      return;
+    }
+
+    // Presets strictly for this active class and discipline
     const specPresets = allRots.filter(r => !r.is_custom && (
       (!r.class && !r.spec) ||
-      (r.class === classSlug && (!r.spec || r.spec === specSlug))
+      (r.class === classSlug && (!r.spec || !specSlug || r.spec === specSlug))
     ));
 
-    // Custom rotations for this active class and discipline (or unassigned custom rotations)
+    // Custom rotations strictly for this active class and discipline
     const specCustom = allRots.filter(r => r.is_custom && (
       (!r.class && !r.spec) ||
-      (r.class === classSlug && (!r.spec || r.spec === specSlug))
+      (r.class === classSlug && (!r.spec || !specSlug || r.spec === specSlug))
     ));
-
-    // Other disciplines
-    const otherCustom = allRots.filter(r => r.is_custom && !specCustom.includes(r));
-    const otherPresets = allRots.filter(r => !r.is_custom && !specPresets.includes(r));
 
     if (specCustom.length > 0) {
       const cGroup = document.createElement("optgroup");
@@ -1761,28 +1767,12 @@
       rotSel.appendChild(pGroup);
     }
 
-    if (otherCustom.length > 0) {
-      const ocGroup = document.createElement("optgroup");
-      ocGroup.label = "★ Custom Files (Other Disciplines)";
-      otherCustom.forEach(it => {
-        const opt = document.createElement("option");
-        opt.value = it.path;
-        opt.textContent = `★ ${it.label || it.name}`;
-        ocGroup.appendChild(opt);
-      });
-      rotSel.appendChild(ocGroup);
-    }
-
-    if (otherPresets.length > 0) {
-      const opGroup = document.createElement("optgroup");
-      opGroup.label = "Presets (Other Disciplines)";
-      otherPresets.forEach(it => {
-        const opt = document.createElement("option");
-        opt.value = it.path;
-        opt.textContent = it.label || it.name;
-        opGroup.appendChild(opt);
-      });
-      rotSel.appendChild(opGroup);
+    if (specCustom.length === 0 && specPresets.length === 0) {
+      const emptyOpt = document.createElement("option");
+      emptyOpt.value = "";
+      emptyOpt.disabled = true;
+      emptyOpt.textContent = `(No rotations found for ${specSlug || classSlug})`;
+      rotSel.appendChild(emptyOpt);
     }
 
     if (prevVal && Array.from(rotSel.options).some(o => o.value === prevVal)) {

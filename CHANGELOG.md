@@ -2393,3 +2393,13 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - **Clean Empty UI Prompts**: Added contextual empty state messages in the ability palette and rotation health linter when no class or discipline has been chosen yet.
 - **`dist/rotation_builder.html`**:
   - Rebuilt static web distribution via `tools/build_web_release.py` to sync all builder UI improvements to browser / Pyodide deployment.
+
+## 2026-11-09 -- Strict Rotation Dropdown Filtering in Builder and Simulator
+- **`tools/rotation_builder_ui.html` (`populateExistingRotationsSelect`)**:
+  - Eliminated cross-class and foreign-discipline clutter (`★ Custom Files (Other Disciplines)` and `Presets (Other Disciplines)` optgroups).
+  - When a class and discipline are selected, the rotation dropdown now strictly filters and displays only custom and preset rotations belonging to that specific class and discipline.
+  - Added an informative placeholder if no class has been chosen yet (`-- Select a Class to view rotations --`) or if no rotations exist for the selected discipline (`(No rotations found for <spec>)`).
+- **`tools/simulator_ui.html` (`updateRotationOptionsForCurrentSpec`)**:
+  - Applied the identical strict filtering logic to the combat simulator's rotation dropdown, removing foreign-discipline and cross-class rotation clutter.
+- **`dist/rotation_builder.html` & `dist/index.html`**:
+  - Recompiled both static web entrypoints via `tools/build_web_release.py`.
