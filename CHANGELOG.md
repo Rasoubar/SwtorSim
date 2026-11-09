@@ -4,6 +4,21 @@
 
 ## Completed Fixes
 
+### 60. Web Rotation Builder Dual-Mode Sub-30 Helper (rotation_builder_ui.html, dist/) - [DONE]
+- Styled .rotation-mode-bar with standard vibrant orange (#ff7818) in light mode with high-contrast inputs and labels and dark theme integration in dark mode.
+- Enforced single-line horizontal layout (white-space: nowrap; flex-wrap: nowrap; overflow-x: auto;) with generous box widths (min-width: 185px for threshold, min-width: 220px for ability select).
+- Removed all emojis across tabs, badges, buttons, and options per UI cleanliness and Codepage Safety standards.
+- Implemented dual-mode timeline view tabs in 	ools/rotation_builder_ui.html (Rotation vs Sub 30 helper):
+  - In Sub 30 helper mode:
+    - Provides configurable HP Threshold selector (30%, 35%, 40%, 25%, 20%) and auto-detected class execute ability selector.
+    - **Fixed Steps**: 1-click [⚡ Replace for Sub 30] automatically transforms the fixed step into a priority block with the execute ability as Priority #1 under the HP threshold and the original fixed ability as default fallback, with 1-click [Revert to Fixed].
+    - **Priority Blocks**: 1-click [⚡ Add Sub 30 Priority #1] prepends the execute ability to the top of the block with 	arget_hp_below_pct. Existing execute priorities are highlighted in gold with 1-click removal.
+    - **Optional Steps**: 1-click [⚡ Tag as Sub 30 Only] toggles 	arget_hp_below_pct.
+    - **Between Steps**: 1-click [+ Insert Sub 30 Optional Weave] inserts an off-GCD execute cast.
+  - In Rotation mode:
+    - Standard clean timeline display with subtle [⚡ Sub 30] badges on any step containing execute logic.
+- Recompiled web release assets via 	ools/build_web_release.py (dist/rotation_builder.html, dist/swtorsim_assets.zip).
+
 ### 59. WebUI Simulation Payload Inline Choices & Preset Simulate Button State (web_gui.py, run_config.py, config_load.py, simulator_ui.html) - [DONE]
 - Fixed disabled Simulate button after loading run configuration preset:
   - In 	ools/simulator_ui.html (pplyPresetRunConfig): added missing call to updateSimulateButtonState(). Previously, programmatic population of class/spec/rotation from presets did not fire DOM change events, leaving the button in its initial disabled state from the clean slate start.

@@ -340,6 +340,134 @@
   }
 
   /* Palette Tabs */
+  /* Sub 30 Helper Mode Bar (Normal orange in light mode) */
+  .rotation-mode-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    overflow-x: auto;
+    gap: 14px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    min-height: 40px;
+    background: #ff7818; /* Normal orange in light mode */
+    color: #ffffff;
+  }
+  [data-theme="dark"] .rotation-mode-bar {
+    background: #141a24;
+    border-color: #263144;
+    color: #f1f5f9;
+  }
+  .rotation-mode-bar .mode-tab-btn {
+    border: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    outline: none !important;
+    background: transparent;
+    padding: 0 18px;
+    height: 40px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .rotation-mode-bar .mode-tab-btn:hover {
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.12);
+  }
+  .rotation-mode-bar .mode-tab-btn.active {
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.22);
+    border: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  [data-theme="dark"] .rotation-mode-bar .mode-tab-btn {
+    color: #869ab3;
+  }
+  [data-theme="dark"] .rotation-mode-bar .mode-tab-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.08);
+  }
+  [data-theme="dark"] .rotation-mode-bar .mode-tab-btn.active {
+    color: #ffffff;
+    background: rgba(255, 120, 24, 0.22);
+    border: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .rotation-mode-bar select {
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    color: #0c2138;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11.5px;
+    height: 28px;
+    font-weight: 500;
+  }
+  [data-theme="dark"] .rotation-mode-bar select {
+    background: #10141d;
+    border-color: #263144;
+    color: #f1f5f9;
+  }
+
+  /* Sub 30 Helper Styles */
+  .badge-sub30 {
+    background: rgba(255, 170, 0, 0.16);
+    color: var(--accent);
+    border: 1px solid rgba(255, 170, 0, 0.45);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 4px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .sub30-banner {
+    background: rgba(255, 170, 0, 0.08);
+    border: 1px solid rgba(255, 170, 0, 0.3);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    font-size: 11.5px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-main);
+  }
+  .sub30-insert-btn {
+    display: block;
+    width: 100%;
+    margin: 4px 0 8px 0;
+    padding: 3px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: transparent;
+    border: 1px dashed rgba(255, 170, 0, 0.4);
+    border-radius: 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .sub30-insert-btn:hover {
+    background: rgba(255, 170, 0, 0.12);
+    border-color: var(--accent);
+  }
+
   .tabs {
     display: flex;
     border-bottom: 1px solid var(--border);
@@ -763,7 +891,7 @@
       <option value="">-- Open Existing Rotation JSON --</option>
     </select>
     <button onclick="triggerLocalFileImport()" title="Import any .json file from disk">Import File...</button>
-    <button class="btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">🌙 Dark</button>
+    <button class="btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">Dark</button>
     <input type="file" id="localFileInput" accept=".json" style="display:none" onchange="handleLocalFileImport(event)">
   </div>
 </header>
@@ -849,6 +977,31 @@
 
   <!-- CENTER PANEL: Interactive Rotation Timeline -->
   <div class="panel panel-center">
+    <!-- View Switcher: Rotation vs Sub 30 helper -->
+    <div class="rotation-mode-bar">
+      <div style="display:inline-flex;align-items:stretch;height:40px;flex-shrink:0;">
+        <button class="mode-tab-btn active" id="tabModeRotation" onclick="setTimelineViewMode('rotation')">Rotation</button>
+        <button class="mode-tab-btn" id="tabModeSub30" onclick="setTimelineViewMode('sub30')">Sub 30 helper</button>
+      </div>
+      <div id="sub30HelperSettings" style="display:none;align-items:center;gap:14px;font-size:11.5px;flex-shrink:0;white-space:nowrap;">
+        <div style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="color:#ffffff;font-weight:700;">HP Threshold:</span>
+          <select id="sub30ThresholdSelect" style="min-width:185px;" onchange="SUB30_THRESHOLD = parseFloat(this.value); renderTimeline();">
+            <option value="0.30">30% (Standard Execute)</option>
+            <option value="0.35">35% (Sniper / Mercenary)</option>
+            <option value="0.40">40% (Assassin Bloodletting)</option>
+            <option value="0.25">25% (Late Execute)</option>
+            <option value="0.20">20% (Deep Execute)</option>
+          </select>
+        </div>
+        <div style="display:inline-flex;align-items:center;gap:6px;">
+          <span style="color:rgba(255,255,255,0.95);font-weight:600;">Default Execute:</span>
+          <select id="sub30DefaultAbilitySelect" style="min-width:220px;max-width:320px;" onchange="SUB30_DEFAULT_ABILITY = this.value;">
+          </select>
+        </div>
+      </div>
+    </div>
+
     <div class="timeline-toolbar">
       <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
         <button class="btn-purple" onclick="addPriorityBlock()">+ Priority Block</button>
@@ -931,7 +1084,7 @@
     }
     const btn = document.getElementById("themeToggleBtn");
     if (btn) {
-      btn.textContent = isDark ? "☀️ Light" : "🌙 Dark";
+      btn.textContent = isDark ? "Light" : "Dark";
     }
   }
 
@@ -972,6 +1125,9 @@ let currentLoadout = {
 };
 
 let rotationSteps = [];
+let TIMELINE_VIEW_MODE = "rotation"; // "rotation" or "sub30"
+let SUB30_THRESHOLD = 0.30;
+let SUB30_DEFAULT_ABILITY = "";
 let activeBlockIndex = null;
 let collapsedSteps = new Set();
 let savedTemplates = []; // { name, kind: 'step' | 'tail', data }
@@ -1448,6 +1604,7 @@ async function refreshLoadoutCatalog(choicesSource = null, gearOverrides = null)
   document.getElementById("countProcs").textContent = (data.procs || []).length;
 
   renderSkillTreeDrawer();
+  populateSub30DefaultAbilitySelect();
   renderPalette();
   renderTimeline();
   renderRightPanel();
@@ -2091,6 +2248,178 @@ function deleteRule(stepIdx, poolIdx, ruleKey) {
   renderRightPanel();
 }
 
+function detectExecuteAbilitySlug() {
+  const abilities = (currentLoadout && currentLoadout.abilities) || [];
+  const executeKeywords = [
+    "assassinate", "vicious_throw", "takedown", "quickdraw",
+    "dispatch", "shadow_strike", "spinning_strike", "rail_shot",
+    "high_impact_bolt", "missile_blast", "volt_rush", "telekinetic_blitz"
+  ];
+  for (const kw of executeKeywords) {
+    const found = abilities.find(a =>
+      (a.slug && a.slug.toLowerCase().includes(kw)) ||
+      (a.name && a.name.toLowerCase().includes(kw.replace(/_/g, " ")))
+    );
+    if (found) return found.slug;
+  }
+  return abilities.length > 0 ? abilities[0].slug : "";
+}
+
+function populateSub30DefaultAbilitySelect() {
+  const sel = document.getElementById("sub30DefaultAbilitySelect");
+  if (!sel) return;
+  const prevVal = SUB30_DEFAULT_ABILITY || sel.value;
+  sel.innerHTML = "";
+  const abilities = (currentLoadout && currentLoadout.abilities) || [];
+  const detected = detectExecuteAbilitySlug();
+  abilities.forEach(a => {
+    const opt = document.createElement("option");
+    opt.value = a.slug;
+    const isDetected = (a.slug === detected);
+    opt.textContent = (isDetected ? "[Execute] " : "") + a.name + (a.triggers_gcd ? "" : " [Off-GCD]");
+    sel.appendChild(opt);
+  });
+  if (prevVal && Array.from(sel.options).some(o => o.value === prevVal)) {
+    sel.value = prevVal;
+  } else if (detected) {
+    sel.value = detected;
+  }
+  SUB30_DEFAULT_ABILITY = sel.value;
+}
+
+function setTimelineViewMode(mode) {
+  TIMELINE_VIEW_MODE = mode;
+  document.getElementById("tabModeRotation")?.classList.toggle("active", mode === "rotation");
+  document.getElementById("tabModeSub30")?.classList.toggle("active", mode === "sub30");
+  const settingsEl = document.getElementById("sub30HelperSettings");
+  if (settingsEl) {
+    settingsEl.style.display = mode === "sub30" ? "inline-flex" : "none";
+  }
+  if (mode === "sub30") {
+    populateSub30DefaultAbilitySelect();
+  }
+  renderTimeline();
+}
+
+function hasSub30Rule(rules) {
+  return rules && (rules.target_hp_below_pct !== undefined);
+}
+
+function getStepSub30Status(step) {
+  if (step.type === "priority_block") {
+    const pool = step.pool || [];
+    const idx = pool.findIndex(r => hasSub30Rule(r.rules));
+    if (idx !== -1) {
+      return { hasSub30: true, candidateIndex: idx, candidate: pool[idx], threshold: pool[idx].rules.target_hp_below_pct };
+    }
+    return { hasSub30: false };
+  } else if (step.type === "optional") {
+    if (hasSub30Rule(step.rules)) {
+      return { hasSub30: true, threshold: step.rules.target_hp_below_pct };
+    }
+    return { hasSub30: false };
+  }
+  return { hasSub30: false };
+}
+
+function transformFixedToSub30Priority(stepIdx) {
+  const step = rotationSteps[stepIdx];
+  if (!step || step.type !== "fixed") return;
+  const executeAbl = SUB30_DEFAULT_ABILITY || detectExecuteAbilitySlug() || step.ability_id;
+  const origAbl = step.ability_id;
+  const execDisp = resolveAbilityDisplay(executeAbl);
+  const isOffGcd = execDisp && !execDisp.triggers_gcd;
+  const origDisp = resolveAbilityDisplay(origAbl);
+
+  rotationSteps[stepIdx] = {
+    type: "priority_block",
+    name: `Sub 30: ${execDisp?.name || executeAbl} / ${origDisp?.name || origAbl}`,
+    pool: [
+      {
+        ability_id: executeAbl,
+        rules: { target_hp_below_pct: SUB30_THRESHOLD },
+        lead_time: isOffGcd ? (step.lead_time || 0.4) : null
+      },
+      {
+        ability_id: origAbl,
+        rules: {},
+        lead_time: step.lead_time
+      }
+    ],
+    _wasFixed: origAbl
+  };
+  renderTimeline();
+  renderRightPanel();
+}
+
+function revertSub30ToFixed(stepIdx) {
+  const step = rotationSteps[stepIdx];
+  if (!step || step.type !== "priority_block") return;
+  const fallbackAbl = step._wasFixed || (step.pool && step.pool.length > 1 ? step.pool[1].ability_id : (step.pool && step.pool[0] ? step.pool[0].ability_id : ""));
+  rotationSteps[stepIdx] = {
+    type: "fixed",
+    ability_id: fallbackAbl,
+    lead_time: (step.pool && step.pool[1]) ? step.pool[1].lead_time : null
+  };
+  renderTimeline();
+  renderRightPanel();
+}
+
+function addSub30ToPriorityBlock(stepIdx) {
+  const step = rotationSteps[stepIdx];
+  if (!step || step.type !== "priority_block") return;
+  const executeAbl = SUB30_DEFAULT_ABILITY || detectExecuteAbilitySlug();
+  if (!executeAbl) return;
+  const execDisp = resolveAbilityDisplay(executeAbl);
+  const isOffGcd = execDisp && !execDisp.triggers_gcd;
+
+  if (!step.pool) step.pool = [];
+  step.pool.unshift({
+    ability_id: executeAbl,
+    rules: { target_hp_below_pct: SUB30_THRESHOLD },
+    lead_time: isOffGcd ? 0.4 : null
+  });
+  renderTimeline();
+  renderRightPanel();
+}
+
+function removeSub30FromPriorityBlock(stepIdx, candIdx) {
+  const step = rotationSteps[stepIdx];
+  if (!step || step.type !== "priority_block" || !step.pool) return;
+  step.pool.splice(candIdx, 1);
+  renderTimeline();
+  renderRightPanel();
+}
+
+function toggleSub30Optional(stepIdx) {
+  const step = rotationSteps[stepIdx];
+  if (!step || step.type !== "optional") return;
+  if (!step.rules) step.rules = {};
+  if (step.rules.target_hp_below_pct !== undefined) {
+    delete step.rules.target_hp_below_pct;
+  } else {
+    step.rules.target_hp_below_pct = SUB30_THRESHOLD;
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function insertSub30OptionalAt(index) {
+  const executeAbl = SUB30_DEFAULT_ABILITY || detectExecuteAbilitySlug();
+  const execDisp = resolveAbilityDisplay(executeAbl);
+  const isOffGcd = execDisp && !execDisp.triggers_gcd;
+
+  const newStep = {
+    type: "optional",
+    ability_id: executeAbl,
+    rules: { target_hp_below_pct: SUB30_THRESHOLD },
+    lead_time: isOffGcd ? 0.4 : 0.0
+  };
+  rotationSteps.splice(index, 0, newStep);
+  renderTimeline();
+  renderRightPanel();
+}
+
 function renderTimeline() {
   const container = document.getElementById("timelineContainer");
   container.innerHTML = "";
@@ -2106,14 +2435,46 @@ function renderTimeline() {
     return;
   }
 
+  const isSub30Mode = (TIMELINE_VIEW_MODE === "sub30");
+
+  if (isSub30Mode) {
+    const banner = document.createElement("div");
+    banner.className = "sub30-banner";
+    banner.innerHTML = `
+      <div>
+        <strong style="color:var(--accent);">Sub 30 helper Active</strong>
+        <span style="margin-left:8px;font-size:11.5px;color:var(--text-muted);">
+          Click <strong>Replace for Sub 30</strong> on fixed steps or <strong>Add Sub 30 Priority #1</strong> on priority blocks to set execute behavior.
+        </span>
+      </div>
+      <button class="btn-sm" onclick="setTimelineViewMode('rotation')">Back to Rotation View</button>
+    `;
+    container.appendChild(banner);
+  }
+
   const anchorIdx = rotationSteps.findIndex(s => s.type === "loop_anchor");
   let execStepCounter = 0;
 
   rotationSteps.forEach((step, idx) => {
+    // If in Sub 30 helper mode, render a gap insert button between steps
+    if (isSub30Mode && idx > 0) {
+      const gapBtn = document.createElement("button");
+      gapBtn.type = "button";
+      gapBtn.className = "sub30-insert-btn";
+      gapBtn.textContent = `+ Insert Sub 30 Optional Weave at #${execStepCounter}`;
+      gapBtn.onclick = () => insertSub30OptionalAt(idx);
+      container.appendChild(gapBtn);
+    }
+
     const isOpener = anchorIdx !== -1 && idx < anchorIdx;
     const phaseBadge = isOpener
       ? '<span class="badge badge-opener">OPENER</span>'
       : '<span class="badge badge-loop">LOOP</span>';
+
+    const sub30Info = getStepSub30Status(step);
+    const sub30Badge = sub30Info.hasSub30
+      ? `<span class="badge badge-sub30" title="Includes sub-30 execute phase logic">Sub 30</span>`
+      : "";
 
     if (step.type === "loop_anchor") {
       const anchorCard = document.createElement("div");
@@ -2137,7 +2498,7 @@ function renderTimeline() {
     const card = document.createElement("div");
 
     if (step.type === "fixed") {
-      card.className = "step-card step-fixed";
+      card.className = "step-card step-fixed" + (isSub30Mode ? " sub30-step-highlight" : "");
       const m = resolveAbilityDisplay(step.ability_id);
       const isOffGcd = m && !m.triggers_gcd;
       const selectHtml = buildAbilitySelectHtml(
@@ -2151,12 +2512,23 @@ function renderTimeline() {
           <input type="number" step="0.05" min="0" max="1.5" style="width:52px;padding:2px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-main);" value="${step.lead_time !== undefined ? step.lead_time : 0.4}" onchange="updateStepLeadTime(${idx}, this.value)">s
         </label>
       ` : "";
+
+      const sub30HelperRowHtml = isSub30Mode ? `
+        <div style="margin-top:8px;padding:7px 10px;background:rgba(255,170,0,0.06);border:1px dashed rgba(255,170,0,0.35);border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="font-size:11.5px;color:var(--text-muted);">
+            <strong style="color:var(--text-main);">${escapeHtml(m?.name || step.ability_id)}</strong> currently casts in all phases.
+          </div>
+          <button class="btn-amber btn-sm" onclick="transformFixedToSub30Priority(${idx})" title="Convert to priority block with execute priority #1 and fallback to this ability">Replace for Sub 30</button>
+        </div>
+      ` : "";
+
       card.innerHTML = `
         <div class="step-header">
           <div class="step-header-left">
             <span class="step-num">#${execStepCounter}</span>
             ${phaseBadge}
             <span class="step-type-pill type-fixed">Fixed Cast</span>
+            ${sub30Badge}
             ${selectHtml}
             ${offGcdControlsHtml}
           </div>
@@ -2167,13 +2539,14 @@ function renderTimeline() {
             <button class="btn-sm btn-danger" onclick="deleteStep(${idx})" title="Delete Step">&times;</button>
           </div>
         </div>
+        ${sub30HelperRowHtml}
       `;
       container.appendChild(card);
       return;
     }
 
     if (step.type === "optional") {
-      card.className = "step-card step-optional";
+      card.className = "step-card step-optional" + (isSub30Mode ? " sub30-step-highlight" : "");
       const m = resolveAbilityDisplay(step.ability_id);
       const isOffGcd = m && !m.triggers_gcd;
       const selectHtml = buildAbilitySelectHtml(
@@ -2192,12 +2565,27 @@ function renderTimeline() {
           <input type="number" step="0.05" min="0" max="1.5" style="width:52px;padding:2px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-main);" value="${step.lead_time !== undefined ? step.lead_time : 0}" onchange="updateStepLeadTime(${idx}, this.value)">s
         </label>
       `;
+
+      const sub30HelperRowHtml = isSub30Mode ? `
+        <div style="margin-top:6px;padding:6px 10px;background:rgba(255,170,0,0.06);border:1px dashed rgba(255,170,0,0.35);border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+          <div style="font-size:11.5px;">
+            ${sub30Info.hasSub30
+              ? `<span style="font-weight:600;color:var(--accent);">Active Sub 30 Cast (Target HP &le; ${Math.round((sub30Info.threshold || 0.3) * 100)}%)</span>`
+              : `<span style="color:var(--text-muted);">Active in all phases (no HP rule).</span>`}
+          </div>
+          <button class="btn-sm ${sub30Info.hasSub30 ? 'btn-danger' : 'btn-amber'}" onclick="toggleSub30Optional(${idx})">
+            ${sub30Info.hasSub30 ? 'Remove Sub 30 Rule' : 'Restrict to Sub 30 Only'}
+          </button>
+        </div>
+      ` : "";
+
       card.innerHTML = `
         <div class="step-header">
           <div class="step-header-left">
             <span class="step-num">#${execStepCounter}</span>
             ${phaseBadge}
             <span class="step-type-pill type-optional">Optional (Non-Blocking)</span>
+            ${sub30Badge}
             ${selectHtml}
             ${offGcdControlsHtml}
           </div>
@@ -2211,6 +2599,7 @@ function renderTimeline() {
         </div>
         <div class="step-body">
           ${renderRulesHtml(step.rules || {}, idx, null)}
+          ${sub30HelperRowHtml}
         </div>
       `;
       container.appendChild(card);
@@ -2220,7 +2609,7 @@ function renderTimeline() {
     if (step.type === "priority_block") {
       const isCollapsed = collapsedSteps.has(idx);
       const isActive = activeBlockIndex === idx;
-      card.className = "step-card step-priority" + (isActive ? " active-block" : "");
+      card.className = "step-card step-priority" + (isActive ? " active-block" : "") + (isSub30Mode && sub30Info.hasSub30 ? " sub30-active-card" : "");
       card.onclick = () => {
         if (activeBlockIndex !== idx) {
           activeBlockIndex = idx;
@@ -2232,7 +2621,18 @@ function renderTimeline() {
       const pool = step.pool || [];
       let rowsHtml = "";
       if (!isCollapsed) {
+        // If in Sub 30 helper mode and block has no sub-30 priority yet, show quick banner at the top
+        if (isSub30Mode && !sub30Info.hasSub30) {
+          rowsHtml += `
+            <div style="margin-bottom:8px;padding:6px 10px;background:rgba(255,170,0,0.06);border:1px dashed rgba(255,170,0,0.35);border-radius:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <span style="font-size:11.5px;color:var(--text-muted);">No execute priority set for this block.</span>
+              <button class="btn-amber btn-sm" onclick="event.stopPropagation(); addSub30ToPriorityBlock(${idx})" title="Prepend execute ability as Priority #1">Add Sub 30 Priority #1</button>
+            </div>
+          `;
+        }
+
         pool.forEach((row, rIdx) => {
+          const isRowSub30 = hasSub30Rule(row.rules);
           const selectHtml = buildAbilitySelectHtml(
             row.ability_id,
             `rotationSteps[${idx}].pool[${rIdx}].ability_id = this.value; renderTimeline(); renderRightPanel();`
@@ -2245,12 +2645,19 @@ function renderTimeline() {
             <label class="control-label" style="margin:0 0 0 4px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;" title="Seconds before GCD ends to weave this off-GCD ability">Lead:
               <input type="number" step="0.05" min="0" max="1.5" style="width:48px;padding:1px 4px;font-size:11px;" value="${rowLeadVal}" onclick="event.stopPropagation()" onchange="rotationSteps[${idx}].pool[${rIdx}].lead_time = parseFloat(this.value); renderTimeline(); renderRightPanel();" />s
             </label>` : "";
+
+          const sub30RowClass = isRowSub30 ? " sub30-row-highlight" : "";
+          const sub30Pill = isRowSub30 ? `
+            <span class="badge badge-sub30" style="margin-left:6px;" title="Execute Priority: Evaluated first under HP threshold">Sub 30 Prio</span>
+          ` : "";
+
           rowsHtml += `
-            <div class="pool-row">
+            <div class="pool-row${sub30RowClass}">
               <div class="pool-rank">${rIdx + 1}.</div>
               <div class="pool-main">
                 <div class="pool-top">
                   ${selectHtml}
+                  ${sub30Pill}
                   ${rowOffGcdBadge}
                 </div>
                 ${renderRulesHtml(row.rules || {}, idx, rIdx)}
@@ -2276,13 +2683,21 @@ function renderTimeline() {
           `;
         }
 
+        const revertFixedBtn = (isSub30Mode && (step._wasFixed || (pool.length === 2 && isSub30Mode))) ? `
+          <button class="btn-sm" onclick="event.stopPropagation(); revertSub30ToFixed(${idx})" title="Revert block back to a simple fixed step">Revert to Fixed</button>
+        ` : "";
+
         rowsHtml += `
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
             <div style="display:flex;gap:6px;align-items:center;">
               <button class="btn-sm btn-purple" onclick="event.stopPropagation(); addPoolRow(${idx})">+ Add Ability to Pool</button>
+              ${isSub30Mode && !sub30Info.hasSub30 ? `<button class="btn-sm btn-amber" onclick="event.stopPropagation(); addSub30ToPriorityBlock(${idx})">Add Sub 30 Prio #1</button>` : ""}
               ${tailInjectHtml}
             </div>
-            <button class="btn-sm" onclick="event.stopPropagation(); saveBlockTailAsTemplate(${idx})" title="Save these priority rows as a reusable filler tail">Save Pool as Filler Tail</button>
+            <div style="display:flex;gap:6px;align-items:center;">
+              ${revertFixedBtn}
+              <button class="btn-sm" onclick="event.stopPropagation(); saveBlockTailAsTemplate(${idx})" title="Save these priority rows as a reusable filler tail">Save Pool as Filler Tail</button>
+            </div>
           </div>
         `;
       } else {
@@ -2297,6 +2712,7 @@ function renderTimeline() {
             <span class="step-num">#${execStepCounter}</span>
             ${phaseBadge}
             <span class="step-type-pill type-priority">Priority Block (${pool.length})</span>
+            ${sub30Badge}
             <input type="text" value="${escapeAttr(step.name || "")}" onchange="rotationSteps[${idx}].name = this.value; renderRightPanel();" onclick="event.stopPropagation();" style="flex:1;min-width:160px;font-weight:600;">
           </div>
           <div style="display:flex;gap:4px;">
@@ -2315,7 +2731,6 @@ function renderTimeline() {
     }
   });
 }
-
 // ---------------------------------------------------------------------------
 // Guided Rule Builder Modal
 // ---------------------------------------------------------------------------
