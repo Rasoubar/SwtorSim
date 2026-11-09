@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794190764"></script>
+  <script src="pyodide_client.js?v=1794192755"></script>
 </head>
 <body>
 
@@ -1874,7 +1874,7 @@
     container.innerHTML = "";
     const tree = CURRENT_SKILL_TREE || {};
 
-    const levels = Object.keys(tree).sort((a, b) => (parseInt(a, 10) || 999) - (parseInt(b, 10) || 999));
+    const levels = Object.keys(tree).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0));
     if (levels.length === 0) {
       container.innerHTML = '<div style="font-size:11px; color:var(--text-muted); padding:4px;">No skill tree choices found for this discipline.</div>';
       return;
@@ -1911,7 +1911,7 @@
 
   function updateChoicesBadge() {
     const badge = Object.entries(CURRENT_CHOICES)
-      .sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10))
+      .sort((a, b) => (parseInt(b[0], 10) || 0) - (parseInt(a[0], 10) || 0))
       .map(([lvl, slot]) => `L${lvl}:${slot}`).join(" ");
     const badgeEl = document.getElementById("choicesPreviewBadge");
     if (badgeEl) badgeEl.textContent = badge;
@@ -2045,14 +2045,24 @@
       if (bundle.stats) {
         applyStatsToInputs(bundle.stats);
       }
+      const rawStatsOverride = (bundle && bundle.stats_override) || (rc && rc.stats_override);
+      if (rawStatsOverride && typeof rawStatsOverride === "object" && Object.keys(rawStatsOverride).length > 0) {
+        applyStatsToInputs(rawStatsOverride);
+      }
 
       if (bundle.choices && typeof bundle.choices === "object") {
         Object.entries(bundle.choices).forEach(([k, v]) => {
           CURRENT_CHOICES[String(k)] = parseInt(v, 10) || 1;
         });
-        renderSkillTreeDrawer();
-        updateChoicesBadge();
       }
+      const rawChoicesOverride = (rc && (rc.choices_override || rc.choices));
+      if (rawChoicesOverride && typeof rawChoicesOverride === "object") {
+        Object.entries(rawChoicesOverride).forEach(([k, v]) => {
+          CURRENT_CHOICES[String(k)] = parseInt(v, 10) || 1;
+        });
+      }
+      renderSkillTreeDrawer();
+      updateChoicesBadge();
 
       setSimMode((rc.mode || "TEST").toUpperCase());
       if (rc.iterations) document.getElementById("iterationsInput").value = rc.iterations;
@@ -2930,6 +2940,7 @@
       spec_name: specName,
       spec_path: p.spec_path,
       stats_path: p.stats_path,
+      stats_override: p.stats_override || getStatsOverrideFromInputs(),
       rotation_path: p.rotation_path,
       choices_path: p.choices_path,
       choices_override: p.choices_override || CURRENT_CHOICES,

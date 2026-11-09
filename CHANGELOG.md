@@ -2,7 +2,17 @@
 
 
 
-## Completed Fixes
+## Completed Fixes
+
+### 58. WebUI Run Config Export/Import Overrides & Skill Tree Descending Level Order (simulator_ui.html, web_gui.py, pyodide_bridge.py) - [DONE]
+- Fixed manual override preservation during Run Config Export and Import:
+  - In `tools/simulator_ui.html` (`buildExportRunConfigObject`): exported `stats_override` alongside `choices_override`, capturing manual stat changes and tree choice customizations.
+  - Ensured environment-agnostic exports (no environment/pts toggle serialized in the export JSON).
+  - In `src/swtorsim/web_gui.py` (`load_run_config_bundle`) and `src/swtorsim/pyodide_bridge.py` (`LOAD_BUILDER_RUN_CONFIG`): merged `choices_override` onto `choices_data` and applied `stats_override` onto `stats_data` when hydrating run config bundles.
+  - In `tools/simulator_ui.html` (`applyPresetRunConfig`): prioritized `rc.choices_override` over baseline choices and restored `stats_override` directly to input fields and computed sheet stats.
+- In `tools/simulator_ui.html` (`renderSkillTreeDrawer` and `updateChoicesBadge`):
+  - Inverted the sort order of skill tree levels to descending order (`(parseInt(b, 10) || 0) - (parseInt(a, 10) || 0)`), placing the highest level (L73) at the top down to the lowest level (L23) at the bottom.
+- Recompiled web release assets to `dist/` via `tools/build_web_release.py`.
 
 ### 57. Energy Barrel & Channeled Resource Cost Scaling (STAT_abl_cost_energy 69) (entities.py, test_simulation_integration.py) - [DONE]
 - Fixed a resource cost bypass in `src/swtorsim/entities.py` (`Player.calculate_resource_cost`):

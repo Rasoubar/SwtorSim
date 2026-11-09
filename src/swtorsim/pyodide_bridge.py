@@ -95,6 +95,9 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
                 c_file = _resolve_workspace_path(rc_data["choices_path"])
                 if c_file.is_file():
                     choices_data = load_json_file(str(c_file))
+            choices_override = rc_data.get("choices_override") or rc_data.get("choices")
+            if isinstance(choices_override, dict) and choices_override:
+                choices_data.update({str(k): v for k, v in choices_override.items()})
             result = {
                 "run_config": rc_data,
                 "choices": choices_data,

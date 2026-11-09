@@ -424,11 +424,20 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
         if s_file.is_file():
             stats_data = load_json_file(str(s_file))
 
+    stats_override = raw_rc.get("stats_override")
+    if isinstance(stats_override, dict) and stats_override:
+        if isinstance(stats_data, dict):
+            stats_data.update(stats_override)
+
     choices_data = {}
     if raw_rc.get("choices_path"):
         c_file = _resolve_workspace_path(raw_rc["choices_path"])
         if c_file.is_file():
             choices_data = load_json_file(str(c_file))
+
+    choices_override = raw_rc.get("choices_override") or raw_rc.get("choices")
+    if isinstance(choices_override, dict) and choices_override:
+        choices_data.update({str(k): v for k, v in choices_override.items()})
 
     return {
         "path": _to_workspace_rel(target),
@@ -437,6 +446,7 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
         "spec": spec_name,
         "run_config": raw_rc,
         "stats": stats_data,
+        "stats_override": stats_override or {},
         "choices": choices_data,
         "gear_options": gear_opts,
     }
