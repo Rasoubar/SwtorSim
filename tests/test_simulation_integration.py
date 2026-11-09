@@ -564,6 +564,51 @@ class SimulationIntegrationTests(unittest.TestCase):
         self.assertEqual(sorc_player.resource.max_value, 600.0)
         self.assertEqual(sorc_player.resource.current_value, 600.0)
 
+    def test_25_energy_barrel_channeled_cost_scaling(self):
+        """Verifies Energy Barrel (+10 cost) properly applies to Penetrating Blasts and Gunslinger mirror."""
+        from src.swtorsim.config_load import load_complete_loadout
+        loadout = load_complete_loadout([
+            "abl.agent.skill.marksmanship.penetrating_blasts",
+            "abl.agent.skill.marksmanship.mods.tier3.efficient_shots",
+            "abl.agent.laze_target",
+        ])
+        stats_config = {"class_name": "sniper", "level": 80, "stats": {}}
+        sim, player, target = prepare_simulation([], stats_config, loadout, 1000000, {}, verbose=False)
+
+        pb = player.ability_db["abl.agent.skill.marksmanship.penetrating_blasts"]
+        laze = player.ability_db["abl.agent.laze_target"]
+
+        # Base cost of PB is 0.0; with Energy Barrel active, modified cost must be 10.0
+        pb_cost = player.calculate_resource_cost(pb.name, pb.energy_cost)
+        self.assertEqual(pb_cost, 10.0, "Energy Barrel must increase Penetrating Blasts cost by 10.0")
+
+        # Zero-cost ability with no modifiers remains 0.0
+        laze_cost = player.calculate_resource_cost(laze.name, laze.energy_cost)
+        self.assertEqual(laze_cost, 0.0, "Unmodified zero-cost ability must remain 0.0")
+
+        # can_cast rejects when energy is insufficient for the upfront cost
+        player.resource.current_value = 5.0
+        self.assertFalse(pb.can_cast(player, target, sim), "PB must not be castable with insufficient energy for upfront cost")
+
+        # can_cast allows when energy >= upfront cost
+        player.resource.current_value = 50.0
+        self.assertTrue(pb.can_cast(player, target, sim), "PB must be castable when energy >= upfront cost")
+
+        # Casting PB deducts 10.0 upfront (+ 4.0 on entry tick)
+        pb.cast(player, target, sim)
+        self.assertEqual(player.resource.current_value, 36.0, "PB cast must deduct 10 upfront plus 4 entry tick energy")
+
+        # Also verify Gunslinger mirror (Sharpshooter Energy Barrels on Penetrating Rounds)
+        gs_loadout = load_complete_loadout([
+            "abl.smuggler.skill.sharpshooter.penetrating_rounds",
+            "abl.smuggler.skill.sharpshooter.mods.tier3.energy_barrels",
+        ])
+        gs_stats = {"class_name": "gunslinger", "level": 80, "stats": {}}
+        _, gs_player, _ = prepare_simulation([], gs_stats, gs_loadout, 1000000, {}, verbose=False)
+        pr = gs_player.ability_db["abl.smuggler.skill.sharpshooter.penetrating_rounds"]
+        gs_cost = gs_player.calculate_resource_cost(pr.name, pr.energy_cost)
+        self.assertEqual(gs_cost, 10.0, "Energy Barrels must increase Penetrating Rounds cost by 10.0 on Gunslinger")
+
 
 if __name__ == "__main__":
     unittest.main()

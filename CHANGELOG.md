@@ -2,7 +2,19 @@
 
 
 
-## Completed Fixes
+## Completed Fixes
+
+### 57. Energy Barrel & Channeled Resource Cost Scaling (STAT_abl_cost_energy 69) (entities.py, test_simulation_integration.py) - [DONE]
+- Fixed a resource cost bypass in `src/swtorsim/entities.py` (`Player.calculate_resource_cost`):
+  - In GOM data, channeled abilities (e.g. *Penetrating Blasts*, *Penetrating Rounds*, *Suppressive Fire*, *Force Lightning*) have `energy_cost: null` (`0.0`) at the root ability level because resource costs are primarily spent per-tick through branch actions.
+  - Previously, `calculate_resource_cost` exited early via `if base_cost <= 0.0: return 0.0`, completely skipping stat modifiers on abilities with zero/null base cost.
+  - Removed premature zero-cost early exit and normalized base cost via `base = max(0.0, float(base_cost or 0.0))`, evaluating modifiers on `STAT_abl_cost_energy` (69), `STAT_abl_cost_force` (68), and `STAT_abl_cost_action_points` (70).
+  - Ensured non-negative cost clamping (`max(0.0, final_cost)`), preserving `0.0` cost for unmodified free abilities and free abilities with cost reductions.
+- Verified Marksmanship Sniper Level 39 choice 2 (*Energy Barrel* / `abl.agent.skill.marksmanship.mods.tier3.efficient_shots`):
+  - Correctly evaluates $+10.0$ flat energy cost on *Penetrating Blasts*, charging 10 energy upfront upon cast + 20 energy over the channel (30 total energy).
+  - Verified `can_cast` gate blocks *Penetrating Blasts* when player energy is insufficient for the upfront cost (< 10 energy).
+  - Verified Sharpshooter Gunslinger Republic mirror (*Energy Barrels* / `abl.smuggler.skill.sharpshooter.mods.tier3.energy_barrels` on *Penetrating Rounds*).
+- Added regression test `test_25_energy_barrel_channeled_cost_scaling` to `tests/test_simulation_integration.py`.
 
 ### 56. Energy Tanks & Max Resource Stat Scaling (STAT_cbt_tech_energy_max, STAT_cbt_force_force_max) (resources.py, entities.py, combat_math.py, test_simulation_integration.py) - [DONE]
 - Implemented maximum resource capacity scaling for Tech and Force classes:

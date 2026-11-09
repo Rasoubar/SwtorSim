@@ -797,10 +797,8 @@ class Player(Entity):
                 res.current_value = new_max
 
     def calculate_resource_cost(self, ability_name: str, base_cost: float, apply = False) -> float:
-        """Calculates resource cost after percentage/flat reductions and optionally consumes buff charges."""
-        if base_cost <= 0.0:
-            return 0.0
-
+        """Calculates resource cost after percentage/flat adjustments and optionally consumes buff charges."""
+        base = max(0.0, float(base_cost or 0.0))
         pct_modifiers = 1.0
         flat_reductions = 0.0
         effects_to_clear = []
@@ -827,7 +825,7 @@ class Player(Entity):
         if effects_to_clear:
             self.cleanup_expired_effects(effects_to_clear)
 
-        final_cost = (base_cost * pct_modifiers) + flat_reductions
+        final_cost = (base * pct_modifiers) + flat_reductions
         return max(0.0, final_cost) #safeguard tbh
 
     def calculate_resource_regen(self, base_rate: float, pool_type: Optional[str] = None) -> float:
