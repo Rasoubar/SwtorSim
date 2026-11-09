@@ -1012,10 +1012,10 @@ window.addEventListener("DOMContentLoaded", async () => {
   });
 
   window.onSwtorCustomFilesChanged = () => {
-    loadWorkspaceCatalog();
+    loadWorkspaceCatalog(false);
   };
 
-  await loadWorkspaceCatalog();
+  await loadWorkspaceCatalog(true);
 });
 
 function showToast(msg, isError = false) {
@@ -1058,11 +1058,24 @@ async function setEnvironment(env) {
     }
   }
 
-  await loadWorkspaceCatalog();
-  await refreshLoadoutCatalog();
+  await loadWorkspaceCatalog(false);
+  if (currentLoadout && currentLoadout.class_name && currentLoadout.spec_name) {
+    await refreshLoadoutCatalog();
+  }
 }
 
-async function loadWorkspaceCatalog() {
+async function loadWorkspaceCatalog(isInitial = false, preferredSavedPath = null) {
+  const prevCls = isInitial ? "" : (document.getElementById("classSelect")?.value || "");
+  const prevSpec = isInitial ? "" : (document.getElementById("specSelect")?.value || "");
+  const prevChoices = isInitial ? "" : (document.getElementById("choicesFileSelect")?.value || "");
+  const prevTac = isInitial ? "" : (document.getElementById("tacticalSelect")?.value || "");
+  const prevLeg1 = isInitial ? "" : (document.getElementById("legendary1Select")?.value || "");
+  const prevLeg2 = isInitial ? "" : (document.getElementById("legendary2Select")?.value || "");
+  const prevRel1 = isInitial ? "" : (document.getElementById("relic1Select")?.value || "");
+  const prevRel2 = isInitial ? "" : (document.getElementById("relic2Select")?.value || "");
+  const prevRot = preferredSavedPath || (isInitial ? "" : (document.getElementById("existingRotationSelect")?.value || ""));
+  const prevFilename = isInitial ? "" : (document.getElementById("saveFilename")?.value || "");
+
   const res = await fetch(`/api/catalog?env=${encodeURIComponent(currentEnvironment)}`);
   workspaceCatalog = await res.json();
 
@@ -1077,7 +1090,7 @@ async function loadWorkspaceCatalog() {
   }
 
   // Populate Existing Rotations dropdown
-  populateExistingRotationsSelect();
+  populateExistingRotationsSelect(prevRot);
 
   // Populate Choices Preset dropdown
   const chSel = document.getElementById("choicesFileSelect");
@@ -1087,6 +1100,9 @@ async function loadWorkspaceCatalog() {
     opt.value = ch.path;
     opt.textContent = ch.label;
     chSel.appendChild(opt);
+  }
+  if (prevChoices && Array.from(chSel.options).some(o => o.value === prevChoices)) {
+    chSel.value = prevChoices;
   }
 
   // Populate Relic 1 & Relic 2 dropdowns
@@ -1100,10 +1116,12 @@ async function loadWorkspaceCatalog() {
       relSel.appendChild(opt);
     }
   }
+  if (prevRel1) document.getElementById("relic1Select").value = prevRel1;
+  if (prevRel2) document.getElementById("relic2Select").value = prevRel2;
 
   // Populate Class dropdown
   const clsSel = document.getElementById("classSelect");
-  clsSel.innerHTML = "";
+  clsSel.innerHTML = '<option value="">-- Select Class --</option>';
   const classes = Object.keys(workspaceCatalog.disciplines || {}).sort();
   for (const c of classes) {
     const opt = document.createElement("option");
@@ -1112,20 +1130,45 @@ async function loadWorkspaceCatalog() {
     clsSel.appendChild(opt);
   }
 
-  // Default to Assassin -> Hatred if available
-  if (classes.includes("Assassin")) {
-    clsSel.value = "Assassin";
-  }
-  await onClassChange("Hatred");
-
-  // Preload BasicMaliPS.json if available so user immediately sees a working example
-  const basicMali = (workspaceCatalog.rotations || []).find(r => r.path.includes("BasicMaliPS.json"));
-  if (basicMali) {
-    document.getElementById("existingRotationSelect").value = basicMali.path;
-    await onSelectExistingRotation(basicMali.path);
+  if (prevCls && classes.includes(prevCls)) {
+    clsSel.value = prevCls;
+    const specSel = document.getElementById("specSelect");
+    specSel.innerHTML = '<option value="">-- Select Discipline --</option>';
+    const specs = Object.keys((workspaceCatalog.disciplines || {})[prevCls] || {}).sort();
+    for (const s of specs) {
+      const opt = document.createElement("option");
+      opt.value = s;
+      opt.textContent = s;
+      specSel.appendChild(opt);
+    }
+    if (prevSpec && specs.includes(prevSpec)) {
+      specSel.value = prevSpec;
+    }
+    if (prevTac) document.getElementById("tacticalSelect").value = prevTac;
+    if (prevLeg1) document.getElementById("legendary1Select").value = prevLeg1;
+    if (prevLeg2) document.getElementById("legendary2Select").value = prevLeg2;
+    if (prevFilename) document.getElementById("saveFilename").value = prevFilename;
   } else {
+    clsSel.value = "";
+    const specSel = document.getElementById("specSelect");
+    if (specSel) specSel.innerHTML = '<option value="">-- Select Discipline --</option>';
+    document.getElementById("activeSpecBadge").textContent = "No Class Selected";
+    currentLoadout = {
+      class_name: "",
+      spec_name: "",
+      spec_path: "",
+      choices: {},
+      skill_tree: {},
+      tacticals: [],
+      legendaries: [],
+      abilities: [],
+      caster_buffs: [],
+      target_debuffs: [],
+      procs: []
+    };
     renderTimeline();
     renderRightPanel();
+    renderPalette();
   }
 }
 
@@ -1223,6 +1266,29 @@ async function onClassChange(preferredSpec = null) {
   const cls = document.getElementById("classSelect").value;
   const specSel = document.getElementById("specSelect");
   specSel.innerHTML = "";
+  if (!cls) {
+    specSel.innerHTML = '<option value="">-- Select Discipline --</option>';
+    document.getElementById("activeSpecBadge").textContent = "No Class Selected";
+    currentLoadout = {
+      class_name: "",
+      spec_name: "",
+      spec_path: "",
+      choices: {},
+      skill_tree: {},
+      tacticals: [],
+      legendaries: [],
+      abilities: [],
+      caster_buffs: [],
+      target_debuffs: [],
+      procs: []
+    };
+    renderPalette();
+    renderTimeline();
+    renderRightPanel();
+    populateExistingRotationsSelect();
+    return;
+  }
+  specSel.innerHTML = '<option value="">-- Select Discipline --</option>';
   const specs = Object.keys((workspaceCatalog.disciplines || {})[cls] || {}).sort();
   for (const s of specs) {
     const opt = document.createElement("option");
@@ -1239,6 +1305,27 @@ async function onClassChange(preferredSpec = null) {
 async function onSpecChange() {
   const cls = document.getElementById("classSelect").value;
   const spec = document.getElementById("specSelect").value;
+  if (!spec) {
+    document.getElementById("activeSpecBadge").textContent = cls ? `${cls} // (No Discipline)` : "No Class Selected";
+    currentLoadout = {
+      class_name: cls,
+      spec_name: "",
+      spec_path: "",
+      choices: {},
+      skill_tree: {},
+      tacticals: [],
+      legendaries: [],
+      abilities: [],
+      caster_buffs: [],
+      target_debuffs: [],
+      procs: []
+    };
+    renderPalette();
+    renderTimeline();
+    renderRightPanel();
+    populateExistingRotationsSelect();
+    return;
+  }
   const specPath = ((workspaceCatalog.disciplines || {})[cls] || {})[spec];
   if (!specPath) return;
 
@@ -1578,7 +1665,10 @@ function renderPalette() {
     );
 
     if (!abilities.length) {
-      container.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;">No matching castable abilities.</div>';
+      const msg = (currentLoadout && currentLoadout.class_name && currentLoadout.spec_name)
+        ? "No matching castable abilities."
+        : "Select a Class and Discipline above to load castable abilities.";
+      container.innerHTML = `<div style="color:var(--text-muted);text-align:center;padding:20px;">${msg}</div>`;
       return;
     }
 
@@ -2586,7 +2676,11 @@ function renderRightPanel() {
     const issues = runRotationLinter();
     let html = `<div style="font-weight:700;margin-bottom:8px;">Rotation Health Check (${rotationSteps.length} steps)</div>`;
     if (!issues.length) {
-      html += `<div class="lint-box lint-ok">[OK] All ${rotationSteps.length} steps validated cleanly against ${escapeHtml(currentLoadout.class_name)} // ${escapeHtml(currentLoadout.spec_name)}.</div>`;
+      if (!currentLoadout || !currentLoadout.class_name || !currentLoadout.spec_name) {
+        html += `<div class="lint-box" style="background:var(--card-bg);border:1px dashed var(--border);color:var(--text-muted);">Select a Class and Discipline above to lint steps against loadout abilities.</div>`;
+      } else {
+        html += `<div class="lint-box lint-ok">[OK] All ${rotationSteps.length} steps validated cleanly against ${escapeHtml(currentLoadout.class_name)} // ${escapeHtml(currentLoadout.spec_name)}.</div>`;
+      }
     } else {
       for (const issue of issues) {
         html += `<div class="lint-box lint-warn">[WARN] ${escapeHtml(issue)}</div>`;
@@ -2749,6 +2843,10 @@ function applyEditedJson() {
 }
 
 async function saveRotationToDisk() {
+  if (!currentLoadout || !currentLoadout.class_name || !currentLoadout.spec_name) {
+    showToast("Please select a Class and Discipline before saving.", true);
+    return;
+  }
   let filename = (document.getElementById("saveFilename")?.value || "CustomRotation.json").trim();
   if (!filename) filename = "CustomRotation.json";
   if (!filename.endsWith(".json")) filename += ".json";
@@ -2772,8 +2870,7 @@ async function saveRotationToDisk() {
     showToast(`Save failed: ${data.error}`, true);
     return;
   }
-  await loadWorkspaceCatalog();
-  populateExistingRotationsSelect(data.path);
+  await loadWorkspaceCatalog(false, data.path);
 
   const isWebMode = window.PYODIDE_BRIDGE || window.location.port === "8080" || !window.location.port;
   if (isWebMode) {

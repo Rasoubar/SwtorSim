@@ -12,19 +12,32 @@
   - In `tools/simulator_ui.html` (`applyPresetRunConfig`): prioritized `rc.choices_override` over baseline choices and restored `stats_override` directly to input fields and computed sheet stats.
 - In `tools/simulator_ui.html` (`renderSkillTreeDrawer` and `updateChoicesBadge`):
   - Inverted the sort order of skill tree levels to descending order (`(parseInt(b, 10) || 0) - (parseInt(a, 10) || 0)`), placing the highest level (L73) at the top down to the lowest level (L23) at the bottom.
-- Recompiled web release assets to `dist/` via `tools/build_web_release.py`.
-
-### 57. Energy Barrel & Channeled Resource Cost Scaling (STAT_abl_cost_energy 69) (entities.py, test_simulation_integration.py) - [DONE]
-- Fixed a resource cost bypass in `src/swtorsim/entities.py` (`Player.calculate_resource_cost`):
-  - In GOM data, channeled abilities (e.g. *Penetrating Blasts*, *Penetrating Rounds*, *Suppressive Fire*, *Force Lightning*) have `energy_cost: null` (`0.0`) at the root ability level because resource costs are primarily spent per-tick through branch actions.
-  - Previously, `calculate_resource_cost` exited early via `if base_cost <= 0.0: return 0.0`, completely skipping stat modifiers on abilities with zero/null base cost.
-  - Removed premature zero-cost early exit and normalized base cost via `base = max(0.0, float(base_cost or 0.0))`, evaluating modifiers on `STAT_abl_cost_energy` (69), `STAT_abl_cost_force` (68), and `STAT_abl_cost_action_points` (70).
-  - Ensured non-negative cost clamping (`max(0.0, final_cost)`), preserving `0.0` cost for unmodified free abilities and free abilities with cost reductions.
-- Verified Marksmanship Sniper Level 39 choice 2 (*Energy Barrel* / `abl.agent.skill.marksmanship.mods.tier3.efficient_shots`):
-  - Correctly evaluates $+10.0$ flat energy cost on *Penetrating Blasts*, charging 10 energy upfront upon cast + 20 energy over the channel (30 total energy).
-  - Verified `can_cast` gate blocks *Penetrating Blasts* when player energy is insufficient for the upfront cost (< 10 energy).
-  - Verified Sharpshooter Gunslinger Republic mirror (*Energy Barrels* / `abl.smuggler.skill.sharpshooter.mods.tier3.energy_barrels` on *Penetrating Rounds*).
-- Added regression test `test_25_energy_barrel_channeled_cost_scaling` to `tests/test_simulation_integration.py`.
+- Recompiled web release assets to `dist/` via `tools/build_web_release.py`.
+
+
+
+### 57. Energy Barrel & Channeled Resource Cost Scaling (STAT_abl_cost_energy 69) (entities.py, test_simulation_integration.py) - [DONE]
+
+- Fixed a resource cost bypass in `src/swtorsim/entities.py` (`Player.calculate_resource_cost`):
+
+  - In GOM data, channeled abilities (e.g. *Penetrating Blasts*, *Penetrating Rounds*, *Suppressive Fire*, *Force Lightning*) have `energy_cost: null` (`0.0`) at the root ability level because resource costs are primarily spent per-tick through branch actions.
+
+  - Previously, `calculate_resource_cost` exited early via `if base_cost <= 0.0: return 0.0`, completely skipping stat modifiers on abilities with zero/null base cost.
+
+  - Removed premature zero-cost early exit and normalized base cost via `base = max(0.0, float(base_cost or 0.0))`, evaluating modifiers on `STAT_abl_cost_energy` (69), `STAT_abl_cost_force` (68), and `STAT_abl_cost_action_points` (70).
+
+  - Ensured non-negative cost clamping (`max(0.0, final_cost)`), preserving `0.0` cost for unmodified free abilities and free abilities with cost reductions.
+
+- Verified Marksmanship Sniper Level 39 choice 2 (*Energy Barrel* / `abl.agent.skill.marksmanship.mods.tier3.efficient_shots`):
+
+  - Correctly evaluates $+10.0$ flat energy cost on *Penetrating Blasts*, charging 10 energy upfront upon cast + 20 energy over the channel (30 total energy).
+
+  - Verified `can_cast` gate blocks *Penetrating Blasts* when player energy is insufficient for the upfront cost (< 10 energy).
+
+  - Verified Sharpshooter Gunslinger Republic mirror (*Energy Barrels* / `abl.smuggler.skill.sharpshooter.mods.tier3.energy_barrels` on *Penetrating Rounds*).
+
+- Added regression test `test_25_energy_barrel_channeled_cost_scaling` to `tests/test_simulation_integration.py`.
+
 
 ### 56. Energy Tanks & Max Resource Stat Scaling (STAT_cbt_tech_energy_max, STAT_cbt_force_force_max) (resources.py, entities.py, combat_math.py, test_simulation_integration.py) - [DONE]
 - Implemented maximum resource capacity scaling for Tech and Force classes:
@@ -2370,3 +2383,13 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Rounded `end_time` and `duration` in `finalize_stalls` to 4 decimal places to prevent floating-point rounding mismatches in deadlock test assertions.
 - **`tests/test_ability_execution.py`**:
   - Added `test_weapon_mode_wildcard_trigger_rejects_periodic_dots` unit test confirming that `weapon_mode: 3` subscribers reject periodic DoT ticks (`weapon_mode: 0`) and trigger on direct weapon attacks (`weapon_mode > 0`).
+
+## 2026-11-09 -- Fix Rotation Builder Web Startup & Save State Regression
+- **`tools/rotation_builder_ui.html`**:
+  - **Neutral Startup State**: Removed hardcoded automatic loading of the Assassin class, Hatred discipline, and `BasicMaliPS.json` rotation on initial page load. Added neutral placeholder options (`-- Select Class --` and `-- Select Discipline --`) to class and discipline select elements.
+  - **Save State Preservation**: Updated `saveRotationToDisk()` to call `loadWorkspaceCatalog(false, data.path)`, preventing the catalog refresh from wiping user selections or resetting `rotationSteps`.
+  - **State-Preserving Catalog Refresh**: Refactored `loadWorkspaceCatalog(isInitial, preferredSavedPath)` to snapshot active selections (class, discipline, gear choices, tacticals, implants, relics, filename) and restore them without re-initializing the workspace or overwriting `rotationSteps`.
+  - **Save Validation Guard**: Added an explicit check in `saveRotationToDisk()` requiring a valid active class and discipline selection before persisting rotation files.
+  - **Clean Empty UI Prompts**: Added contextual empty state messages in the ability palette and rotation health linter when no class or discipline has been chosen yet.
+- **`dist/rotation_builder.html`**:
+  - Rebuilt static web distribution via `tools/build_web_release.py` to sync all builder UI improvements to browser / Pyodide deployment.
