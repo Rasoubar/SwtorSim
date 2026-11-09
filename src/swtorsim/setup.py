@@ -112,6 +112,8 @@ def prepare_simulation(
     debuff_module,
     verbose: bool = True,
     seed: int | None = None,
+    tracer=None,
+    config=None,
 ):
     """Prepares simulation entities from unified loadout blueprints."""
     active_abilities = {}
@@ -150,7 +152,7 @@ def prepare_simulation(
 
     if seed is not None:
         random.seed(seed)
-    sim = Simulation(verbose=verbose, seed=seed)
+    sim = Simulation(verbose=verbose, seed=seed, tracer=tracer)
     player.current_target = target
 
     for eff_key, eff in target.effects.items():
@@ -213,5 +215,14 @@ def prepare_simulation(
     sim.schedule_absolute(0.0, PlayerReady(player, target))
     first_regen_tick = random.uniform(0.0, 1.0)
     sim.schedule_absolute(first_regen_tick, ResourceTick(player))
+
+    if tracer is not None:
+        tracer.record_initial_state(
+            player=player,
+            target=target,
+            config=config,
+            loadout_blueprints=loadout_blueprints,
+            rotation_config=rotation_config,
+        )
 
     return sim, player, target

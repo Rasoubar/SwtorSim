@@ -539,7 +539,14 @@ def _level_sort_key(level: str) -> tuple[int, int | str]:
 
 def _is_file(path: str) -> bool:
     from pathlib import Path
-    return Path(path).is_file()
+    p = Path(path)
+    if p.is_file():
+        return True
+    if not p.is_absolute():
+        project_root = Path(__file__).resolve().parent.parent.parent
+        if (project_root / p).is_file():
+            return True
+    return False
 
 
 def _load_json(path: str) -> Any:

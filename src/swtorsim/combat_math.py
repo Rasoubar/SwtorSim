@@ -32,6 +32,18 @@ def calculate_hit(caster, target, action_data):
 
     post_crit_damage, is_crit = calculate_crit(caster, post_mod_damage, modifiers)
 
+    if action_data.get("record_audit"):
+        action_data["_audit"] = {
+            "base_damage": round(base_damage, 2),
+            "post_mit_damage": round(post_mit_damage, 2),
+            "post_mod_damage": round(post_mod_damage, 2),
+            "total_multiplier": round(modifiers.get('total_multiplier', 1.0), 4),
+            "buckets": {k: round(v, 4) for k, v in modifiers.get('_buckets', {}).items()} if '_buckets' in modifiers else {},
+            "bonus_crit_chance": round(modifiers.get('bonus_crit_chance', 0.0), 4),
+            "bonus_crit_modifier": round(modifiers.get('bonus_crit_modifier', 0.0), 4),
+            "bonus_armor_pen": round(modifiers.get('bonus_armor_pen', 0.0), 4),
+        }
+
     return int(post_crit_damage), is_crit
 
 def handle_modifiers(caster, target, action_data, damage_type=None):
@@ -62,6 +74,8 @@ def handle_modifiers(caster, target, action_data, damage_type=None):
     handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, hand=hand)
     handle_target_debuffs(target, action_tags, ability_fqn, attack_type, damage_type, buckets, modifiers, caster=caster)
 
+    if action_data.get("record_audit"):
+        modifiers['_buckets'] = {k: 1.0 + v for k, v in buckets.items()}
     for bucket_value in buckets.values():
         modifiers['total_multiplier'] *= (1.0 + bucket_value)
 

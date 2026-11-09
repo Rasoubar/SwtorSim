@@ -208,24 +208,36 @@ def load_json_file(filepath: str) -> Any:
     if not os.path.exists(filepath):
         p = Path(filepath)
         if not p.is_absolute():
+            project_root = Path(__file__).resolve().parent.parent.parent
+            candidate = project_root / p
+            if candidate.is_file():
+                filepath = str(candidate)
+
+    if not os.path.exists(filepath):
+        p = Path(filepath)
+        if not p.is_absolute():
             parts = p.parts
-            curr = Path(".")
-            matched = True
-            for part in parts:
-                found = False
-                try:
-                    for child in curr.iterdir():
-                        if child.name.lower() == part.lower():
-                            curr = child
-                            found = True
-                            break
-                except Exception:
-                    pass
-                if not found:
-                    matched = False
+            project_root = Path(__file__).resolve().parent.parent.parent
+            for base_dir in (project_root, Path(".")):
+                curr = base_dir
+                matched = True
+                for part in parts:
+                    found = False
+                    try:
+                        for child in curr.iterdir():
+                            if child.name.lower() == part.lower():
+                                curr = child
+                                found = True
+                                break
+                    except Exception:
+                        pass
+                    if not found:
+                        matched = False
+                        break
+                if matched and curr.is_file():
+                    filepath = str(curr)
                     break
-            if matched and curr.is_file():
-                filepath = str(curr)
+
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Configuration file not found at: {filepath}")
 

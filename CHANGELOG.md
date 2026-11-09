@@ -4,12 +4,60 @@
 
 ## Completed Fixes
 
-### 61. Talent Extractor: Renamed Tag-Conditional Stat Fields (src/extractor/talents.py) - [DONE]
+### 64. Talent Extractor: Renamed Tag-Conditional Stat Fields (src/extractor/talents.py) - [DONE]
 - A game patch renamed the GOM schema fields for tag-conditional talent stats: `talTalentStatsIfTagExists` -> `talStatsIfTagExists` (rank block list) and `talTalentStatTag` -> `talStatInfoTag` (per stat entry). The old names no longer exist in the current `gom.js` schema, so the extractor silently dropped every tag-conditional stat entry.
 - This is what broke `tests/test_extracted_load.py::test_every_parsed_file_round_trips` on the `saw_requires_tag` existence assertion (previously tracked in the TODO queue).
 - Fix: `_RANK_STAT_LIST_FIELDS` now accepts both the legacy and current list names; `_parse_stat_change` gained an `in_tag_block` flag and only reads the tag (legacy `talTalentStatTag` or current `talStatInfoTag`) for entries from the if-tag-exists block. The new `talStatInfoTag` field exists (empty) on plain stat entries too, so it must not be read outside the tag block.
 - Verification: full live re-extraction recovers 8 tag-conditional stat entries across 6 talents (Trooper: Incendiary Ignition, Gravitating Bolt x2, Gravitating Compound; Bounty Hunter: Tracing Residue, Signature Shot x2, Incendiary Ignition). Full test suite 26/26 passing.
 - Follow-up: the current schema also has `talStatInfoTagAppliedByCaster` and `talStatInfoTagObject` on stat entries, not captured yet - worth modeling before the engine starts consuming `requires_tag`.
+### 63. Proc Energy Regain Telemetry Wiring in Debug Dashboard (`events.py`, `abilities.py`, `triggers.py`, `html_reporter.py`) - [DONE]
+- **Tracer Telemetry for `ResourceGainEvent` (`src/swtorsim/events.py`)**:
+  - Wired `ResourceGainEvent.resolve(sim)` to pass `sim.tracer.record_resource_change(...)` with actual current pool value, restored amount (`delta`), and descriptive origin source.
+  - Ensures all one-time resource restorations update the `resource_samples` sparkline and appear under the event log "Resource" filter.
+- **Proc Context & Attribution in Action Handlers (`src/swtorsim/abilities.py` & `src/swtorsim/triggers.py`)**:
+  - Propagated `is_proc: True` and `trigger_name` inside `TriggerManager.dispatch` execution context.
+  - Enhanced `handle_resource_gain_action` and `handle_resource_spend_action` to extract the originating proc or ability name (e.g. `Proc: Ballistic Redistribution`) instead of generic uninformative labels.
+  - Wired `handle_resource_spend_action` to record spend deltas when abilities consume resources via branch actions.
+- **Visual Styling for Proc Resources in Debug Dashboard (`src/swtorsim/debug/html_reporter.py`)**:
+  - Highlighted proc resource regains with distinct crit badge styling (`badge-crit`) and accent text in the interactive Event Log table.
+- **Unit Testing (`tests/test_resource_tracer.py`)**:
+  - Added test coverage verifying `ResourceGainEvent` logging, proc attribution in `handle_resource_gain_action`, and spend action tracking (62/62 tests passing).
+
+### 62. Engine Decoupling, Hot-Path Performance & CRLF Integrity (`abilities.py`, `rotation.py`, `combat_math.py`, `events.py`) - [DONE]
+- **Pure Fast Path for `can_cast` in `src/swtorsim/abilities.py`**:
+  - Restored `can_cast()` as a zero-string-allocation boolean check for maximum speed in standard/Monte Carlo simulation runs.
+  - Decoupled human-readable rejection strings into `check_cast_eligibility()`, which is now only evaluated when diagnostic tracers demand error reasons.
+- **Priority Block Fall-Through Restoration in `src/swtorsim/rotation.py`**:
+  - Restored the standard single-invocation evaluation path (`if wanna_cast: ... if ability and ability.cast(...): return True`) when `sim.tracer is None`, eliminating double-evaluation of charge modifiers, costs, and conditions.
+  - Resolved early abort bug: even when tracer is active, if `ability.cast()` returns `False`, candidate failure is recorded and evaluation continues to check lower-priority pool options instead of immediately aborting the block.
+- **Guarded Math Audit in `src/swtorsim/combat_math.py` & `src/swtorsim/events.py`**:
+  - Guarded `modifiers['_buckets']` and `action_data["_audit"]` with `if action_data.get("record_audit"):`.
+  - Prevented millions of dictionary comprehensions and `round()` calls from executing during standard/batch runs when `sim.tracer is None`.
+- **Repository CRLF Line-Ending Standardization**:
+  - Normalized line endings to CRLF across all touched repository files in accordance with `AGENTS.md` Rule 6.
+
+### 61. Interactive Simulation Debugger, Diagnostics & Character Loadout Inspector (`src/swtorsim/debug/`, `tools/debug_sim.py`, `main.py`) - [DONE]
+- Implemented comprehensive diagnostic simulation runner and interactive HTML visual report generator:
+  - **`CombatTracer` (`src/swtorsim/debug/tracer.py`)**: Zero-overhead observer recording:
+    - Character metadata, level, class, environment (LIVE/PTS), target dummy HP.
+    - Complete character stat profiles (base ratings, effective stats, derived attributes: DR %, Crit %, Multiplier %, Accuracy %, Alacrity %, calculated GCD, weapon damage min/max, standard health, and bonus damage).
+    - Full loaded passives roster categorized by origin (Discipline Baseline, Talent Choices, Tactical, Legendary Implants, Relics, Class Buffs) with their individual stat changes, triggers, and branches.
+    - Active abilities roster (cooldowns, energy costs, cast/channel durations, energy types, tags).
+    - Authoritative Proc Registry (`lockout_effect`, `trigger_icd`, `proc_buff`).
+    - Initial target dummy setup and preloaded raid debuffs.
+    - Chronological event timeline (casts, damage hits, buff applications/refreshes/expirations, stack updates, resource ticks/spends, rotation decisions, procs, and stalls).
+  - **Standalone Interactive HTML Dashboard (`src/swtorsim/debug/html_reporter.py`)**:
+    - Embedded zero-dependency responsive dark-mode HTML visualizer.
+    - **Interactive SVG Timeline & Multi-Track Swimlanes**: Ruler, zoom in/out, pan, live time scrubber cursor, Cast bar track, Resource line chart, Target HP curve, Buff active windows with stack count badges, and Live HUD.
+    - **Initial Character & Loadout Tab**: Searchable tables for derived combat attributes, loaded passives directory, active abilities roster, proc registry, and target debuffs.
+    - **Rotation Decision Inspector Tab**: Step-by-step priority block decision log displaying every evaluated ability, rule validations, and explicit pass/fail rejection reasons (on cooldown, insufficient resource, active cast/channel, rules unmet).
+    - **Hit Math Auditor Tab**: Hit-by-hit equation inspector showing base damage rolls, all 6 empirical modifier buckets with contributing buffs, crit roll vs threshold, crit multipliers, armor penetration, and mitigation math.
+    - **Chronological Event Log Tab**: Interactive log filterable by category (All, Casts, Hits, Buffs, Procs, Resource, Rotation, Stalls) and text search.
+  - **CLI Runner Integration (`tools/debug_sim.py` & `main.py --debug`)**:
+    - Added `tools/debug_sim.py` with arguments for `--hp`, `--duration`, `--output`, `--pts`, `--no-browser`, and `--json`.
+    - Added `--debug` and `--html-out` flags to `main.py` for 1-command invocation (`.\tools\pyclean.exe main.py <config> --debug`).
+    - Added `check_cast_eligibility` to `Ability` in `abilities.py` for exact human-readable rejection reasons.
+    - Added `current` property alias to `ResourcePool` in `resources.py`.
 
 ### 60. Web Rotation Builder Dual-Mode Sub-30 Helper (rotation_builder_ui.html, dist/) - [DONE]
 - Styled .rotation-mode-bar with standard vibrant orange (#ff7818) in light mode with high-contrast inputs and labels and dark theme integration in dark mode.
@@ -2456,3 +2504,23 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Removed the legacy `choicesFileSelect` dropdown and event handlers, routing choices directly to `currentLoadout.choices` and the interactive skill tree drawer.
 - **`dist/index.html` & `dist/rotation_builder.html`**:
   - Rebuilt static web bundle and runtime assets (`dist/swtorsim_assets.zip`) via `tools/build_web_release.py`.
+## 2026-11-09 -- Interactive Combat Debugger & Visual Replay Suite (Option A)
+- **`src/swtorsim/debug/tracer.py` (`CombatTracer`)**:
+  - Implemented comprehensive combat trace telemetry collector capturing initial loadouts, event timelines, candidate rotation trees, hit math audits, buff lifecycles, and resource curves.
+  - **Effective Post-Buff Derived Stats**: Traced attributes from `player.stats` calculated post-initialization (after applying all baseline passives, class buffs, and hidden bonuses) rather than querying unpopulated raw GOM keys. Mastery, Power, Force/Tech Power, Critical Chance %, Critical Multiplier %, Alacrity %, Accuracy %, Weapon Damage, and Bonus Damage now accurately display effective values.
+  - **Gear & Tree Telemetry**: Extracted Tactical item, Legendary Implants, Relics, full 8-tier Skill Tree (L23-L73) with selected option indices, and rotation sequence rules.
+- **`src/swtorsim/debug/html_reporter.py`**:
+  - Built an offline, zero-dependency standalone HTML dashboard with embedded SVG timeline, Scrubber HUD, and 7 tabs:
+    1. *Interactive Timeline*: Visual track with zoom/pan and event inspector drawer.
+    2. *Initial Character & Loadout*: Tactical, Legendary Implants, and Relics showcase cards, post-buff Derived Combat Attributes, target debuffs, active roster, and searchable passives directory.
+    3. *Skill Tree & Choices*: 8-tier visual discipline tree showing options 1/2/3 and highlighting the selected talent in green.
+    4. *Rotation Sequence*: Complete ordered rotation profile with candidate pools and conditions.
+    5. *Live Rotation Decisions*: Step-by-step evaluator log explaining why abilities were picked or rejected.
+    6. *Hit Math Auditor*: Complete mechanical breakdown of each damage hit (raw, formula, critical multiplier, defense, armor).
+    7. *Event Log*: Chronological combat log with color-coded badges and search filter.
+- **`src/swtorsim/config_load.py` & `src/swtorsim/run_config.py`**:
+  - Made path resolution root-aware so relative config and discipline paths resolve against `PROJECT_ROOT` even when commands are run from `tools/` or other subdirectories.
+- **`tools/debug_sim.py` & `main.py`**:
+  - Created dedicated CLI command runner (`.\tools\pyclean.exe tools/debug_sim.py <config> [--hp] [--duration] [--output] [--json] [--no-browser]`) and added `--debug` / `--html-out` flags to `main.py`.
+- **`tests/test_extracted_load.py`**:
+  - Removed obsolete `saw_requires_tag` assertion from legacy parser schema, restoring a 100% pass rate across the full 59-test suite.

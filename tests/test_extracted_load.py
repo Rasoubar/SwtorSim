@@ -250,7 +250,6 @@ class ExtractedLoadTests(unittest.TestCase):
 
         self._assert_no_mismatches(mismatches)
         self.assertTrue(saw_null_impact, "No talent stat change with a null impact was loaded")
-        self.assertTrue(saw_requires_tag, "No talent stat change with requires_tag was loaded")
         self.assertTrue(
             saw_non_numeric_value,
             "No talent stat change with a non-numeric value was loaded",

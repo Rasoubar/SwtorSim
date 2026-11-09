@@ -259,7 +259,35 @@ def main():
         help="Launch the step-by-step terminal wizard to build a new loadout from scratch.",
     )
 
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Run single simulation with diagnostic tracer and open interactive HTML debug dashboard.",
+    )
+    parser.add_argument(
+        "--html-out",
+        default=None,
+        help="Custom output file path for the generated HTML debug dashboard.",
+    )
+
     args = parser.parse_args()
+
+    # 0. Debug HTML dashboard mode
+    if args.debug:
+        from tools.debug_sim import run_debug_simulation
+
+        cfg_arg = args.config_opt or args.config or "hatred_14gcd"
+        hp_val = parse_hp_value(args.hp) if args.hp else None
+        active_env = "pts" if args.pts else "live"
+        run_debug_simulation(
+            config_identifier=cfg_arg,
+            dummy_hp=hp_val,
+            duration=args.duration,
+            output_path=args.html_out,
+            open_browser=not args.no_browser,
+            environment=active_env,
+        )
+        return
 
     # 1. Web GUI mode
     if args.web:
