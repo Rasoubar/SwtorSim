@@ -413,6 +413,8 @@ _SKIP_BASE_STATS = frozenset({
     "STAT_cbt_damage_bonus",
     "STAT_cbt_armor_penetration", "166",
     "STAT_att_endurance",
+    "STAT_cbt_tech_energy_max", "9",
+    "STAT_cbt_force_force_max", "10",
     "STAT_cbtStealthEffectiveLevel",
 })
 

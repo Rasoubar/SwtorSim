@@ -534,6 +534,36 @@ class SimulationIntegrationTests(unittest.TestCase):
         hits_after = sim.tracker.breakdown["Corrosive Dart"]["hit_count"]
         self.assertGreater(hits_after, hits_before, "Followthrough must trigger an extra tick of Corrosive Dart")
 
+    def test_24_energy_tanks_max_energy_scaling(self):
+        """Verifies tal.agent.energy_tanks increases Sniper max energy from 100 to 110."""
+        from src.swtorsim.config_load import load_complete_loadout
+        loadout = load_complete_loadout([
+            "tal.agent.energy_tanks",
+        ])
+        stats_config = {"class_name": "sniper", "level": 80, "stats": {}}
+        sim, player, target = prepare_simulation([], stats_config, loadout, 1000000, {}, verbose=False)
+        self.assertEqual(player.resource.pool_type.lower(), "energy")
+        self.assertEqual(player.resource.max_value, 110.0)
+        self.assertEqual(player.resource.current_value, 110.0)
+
+        # Spend 30 energy, energy drops to 80
+        player.resource.spend(30.0)
+        self.assertEqual(player.resource.current_value, 80.0)
+
+        # Generate 50 energy, energy caps at 110
+        player.resource.generate(50.0)
+        self.assertEqual(player.resource.current_value, 110.0)
+
+        # Also test Force Attunement (Sorcerer)
+        sorc_loadout = load_complete_loadout([
+            "tal.sith_inquisitor.skill.force_attunement",
+        ])
+        sorc_stats = {"class_name": "sorcerer", "level": 80, "stats": {}}
+        _, sorc_player, _ = prepare_simulation([], sorc_stats, sorc_loadout, 1000000, {}, verbose=False)
+        self.assertEqual(sorc_player.resource.pool_type.lower(), "force")
+        self.assertEqual(sorc_player.resource.max_value, 600.0)
+        self.assertEqual(sorc_player.resource.current_value, 600.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -7,6 +7,7 @@ class ResourcePool:
 
     def __init__(self, pool_type: str, max_value: float = 100.0, base_regen: float = 0.0):
         self.pool_type = pool_type
+        self.base_max_value = max_value
         self.max_value = max_value
         self.base_regen = base_regen
         self.current_value = max_value
@@ -164,7 +165,35 @@ RESOURCE_POOL_MAP = {
 
 # Class (discipline tab_name, lowercase) -> resource pool type. Classes not listed use the "Force" default.
 CLASS_RESOURCE_MAP = {
+    # Imperial Agent / Smuggler
+    "sniper": "energy",
+    "operative": "energy",
+    "agent": "energy",
+    "imperial agent": "energy",
+    "gunslinger": "energy",
+    "scoundrel": "energy",
+    "smuggler": "energy",
+    # Bounty Hunter / Trooper
+    "mercenary": "heat",
+    "powertech": "heat",
+    "bounty hunter": "heat",
+    "commando": "heat",
+    "vanguard": "heat",
+    "trooper": "heat",
+    # Sith Warrior / Jedi Knight
     "marauder": "rage",
+    "juggernaut": "rage",
+    "sith warrior": "rage",
+    "sentinel": "focus",
+    "guardian": "focus",
+    "jedi knight": "focus",
+    # Sith Inquisitor / Jedi Consular
+    "assassin": "force",
+    "sorcerer": "force",
+    "sith inquisitor": "force",
+    "shadow": "force",
+    "sage": "force",
+    "jedi consular": "force",
 }
 
 
@@ -173,7 +202,7 @@ def resource_type_for_class(class_name: Optional[str]) -> str:
     return CLASS_RESOURCE_MAP.get((class_name or "").strip().lower(), "Force")
 
 
-def create_resource_pool(pool_type: str = "Force", max_value: Optional[float] = None, base_regen: float = 8.0) -> ResourcePool:
+def create_resource_pool(pool_type: str = "Force", max_value: Optional[float] = None, base_regen: Optional[float] = None) -> ResourcePool:
     """Helper to instantiate the appropriate ResourcePool subclass."""
     cls = RESOURCE_POOL_MAP.get(pool_type.lower(), StandardPool)
     if issubclass(cls, BuilderPool):
@@ -181,4 +210,9 @@ def create_resource_pool(pool_type: str = "Force", max_value: Optional[float] = 
         if max_value is None:
             return cls(pool_type=pool_type)
         return cls(pool_type=pool_type, max_value=max_value)
-    return cls(pool_type=pool_type, max_value=100.0 if max_value is None else max_value, base_regen=base_regen)
+    kwargs: dict[str, Any] = {}
+    if max_value is not None:
+        kwargs["max_value"] = max_value
+    if base_regen is not None:
+        kwargs["base_regen"] = base_regen
+    return cls(pool_type=pool_type, **kwargs)

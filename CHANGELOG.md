@@ -4,6 +4,17 @@
 
 ## Completed Fixes
 
+### 56. Energy Tanks & Max Resource Stat Scaling (STAT_cbt_tech_energy_max, STAT_cbt_force_force_max) (resources.py, entities.py, combat_math.py, test_simulation_integration.py) - [DONE]
+- Implemented maximum resource capacity scaling for Tech and Force classes:
+  - Mapped canonical class-to-resource definitions in `src/swtorsim/resources.py` (`CLASS_RESOURCE_MAP`), ensuring all 16 advanced classes (e.g. Sniper, Operative, Gunslinger, Scoundrel -> Energy; Mercenary, Powertech -> Heat; Sorcerer, Assassin -> Force; etc.) properly instantiate their respective `ResourcePool` subclass.
+  - Initialized `base_max_value` on `ResourcePool` to track the unbuffed baseline pool capacity.
+  - In `src/swtorsim/entities.py` (`Player.recalculate_stats`), aggregated `STAT_cbt_tech_energy_max` (Global ID `9`) and `STAT_cbt_force_force_max` (Global ID `10`) modifiers (supporting both flat and percentage bonuses without magnitude heuristics).
+  - Dynamically scaled `player.resource.max_value` during stat recalculation and preserved initial full capacity (`current_value = new_max`).
+  - Added stat IDs `9` and `10` to `_SKIP_BASE_STATS` in `src/swtorsim/combat_math.py` and `combat_math_unbucketed.py`.
+- Verified passive talent `tal.agent.energy_tanks` on Sniper (`EnergyPool`): maximum energy scales from 100 to 110, expanding the top 5.0 energy/sec regen bracket (>= 60 energy) to a 50 energy operating buffer.
+- Verified passive talent `tal.sith_inquisitor.skill.force_attunement` on Sorcerer: maximum force scales from 100 to 600.
+- Added regression test `test_24_energy_tanks_max_energy_scaling` to `tests/test_simulation_integration.py`.
+
 ### 55. GOM WeaponMode Architecture (Ranged=3, Melee=2, Wildcard=1) & Recharge CDR (events.py, triggers.py, abilities.py, test_ability_execution.py) - [DONE]
 - Fixed a trigger rejection issue in `src/swtorsim/triggers.py` and `src/swtorsim/events.py` where GOM `weapon_mode` represents combat weapon modes (1 = Universal Wildcard, 2 = Melee, 3 = Ranged, 4 = Cover).
 - In `src/swtorsim/events.py`: resolved `weapon_mode` directly from hit `attack_type`: `weapon_mode = 3 if attack_type == 2 else 2` for weapon attacks, and `0` for non-weapon / periodic DoTs.

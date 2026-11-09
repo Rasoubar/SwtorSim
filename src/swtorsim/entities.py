@@ -302,7 +302,7 @@ class Player(Entity):
         self.is_in_cover = False
         self.is_in_portable_cover = False
         self.is_stealthed = False
-        self.character_class = "assassin"
+        self.character_class = (name or "assassin").lower()
         self.faction = "empire"
         self.resource = create_resource_pool(
             pool_type=resource
@@ -692,6 +692,16 @@ class Player(Entity):
                     bonuses["T_Bonus_Damage_PCT"] += val
                 elif stat in ("STAT_cbt_damage_bonus",):
                     bonuses["Bonus Damage"] += val
+                elif stat in ("STAT_cbt_tech_energy_max", "9"):
+                    if modifier.is_percent:
+                        bonuses["Tech Energy Max PCT"] += val
+                    else:
+                        bonuses["Tech Energy Max Stat"] += val
+                elif stat in ("STAT_cbt_force_force_max", "10"):
+                    if modifier.is_percent:
+                        bonuses["Force Max PCT"] += val
+                    else:
+                        bonuses["Force Max Stat"] += val
 
         bonuses["Accuracy"] += self.permanent_bonuses.get("Accuracy", 0.0)
 
@@ -760,6 +770,31 @@ class Player(Entity):
         temp_stats["Tech Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Tech Accuracy"]
 
         self.stats = temp_stats
+
+        # Resource pool max value scaling
+        if getattr(self, "resource", None) is not None:
+            res = self.resource
+            pool_type = getattr(res, "pool_type", "").lower()
+            base_max = getattr(res, "base_max_value", res.max_value)
+
+            if pool_type in ("energy", "heat", "ammo"):
+                bonus_stat = bonuses.get("Tech Energy Max Stat", 0.0)
+                bonus_pct = bonuses.get("Tech Energy Max PCT", 0.0)
+            elif pool_type in ("force",):
+                bonus_stat = bonuses.get("Force Max Stat", 0.0)
+                bonus_pct = bonuses.get("Force Max PCT", 0.0)
+            else:
+                bonus_stat = 0.0
+                bonus_pct = 0.0
+
+            old_max = res.max_value
+            new_max = max(1.0, (base_max + bonus_stat) * (1.0 + bonus_pct))
+            res.max_value = new_max
+
+            if res.current_value >= old_max and pool_type != "heat":
+                res.current_value = new_max
+            elif res.current_value > new_max:
+                res.current_value = new_max
 
     def calculate_resource_cost(self, ability_name: str, base_cost: float, apply = False) -> float:
         """Calculates resource cost after percentage/flat reductions and optionally consumes buff charges."""
