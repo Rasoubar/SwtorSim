@@ -4,6 +4,20 @@
 
 ## Completed Fixes
 
+### 59. WebUI Simulation Payload Inline Choices & Path Normalization (web_gui.py, run_config.py, config_load.py, simulator_ui.html) - [DONE]
+- Fixed simulation error Invalid run config: - choices_path file not found: . on Web simulator:
+  - In src/swtorsim/web_gui.py (_resolve_simulation_inputs_from_payload):
+    - Extracted inline choices / choices_override before instantiating RunConfig, passing choices=choices_data.
+    - Only resolved choices_path if a non-empty string is provided; otherwise left it as " " instead of resolving empty path to root workspace directory (\.\).
+ - In src/swtorsim/run_config.py (alidate_run_config):
+ - Allowed choices_path validation check to pass whenever config.choices is non-empty or when path is empty or \.\.
+ - Guarded skill tree choices loading to only read choices_path when non-empty and not \.\.
+ - In src/swtorsim/config_load.py (selected_fqns_from_config):
+ - Added guard against empty/dot choices_path when resolving skill tree choices.
+ - In ools/simulator_ui.html (uildExportRunConfigObject):
+ - Cleaned exported run config payload to export choices: CURRENT_CHOICES directly without stale choices_path.
+- Recompiled web release assets via ools/build_web_release.py (dist/swtorsim_assets.zip, dist/index.html).
+
 ### 58. WebUI Run Config Export/Import Overrides & Skill Tree Descending Level Order (simulator_ui.html, web_gui.py, pyodide_bridge.py) - [DONE]
 - Fixed manual override preservation during Run Config Export and Import:
   - In `tools/simulator_ui.html` (`buildExportRunConfigObject`): exported `stats_override` alongside `choices_override`, capturing manual stat changes and tree choice customizations.

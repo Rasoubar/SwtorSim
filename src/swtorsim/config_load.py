@@ -152,7 +152,7 @@ def selected_fqns_from_config(config: RunConfig) -> List[str]:
 
     if getattr(config, "choices", None):
         choices = config.choices
-    elif config.choices_path:
+    elif config.choices_path and config.choices_path.strip() not in ("", "."):
         choices = load_json_file(config.choices_path)
     else:
         choices = {}

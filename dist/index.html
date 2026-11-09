@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794240288"></script>
+  <script src="pyodide_client.js?v=1794241061"></script>
 </head>
 <body>
 
@@ -2943,8 +2943,7 @@
       stats_path: p.stats_path,
       stats_override: p.stats_override || getStatsOverrideFromInputs(),
       rotation_path: p.rotation_path,
-      choices_path: p.choices_path,
-      choices_override: p.choices_override || CURRENT_CHOICES,
+      choices: CURRENT_CHOICES,
       tactical_fqn: p.tactical_fqn,
       legendary_fqns: p.legendary_fqns,
       relic_fqns: p.relic_fqns,

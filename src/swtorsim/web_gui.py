@@ -495,7 +495,8 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     spec_path = str(_resolve_workspace_path(raw_spec))
     stats_path = str(_resolve_workspace_path(payload.get("stats_path") or ""))
     rotation_path = str(_resolve_workspace_path(payload.get("rotation_path") or ""))
-    choices_path = str(_resolve_workspace_path(payload.get("choices_path") or ""))
+    raw_choices_path = str(payload.get("choices_path") or "").strip()
+    choices_path = str(_resolve_workspace_path(raw_choices_path)) if raw_choices_path else ""
 
     spec_data = load_json_file(spec_path)
     class_name, spec_name = discipline_names(spec_data, spec_path)
@@ -526,13 +527,23 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     in_flashpoint_operation = bool(payload.get("in_flashpoint_operation", True))
     combat_distance = max(0.0, float(payload.get("combat_distance", 30.0)))
 
+    # Resolve choices
+    choices_data = {}
+    if choices_path and Path(choices_path).is_file():
+        choices_data = load_json_file(choices_path)
+    if isinstance(payload.get("choices_override"), dict) and payload["choices_override"]:
+        choices_data = {str(k): int(v) for k, v in payload["choices_override"].items()}
+    elif isinstance(payload.get("choices"), dict) and payload["choices"]:
+        choices_data = {str(k): int(v) for k, v in payload["choices"].items()}
+
     config = RunConfig(
         spec_path=_to_workspace_rel(spec_path),
         class_name=class_name,
         spec=spec_name,
         stats_path=_to_workspace_rel(stats_path),
         rotation_path=_to_workspace_rel(rotation_path),
-        choices_path=_to_workspace_rel(choices_path),
+        choices=choices_data,
+        choices_path=_to_workspace_rel(choices_path) if choices_path else "",
         tactical_fqn=tactical_fqn,
         legendary_fqns=legendary_fqns,
         relic_fqns=relic_fqns,
@@ -561,13 +572,6 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     # Ensure CWD is SWTORSIM_ROOT for validate_run_config relative path checks
     os.chdir(SWTORSIM_ROOT)
     validate_run_config(config)
-
-    # Resolve choices and FQNs
-    choices_data = {}
-    if choices_path and Path(choices_path).is_file():
-        choices_data = load_json_file(choices_path)
-    if isinstance(payload.get("choices_override"), dict) and payload["choices_override"]:
-        choices_data = payload["choices_override"]
 
     baseline = spec_data.get("active_abilities", [])
     tree_fqns = resolve_skill_tree_fqns(spec_data.get("skill_tree", {}), choices_data)

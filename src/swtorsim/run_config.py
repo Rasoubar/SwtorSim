@@ -216,7 +216,7 @@ def validate_run_config(
         ("gear catalog", actual_gear),
         ("relic catalog", actual_relics),
     ):
-        if label == "choices_path" and (config.choices or not path or not str(path).strip()):
+        if label == "choices_path" and (config.choices or not path or not str(path).strip() or str(path).strip() == "."): 
             continue
         if not isinstance(path, str) or not path.strip():
             errors.append(f"{label} must be a non-empty path.")
@@ -261,7 +261,7 @@ def validate_run_config(
     try:
         if config.choices:
             choices = config.choices
-        elif config.choices_path:
+        elif config.choices_path and config.choices_path.strip() not in ("", "."):
             choices = _load_json(config.choices_path)
         else:
             choices = {}
