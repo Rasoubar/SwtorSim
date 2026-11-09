@@ -812,11 +812,25 @@ def handle_cooldown_modification(sim, caster, action):
     is_reset = bool(action.get("reset", False)) or (is_pct and amount <= -1.0)
 
     for abl in _find_target_abilities(caster, action):
-        if action_type == "modify_recharge_time":
-            if is_pct:
-                abl.recharge_time = max(0.0, abl.recharge_time * (1.0 + amount))
-            else:
-                abl.recharge_time = max(0.0, abl.recharge_time + amount)
+        if abl.has_charges:
+            # For charge-based abilities, modify_recharge_time (or modify_cooldown when un-paired) reduces in-flight recharge timer
+            if action_type == "modify_cooldown":
+                continue
+            if abl.charges < abl.max_charges and getattr(abl, "active_charge_event", None) is not None:
+                delta = (amount * abl.recharge_time) if is_pct else amount
+                target_time = getattr(abl, "recharge_target_time", None)
+                if target_time is not None:
+                    new_target = max(sim.current_time, round(target_time + delta, 4))
+                    if new_target <= sim.current_time:
+                        abl.active_charge_event = None
+                        abl.recharge_target_time = None
+                        abl.restore_charge(caster, sim, amount=1, from_timer=True)
+                    else:
+                        from src.swtorsim.events import ChargeRestoreEvent
+                        new_ev = ChargeRestoreEvent(caster, abl)
+                        abl.active_charge_event = new_ev
+                        abl.recharge_target_time = new_target
+                        sim.schedule_absolute(new_target, new_ev)
             continue
 
         for cd_key in (abl.name, abl.fqn):
@@ -1211,6 +1225,7 @@ class Ability:
         self.charges: Optional[int] = blueprint.max_charges
         self.recharge_time = getattr(blueprint, "recharge_time", self.cooldown)
         self.active_charge_event = None
+        self.recharge_target_time: Optional[float] = None
 
     @property
     def has_charges(self) -> bool:
@@ -1245,6 +1260,7 @@ class Ability:
             actual_recharge = caster.calculate_cooldown(self.recharge_time, ability=self)
         event = ChargeRestoreEvent(caster, self)
         self.active_charge_event = event
+        self.recharge_target_time = round(sim.current_time + actual_recharge, 4)
         sim.schedule_relative(actual_recharge, event)
 
     def consume_charge(self, caster, sim):
@@ -1269,6 +1285,7 @@ class Ability:
 
         if self.charges == self.max_charges:
             self.active_charge_event = None
+            self.recharge_target_time = None
         elif from_timer:
             self.schedule_recharge(caster, sim)
 

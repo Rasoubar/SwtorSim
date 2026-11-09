@@ -198,5 +198,85 @@ class AbilityExecutionTests(unittest.TestCase):
         )
 
 
+    def test_modify_recharge_time_advances_charge_restore_event(self):
+        """Verifies that modify_recharge_time reduces in-flight recharge timer on charge-based abilities."""
+        from src.swtorsim.abilities import handle_cooldown_modification
+        charge_abl = self._find_ability(lambda a: a.has_charges and a.charges > 0)
+        initial_charges = charge_abl.charges
+
+        # Consume 1 charge to start recharge chain
+        charge_abl.consume_charge(self.player, self.sim)
+        self.assertEqual(charge_abl.charges, initial_charges - 1)
+        self.assertIsNotNone(charge_abl.active_charge_event)
+        orig_target_time = charge_abl.recharge_target_time
+
+        # Apply modify_recharge_time action of -2.0s
+        action = {
+            "action_type": "modify_recharge_time",
+            "floats": {"amount": -2.0},
+            "ints": {"ability_spec": charge_abl.fqn},
+            "bools": {"is_percentage": False},
+        }
+        handle_cooldown_modification(self.sim, self.player, action)
+        self.assertAlmostEqual(charge_abl.recharge_target_time, orig_target_time - 2.0, places=3)
+
+    def test_weapon_mode_wildcard_trigger_rejects_periodic_dots(self):
+        """Verifies that weapon_mode: 3 triggers (e.g. Lazer Focus) reject DoTs (weapon_mode: 0) and accept weapon hits."""
+        proc_count = 0
+        class MockBranch:
+            triggers = [{
+                "trigger": "on_damage_dealt",
+                "ints": {"actor": 1, "damage_type": 5, "weapon_mode": 3, "spell_type": 1},
+                "floats": {"proc_chance_percent": 100.0},
+            }]
+            def execute(self, inner_sim, caster, target, context=None, ability=None):
+                nonlocal proc_count
+                proc_count += 1
+        branch = MockBranch()
+        class MockAbl:
+            def execute_branch(self, sim, branch, caster, target, context=None):
+                branch.execute(sim, caster, target, context=context)
+                return True
+        self.sim.triggers.subscribe("test_owner", MockAbl(), branch, self.player, self.player)
+
+        # 1. Periodic DoT event: weapon_mode = 0, is_periodic = True
+        dot_ctx = {
+            "caster": self.player,
+            "target": self.target,
+            "is_periodic": True,
+            "is_weapon_attack": False,
+            "weapon_mode": 0,
+            "damage_type": 4,
+            "spell_type": 2,
+        }
+        self.sim.triggers.dispatch("on_damage_dealt", self.sim, dot_ctx)
+        self.assertEqual(proc_count, 0, "DoT tick with weapon_mode=0 must NOT proc weapon_mode=3 trigger!")
+
+        # 2. Melee weapon attack: weapon_mode = 2 (attack_type=1)
+        melee_ctx = {
+            "caster": self.player,
+            "target": self.target,
+            "is_periodic": False,
+            "is_weapon_attack": True,
+            "weapon_mode": 2,
+            "damage_type": 1,
+            "spell_type": 1,
+        }
+        self.sim.triggers.dispatch("on_damage_dealt", self.sim, melee_ctx)
+        self.assertEqual(proc_count, 0, "Melee weapon hit (weapon_mode=2) must NOT proc weapon_mode=3 (Ranged) trigger!")
+
+        # 3. Direct Ranged weapon attack: weapon_mode = 3 (attack_type=2)
+        ranged_ctx = {
+            "caster": self.player,
+            "target": self.target,
+            "is_periodic": False,
+            "is_weapon_attack": True,
+            "weapon_mode": 3,
+            "damage_type": 1,
+            "spell_type": 1,
+        }
+        self.sim.triggers.dispatch("on_damage_dealt", self.sim, ranged_ctx)
+        self.assertEqual(proc_count, 1, "Ranged weapon hit (weapon_mode=3) must proc weapon_mode=3 trigger!")
+
 if __name__ == "__main__":
     unittest.main()

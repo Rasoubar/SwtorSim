@@ -126,7 +126,10 @@ class DamageHit(Event):
             )
         )
         is_weapon_attack = attack_type in (1, 2) and not is_periodic
-        weapon_mode = 2 if is_weapon_attack else 0
+        if is_weapon_attack:
+            weapon_mode = 3 if attack_type == 2 else 2  # 3 = Ranged, 2 = Melee
+        else:
+            weapon_mode = 0  # Non-weapon / periodic DoT
         ctx = {
             "caster": self.source,
             "target": self.target,

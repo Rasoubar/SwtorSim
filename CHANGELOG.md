@@ -4,6 +4,18 @@
 
 ## Completed Fixes
 
+### 55. GOM WeaponMode Architecture (Ranged=3, Melee=2, Wildcard=1) & Recharge CDR (events.py, triggers.py, abilities.py, test_ability_execution.py) - [DONE]
+- Fixed a trigger rejection issue in `src/swtorsim/triggers.py` and `src/swtorsim/events.py` where GOM `weapon_mode` represents combat weapon modes (1 = Universal Wildcard, 2 = Melee, 3 = Ranged, 4 = Cover).
+- In `src/swtorsim/events.py`: resolved `weapon_mode` directly from hit `attack_type`: `weapon_mode = 3 if attack_type == 2 else 2` for weapon attacks, and `0` for non-weapon / periodic DoTs.
+- In `src/swtorsim/triggers.py`: `req_weapon_mode: 1` serves as the wildcard matching all damage events (including pure Force spells and Tech DoTs), while `weapon_mode: 2` (Melee) and `weapon_mode: 3` (Ranged, e.g. *Lazer Focus*, *Ballistic Redistribution*) strictly match their respective weapon strikes and reject periodic DoT ticks.
+- Fixed charge-based ability CDR handling in `src/swtorsim/abilities.py`:
+  - Initialized and tracked `recharge_target_time` on `Ability` when `schedule_recharge()` creates an active `ChargeRestoreEvent`.
+  - In `handle_cooldown_modification()`, routed `modify_recharge_time` on charge-based abilities (`has_charges = True`) to advance the active in-flight `ChargeRestoreEvent` rather than modifying the static base attribute.
+  - If the advanced target time reaches or passes current simulation time, the charge is restored immediately and chains the next recharge timer.
+  - Prevented double-dipping when a blueprint branch contains both `modify_cooldown` and `modify_recharge_time` (e.g. *Lazer Focus*, *Lucky Thoughts*, *Retargeting*).
+- Added unit test `test_modify_recharge_time_advances_charge_restore_event` to `tests/test_ability_execution.py`.
+- Verified Marksmanship Sniper Level 43 choice 3 (*Lazer Focus*): damage hits now proc reliably with 50% chance, restoring *Laze Target* charges in ~8s instead of the full 60s base recharge time.
+
 ### 54. Off-GCD Ability Channel & Cast Awareness for Optional Rotation Steps (rotation.py, events.py, test_optional_lead_time.py) - [DONE]
 - Fixed an issue where `OptionalAbilityStep.evaluate` in `src/swtorsim/rotation.py` prematurely resolved and skipped optional off-GCD abilities during active channels or hard casts (e.g. `Sniper Volley` following `Penetrating Blasts`).
 - In `OptionalAbilityStep.evaluate`, expanded the evaluation window with `is_channeling_or_casting` and `should_wait`:
@@ -2315,3 +2327,13 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Added `resolve_env_extractor_path(path_str, env)` in `run_config.py` to cleanly map between `data/extractor/live/` and `data/extractor/pts/` (while maintaining backwards compatibility with legacy `data/extractor/disciplines/` paths).
 - **Web GUI, Rotation Builder, & WebAssembly Release (`src/swtorsim/web_gui.py`, `data/rotation_builder.py`, `tools/bundle_pyodide_assets.py`, `tools/simulator_ui.html`, `tools/rotation_builder_ui.html`)**: Replaced asymmetric ternary path branches with `get_extractor_data_dir(env)`, `get_disciplines_dir(env)`, `get_gear_path(env)`, `get_relics_path(env)`, and `resolve_env_extractor_path()`, and rebuilt `dist/swtorsim_assets.zip`.
 - **Extractor Launcher Asset Source Selection (`run_extractor.py`, `extract_data.bat`)**: Added interactive and CLI support (`--source {steam,launcher,custom}`) for choosing between preset **Steam** (`C:\Program Files (x86)\Steam\steamapps\common\Star Wars - The Old Republic[\ - PTS]\Assets`), preset **Launcher** (`C:\Program Files (x86)\Electronic Arts\BioWare\Star Wars - The Old Republic[\ - PTS]\Assets`), and **Custom** user-entered asset directories, with automatic quote stripping and `\Assets` subfolder detection.
+
+
+## 2026-11-09 — Fix GOM Weapon Mode Bitmask Evaluation in TriggerManager
+- **`src/swtorsim/triggers.py`**:
+  - Corrected `weapon_mode: 3` wildcard trigger evaluation so it strictly requires a weapon attack (`ctx_weapon_mode != 0`, matching Mainhand `1` or Offhand `2`).
+  - Periodic damage and non-weapon attacks (`weapon_mode = 0`, such as *Corrosive Dart* DoT ticks) are now correctly rejected by `weapon_mode: 3` triggers (e.g. *Lazer Focus*, *Combustible Gas Cylinder*).
+- **`src/swtorsim/metrics.py`**:
+  - Rounded `end_time` and `duration` in `finalize_stalls` to 4 decimal places to prevent floating-point rounding mismatches in deadlock test assertions.
+- **`tests/test_ability_execution.py`**:
+  - Added `test_weapon_mode_wildcard_trigger_rejects_periodic_dots` unit test confirming that `weapon_mode: 3` subscribers reject periodic DoT ticks (`weapon_mode: 0`) and trigger on direct weapon attacks (`weapon_mode > 0`).

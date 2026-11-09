@@ -185,7 +185,8 @@ class TriggerManager:
 
                 req_weapon_mode = ints.get("weapon_mode")
                 if req_weapon_mode and req_weapon_mode != 1:
-                    if context.get("weapon_mode") != req_weapon_mode:
+                    ctx_weapon_mode = context.get("weapon_mode") or 0
+                    if ctx_weapon_mode != req_weapon_mode:
                         continue
 
             # 5. Proc chance check (STAT_eff_trigger_proc_chance_percent_modifier_fixed / 228)

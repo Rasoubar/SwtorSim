@@ -92,12 +92,13 @@ class Metrics:
     def finalize_stalls(self, current_time: float):
         """Closes any open stall window at fight completion, marking permanent deadlocks if unrecovered."""
         if self._active_stall is not None:
-            duration = max(0.0, current_time - self._active_stall["start"])
-            self.total_stalled_time += duration
+            end_time = round(current_time, 4)
+            duration = round(max(0.0, end_time - self._active_stall["start"]), 4)
+            self.total_stalled_time = round(self.total_stalled_time + duration, 4)
             self.permanent_stall = True
             self.stall_events.append({
                 **self._active_stall,
-                "end": current_time,
+                "end": end_time,
                 "duration": duration,
                 "recovered": False,
             })
