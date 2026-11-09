@@ -23,7 +23,7 @@ class Tester:
         self.enable_stem_matching = enable_stem_matching
         self.seed = seed
 
-    def run_test(self, show_buffs: bool = True):
+    def run_test(self, show_buffs: bool = True, tracer=None, config=None):
         """Orchestrates a single simulation."""
         print(f"--- Starting Single Test Run ({self.duration}s) ---")
         sim, player, target = prepare_simulation(
@@ -33,9 +33,12 @@ class Tester:
             self.dummy_hp,
             self.debuff_module,
             seed=self.seed,
+            tracer=tracer,
+            config=config,
         )
         sim.run_timed(duration=self.duration, target=target)
         sim.tracker.print_metrics(sim.current_time, show_buffs=show_buffs)
+        return sim, player, target
 
     def run_monte_carlo(self, iterations=1000):
         """Orchestrates monte carlo workflow."""

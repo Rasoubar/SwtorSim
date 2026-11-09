@@ -219,6 +219,8 @@ class TriggerManager:
                 "owner_effect_key": sub["effect_key"],
                 "owner_entity": sub["target"],
                 "effect_tags": set(context.get("effect_tags") or ()) | set(sub.get("effect_tags") or ()),
+                "is_proc": True,
+                "trigger_name": event_name,
             }
             if effective_interval > 0.0:
                 sub["next_allowed_time"] = sim.current_time + effective_interval
@@ -229,5 +231,14 @@ class TriggerManager:
                 sub["target"],
                 context=branch_ctx,
             )
+            if ran and getattr(sim, "tracer", None) is not None:
+                sim.tracer.record_proc_dispatch(
+                    timestamp=sim.current_time,
+                    trigger_name=event_name,
+                    source_name=getattr(sub["ability"], "name", "Ability"),
+                    effect_name=str(sub.get("effect_key") or getattr(sub["ability"], "name", "")),
+                    passed=True,
+                    reason="Trigger conditions satisfied",
+                )
             if not ran and effective_interval > 0.0:
                 sub["next_allowed_time"] = sim.current_time

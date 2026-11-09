@@ -164,6 +164,24 @@ class Entity:
                     stacks=getattr(effect_instance, "stacks", 1),
                     is_passive=is_passive,
                 )
+            if getattr(sim, "tracer", None) is not None:
+                if existing is not None and not getattr(existing, "is_expired", False):
+                    sim.tracer.record_buff_refreshed(
+                        current_time,
+                        self.name,
+                        effect_key,
+                        stacks=getattr(effect_instance, "stacks", 1),
+                        duration=duration,
+                    )
+                else:
+                    sim.tracer.record_buff_applied(
+                        current_time,
+                        self.name,
+                        effect_key,
+                        stacks=getattr(effect_instance, "stacks", 1),
+                        duration=duration,
+                        is_passive=is_passive,
+                    )
             if hasattr(sim, "triggers") and ability is not None:
                 sim.triggers.unsubscribe(owner_id)
                 effect_tags = (
@@ -250,6 +268,8 @@ class Entity:
                 popped_effect.is_expired = True
             if sim_ref is not None and hasattr(sim_ref, "tracker") and sim_ref.tracker is not None and hasattr(sim_ref.tracker, "log_effect_removed"):
                 sim_ref.tracker.log_effect_removed(self.name, r_id, getattr(sim_ref, "current_time", 0.0))
+            if sim_ref is not None and getattr(sim_ref, "tracer", None) is not None:
+                sim_ref.tracer.record_buff_expired(getattr(sim_ref, "current_time", 0.0), self.name, r_id)
             owner_id = getattr(popped_effect, "owner_id", None)
             if owner_id and sim_ref is not None and hasattr(sim_ref, "triggers"):
                 sim_ref.triggers.unsubscribe(owner_id)

@@ -491,9 +491,24 @@ def execute_single_action(sim, caster, target, action, source_name, ability=None
         "regen_energy",
         "restore_action_points",
     ):
-        handle_resource_gain_action(sim, caster, action, delay, ability=ability)
+        handle_resource_gain_action(
+            sim,
+            caster,
+            action,
+            delay,
+            ability=ability,
+            source_name=source_name,
+            context=context,
+        )
     elif action_type in ("spend_energy", "spend_force"):
-        handle_resource_spend_action(caster, action)
+        handle_resource_spend_action(
+            caster,
+            action,
+            sim=sim,
+            source_name=source_name,
+            ability=ability,
+            context=context,
+        )
     elif action_type in ("cooldown_mod", "modify_cooldown", "modify_recharge_time"):
         handle_cooldown_modification(sim, caster, action)
     elif action_type in ("grant_charge", "modify_ability_stack_charge"):
@@ -703,7 +718,15 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
 
 
 
-def handle_resource_gain_action(sim, caster, action, delay: float = 0.0, ability: Any = None):
+def handle_resource_gain_action(
+    sim,
+    caster,
+    action,
+    delay: float = 0.0,
+    ability: Any = None,
+    source_name: str = "",
+    context: Optional[dict[str, Any]] = None,
+):
     """Schedules or executes the resource gain event (legacy & extracted schemas)."""
     floats = action.get("floats") or {}
     flat = (
@@ -776,14 +799,45 @@ def handle_resource_gain_action(sim, caster, action, delay: float = 0.0, ability
     if regen <= 0.0:
         return
 
-    gain_event = ResourceGainEvent(caster, regen)
+    # Determine descriptive reason for telemetry / logs
+    if context and context.get("is_proc"):
+        raw_key = str(context.get("owner_effect_key") or "")
+        clean_key = raw_key.rsplit("_", 1)[0] if ("_" in raw_key and raw_key.rsplit("_", 1)[1].isdigit()) else raw_key
+        origin = (
+            getattr(ability, "name", None)
+            or clean_key
+            or source_name
+            or "Proc"
+        )
+        reason = f"Proc: {origin}"
+    elif context and context.get("owner_effect_key"):
+        raw_key = str(context["owner_effect_key"])
+        origin = raw_key.rsplit("_", 1)[0] if ("_" in raw_key and raw_key.rsplit("_", 1)[1].isdigit()) else raw_key
+        reason = f"Proc: {origin}"
+    else:
+        origin = (
+            source_name
+            or getattr(ability, "name", None)
+            or (getattr(context.get("effect"), "name", None) if context else None)
+            or "Resource Gain"
+        )
+        reason = f"{origin}"
+
+    gain_event = ResourceGainEvent(caster, regen, source=reason)
     if delay > 0.0:
         sim.schedule_relative(delay, gain_event)
     else:
         gain_event.resolve(sim)
 
 
-def handle_resource_spend_action(caster, action):
+def handle_resource_spend_action(
+    caster,
+    action,
+    sim=None,
+    source_name: str = "",
+    ability: Any = None,
+    context: Optional[dict[str, Any]] = None,
+):
     """Spends resources for extracted spend_energy / spend_force actions."""
     resource = getattr(caster, "resource", None)
     if resource is None:
@@ -799,6 +853,28 @@ def handle_resource_spend_action(caster, action):
     )
     if spend > 0.0:
         resource.spend(spend)
+        if sim is not None and getattr(sim, "tracer", None) is not None:
+            if context and context.get("is_proc"):
+                raw_key = str(context.get("owner_effect_key") or "")
+                clean_key = raw_key.rsplit("_", 1)[0] if ("_" in raw_key and raw_key.rsplit("_", 1)[1].isdigit()) else raw_key
+                origin = (
+                    getattr(ability, "name", None)
+                    or clean_key
+                    or source_name
+                    or "Proc"
+                )
+                reason = f"Proc Spend: {origin}"
+            else:
+                origin = source_name or getattr(ability, "name", None) or "Resource Spend"
+                reason = f"Spend: {origin}"
+            sim.tracer.record_resource_change(
+                timestamp=sim.current_time,
+                entity_name=caster.name,
+                resource_type=getattr(resource, "pool_type", "Resource"),
+                current=resource.current,
+                delta=-spend,
+                reason=reason,
+            )
 
 
 def handle_cooldown_modification(sim, caster, action):
@@ -1231,6 +1307,16 @@ class Ability:
     def has_charges(self) -> bool:
         return self.max_charges is not None and self.max_charges > 0
 
+    @property
+    def is_channel(self) -> bool:
+        act = self.activation or getattr(self.blueprint, "activation", None) or {}
+        return isinstance(act, dict) and act.get("type") == "channel"
+
+    @property
+    def activation_duration(self) -> float:
+        act = self.activation or getattr(self.blueprint, "activation", None) or {}
+        return float(act.get("duration", 0.0)) if isinstance(act, dict) else 0.0
+
     def execute_effect(self, effect_id, caster, target, sim, context=None):
         """Delegates effect execution directly to the target Effect instance."""
         effect = self.effects.get(effect_id)
@@ -1296,8 +1382,6 @@ class Ability:
         if self.triggers_gcd and sim.current_time < caster.next_gcd:
             return False
 
-        # Protect active channels by default: neither GCD nor off-GCD abilities can interrupt
-        # unless explicit clipping is permitted
         if getattr(caster, "active_channel", None) is not None and not allow_clip:
             return False
 
@@ -1307,11 +1391,11 @@ class Ability:
         if self.has_charges and self.charges < 1:
             return False
 
-        if sim.current_time < caster.cooldowns.get(self.name, 0.0):
+        cd_rem = caster.cooldowns.get(self.name, 0.0) - sim.current_time
+        if cd_rem > 1e-4:
             return False
 
         modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply=False)
-
         if not caster.resource.can_afford(modified_cost):
             return False
 
@@ -1330,6 +1414,51 @@ class Ability:
         ability_target = target if is_aggressive else caster
         conds = self.conditions or getattr(self.blueprint, "conditions", None) or {}
         return validate_all(conds, caster, ability_target, sim=sim)
+
+    def check_cast_eligibility(self, caster: "Player", target: "Dummy", sim, allow_clip: bool = False) -> tuple[bool, str]:
+        """Evaluates whether the ability can be cast and returns (can_cast, reason). Intended for diagnostic tracers."""
+        if hasattr(self, "apply_charge_modifiers") and caster is not None:
+            self.apply_charge_modifiers(caster)
+        if self.triggers_gcd and sim.current_time < caster.next_gcd:
+            gcd_rem = max(0.0, caster.next_gcd - sim.current_time)
+            return False, f"On GCD ({gcd_rem:.2f}s remaining)"
+
+        if getattr(caster, "active_channel", None) is not None and not allow_clip:
+            return False, f"Active channel: {getattr(caster.active_channel, 'ability_name', 'Channel')}"
+
+        if getattr(caster, "active_cast", None) is not None and not allow_clip:
+            return False, f"Active cast: {getattr(caster.active_cast, 'ability_name', 'Cast')}"
+
+        if self.has_charges and self.charges < 1:
+            return False, f"No charges (0/{self.max_charges})"
+
+        cd_rem = caster.cooldowns.get(self.name, 0.0) - sim.current_time
+        if cd_rem > 1e-4:
+            return False, f"On cooldown ({cd_rem:.2f}s remaining)"
+
+        modified_cost = caster.calculate_resource_cost(self.name, self.energy_cost, apply=False)
+        if not caster.resource.can_afford(modified_cost):
+            return False, f"Insufficient resource (needs {modified_cost:.1f}, has {caster.resource.current:.1f})"
+
+        is_aggressive = (
+            "tag.abl.utility.aggressive_action" in self.tags
+            or "tag.abl.utility.is_basic_attack" in self.tags
+            or (
+                not self.tags
+                and any(
+                    getattr(b, "is_attack", False)
+                    for eff in self.effects.values()
+                    for b in getattr(eff, "branches", ())
+                )
+            )
+        )
+        ability_target = target if is_aggressive else caster
+        conds = self.conditions or getattr(self.blueprint, "conditions", None) or {}
+        if not validate_all(conds, caster, ability_target, sim=sim):
+            return False, "Conditions / requirements not met"
+
+        return True, "Ready"
+
 
     def apply_cooldown_locks(self, caster, sim):
         """Deducts charges or sets cooldown, and sets GCD lockouts."""
@@ -1374,8 +1503,50 @@ class Ability:
             caster.active_cast = None
             caster.is_casting = False
 
-        final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply=True)
-        caster.resource.spend(final_spend)
+        # Resolve activation up front: timed casts (activation type "cast" with a positive scaled
+        # cast time) pay their resource cost on completion in CastFinishEvent, not at cast start.
+        activation = self.activation or getattr(self.blueprint, "activation", None) or {}
+        act_type = activation.get("type") if isinstance(activation, dict) else None
+        act_dur = float(activation.get("duration", 0.0)) if isinstance(activation, dict) else 0.0
+        scaled_cast_time = 0.0
+        if act_type == "cast" and act_dur > 0.0:
+            scaled_cast_time = (
+                caster.calculate_cast_time(act_dur, ability=self)
+                if hasattr(caster, "calculate_cast_time")
+                else act_dur
+            )
+        is_timed_cast = scaled_cast_time > 0.0 and sim is not None
+
+        final_spend = 0.0
+        if not is_timed_cast:
+            final_spend = caster.calculate_resource_cost(self.name, self.energy_cost, apply=True)
+            caster.resource.spend(final_spend)
+        if getattr(sim, "tracer", None) is not None:
+            is_chan = self.is_channel
+            act_dur = self.activation_duration
+            dur = (
+                caster.calculate_channel_duration(act_dur, ability=self)
+                if is_chan
+                else (caster.calculate_cast_time(act_dur, ability=self) if act_dur > 0.0 else 0.0)
+            )
+            sim.tracer.record_cast_start(
+                timestamp=sim.current_time,
+                caster_name=caster.name,
+                ability_name=self.name,
+                ability_fqn=self.fqn,
+                duration=dur,
+                is_channel=is_chan,
+                target_name=target.name if target else "",
+            )
+            if final_spend > 0:
+                sim.tracer.record_resource_change(
+                    timestamp=sim.current_time,
+                    entity_name=caster.name,
+                    resource_type=getattr(caster.resource, "pool_type", "Resource"),
+                    current=caster.resource.current,
+                    delta=-final_spend,
+                    reason=f"Cast {self.name}",
+                )
         if getattr(sim, "verbose", True):
             print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
 
@@ -1420,21 +1591,12 @@ class Ability:
                 )
         ability_target = target if is_aggressive else caster
 
-        # Check if ability has channel or cast activation
-        activation = self.activation or getattr(self.blueprint, "activation", None) or {}
-        act_type = activation.get("type") if isinstance(activation, dict) else None
-        act_dur = float(activation.get("duration", 0.0)) if isinstance(activation, dict) else 0.0
-
+        # Route by channel or cast activation (resolved above, before resource spending)
         dispatch_post_activate = True
         if act_type == "channel" and act_dur > 0.0:
             self._start_channel(caster, ability_target, sim, act_dur)
         elif act_type == "cast" and act_dur > 0.0:
-            scaled_cast_time = (
-                caster.calculate_cast_time(act_dur, ability=self)
-                if hasattr(caster, "calculate_cast_time")
-                else act_dur
-            )
-            if scaled_cast_time > 0.0 and sim is not None:
+            if is_timed_cast:
                 caster.active_cast = self
                 caster.is_casting = True
                 from src.swtorsim.events import CastFinishEvent

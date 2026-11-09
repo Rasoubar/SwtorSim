@@ -132,15 +132,90 @@ class PriorityBlockStep:
     def evaluate(self, player, target, sim) -> bool:
         """Mandatory block step. Resolves if any valid priority option casts successfully."""
         is_early = (getattr(player, "next_gcd", 0.0) - sim.current_time) > 1e-4
+        tracer = getattr(sim, "tracer", None)
+
+        # Fast path when no diagnostic tracer is attached
+        if tracer is None:
+            for option in self.pool:
+                wanna_cast = validate_all(option.get("rules", {}), player, target, sim)
+                if wanna_cast:
+                    ability = player.ability_db.get(option["ability_id"])
+                    # If we are early (before next_gcd), only off-GCD abilities can be cast
+                    if is_early and (not ability or getattr(ability, "triggers_gcd", True)):
+                        continue
+                    if ability and ability.cast(player, target, sim):
+                        return True
+            return False
+
+        # Diagnostic path when tracer is active
+        candidates_trace = []
         for option in self.pool:
             wanna_cast = validate_all(option.get("rules", {}), player, target, sim)
-            if wanna_cast:
-                ability = player.ability_db.get(option["ability_id"])
-                # If we are early (before next_gcd), only off-GCD abilities can be cast
-                if is_early and (not ability or getattr(ability, "triggers_gcd", True)):
-                    continue
-                if ability and ability.cast(player, target, sim):
-                    return True
+            ability = player.ability_db.get(option["ability_id"])
+            ability_name = ability.name if ability else option["ability_id"]
+            if not wanna_cast:
+                candidates_trace.append({
+                    "ability": ability_name,
+                    "rules_passed": False,
+                    "can_cast": False,
+                    "reason": "Priority rules not satisfied",
+                    "accepted": False,
+                })
+                continue
+            if is_early and (not ability or getattr(ability, "triggers_gcd", True)):
+                candidates_trace.append({
+                    "ability": ability_name,
+                    "rules_passed": True,
+                    "can_cast": False,
+                    "reason": "Early check (triggers GCD)",
+                    "accepted": False,
+                })
+                continue
+            if ability:
+                can_cast, reason = (
+                    ability.check_cast_eligibility(player, target, sim)
+                    if hasattr(ability, "check_cast_eligibility")
+                    else (ability.can_cast(player, target, sim), "Ready")
+                )
+                if can_cast:
+                    if ability.cast(player, target, sim):
+                        candidates_trace.append({
+                            "ability": ability_name,
+                            "rules_passed": True,
+                            "can_cast": True,
+                            "reason": "Cast initiated",
+                            "accepted": True,
+                        })
+                        tracer.record_rotation_evaluation(
+                            timestamp=sim.current_time,
+                            step_index=getattr(self, "step_index", 0),
+                            step_type="priority_block",
+                            step_name=self.name,
+                            candidates=candidates_trace,
+                            chosen_ability=ability_name,
+                            is_stall=False,
+                        )
+                        return True
+                    else:
+                        reason = "Cast execution returned False"
+
+                candidates_trace.append({
+                    "ability": ability_name,
+                    "rules_passed": True,
+                    "can_cast": False,
+                    "reason": reason,
+                    "accepted": False,
+                })
+
+        tracer.record_rotation_evaluation(
+            timestamp=sim.current_time,
+            step_index=getattr(self, "step_index", 0),
+            step_type="priority_block",
+            step_name=self.name,
+            candidates=candidates_trace,
+            chosen_ability=None,
+            is_stall=not is_early,
+        )
         return False
 
 

@@ -11,11 +11,13 @@ class Simulation:
         in_flashpoint_operation: bool | None = None,
         verbose: bool = True,
         seed: int | None = None,
+        tracer=None,
     ):
         self.queue = []
         self.current_time = 0.0
         self.event_counter = 0
         self.seed = seed
+        self.tracer = tracer
         self.tracker = Metrics()
         self.tracker.seed = seed
         self.triggers = TriggerManager()
@@ -51,3 +53,5 @@ class Simulation:
                 break
         if hasattr(self, "tracker") and hasattr(self.tracker, "finalize_stalls"):
             self.tracker.finalize_stalls(self.current_time)
+        if getattr(self, "tracer", None) is not None:
+            self.tracer.finalize(self.current_time, metrics=getattr(self, "tracker", None))

@@ -12,6 +12,15 @@ class ResourcePool:
         self.base_regen = base_regen
         self.current_value = max_value
 
+    @property
+    def current(self) -> float:
+        """Convenience alias for current_value."""
+        return self.current_value
+
+    @current.setter
+    def current(self, value: float):
+        self.current_value = value
+
     def can_afford(self, amount: float) -> bool:
         """Returns True if the pool has sufficient resource to pay `amount`."""
         raise NotImplementedError

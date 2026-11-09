@@ -35,7 +35,7 @@ class AbilityCast(Event):
 class ApplyDamageLand(Event):
     """Applies pre-calculated damage to the target. Needed because of impact_delay, when damage is calculated earlier
     than it is applied."""
-    def __init__(self, source, target, final_damage, is_crit, ability_name, attack_type=None, damage_type=None):
+    def __init__(self, source, target, final_damage, is_crit, ability_name, attack_type=None, damage_type=None, math_audit=None):
         super().__init__()
         self.source = source
         self.target = target
@@ -44,6 +44,7 @@ class ApplyDamageLand(Event):
         self.ability_name = ability_name
         self.attack_type = attack_type
         self.damage_type = damage_type
+        self.math_audit = math_audit
 
     def resolve(self, sim):
         """Applies pre-calculated damage to the target, logs it into metrics."""
@@ -81,6 +82,21 @@ class ApplyDamageLand(Event):
                 sim.triggers.dispatch("on_kill", sim, death_ctx)
         if getattr(sim, "verbose", True):
             print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
+        if getattr(sim, "tracer", None) is not None:
+            from src.swtorsim.metrics import ATTACK_TYPE_NAMES, DAMAGE_TYPE_NAMES
+            at_name = ATTACK_TYPE_NAMES.get(self.attack_type, str(self.attack_type)) if self.attack_type else ""
+            dt_name = DAMAGE_TYPE_NAMES.get(self.damage_type, str(self.damage_type)) if self.damage_type else ""
+            sim.tracer.record_damage_hit(
+                timestamp=sim.current_time,
+                ability_name=self.ability_name,
+                damage=self.final_damage,
+                is_crit=self.is_crit,
+                target_name=self.target.name,
+                target_hp_after=self.target.hp,
+                attack_type=at_name,
+                damage_type=dt_name,
+                math_audit=getattr(self, "math_audit", None),
+            )
 
 class DamageHit(Event):
     """ Represents a hit execution. Holds the data needed to calculate damage, and trigger procs."""
@@ -102,6 +118,8 @@ class DamageHit(Event):
         action_with_ctx["tags"] = self.tags
         action_with_ctx["ability_fqn"] = self.ability_fqn
         action_with_ctx["ability_name"] = self.ability_name
+        if getattr(sim, "tracer", None) is not None:
+            action_with_ctx["record_audit"] = True
 
         final_damage, is_crit = calculate_hit(self.source, self.target, action_with_ctx)
         self.is_crit = is_crit
@@ -157,6 +175,7 @@ class DamageHit(Event):
             self.ability_name,
             attack_type=resolved_at,
             damage_type=resolved_dt,
+            math_audit=action_with_ctx.get("_audit"),
         )
         instant_land.resolve(sim)
 
@@ -530,6 +549,35 @@ class CastFinishEvent(Event):
 
         self.caster.active_cast = None
         self.caster.is_casting = False
+
+        # Timed casts pay their resource cost on completion (cost modifiers evaluated now).
+        # If the pool can no longer cover the cost, the cast fails without executing effects.
+        resource = getattr(self.caster, "resource", None)
+        if resource is not None and hasattr(self.caster, "calculate_resource_cost"):
+            final_spend = self.caster.calculate_resource_cost(
+                self.ability.name, getattr(self.ability, "energy_cost", 0.0), apply=True
+            )
+            if final_spend > 0.0:
+                if not resource.spend(final_spend):
+                    if getattr(sim, "verbose", True):
+                        print(f"[{sim.current_time:.3f}s] {self.caster.name} failed casting {self.ability.name} (insufficient resource)")
+                    target_time = (
+                        self.caster.get_next_action_time(sim.current_time)
+                        if hasattr(self.caster, "get_next_action_time")
+                        else max(sim.current_time, getattr(self.caster, "next_gcd", sim.current_time))
+                    )
+                    sim.schedule_absolute(target_time, PlayerReady(self.caster, getattr(self.caster, "current_target", self.target)))
+                    return
+                if getattr(sim, "tracer", None) is not None:
+                    sim.tracer.record_resource_change(
+                        timestamp=sim.current_time,
+                        entity_name=self.caster.name,
+                        resource_type=getattr(resource, "pool_type", "Resource"),
+                        current=resource.current,
+                        delta=-final_spend,
+                        reason=f"Cast {self.ability.name}",
+                    )
+
         if getattr(sim, "verbose", True):
             print(f"[{sim.current_time:.3f}s] {self.caster.name} finished casting {self.ability.name}")
 
@@ -568,19 +616,44 @@ class ResourceTick(Event):
         """Applies alacrity, generates the resource, and schedules the next tick."""
         alacrity_pct = self.player.stats.get("Alacrity", 0.0)
         alacrity_mod = 1.0 + alacrity_pct
+        old_val = getattr(self.player.resource, "current", 0.0)
         self.player.resource.tick_passive_regen(self.interval, alacrity_mod, player=self.player) #generate
+        if getattr(sim, "tracer", None) is not None:
+            sim.tracer.record_resource_change(
+                timestamp=sim.current_time,
+                entity_name=self.player.name,
+                resource_type=getattr(self.player.resource, "pool_type", "Resource"),
+                current=self.player.resource.current,
+                delta=self.player.resource.current - old_val,
+                reason="Passive Regen Tick",
+            )
         sim.schedule_relative(self.interval, self) #schedule next
 
 class ResourceGainEvent(Event):
     """Represents one-time resource gain events."""
-    def __init__(self, player, amount):
+
+    def __init__(self, player, amount: float, source: str = "Resource Gain"):
         super().__init__("Resource Gain")
         self.player = player
-        self.amount = amount
+        self.amount = float(amount)
+        self.source = source
 
     def resolve(self, sim):
-        """Adds the resource value to the resource pool."""
+        """Adds the resource value to the resource pool and records trace telemetry."""
+        if not hasattr(self.player, "resource") or self.player.resource is None:
+            return
+        old_val = getattr(self.player.resource, "current", 0.0)
         self.player.resource.generate(self.amount)
+        new_val = getattr(self.player.resource, "current", 0.0)
+        if getattr(sim, "tracer", None) is not None:
+            sim.tracer.record_resource_change(
+                timestamp=sim.current_time,
+                entity_name=self.player.name,
+                resource_type=getattr(self.player.resource, "pool_type", "Resource"),
+                current=new_val,
+                delta=self.amount,
+                reason=self.source,
+            )
 
 class ChargeRestoreEvent(Event):
     """Represents a single charge restore event"""
