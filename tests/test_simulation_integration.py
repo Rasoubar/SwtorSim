@@ -706,6 +706,37 @@ class SimulationIntegrationTests(unittest.TestCase):
         after_armor = target.stats["Armor"]
         self.assertAlmostEqual(after_armor, 13780.0, delta=1.0, msg="Sundered must not double-apply on dummy")
 
+    def test_29_channel_effects_cleanup_retains_entry_hit_on_subsequent_casts(self):
+        """Verifies channel cleanup properly clears 0-duration channel effects so on_apply hits land on recasts."""
+        from src.swtorsim.config_load import load_complete_loadout
+
+        loadout = load_complete_loadout([
+            "abl.agent.skill.marksmanship.penetrating_blasts",
+        ])
+        stats_config = {"class_name": "sniper", "level": 80, "stats": {}}
+        sim, player, target = prepare_simulation([], stats_config, loadout, 10000000, {}, verbose=False)
+        player.is_in_cover = True
+        player.stats["Ranged Accuracy"] = 1.10
+        player.stats["Main Accuracy"] = 1.10
+
+        pb = player.ability_db["abl.agent.skill.marksmanship.penetrating_blasts"]
+
+        # First cast (5 ticks + 1 initial on_apply = 6 hits)
+        pb.cast(player, target, sim)
+        sim.run_timed(duration=2.5, target=target)
+        pb_stats = sim.tracker.breakdown.get("Penetrating Blasts", {})
+        self.assertEqual(pb_stats.get("hit_count"), 6)
+
+        # Channel-bound 0-duration effect #1 must be cleared from target
+        self.assertNotIn("abl.agent.skill.marksmanship.penetrating_blasts:1", target.effects)
+
+        # Reset cooldown and recast PB (must land another 6 hits, reaching 12 hits total)
+        player.cooldowns.clear()
+        player.next_gcd = sim.current_time
+        pb.cast(player, target, sim)
+        sim.run_timed(duration=5.0, target=target)
+        self.assertEqual(pb_stats.get("hit_count"), 12)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2640,3 +2640,14 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
   - Created dedicated CLI command runner (`.\tools\pyclean.exe tools/debug_sim.py <config> [--hp] [--duration] [--output] [--json] [--no-browser]`) and added `--debug` / `--html-out` flags to `main.py`.
 - **`tests/test_extracted_load.py`**:
   - Removed obsolete `saw_requires_tag` assertion from legacy parser schema, restoring a 100% pass rate across the full 59-test suite.
+
+## 2026-11-10 -- Fix Channel Cleanup for Entry Hit on Recast & Preserve Independent Duration Debuffs
+- **`src/swtorsim/abilities.py` (`cleanup_channel_effects`)**:
+  - Fixed an issue where channel entry-hit effects (such as `Penetrating Blasts_1`, which has `duration: 0.0` but `is_passive: True`) were bypassed by channel cleanup due to `or getattr(eff_inst, "is_passive", False)`.
+  - Because `Penetrating Blasts_1` persisted in `target.effects`, subsequent casts of Penetrating Blasts did not re-trigger `on_apply` damage, causing every recast to deal 5 hits instead of 6 hits (~1,400 DPS loss across 34 casts).
+  - Streamlined the retention condition to `if getattr(eff_inst, "duration", 0.0) > 0.0: continue`, which removes 0-duration channel entry effects while retaining independent duration debuffs/buffs (e.g. `Sundered (Physical)` with 45.0s duration, including permanent dummy debuffs).
+- **`tests/test_simulation_integration.py` (`test_29_channel_effects_cleanup_retains_entry_hit_on_subsequent_casts`)**:
+  - Added unit test asserting that successive casts of Penetrating Blasts trigger their full entry hit + channel ticks (6 hits per cast, 12 hits total across 2 casts) and verified proper channel effect cleanup.
+- **Verification**:
+  - All 80/80 unit tests pass via `.\tools\pyclean.exe -m unittest discover -s tests`.
+  - Benchmarked against user parse (`test.json`): restored DPS from 32,110.7 to 33,515.3 (204 PB hits, matching baseline `88fdede` 33,511.5 DPS).
