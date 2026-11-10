@@ -1544,6 +1544,33 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(html_bytes)
                 return
 
+            if route.startswith("/icons/"):
+                icon_name = Path(route).name
+                if not icon_name.lower().endswith(".png"):
+                    icon_name = f"{icon_name}.png"
+                icon_file = None
+                for cand_dir in (
+                    SWTORSIM_ROOT / "tools" / "web" / "icons",
+                    SWTORSIM_ROOT / "data" / "extractor" / "live" / "icons",
+                    SWTORSIM_ROOT / "data" / "extractor" / "pts" / "icons",
+                ):
+                    cand_path = cand_dir / icon_name
+                    if cand_path.is_file():
+                        icon_file = cand_path
+                        break
+                if icon_file is None:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                png_bytes = icon_file.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(png_bytes)))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(png_bytes)
+                return
+
             env = (qs.get("env") or ["live"])[0]
             if route == "/api/catalog":
                 self._send_json(get_simulator_catalog(env=env))

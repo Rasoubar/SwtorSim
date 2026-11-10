@@ -4,6 +4,30 @@
 
 ## Completed Fixes
 
+### 64. Ability & Effect Icon Extraction, Web Serving & Rotation Builder UI Integration - [DONE]
+- **Standalone Icon Extraction Pipeline (`tools/extract_icons.py`)**:
+  - Implemented standalone extractor tool that auto-detects SWTOR game asset directories (Steam / EA / standard paths).
+  - Scans parsed ability and talent JSON blueprints for referenced icon specifications.
+  - Resolves FNV-1a 64-bit hashes against `data/extractor/hashes.bin` and extracts DDS textures directly from `swtor_main_gfx_assets_1.tor`.
+  - Converts DDS textures to RGBA PNGs using Pillow into `data/extractor/live/icons/` and mirrors to `tools/web/icons/` (1,035 icons extracted and converted in ~15s).
+- **Talent Icon Extraction Enhancement (`src/extractor/talents.py` & `src/extractor/cli.py`)**:
+  - Added `talTalentIcon` extraction to `_build_talent_payload` to populate `"icon"` on talent nodes.
+  - Updated `build_talents` to collect talent icon stems into `icon_stems`.
+- **Loadout Catalog & HTTP Route Wiring (`data/rotation_builder.py` & `src/swtorsim/web_gui.py`)**:
+  - Updated `discover_loadout_catalog()` to propagate `"icon"` on active abilities, skill tree entries, buffs, debuffs, and procs.
+  - Added `/icons/<filename>.png` HTTP static handler to `RotationBuilderRequestHandler` and `SimulatorRequestHandler`.
+- **Rotation Builder UI Visual Enhancement (`tools/rotation_builder_ui.html`)**:
+  - Integrated high-resolution 28x28 / 26x26 / 22x22 icon thumbnails with rounded borders and hover zoom across:
+    - Left Palette (Abilities, Buffs, Debuffs, Procs tabs).
+    - Skill Tree Choice drawer buttons.
+    - Timeline Fixed Cast and Optional Cast step headers.
+    - Priority Block pool rows.
+  - Added graceful fallback handling (`onerror="this.style.display='none';"`) and lazy loading.
+- **Static Web Distribution (`tools/build_web_release.py`)**:
+  - Integrated icon copying to `dist/icons/` during static Pyodide WASM web release builds.
+- **Verification & Testing (`tests/test_icon_integration.py`, `tests/test_cast_resource_timing.py`)**:
+  - Added unit and integration tests verifying hash indexing, catalog propagation, and icon directories (70/70 tests passing).
+
 ### 63. Proc Energy Regain Telemetry Wiring in Debug Dashboard (`events.py`, `abilities.py`, `triggers.py`, `html_reporter.py`) - [DONE]
 - **Tracer Telemetry for `ResourceGainEvent` (`src/swtorsim/events.py`)**:
   - Wired `ResourceGainEvent.resolve(sim)` to pass `sim.tracer.record_resource_change(...)` with actual current pool value, restored amount (`delta`), and descriptive origin source.

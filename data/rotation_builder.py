@@ -289,14 +289,16 @@ def discover_loadout_catalog(
                     bp_path = parsed_dir / fqn_to_relative_path(fqn)
                     bp_name = fqn.split(".")[-1].replace("_", " ").title()
                     bp_type = "talent" if fqn.startswith("tal.") else "ability"
+                    bp_icon = ""
                     if bp_path.is_file():
                         try:
                             bp_doc = load_json_file(str(bp_path))
                             bp_name = bp_doc.get("name") or bp_name
                             bp_type = bp_doc.get("type") or bp_type
+                            bp_icon = bp_doc.get("icon") or ""
                         except Exception:
                             pass
-                    entries.append({"fqn": fqn, "name": bp_name, "type": bp_type})
+                    entries.append({"fqn": fqn, "name": bp_name, "type": bp_type, "icon": bp_icon})
                 skill_tree_info[lvl_str][str(slot_key)] = entries
 
     initial_fqns = loadout_fqns(
@@ -368,6 +370,7 @@ def discover_loadout_catalog(
                     "fqn": fqn,
                     "name": parent_name,
                     "slug": ability_name_to_slug(parent_name, fqn),
+                    "icon": doc.get("icon") or "",
                     "triggers_gcd": doc.get("triggers_gcd") is not False,
                     "cooldown": float(doc.get("cooldown") or 0.0),
                     "energy_cost": float(doc.get("energy_cost") or 0.0),
@@ -429,6 +432,8 @@ def discover_loadout_catalog(
             stack_charge = eff.get("stack_charge") or {}
             max_stacks = int(stack_charge.get("max", stack_charge.get("nr_occurances", 1)) or 1)
 
+            eff_icon = eff.get("icon") or doc.get("icon") or ""
+
             # Check lockout tags (e.g. tag.abl.sith_inquisitor.bloodletting_lockout)
             if any("lockout" in t.lower() for t in eff_tags):
                 proc_label = _strip_effect_number_suffix(raw_eff_name, parent_name)
@@ -439,6 +444,7 @@ def discover_loadout_catalog(
                     "source_fqn": fqn,
                     "icd": duration,
                     "kind": "lockout_effect",
+                    "icon": eff_icon,
                 }
                 continue
 
@@ -456,6 +462,7 @@ def discover_loadout_catalog(
                                 "source_fqn": fqn,
                                 "icd": icd_val,
                                 "kind": "trigger_icd",
+                                "icon": eff_icon,
                             }
 
             # Skip passive container effects that don't expire
@@ -540,6 +547,7 @@ def discover_loadout_catalog(
                         "duration": duration,
                         "max_stacks": max_stacks,
                         "is_dot": is_dot,
+                        "icon": eff_icon,
                     }
             else:
                 existing = caster_buffs_map.get(clean_name)
@@ -551,6 +559,7 @@ def discover_loadout_catalog(
                         "duration": duration,
                         "max_stacks": max_stacks,
                         "is_proc": is_proc_init or ability_type == "passive",
+                        "icon": eff_icon,
                     }
                 if is_proc_init and clean_name not in procs_map:
                     procs_map[clean_name] = {
@@ -559,6 +568,7 @@ def discover_loadout_catalog(
                         "source_fqn": fqn,
                         "icd": duration,
                         "kind": "proc_buff",
+                        "icon": eff_icon,
                     }
 
     abilities_list.sort(key=lambda a: (a["name"].lower(), a["fqn"]))
@@ -1068,6 +1078,33 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(html_bytes)
+                return
+
+            if route.startswith("/icons/"):
+                icon_name = Path(route).name
+                if not icon_name.lower().endswith(".png"):
+                    icon_name = f"{icon_name}.png"
+                icon_file = None
+                for cand_dir in (
+                    SWTORSIM_ROOT / "tools" / "web" / "icons",
+                    SWTORSIM_ROOT / "data" / "extractor" / "live" / "icons",
+                    SWTORSIM_ROOT / "data" / "extractor" / "pts" / "icons",
+                ):
+                    cand_path = cand_dir / icon_name
+                    if cand_path.is_file():
+                        icon_file = cand_path
+                        break
+                if icon_file is None:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                png_bytes = icon_file.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(png_bytes)))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(png_bytes)
                 return
 
             if route == "/api/catalog":
