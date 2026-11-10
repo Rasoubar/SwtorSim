@@ -12,8 +12,13 @@ from extractor.graph import NodeRecord
 _RANK_STAT_LIST_FIELDS = (
     "talStatsList",
     "talModStatsList",
+    # Tag-conditional stat lists. "talTalentStatsIfTagExists" is the legacy
+    # schema name; the game renamed it to "talStatsIfTagExists".
     "talTalentStatsIfTagExists",
+    "talStatsIfTagExists",
 )
+
+_TAG_BLOCK_FIELDS = frozenset(("talTalentStatsIfTagExists", "talStatsIfTagExists"))
 
 
 def _field_value(record: NodeRecord, name: str) -> Any:
@@ -50,7 +55,7 @@ def _impact_from_key(key: str | None) -> dict[str, str] | None:
     return None
 
 
-def _parse_stat_change(stat_fields: list[dict[str, Any]]) -> dict[str, Any]:
+def _parse_stat_change(stat_fields: list[dict[str, Any]], in_tag_block: bool = False) -> dict[str, Any]:
     fields = _fields_to_dict(stat_fields)
     enum_type = fields.get("talStatInfoStatEnumType")
     if "talStatInfoStatValue" in fields:
@@ -69,9 +74,13 @@ def _parse_stat_change(stat_fields: list[dict[str, Any]]) -> dict[str, Any]:
     }
     if enum_type is not None:
         change["enum_type"] = enum_type
-    requires_tag = fields.get("talTalentStatTag")
-    if requires_tag:
-        change["requires_tag"] = requires_tag
+    # Only entries from the tag-conditional list carry a meaningful tag. The
+    # new "talStatInfoTag" field exists on plain stat entries too (empty), so
+    # it must not be read outside the if-tag-exists block.
+    if in_tag_block:
+        requires_tag = fields.get("talTalentStatTag") or fields.get("talStatInfoTag")
+        if requires_tag:
+            change["requires_tag"] = requires_tag
     return change
 
 
@@ -96,8 +105,9 @@ def _stat_changes_from_rank_block(rank_fields: list[dict[str, Any]]) -> list[dic
         block = blocks_by_name.get(field_name)
         if block is None:
             continue
+        in_tag_block = field_name in _TAG_BLOCK_FIELDS
         for stat_fields in _stat_entries_from_list_field(block):
-            changes.append(_parse_stat_change(stat_fields))
+            changes.append(_parse_stat_change(stat_fields, in_tag_block))
     return changes
 
 
