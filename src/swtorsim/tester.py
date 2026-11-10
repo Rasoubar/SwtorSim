@@ -86,8 +86,9 @@ class Tester:
             )
             sim.run_timed(duration, target)
 
-            elapsed_time = sim.current_time
-            calculated_dps = sim.tracker.total_damage / elapsed_time
+            combat_start = getattr(sim, "combat_start_time", None) or 0.0
+            elapsed_time = max(0.0, sim.current_time - combat_start)
+            calculated_dps = sim.tracker.total_damage / elapsed_time if elapsed_time > 0 else 0.0
 
             ability_data_summary = {
                 name: {

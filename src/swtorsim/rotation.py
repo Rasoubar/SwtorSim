@@ -19,7 +19,12 @@ class Rotation:
 
     def build_steps(self, steps_config):
         """On setup builds the rotation according to config"""
-        for step_data in steps_config:
+        raw_list = (
+            (steps_config.get("sequence") or steps_config.get("steps") or [])
+            if isinstance(steps_config, dict)
+            else (steps_config or [])
+        )
+        for step_data in raw_list:
             if step_data["type"] == "fixed":
                 lead = step_data.get("lead_time") if "lead_time" in step_data else step_data.get("pre_cast_offset")
                 self.sequence.append(FixedAbilityStep(step_data["ability_id"], lead_time=lead))

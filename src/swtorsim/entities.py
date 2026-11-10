@@ -14,7 +14,7 @@ from src.swtorsim.combat_curves import (
     derived_stat,
 )
 from src.swtorsim.combat_math import calc_dr
-from src.swtorsim.effects import ActiveEffect
+from src.swtorsim.effects import ActiveEffect, EffectCollection
 
 
 class Entity:
@@ -30,7 +30,7 @@ class Entity:
         self.is_in_cover = False
         self.is_in_portable_cover = False
         self.is_stealthed = False
-        self.effects = {}
+        self.effects = EffectCollection()
         self.stats = {}
         self.active_channel = None
         self.is_channeling = False
@@ -102,12 +102,23 @@ class Entity:
             target=self,
             sim=sim,
         )
-        raw_effect_name = getattr(effect, "name", None)
-        effect_key = (
-            raw_effect_name
-            if raw_effect_name
-            else f"{effect_instance.name or effect_instance.fqn}:{effect_instance.number}"
+        parent_fqn = (
+            getattr(getattr(ability, "blueprint", None), "fqn", None)
+            or getattr(ability, "fqn", None)
+            or getattr(ability, "name", "")
         )
+        effect_number = getattr(effect, "number", None)
+        raw_effect_name = getattr(effect, "name", None)
+
+        if parent_fqn and effect_number is not None:
+            canonical_id = f"{parent_fqn}:{effect_number}"
+        elif getattr(effect_instance, "fqn", None) and getattr(effect_instance, "number", None) is not None:
+            canonical_id = f"{effect_instance.fqn}:{effect_instance.number}"
+        else:
+            canonical_id = raw_effect_name or effect_instance.name or f"effect_{id(effect_instance)}"
+
+        effect_key = canonical_id
+        display_name = raw_effect_name or effect_instance.name or effect_key
 
         raw_tick = float(getattr(effect, "tick_interval", 0.0) or 0.0)
         if raw_tick > 0.0 and caster is not None and hasattr(caster, "calculate_effect_tick"):
@@ -159,7 +170,7 @@ class Entity:
             if hasattr(sim, "tracker") and sim.tracker is not None and hasattr(sim.tracker, "log_effect_applied"):
                 sim.tracker.log_effect_applied(
                     self.name,
-                    effect_key,
+                    display_name,
                     current_time,
                     stacks=getattr(effect_instance, "stacks", 1),
                     is_passive=is_passive,
@@ -169,7 +180,7 @@ class Entity:
                     sim.tracer.record_buff_refreshed(
                         current_time,
                         self.name,
-                        effect_key,
+                        display_name,
                         stacks=getattr(effect_instance, "stacks", 1),
                         duration=duration,
                     )
@@ -177,7 +188,7 @@ class Entity:
                     sim.tracer.record_buff_applied(
                         current_time,
                         self.name,
-                        effect_key,
+                        display_name,
                         stacks=getattr(effect_instance, "stacks", 1),
                         duration=duration,
                         is_passive=is_passive,
@@ -266,10 +277,11 @@ class Entity:
                 continue
             if hasattr(popped_effect, "is_expired"):
                 popped_effect.is_expired = True
+            display_name = getattr(popped_effect, "name", None) or getattr(popped_effect, "fqn", None) or r_id
             if sim_ref is not None and hasattr(sim_ref, "tracker") and sim_ref.tracker is not None and hasattr(sim_ref.tracker, "log_effect_removed"):
-                sim_ref.tracker.log_effect_removed(self.name, r_id, getattr(sim_ref, "current_time", 0.0))
+                sim_ref.tracker.log_effect_removed(self.name, display_name, getattr(sim_ref, "current_time", 0.0))
             if sim_ref is not None and getattr(sim_ref, "tracer", None) is not None:
-                sim_ref.tracer.record_buff_expired(getattr(sim_ref, "current_time", 0.0), self.name, r_id)
+                sim_ref.tracer.record_buff_expired(getattr(sim_ref, "current_time", 0.0), self.name, display_name)
             owner_id = getattr(popped_effect, "owner_id", None)
             if owner_id and sim_ref is not None and hasattr(sim_ref, "triggers"):
                 sim_ref.triggers.unsubscribe(owner_id)
@@ -288,7 +300,7 @@ class Entity:
                 continue
             if any("lockout" in t for t in getattr(eff, "tags", ())):
                 continue
-            if getattr(eff, "name", None) == effect_name:
+            if getattr(eff, "name", None) == effect_name or getattr(eff, "fqn", None) == effect_name:
                 return True
         return False
 

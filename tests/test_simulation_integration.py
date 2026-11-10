@@ -609,6 +609,76 @@ class SimulationIntegrationTests(unittest.TestCase):
         gs_cost = gs_player.calculate_resource_cost(pr.name, pr.energy_cost)
         self.assertEqual(gs_cost, 10.0, "Energy Barrels must increase Penetrating Rounds cost by 10.0 on Gunslinger")
 
+    def test_26_penetrating_blasts_resets_followthrough_after_snipe(self):
+        """Verifies PB's reset_followthrough effect fires Recoil Control's reset even when Snipe's same-named Followthrough proc is active."""
+        from src.swtorsim.config_load import load_complete_loadout
+        loadout = load_complete_loadout([
+            "abl.agent.snipe",
+            "abl.agent.skill.marksmanship.followthrough",
+            "abl.agent.skill.marksmanship.penetrating_blasts",
+            "abl.agent.skill.marksmanship.recoil_control",
+        ])
+        stats_config = {"class_name": "sniper", "level": 80, "stats": {}}
+        sim, player, target = prepare_simulation([], stats_config, loadout, 10000000, {}, verbose=False)
+        player.is_in_cover = True
+        for k in ("Ranged Accuracy", "Main Accuracy", "Tech Accuracy"):
+            player.stats[k] = 1.10
+
+        snipe = player.ability_db["abl.agent.snipe"]
+        ft = player.ability_db["abl.agent.skill.marksmanship.followthrough"]
+        pb = player.ability_db["abl.agent.skill.marksmanship.penetrating_blasts"]
+
+        def cast_and_wait(abl, wait):
+            self.assertTrue(abl.can_cast(player, target, sim), f"{abl.name} must be castable")
+            abl.cast(player, target, sim)
+            sim.run_timed(duration=sim.current_time + wait, target=target)
+
+        cast_and_wait(snipe, 1.6)
+        cast_and_wait(ft, 1.6)
+        self.assertIn(ft.name, player.cooldowns, "Followthrough must be on cooldown")
+        cast_and_wait(snipe, 1.6)
+        self.assertIn("Followthrough", player.effects, "Snipe must apply its Followthrough proc")
+        cast_and_wait(pb, 2.5)
+
+        self.assertIn("Recoil Control_3", player.effects, "Recoil Control reset effect must be applied by PB")
+        self.assertNotIn(ft.name, player.cooldowns, "PB must fully reset Followthrough cooldown after Snipe")
+        self.assertNotIn(ft.fqn, player.cooldowns)
+
+    def test_27_canonical_effect_ids_and_collection_dual_lookup(self):
+        """Verifies canonical effect ID keying and dual-lookup transparency in EffectCollection."""
+        from src.swtorsim.effects import ActiveEffect, EffectCollection
+
+        coll = EffectCollection()
+        eff_snipe = ActiveEffect(fqn="abl.agent.snipe", name="Followthrough", number=2)
+        eff_pb = ActiveEffect(fqn="abl.agent.skill.marksmanship.penetrating_blasts", name="Followthrough", number=3)
+
+        coll[eff_snipe.canonical_id] = eff_snipe
+        coll[eff_pb.canonical_id] = eff_pb
+
+        # 1. Canonical keys are distinct and both exist in collection
+        self.assertEqual(len(coll), 2)
+        self.assertIn("abl.agent.snipe:2", coll)
+        self.assertIn("abl.agent.skill.marksmanship.penetrating_blasts:3", coll)
+
+        # 2. Dual lookup by display name resolves transparently
+        self.assertIn("Followthrough", coll)
+        self.assertEqual(coll["Followthrough"].name, "Followthrough")
+        self.assertIsNotNone(coll.get("Followthrough"))
+        self.assertEqual(len(coll.get_all("Followthrough")), 2)
+
+        # 3. Popping one canonical instance leaves the other active and name lookup still succeeds
+        coll.pop("abl.agent.snipe:2")
+        self.assertEqual(len(coll), 1)
+        self.assertNotIn("abl.agent.snipe:2", coll)
+        self.assertIn("abl.agent.skill.marksmanship.penetrating_blasts:3", coll)
+        self.assertIn("Followthrough", coll)
+        self.assertEqual(coll["Followthrough"].fqn, "abl.agent.skill.marksmanship.penetrating_blasts")
+
+        # 4. Popping by display name removes remaining matching instance
+        coll.pop("Followthrough")
+        self.assertEqual(len(coll), 0)
+        self.assertNotIn("Followthrough", coll)
+
 
 if __name__ == "__main__":
     unittest.main()

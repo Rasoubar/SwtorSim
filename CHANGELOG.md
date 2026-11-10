@@ -4,12 +4,115 @@
 
 ## Completed Fixes
 
-### 64. Talent Extractor: Renamed Tag-Conditional Stat Fields (src/extractor/talents.py) - [DONE]
+### 70. Talent Extractor: Renamed Tag-Conditional Stat Fields (src/extractor/talents.py) - [DONE]
 - A game patch renamed the GOM schema fields for tag-conditional talent stats: `talTalentStatsIfTagExists` -> `talStatsIfTagExists` (rank block list) and `talTalentStatTag` -> `talStatInfoTag` (per stat entry). The old names no longer exist in the current `gom.js` schema, so the extractor silently dropped every tag-conditional stat entry.
 - This is what broke `tests/test_extracted_load.py::test_every_parsed_file_round_trips` on the `saw_requires_tag` existence assertion (previously tracked in the TODO queue).
 - Fix: `_RANK_STAT_LIST_FIELDS` now accepts both the legacy and current list names; `_parse_stat_change` gained an `in_tag_block` flag and only reads the tag (legacy `talTalentStatTag` or current `talStatInfoTag`) for entries from the if-tag-exists block. The new `talStatInfoTag` field exists (empty) on plain stat entries too, so it must not be read outside the tag block.
 - Verification: full live re-extraction recovers 8 tag-conditional stat entries across 6 talents (Trooper: Incendiary Ignition, Gravitating Bolt x2, Gravitating Compound; Bounty Hunter: Tracing Residue, Signature Shot x2, Incendiary Ignition). Full test suite 26/26 passing.
 - Follow-up: the current schema also has `talStatInfoTagAppliedByCaster` and `talStatInfoTagObject` on stat entries, not captured yet - worth modeling before the engine starts consuming `requires_tag`.
+### 69. Canonical Effect IDs and EffectCollection Dual-Lookup Architecture (`effects.py`, `entities.py`, `abilities.py`, `setup.py`) - [DONE]
+- **Architectural Motivation**:
+  - Previously, `entity.effects` was a standard dictionary keyed by effect display name (`effect_key = raw_effect_name`).
+  - Across the 367 effect names shared by multiple abilities (with 215 having conflicting tags, durations, or action types), applying a same-named effect clobbered the existing effect in `self.effects[effect_key]`, prematurely un-subscribing proc listeners via `sim.triggers.unsubscribe`, deleting stat modifiers from `recalculate_stats()`, and desynchronizing `EffectExpire` and `DotTick` scheduled events.
+- **Canonical Effect ID & EffectCollection (`effects.py`, `entities.py`, `abilities.py`, `setup.py`)**:
+  - Implemented `ActiveEffect.canonical_id` property computing `f"{fqn}:{number}"` (matching SWTOR GOM's authoritative `ability/number` schema).
+  - Implemented `EffectCollection(dict)` in `src/swtorsim/effects.py` supporting dual-lookup:
+    - Primary keys are canonical effect IDs (`abl.agent.snipe:2`, `abl.agent.skill.marksmanship.penetrating_blasts:3`), allowing distinct effects to coexist without collision.
+    - Transparent name-based lookups (`__contains__`, `__getitem__`, `get`, `pop`, `get_all`): rotational rules, telemetry, and unit tests using display names (`"Followthrough"`, `"Recklessness"`) resolve across active instances.
+  - Updated `Entity.apply_effect` to store effects under their canonical ID while passing `display_name` to `sim.tracker` and `sim.tracer`.
+  - Updated `Effect.execute` in `abilities.py` to evaluate refresh state against the exact canonical ID.
+  - Updated `Entity.cleanup_expired_effects` to resolve and log user-facing display names upon effect expiration/removal.
+- **Verification (`tests/test_simulation_integration.py :: test_27_canonical_effect_ids_and_collection_dual_lookup`)**:
+  - Added unit test asserting concurrent coexistence of same-named effects, dual lookup by display name and canonical ID, and isolated popping.
+  - Full regression pass: 78/78 tests passing (100% pass rate).
+
+### 68. Penetrating Blasts Followthrough Reset After Snipe (`entities.py`) - [DONE]
+- **Root Cause (`entities.py :: Entity.apply_effect`)**:
+  - Effects are keyed by name. Snipe (effect 2) and Penetrating Blasts (effect 3) both apply an effect named `Followthrough` (by-tag stacking on `tag.abl.agent.follow_through`); only PB's carries `tag.abl.agent.reset_followthrough`.
+  - When PB finished channeling while Snipe's proc was still active, the dispatch context flagged `include_effect_refreshes=True`, so Recoil Control's `on_effect_received` listener (`include_effect_refreshes: false`) rejected it and the 100% Followthrough cooldown reset (`modify_cooldown`, `amount=-1.0`, `is_percentage=true`) never fired.
+- **Fix**: A refresh is now only flagged when the existing instance is the same blueprint effect (matching ability `fqn` and effect `number`). A different effect replacing a same-named / by-tag instance counts as a fresh application.
+- **Verification (`tests/test_simulation_integration.py :: test_26_penetrating_blasts_resets_followthrough_after_snipe`)**:
+  - Snipe -> Followthrough -> Snipe -> Penetrating Blasts: asserts `Recoil Control_3` is applied and Followthrough's cooldown is cleared. Fails without the fix, passes with it.
+  - Full regression pass: 77/77 tests passing (100% pass rate).
+
+### 67. Pre-Cast & Pre-Combat Sequencing with First-Damage Combat Clock Activation (`engine.py`, `events.py`, `metrics.py`, `run_config.py`, `setup.py`, `web_gui.py`, `tester.py`) - [DONE]
+- **First-Damage Combat Clock Parity (`engine.py`, `metrics.py`, `events.py`)**:
+  - Aligned combat clock initialization with live SWTOR combat logs and StarParse: `combat_start_time` is dynamically captured on the exact timestamp the first damaging hit lands (`ApplyDamageLand`).
+  - Updated `Simulation.run_timed` to evaluate stopping conditions relative to `combat_start_time + duration`, guaranteeing the full designated combat window is simulated regardless of pre-cast duration.
+  - Added `Simulation.get_combat_duration()` and updated `Metrics.get_combat_duration()` and `Metrics.print_metrics()` to compute DPS as `total_damage / (sim.current_time - combat_start_time)`, preventing pre-combat cast delays from deflating DPS metrics.
+- **Pre-Combat Execution Engine & Event Lifecycle (`events.py`, `setup.py`)**:
+  - Implemented `PreCombatEvent` in `src/swtorsim/events.py` to step through pre-combat sequences (`stealth`, offensive cooldowns, hard-cast openers, channels) prior to priority rotation activation.
+  - Automatically advances steps respecting cast times (`calculate_cast_time`), channel durations (`calculate_channel_duration`), and GCDs (`calculate_gcd`).
+  - Once pre-combat steps conclude, hands off immediately to `PlayerReady` at `max(sim.current_time, player.next_gcd)`, allowing the player to engage the rotation off-GCD without artificial delay.
+- **RunConfig & Web GUI Integration (`run_config.py`, `setup.py`, `web_gui.py`, `tester.py`, `rotation.py`, `rotation_builder.py`)**:
+  - Added `precast` (string or dict) and `pre_combat` (list of strings or dicts) fields to `RunConfig`.
+  - Added `normalize_pre_combat()` helper to sanitize and deduplicate precast abilities and multi-step pre-combat queues.
+  - Integrated pre-cast support across single runs and multi-core worker slices in `web_gui.py` and `tester.py`.
+  - Added dictionary wrapper support (`{"sequence": [...]}` or `{"steps": [...]}`) to `Rotation.build_steps` and `normalize_rotation_steps` in `data/rotation_builder.py`.
+  - Wired precast/pre-combat into `run_dry_run_preview` in `data/rotation_builder.py` with combat duration-based DPS calculation.
+- **Verification (`tests/test_precast.py`)**:
+  - Created comprehensive unit test suite covering:
+    - String, dict, and mixed list input normalization with deduplication.
+    - Hard-cast ability pre-cast with alacrity scaling starting clock when damage lands.
+    - Multi-step pre-combat staging (`stealth` + `recklessness` + cast) verifying stealth breaks and reckless charges consume on damage.
+    - Backwards compatibility verifying default 0.0s start when no pre-cast is specified.
+  - Full regression pass: 75/75 tests passing (100% pass rate).
+
+### 66. Icon Resolution & Archive Hash Collision Fix for Takedown & Creeping Terror (`icons.py`, `rotation_builder.py`, `web_gui.py`, `build_web_release.py`) - [DONE]
+- **Takedown & Subdirectory Hash Collision Resolution (`src/extractor/icons.py`)**:
+  - Root Cause: Takedown and 7 other Agent abilities/talents reference `ablIconSpec: "imperialagent"`. In `hashes.bin`, `/resources/gfx/icons/larger/imperialagent.dds` (non-existent in game archives) overwrote `/resources/gfx/icons/imperialagent.dds` (valid icon).
+  - Fix: Updated `build_icon_hash_index()` to prioritize root `/resources/gfx/icons/<stem>.dds` over subdirectories (`larger/`). Extracted `imperialagent.png` and created `takedown.png` alias in both live and web distribution icon directories.
+- **Creeping Terror Casing & Routing Resilience (`tools/rotation_builder_ui.html`, `rotation_builder.py`, `web_gui.py`, `build_web_release.py`)**:
+  - Root Cause: Blueprints specified `"icon": "creepingTerror.png"` (camelCase) while the DDS in game archives and on disk was `creepingterror.png` (lowercase), causing 404s on case-sensitive servers and web clients.
+  - Fix:
+    - Added automated lowercase retry fallback in `getAbilityIconHtml()` via `onerror`.
+    - Added case-insensitive fallback resolution in both `data/rotation_builder.py` and `src/swtorsim/web_gui.py`.
+    - Added lowercased copies and slug aliases (`creeping_terror.png`, `takedown.png`) in `tools/build_web_release.py`.
+- **Verification**:
+  - Verified presence of `imperialagent.png`, `takedown.png`, `creepingterror.png`, and `creeping_terror.png` in `tools/web/icons` and `dist/icons`.
+  - Rebuilt web release via `tools/build_web_release.py` and confirmed 100% test pass rate (70/70 passing).
+
+### 65. Drag-and-Drop Rotation Workflow & Step Type Switching (`tools/rotation_builder_ui.html`, `dist/rotation_builder.html`) - [DONE]
+- **Full Drag-and-Drop Interaction Support**:
+  - **Palette to Timeline / Block**: Dragging abilities from the palette onto the timeline automatically inserts a step with smart detection (Off-GCD -> Optional Step; On-GCD -> Priority Block). Dropping onto existing Priority Blocks adds candidates at rank; dropping onto Fixed/Optional steps upgrades them to a Priority Block containing both abilities ("folder-style").
+  - **Timeline Step Reordering**: Added draggable grip handles (`⋮⋮`) and top/bottom drop insertion indicators to reorder steps or the End Of Opener anchor.
+  - **Priority Block Candidate Reordering**: Added draggable grip handles to pool rows allowing frictionless reordering of candidate priority ranking or moving candidates between blocks.
+  - **Bottom & Empty Drop Targets**: Added dedicated drop zones to easily append abilities or start empty rotations.
+- **Interactive Step Type Selector**:
+  - Replaced static step type badges with an interactive styled `<select>` (`Fixed Cast`, `Optional (Non-Blocking)`, `Priority Block`).
+  - Seamless, lossless conversion between step types preserving ability selections, lead times, and conditional rules.
+- **Terminology Alignment ("Loop Anchor" -> "End Of Opener")**:
+  - Renamed "+ Loop Anchor" button and "=== LOOP ANCHOR ===" timeline divider card to "+ End Of Opener" and "=== END OF OPENER ===", while preserving underlying `type: "loop_anchor"` JSON engine compatibility.
+- **Palette Action Overlay & Overlap Resolution (Option 2)**:
+  - Configured `+Block` and `+Opt` buttons to appear on card hover (`.palette-item-actions` with clean gradient backdrop overlay), freeing up the full width by default.
+  - Added CSS text truncation (`.ability-name-text`) and `flex-shrink: 0` on badges, completely preventing any overlap or text wrapping on long ability names (e.g. *Countermeasures*, *Ballistic Shield*).
+- **Static Web Distribution**:
+  - Rebuilt `dist/rotation_builder.html` and verified 100% test pass rate across the full regression suite (70/70 passing).
+
+### 64. Ability & Effect Icon Extraction, Web Serving & Rotation Builder UI Integration - [DONE]
+- **Standalone Icon Extraction Pipeline (`tools/extract_icons.py`)**:
+  - Implemented standalone extractor tool that auto-detects SWTOR game asset directories (Steam / EA / standard paths).
+  - Scans parsed ability and talent JSON blueprints for referenced icon specifications.
+  - Resolves FNV-1a 64-bit hashes against `data/extractor/hashes.bin` and extracts DDS textures directly from `swtor_main_gfx_assets_1.tor`.
+  - Converts DDS textures to RGBA PNGs using Pillow into `data/extractor/live/icons/` and mirrors to `tools/web/icons/` (1,035 icons extracted and converted in ~15s).
+- **Talent Icon Extraction Enhancement (`src/extractor/talents.py` & `src/extractor/cli.py`)**:
+  - Added `talTalentIcon` extraction to `_build_talent_payload` to populate `"icon"` on talent nodes.
+  - Updated `build_talents` to collect talent icon stems into `icon_stems`.
+- **Loadout Catalog & HTTP Route Wiring (`data/rotation_builder.py` & `src/swtorsim/web_gui.py`)**:
+  - Updated `discover_loadout_catalog()` to propagate `"icon"` on active abilities, skill tree entries, buffs, debuffs, and procs.
+  - Added `/icons/<filename>.png` HTTP static handler to `RotationBuilderRequestHandler` and `SimulatorRequestHandler`.
+- **Rotation Builder UI Visual Enhancement (`tools/rotation_builder_ui.html`)**:
+  - Integrated high-resolution 28x28 / 26x26 / 22x22 icon thumbnails with rounded borders and hover zoom across:
+    - Left Palette (Abilities, Buffs, Debuffs, Procs tabs).
+    - Skill Tree Choice drawer buttons.
+    - Timeline Fixed Cast and Optional Cast step headers.
+    - Priority Block pool rows.
+  - Added graceful fallback handling (`onerror="this.style.display='none';"`) and lazy loading.
+- **Static Web Distribution (`tools/build_web_release.py`)**:
+  - Integrated icon copying to `dist/icons/` during static Pyodide WASM web release builds.
+- **Verification & Testing (`tests/test_icon_integration.py`, `tests/test_cast_resource_timing.py`)**:
+  - Added unit and integration tests verifying hash indexing, catalog propagation, and icon directories (70/70 tests passing).
+
 ### 63. Proc Energy Regain Telemetry Wiring in Debug Dashboard (`events.py`, `abilities.py`, `triggers.py`, `html_reporter.py`) - [DONE]
 - **Tracer Telemetry for `ResourceGainEvent` (`src/swtorsim/events.py`)**:
   - Wired `ResourceGainEvent.resolve(sim)` to pass `sim.tracer.record_resource_change(...)` with actual current pool value, restored amount (`delta`), and descriptive origin source.

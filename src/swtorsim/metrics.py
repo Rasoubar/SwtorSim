@@ -50,6 +50,8 @@ class Metrics:
         self.total_execute_damage = 0.0
         self.execute_breakdown = {}
         self.execute_start_time = None
+        self.combat_start_time = None
+        self.combat_end_time = None
         self.active_effects = {}
         self.effect_history = {}
         self.seed = None
@@ -104,6 +106,13 @@ class Metrics:
             })
             self._active_stall = None
 
+    def get_combat_duration(self, current_time: float | None = None) -> float:
+        """Returns elapsed combat duration (seconds) since the first damage landed."""
+        if self.combat_start_time is None:
+            return 0.0
+        end_val = current_time if current_time is not None else (self.combat_end_time or self.combat_start_time)
+        return max(0.0, end_val - self.combat_start_time)
+
     def log_damage(
         self,
         ability_name: str,
@@ -115,6 +124,9 @@ class Metrics:
         damage_type: int = None,
     ):
         """Called on every hit, logs the damage and what caused it"""
+        if self.combat_start_time is None:
+            self.combat_start_time = current_time
+        self.combat_end_time = current_time
         self.total_damage += dmg_value
         self._record_hit(self.breakdown, ability_name, dmg_value, is_crit, attack_type, damage_type)
 
@@ -239,18 +251,20 @@ class Metrics:
 
     def print_metrics(self, duration, show_buffs: bool = False):
         """Prints the metrics logged data"""
-        total_dps = self.total_damage / duration
+        fight_duration = max(0.0, duration - self.combat_start_time) if self.combat_start_time is not None else duration
+        total_dps = self.total_damage / fight_duration if fight_duration > 0 else 0.0
         print("Run Damage Stats")
-        print(f"Duration: {duration:,.1f}s")
+        print(f"Duration: {fight_duration:,.1f}s")
         print(f'Total Damage: {self.total_damage:,.0f}')
         print(f"DPS: {total_dps:,.1f}")
         print("=" * 75)
 
         sorted_abilities = sorted(self.breakdown.items(), key=lambda item: item[1]["total_damage"], reverse=True)
-        print_ability_breakdown(duration, sorted_abilities)
+        print_ability_breakdown(fight_duration, sorted_abilities)
 
-        if self.total_execute_damage > 0 and duration > self.execute_start_time:
-            execute_duration = duration - self.execute_start_time
+        if self.total_execute_damage > 0 and duration > (self.execute_start_time or 0.0):
+            exec_start_ref = max(self.execute_start_time, self.combat_start_time or 0.0)
+            execute_duration = max(0.0, duration - exec_start_ref)
             print("\n" + "=" * 75)
             print(f"EXECUTE PHASE (<30% HP) - DPS: {self.total_execute_damage/execute_duration:,.0f}, Duration: {execute_duration:,.1f}s")
             sorted_exec = sorted(self.execute_breakdown.items(), key=lambda item: item[1]["total_damage"], reverse=True)
@@ -265,7 +279,7 @@ class Metrics:
             print("\n" + "=" * 75)
             status_tag = "[FAIL] ROTATION PERMANENT DEADLOCK" if self.permanent_stall else "[WARN] ROTATION STALLS DETECTED"
             print(f"{status_tag}")
-            pct = (self.total_stalled_time / duration * 100.0) if duration > 0 else 0.0
+            pct = (self.total_stalled_time / fight_duration * 100.0) if fight_duration > 0 else 0.0
             print(f"Total Stalled Time: {self.total_stalled_time:,.2f}s ({pct:.1f}% of fight)")
             print(f"Stall Count: {len(self.stall_events)}")
             if self.seed is not None:

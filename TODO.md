@@ -9,4 +9,4 @@
 - **Parallelism**: In-browser dynamic hardware concurrency with interactive core selector (`1` to `32` cores, `localStorage` persistence) and batch warm-up gating (`ensureAllWorkersReady`).
 - **Performance**: High-speed batch simulation with combat string formatting and `/dev/null` I/O bypass (`verbose=False`).
 - **Environments**: Full Live (Level 80, 7.9) and PTS (Level 85, 8.0) dual-environment scaling across extractor, curves, engine, CLI, and Web GUI.
-- **Verification**: 62/62 unit, rotational lead-time, rotation stall, blueprint round-trip, and simulation integration tests passing (100% pass rate).
+- **Verification**: 78/78 unit, rotational lead-time, rotation stall, blueprint round-trip, cast resource timing, icon integration, pre-cast, and simulation integration tests passing (100% pass rate).

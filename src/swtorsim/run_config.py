@@ -123,6 +123,39 @@ class RunConfig:
     level: int = 85
     seed: int = 42
     environment: str = "live"
+    precast: str = ""
+    pre_combat: list[Any] = field(default_factory=list)
+
+
+def normalize_pre_combat(
+    precast: str | dict | list | None = None,
+    pre_combat: list | None = None,
+) -> list[dict]:
+    """Normalizes precast ability and pre-combat sequences into a list of step dicts."""
+    steps: list[dict] = []
+
+    def _append_item(item: Any) -> None:
+        if isinstance(item, str) and item.strip():
+            abl_str = item.strip()
+            if not steps or steps[-1].get("ability") != abl_str:
+                steps.append({"ability": abl_str})
+        elif isinstance(item, dict) and item.get("ability"):
+            steps.append(dict(item))
+        elif isinstance(item, (list, tuple)):
+            for sub in item:
+                _append_item(sub)
+
+    if pre_combat:
+        if isinstance(pre_combat, (list, tuple)):
+            for entry in pre_combat:
+                _append_item(entry)
+        else:
+            _append_item(pre_combat)
+
+    if precast:
+        _append_item(precast)
+
+    return steps
 
 
 def load_run_config(path: str, environment: str | None = None) -> RunConfig:
@@ -186,6 +219,8 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
         level=_optional_config_int(raw, "level", 85),
         seed=_optional_config_int(raw, "seed", 42),
         environment=active_env,
+        precast=_optional_config_str(raw, "precast", ""),
+        pre_combat=list(raw.get("pre_combat") or []) if isinstance(raw.get("pre_combat"), list) else [],
     )
     set_data_environment(config.environment)
     set_stem_matching(config.enable_stem_matching)

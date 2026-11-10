@@ -31,7 +31,12 @@ def build_icon_hash_index(hash_dictionary: dict[int, str]) -> dict[str, tuple[in
     for file_hash, path in hash_dictionary.items():
         if not _is_gfx_icon_path(path):
             continue
-        index[_icon_stem(path).lower()] = (file_hash, path)
+        stem = _icon_stem(path).lower()
+        norm = _normalized_path(path)
+        # Prioritize direct /resources/gfx/icons/<stem>.dds over subdirectories like /larger/
+        is_direct = (norm == f"/resources/gfx/icons/{stem}.dds")
+        if stem not in index or is_direct:
+            index[stem] = (file_hash, path)
     return index
 
 

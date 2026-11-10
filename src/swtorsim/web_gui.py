@@ -559,6 +559,8 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         level=level,
         seed=seed,
         environment=env,
+        precast=str(payload.get("precast") or "").strip(),
+        pre_combat=list(payload.get("pre_combat") or []) if isinstance(payload.get("pre_combat"), list) else [],
     )
     from src.swtorsim.settings import set_data_environment
     set_data_environment(env)
@@ -707,6 +709,7 @@ def _run_single_test_detailed(
             config.dummy_hp,
             sim_inputs["debuff_module"],
             seed=config.seed,
+            config=config,
         )
         player.combat_distance = config.combat_distance
         target.combat_distance = config.combat_distance
@@ -858,7 +861,8 @@ def _run_single_test_detailed(
         combat_events.sort(key=lambda ev: ev["time"])
 
     wall_ms = round((time.perf_counter() - t0) * 1000.0, 1)
-    fight_duration = float(sim.current_time)
+    combat_start = sim.combat_start_time if getattr(sim, "combat_start_time", None) is not None else 0.0
+    fight_duration = max(0.0, float(sim.current_time) - combat_start)
     total_damage = float(sim.tracker.total_damage)
     dps = total_damage / fight_duration if fight_duration > 0 else 0.0
 
@@ -1062,8 +1066,18 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
     old_stdout = sys.stdout
     sys.stdout = open(os.devnull, "w")
     try:
+        precast = settings_dict.get("precast")
+        pre_combat = settings_dict.get("pre_combat")
         sim, player, target = prepare_simulation(
-            rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False, seed=worker_seed
+            rotation_config,
+            stats_config,
+            loadout_blueprints,
+            dummy_hp,
+            debuff_module,
+            verbose=False,
+            seed=worker_seed,
+            precast=precast,
+            pre_combat=pre_combat,
         )
         player.combat_distance = settings_dict["combat_distance"]
         target.combat_distance = settings_dict["combat_distance"]
@@ -1073,7 +1087,8 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
         sys.stdout.close()
         sys.stdout = old_stdout
 
-    elapsed_time = float(sim.current_time)
+    combat_start = sim.combat_start_time if getattr(sim, "combat_start_time", None) is not None else 0.0
+    elapsed_time = max(0.0, float(sim.current_time) - combat_start)
     calculated_dps = float(sim.tracker.total_damage) / elapsed_time if elapsed_time > 0 else 0.0
 
     ability_data_summary = {
@@ -1169,6 +1184,8 @@ def _run_batch_monte_carlo_detailed(
         "enable_projectile_flight_time": config.enable_projectile_flight_time,
         "combat_distance": config.combat_distance,
         "in_flashpoint_operation": config.in_flashpoint_operation,
+        "precast": getattr(config, "precast", ""),
+        "pre_combat": getattr(config, "pre_combat", []),
     }
 
     sim_context = {
@@ -1418,6 +1435,8 @@ def execute_simulation_slice(payload: dict[str, Any]) -> dict[str, Any]:
         "enable_projectile_flight_time": config.enable_projectile_flight_time,
         "combat_distance": config.combat_distance,
         "in_flashpoint_operation": config.in_flashpoint_operation,
+        "precast": getattr(config, "precast", ""),
+        "pre_combat": getattr(config, "pre_combat", []),
     }
     sim_context = {
         "rotation_config": sim_inputs["rotation_config"],
@@ -1542,6 +1561,37 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(html_bytes)
+                return
+
+            if route.startswith("/icons/"):
+                icon_name = Path(route).name
+                if not icon_name.lower().endswith(".png"):
+                    icon_name = f"{icon_name}.png"
+                icon_file = None
+                for cand_dir in (
+                    SWTORSIM_ROOT / "tools" / "web" / "icons",
+                    SWTORSIM_ROOT / "data" / "extractor" / "live" / "icons",
+                    SWTORSIM_ROOT / "data" / "extractor" / "pts" / "icons",
+                ):
+                    cand_path = cand_dir / icon_name
+                    if cand_path.is_file():
+                        icon_file = cand_path
+                        break
+                    lower_path = cand_dir / icon_name.lower()
+                    if lower_path.is_file():
+                        icon_file = lower_path
+                        break
+                if icon_file is None:
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                png_bytes = icon_file.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/png")
+                self.send_header("Content-Length", str(len(png_bytes)))
+                self.send_header("Cache-Control", "public, max-age=86400")
+                self.end_headers()
+                self.wfile.write(png_bytes)
                 return
 
             env = (qs.get("env") or ["live"])[0]

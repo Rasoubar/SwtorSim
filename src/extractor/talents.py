@@ -120,6 +120,21 @@ def _tags_from_record(record: NodeRecord) -> list[str]:
     return []
 
 
+def _talent_icon(record: NodeRecord) -> str | None:
+    val = _field_value(record, "talTalentIcon")
+    if not isinstance(val, str):
+        return None
+    val = val.strip()
+    if not val:
+        return None
+    lower = val.lower()
+    if lower.endswith(".png") or lower.endswith(".dds"):
+        val = val[: val.rfind(".")]
+        if not val:
+            return None
+    return f"{val}.png"
+
+
 def _build_talent_payload(record: NodeRecord) -> dict[str, Any]:
     rank_list = _field_value(record, "talRankList")
     stat_changes: list[dict[str, Any]] = []
@@ -128,17 +143,22 @@ def _build_talent_payload(record: NodeRecord) -> dict[str, Any]:
         if isinstance(first_rank, list):
             stat_changes = _stat_changes_from_rank_block(first_rank)
 
-    return {
+    payload: dict[str, Any] = {
         "fqn": record.entry.fqn,
         "name": _talent_name(record),
         "tags": _tags_from_record(record),
         "stat_changes": stat_changes,
     }
+    icon = _talent_icon(record)
+    if icon:
+        payload["icon"] = icon
+    return payload
 
 
 def build_talents(
     records: dict[str, NodeRecord],
     output_dir: Path,
+    icon_stems: set[str] | None = None,
 ) -> int:
     """Build trimmed talent JSON files from extracted node records."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -150,6 +170,11 @@ def build_talents(
         if record.entry.base_class_name != "talTalent":
             continue
         payload = _build_talent_payload(record)
+        if icon_stems is not None and payload.get("icon"):
+            stem = payload["icon"]
+            if stem.endswith(".png"):
+                stem = stem[:-4]
+            icon_stems.add(stem)
         dest = output_dir / fqn_to_relative_path(record.entry.fqn)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(

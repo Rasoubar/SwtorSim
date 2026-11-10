@@ -190,17 +190,19 @@ def run_extraction(config: ExtractorConfig) -> Path | None:
     discipline_count = build_disciplines(records, disciplines_dir)
 
     parsed_dir = config.data_dir / "parsed"
-    talent_count = build_talents(records, parsed_dir)
+    icon_stems: set[str] = set()
+    talent_count = build_talents(records, parsed_dir, icon_stems=icon_stems)
     standard_rating_table = load_standard_rating_table(store, gom, strings)
     standard_rating = standard_rating_for_item_rating(
         standard_rating_table,
         config.item_rating,
     )
-    ability_count, icon_stems = build_abilities(
+    ability_count, abl_icon_stems = build_abilities(
         records,
         parsed_dir,
         standard_rating=standard_rating,
     )
+    icon_stems.update(abl_icon_stems)
 
     icon_count = 0
     if config.extract_icons:
