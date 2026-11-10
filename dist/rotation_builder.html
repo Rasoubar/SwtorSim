@@ -929,7 +929,7 @@
     z-index: 2000;
   }
 </style>
-  <script src="pyodide_client.js?v=1794272380"></script>
+  <script src="pyodide_client.js?v=1794273015"></script>
 </head>
 <body>
 
@@ -1815,7 +1815,7 @@ function getAbilityIconHtml(iconName, extraClass = "") {
     return "";
   }
   const clean = iconName.endsWith(".png") ? iconName : `${iconName}.png`;
-  return `<img src="/icons/${escapeAttr(clean)}" class="ability-icon ${extraClass}" onerror="this.style.display='none';" alt="" loading="lazy" />`;
+  return `<img src="icons/${escapeAttr(clean)}" class="ability-icon ${extraClass}" onerror="this.style.display='none';" alt="" loading="lazy" />`;
 }
 
 function switchPaletteTab(tab) {
