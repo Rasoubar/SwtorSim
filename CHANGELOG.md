@@ -4,6 +4,54 @@
 
 ## Completed Fixes
 
+### 69. Canonical Effect IDs and EffectCollection Dual-Lookup Architecture (`effects.py`, `entities.py`, `abilities.py`, `setup.py`) - [DONE]
+- **Architectural Motivation**:
+  - Previously, `entity.effects` was a standard dictionary keyed by effect display name (`effect_key = raw_effect_name`).
+  - Across the 367 effect names shared by multiple abilities (with 215 having conflicting tags, durations, or action types), applying a same-named effect clobbered the existing effect in `self.effects[effect_key]`, prematurely un-subscribing proc listeners via `sim.triggers.unsubscribe`, deleting stat modifiers from `recalculate_stats()`, and desynchronizing `EffectExpire` and `DotTick` scheduled events.
+- **Canonical Effect ID & EffectCollection (`effects.py`, `entities.py`, `abilities.py`, `setup.py`)**:
+  - Implemented `ActiveEffect.canonical_id` property computing `f"{fqn}:{number}"` (matching SWTOR GOM's authoritative `ability/number` schema).
+  - Implemented `EffectCollection(dict)` in `src/swtorsim/effects.py` supporting dual-lookup:
+    - Primary keys are canonical effect IDs (`abl.agent.snipe:2`, `abl.agent.skill.marksmanship.penetrating_blasts:3`), allowing distinct effects to coexist without collision.
+    - Transparent name-based lookups (`__contains__`, `__getitem__`, `get`, `pop`, `get_all`): rotational rules, telemetry, and unit tests using display names (`"Followthrough"`, `"Recklessness"`) resolve across active instances.
+  - Updated `Entity.apply_effect` to store effects under their canonical ID while passing `display_name` to `sim.tracker` and `sim.tracer`.
+  - Updated `Effect.execute` in `abilities.py` to evaluate refresh state against the exact canonical ID.
+  - Updated `Entity.cleanup_expired_effects` to resolve and log user-facing display names upon effect expiration/removal.
+- **Verification (`tests/test_simulation_integration.py :: test_27_canonical_effect_ids_and_collection_dual_lookup`)**:
+  - Added unit test asserting concurrent coexistence of same-named effects, dual lookup by display name and canonical ID, and isolated popping.
+  - Full regression pass: 78/78 tests passing (100% pass rate).
+
+### 68. Penetrating Blasts Followthrough Reset After Snipe (`entities.py`) - [DONE]
+- **Root Cause (`entities.py :: Entity.apply_effect`)**:
+  - Effects are keyed by name. Snipe (effect 2) and Penetrating Blasts (effect 3) both apply an effect named `Followthrough` (by-tag stacking on `tag.abl.agent.follow_through`); only PB's carries `tag.abl.agent.reset_followthrough`.
+  - When PB finished channeling while Snipe's proc was still active, the dispatch context flagged `include_effect_refreshes=True`, so Recoil Control's `on_effect_received` listener (`include_effect_refreshes: false`) rejected it and the 100% Followthrough cooldown reset (`modify_cooldown`, `amount=-1.0`, `is_percentage=true`) never fired.
+- **Fix**: A refresh is now only flagged when the existing instance is the same blueprint effect (matching ability `fqn` and effect `number`). A different effect replacing a same-named / by-tag instance counts as a fresh application.
+- **Verification (`tests/test_simulation_integration.py :: test_26_penetrating_blasts_resets_followthrough_after_snipe`)**:
+  - Snipe -> Followthrough -> Snipe -> Penetrating Blasts: asserts `Recoil Control_3` is applied and Followthrough's cooldown is cleared. Fails without the fix, passes with it.
+  - Full regression pass: 77/77 tests passing (100% pass rate).
+
+### 67. Pre-Cast & Pre-Combat Sequencing with First-Damage Combat Clock Activation (`engine.py`, `events.py`, `metrics.py`, `run_config.py`, `setup.py`, `web_gui.py`, `tester.py`) - [DONE]
+- **First-Damage Combat Clock Parity (`engine.py`, `metrics.py`, `events.py`)**:
+  - Aligned combat clock initialization with live SWTOR combat logs and StarParse: `combat_start_time` is dynamically captured on the exact timestamp the first damaging hit lands (`ApplyDamageLand`).
+  - Updated `Simulation.run_timed` to evaluate stopping conditions relative to `combat_start_time + duration`, guaranteeing the full designated combat window is simulated regardless of pre-cast duration.
+  - Added `Simulation.get_combat_duration()` and updated `Metrics.get_combat_duration()` and `Metrics.print_metrics()` to compute DPS as `total_damage / (sim.current_time - combat_start_time)`, preventing pre-combat cast delays from deflating DPS metrics.
+- **Pre-Combat Execution Engine & Event Lifecycle (`events.py`, `setup.py`)**:
+  - Implemented `PreCombatEvent` in `src/swtorsim/events.py` to step through pre-combat sequences (`stealth`, offensive cooldowns, hard-cast openers, channels) prior to priority rotation activation.
+  - Automatically advances steps respecting cast times (`calculate_cast_time`), channel durations (`calculate_channel_duration`), and GCDs (`calculate_gcd`).
+  - Once pre-combat steps conclude, hands off immediately to `PlayerReady` at `max(sim.current_time, player.next_gcd)`, allowing the player to engage the rotation off-GCD without artificial delay.
+- **RunConfig & Web GUI Integration (`run_config.py`, `setup.py`, `web_gui.py`, `tester.py`, `rotation.py`, `rotation_builder.py`)**:
+  - Added `precast` (string or dict) and `pre_combat` (list of strings or dicts) fields to `RunConfig`.
+  - Added `normalize_pre_combat()` helper to sanitize and deduplicate precast abilities and multi-step pre-combat queues.
+  - Integrated pre-cast support across single runs and multi-core worker slices in `web_gui.py` and `tester.py`.
+  - Added dictionary wrapper support (`{"sequence": [...]}` or `{"steps": [...]}`) to `Rotation.build_steps` and `normalize_rotation_steps` in `data/rotation_builder.py`.
+  - Wired precast/pre-combat into `run_dry_run_preview` in `data/rotation_builder.py` with combat duration-based DPS calculation.
+- **Verification (`tests/test_precast.py`)**:
+  - Created comprehensive unit test suite covering:
+    - String, dict, and mixed list input normalization with deduplication.
+    - Hard-cast ability pre-cast with alacrity scaling starting clock when damage lands.
+    - Multi-step pre-combat staging (`stealth` + `recklessness` + cast) verifying stealth breaks and reckless charges consume on damage.
+    - Backwards compatibility verifying default 0.0s start when no pre-cast is specified.
+  - Full regression pass: 75/75 tests passing (100% pass rate).
+
 ### 66. Icon Resolution & Archive Hash Collision Fix for Takedown & Creeping Terror (`icons.py`, `rotation_builder.py`, `web_gui.py`, `build_web_release.py`) - [DONE]
 - **Takedown & Subdirectory Hash Collision Resolution (`src/extractor/icons.py`)**:
   - Root Cause: Takedown and 7 other Agent abilities/talents reference `ablIconSpec: "imperialagent"`. In `hashes.bin`, `/resources/gfx/icons/larger/imperialagent.dds` (non-existent in game archives) overwrote `/resources/gfx/icons/imperialagent.dds` (valid icon).

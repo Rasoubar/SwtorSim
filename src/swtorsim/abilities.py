@@ -288,11 +288,17 @@ class Effect:
             return
 
         if self.is_persistent:
-            effect_key = (
-                self.name
-                or f"{getattr(ability, 'name', None) or getattr(ability, 'fqn', '')}:{self.number}"
+            parent_fqn = (
+                getattr(getattr(ability, "blueprint", None), "fqn", None)
+                or getattr(ability, "fqn", None)
+                or getattr(ability, "name", "")
             )
-            existing = effect_target.effects.get(effect_key)
+            canonical_id = (
+                f"{parent_fqn}:{self.number}"
+                if parent_fqn and self.number is not None
+                else (self.name or str(id(self)))
+            )
+            existing = effect_target.effects.get(canonical_id)
             was_refreshed = existing is not None and not getattr(existing, "is_expired", False)
             old_stacks = getattr(existing, "stacks", 0) if was_refreshed else 0
             effect_key, effect_instance, duration = effect_target.apply_effect(sim, ability, self, caster)

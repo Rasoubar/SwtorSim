@@ -712,13 +712,15 @@ KNOWN_RULE_KEYS = {item["key"] for item in CONDITION_METADATA} | {
 }
 
 
-def normalize_rotation_steps(raw_steps: list[Any]) -> tuple[list[dict[str, Any]], list[str]]:
+def normalize_rotation_steps(raw_steps: Any) -> tuple[list[dict[str, Any]], list[str]]:
     """
     Normalizes loaded rotation steps and repairs common hand-authored JSON issues
     (such as rule keys accidentally placed on the pool entry dict outside 'rules').
     """
+    if isinstance(raw_steps, dict):
+        raw_steps = raw_steps.get("sequence") or raw_steps.get("steps") or []
     if not isinstance(raw_steps, list):
-        raise ValueError("Rotation file must be a JSON array of steps.")
+        raise ValueError("Rotation file must be a JSON array of steps or contain a 'sequence' array.")
 
     normalized: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -974,8 +976,16 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     except Exception:
         pass
 
+    precast_opt = payload.get("precast")
+    pre_combat_opt = payload.get("pre_combat")
     sim, player, target = prepare_simulation(
-        rotation_steps, stats_cfg, loadout_bps, 10_000_000, debuff_mod
+        rotation_steps,
+        stats_cfg,
+        loadout_bps,
+        10_000_000,
+        debuff_mod,
+        precast=precast_opt,
+        pre_combat=pre_combat_opt,
     )
     player.rotation = Rotation("PreviewRotation", rotation_steps)
 
@@ -1022,13 +1032,12 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
 
         abl.cast = _make_wrapper(abl, orig_fn)
 
-    sim.schedule_absolute(0.0, PlayerReady(player, target))
-    sim.schedule_relative(1.0, ResourceTick(player))
     schedule_periodic(player, target, sim)
     sim.run_timed(duration=duration)
 
     total_dmg = getattr(sim.tracker, "total_damage", 0.0) if hasattr(sim, "tracker") and sim.tracker else (target.max_hp - target.hp)
-    dps = total_dmg / duration if duration > 0 else 0.0
+    combat_dur = sim.get_combat_duration() if getattr(sim, "combat_start_time", None) is not None else duration
+    dps = total_dmg / combat_dur if combat_dur > 0 else 0.0
 
     return {
         "duration": duration,

@@ -7,11 +7,12 @@ from typing import Any
 from src.swtorsim.engine import Simulation
 from src.swtorsim.abilities import Ability
 from src.swtorsim.entities import Player, Dummy
-from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick
+from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick, PreCombatEvent
 from src.swtorsim.combat_curves import player_standard_health
 from src.swtorsim.rotation import Rotation
 from src.swtorsim.class_buffs import apply_class_buffs
 from src.swtorsim.resources import resource_type_for_class
+from src.swtorsim.run_config import normalize_pre_combat
 
 
 def _strip_effect_number_suffix(effect_name: str, parent_name: str) -> str:
@@ -114,6 +115,8 @@ def prepare_simulation(
     seed: int | None = None,
     tracer=None,
     config=None,
+    precast: str | dict | None = None,
+    pre_combat: list | None = None,
 ):
     """Prepares simulation entities from unified loadout blueprints."""
     active_abilities = {}
@@ -147,7 +150,8 @@ def prepare_simulation(
 
     # Set up dummy
     target = Dummy("Target Dummy", hp=dummy_hp)
-    target.effects = copy.deepcopy(debuff_module)
+    from src.swtorsim.effects import EffectCollection
+    target.effects = EffectCollection(copy.deepcopy(debuff_module))
     target.recalculate_stats()
 
     if seed is not None:
@@ -211,8 +215,21 @@ def prepare_simulation(
     # Assign rotation
     player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
 
+    # Resolve pre-combat / pre-cast steps from config, rotation, or explicit arguments
+    cfg_precast = getattr(config, "precast", None) if config else None
+    cfg_pre_combat = getattr(config, "pre_combat", None) if config else None
+    rot_precast = rotation_config.get("precast") if isinstance(rotation_config, dict) else None
+    rot_pre_combat = rotation_config.get("pre_combat") if isinstance(rotation_config, dict) else None
+
+    resolved_precast = precast or cfg_precast or rot_precast
+    resolved_pre_combat = pre_combat or cfg_pre_combat or rot_pre_combat
+    pre_combat_steps = normalize_pre_combat(resolved_precast, resolved_pre_combat)
+
     # Schedule initial lifecycle events
-    sim.schedule_absolute(0.0, PlayerReady(player, target))
+    if pre_combat_steps:
+        sim.schedule_absolute(0.0, PreCombatEvent(player, target, pre_combat_steps, index=0))
+    else:
+        sim.schedule_absolute(0.0, PlayerReady(player, target))
     first_regen_tick = random.uniform(0.0, 1.0)
     sim.schedule_absolute(first_regen_tick, ResourceTick(player))
 

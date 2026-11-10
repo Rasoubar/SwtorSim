@@ -49,6 +49,8 @@ class ApplyDamageLand(Event):
     def resolve(self, sim):
         """Applies pre-calculated damage to the target, logs it into metrics."""
         crit_string = " (CRITICAL!)" if self.is_crit else ""
+        if sim is not None and getattr(sim, "combat_start_time", None) is None:
+            sim.combat_start_time = sim.current_time
         try:
             sim.tracker.log_damage(
                 self.ability_name,
@@ -204,6 +206,69 @@ class PeriodicProcTick(Event):
         is_affected = getattr(self.proc, 'affected_by_cdr', False)
         interval = self.player.scale_time_modifier(self.proc.icd) if is_affected else self.proc.icd
         sim.schedule_relative(interval, PeriodicProcTick(self.player, self.target, self.proc))
+
+class PreCombatEvent(Event):
+    """Executes pre-combat opener actions (e.g. stealth, pre-buffs, hard-cast openers) before the rotation begins.
+
+    When all pre-combat steps conclude, schedules PlayerReady at max(sim.current_time, player.next_gcd)
+    so the rotation takes over immediately off-GCD.
+    """
+
+    def __init__(self, player: "Player", target: "Dummy", sequence: list[dict], index: int = 0):
+        super().__init__("Pre-Combat Step")
+        self.player = player
+        self.target = target
+        self.sequence = sequence
+        self.index = index
+
+    def resolve(self, sim):
+        """Executes the next pre-combat step or hands off execution to PlayerReady."""
+        if self.index >= len(self.sequence):
+            target_time = (
+                self.player.get_next_action_time(sim.current_time)
+                if hasattr(self.player, "get_next_action_time")
+                else max(sim.current_time, self.player.next_gcd)
+            )
+            sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
+            return
+
+        step = self.sequence[self.index]
+        abl_key = step.get("ability")
+        if not abl_key:
+            sim.schedule_relative(0.0, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
+            return
+
+        abl = self.player.ability_db.get(abl_key) or self.player.ability_db.get(abl_key.lower().replace(" ", "_"))
+        if abl is None:
+            if sim.verbose:
+                print(f"[WARN] Pre-combat ability '{abl_key}' not found in player abilities.")
+            sim.schedule_relative(0.0, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
+            return
+
+        tgt_pref = step.get("target")
+        if tgt_pref == "self":
+            tgt = self.player
+        elif tgt_pref == "target":
+            tgt = self.target
+        else:
+            tgt = self.target if (getattr(abl, "is_offensive", True) or "target" in getattr(abl, "target_type", "").lower()) else self.player
+
+        abl.cast(self.player, tgt, sim)
+
+        activation = getattr(abl, "activation", None) or getattr(getattr(abl, "blueprint", None), "activation", None) or {}
+        act_dur = float(activation.get("duration", 0.0)) if isinstance(activation, dict) else 0.0
+
+        if getattr(self.player, "active_cast", None) is not None:
+            cast_dur = self.player.calculate_cast_time(act_dur, ability=abl) if hasattr(self.player, "calculate_cast_time") else act_dur
+            next_time = max(sim.current_time + cast_dur, self.player.next_gcd)
+            sim.schedule_absolute(next_time, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
+        elif getattr(self.player, "active_channel", None) is not None:
+            chan_dur = self.player.calculate_channel_duration(act_dur, ability=abl) if hasattr(self.player, "calculate_channel_duration") else act_dur
+            next_time = max(sim.current_time + chan_dur, self.player.next_gcd)
+            sim.schedule_absolute(next_time, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
+        else:
+            next_time = max(sim.current_time, self.player.next_gcd)
+            sim.schedule_absolute(next_time, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
 
 class PlayerReady(Event):
     """Represents a player's actions/decisions to act"""

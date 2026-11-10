@@ -148,6 +148,12 @@ class ActiveEffect:
     number: int = 1
     tags: frozenset = frozenset()
 
+    @property
+    def canonical_id(self) -> str:
+        if self.fqn and self.number is not None:
+            return f"{self.fqn}:{self.number}"
+        return self.fqn or self.name or f"effect_{id(self)}"
+
     # Timers
     expires_at: Optional[float] = None
     duration: float = 0.0
@@ -452,3 +458,80 @@ def parse_tags(raw_tags) -> frozenset | None:
     if isinstance(raw_tags, str):
         return frozenset([raw_tags])
     return frozenset(raw_tags)
+
+
+class EffectCollection(dict):
+    """Dictionary of active effects supporting dual canonical ID and name/tag lookups.
+
+    Keys are canonical effect identifiers (e.g. 'abl.agent.snipe:2'). Lookups by
+    display name (e.g. 'Followthrough') or source FQN automatically resolve across
+    active, non-expired effect instances to maintain complete transparency with
+    rotation rules, telemetry, and unit tests.
+    """
+
+    def __contains__(self, key: Any) -> bool:
+        if super().__contains__(key):
+            val = super().__getitem__(key)
+            if not getattr(val, "is_expired", False):
+                return True
+        if isinstance(key, str):
+            for eff in super().values():
+                if getattr(eff, "is_expired", False):
+                    continue
+                if getattr(eff, "name", None) == key or getattr(eff, "fqn", None) == key:
+                    return True
+        return False
+
+    def __getitem__(self, key: Any) -> Any:
+        if super().__contains__(key):
+            val = super().__getitem__(key)
+            if not getattr(val, "is_expired", False):
+                return val
+        if isinstance(key, str):
+            for eff in super().values():
+                if getattr(eff, "is_expired", False):
+                    continue
+                if getattr(eff, "name", None) == key or getattr(eff, "fqn", None) == key:
+                    return eff
+        return super().__getitem__(key)
+
+    def get(self, key: Any, default: Any = None) -> Any:
+        if super().__contains__(key):
+            val = super().get(key, default)
+            if val is not default and not getattr(val, "is_expired", False):
+                return val
+        if isinstance(key, str):
+            for eff in super().values():
+                if getattr(eff, "is_expired", False):
+                    continue
+                if getattr(eff, "name", None) == key or getattr(eff, "fqn", None) == key:
+                    return eff
+        return default
+
+    def pop(self, key: Any, *args) -> Any:
+        if super().__contains__(key):
+            return super().pop(key, *args)
+        if isinstance(key, str):
+            keys_to_pop = [
+                k for k, eff in super().items()
+                if getattr(eff, "name", None) == key or getattr(eff, "fqn", None) == key
+            ]
+            if keys_to_pop:
+                res = None
+                for k in keys_to_pop:
+                    res = super().pop(k)
+                return res
+        if args:
+            return args[0]
+        raise KeyError(key)
+
+    def get_all(self, name_or_fqn: str) -> List[ActiveEffect]:
+        """Returns all active, non-expired effects matching the given name or FQN."""
+        matches = []
+        for eff in super().values():
+            if getattr(eff, "is_expired", False):
+                continue
+            if getattr(eff, "name", None) == name_or_fqn or getattr(eff, "fqn", None) == name_or_fqn:
+                matches.append(eff)
+        return matches
+

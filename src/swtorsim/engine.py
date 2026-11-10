@@ -15,6 +15,7 @@ class Simulation:
     ):
         self.queue = []
         self.current_time = 0.0
+        self.combat_start_time = None
         self.event_counter = 0
         self.seed = seed
         self.tracer = tracer
@@ -39,10 +40,17 @@ class Simulation:
         self.event_counter += 1
         heapq.heappush(self.queue, (absolute_time,self.event_counter, event))
 
+    def get_combat_duration(self) -> float:
+        """Returns elapsed combat duration (seconds) since the first damage landed."""
+        if self.combat_start_time is None:
+            return 0.0
+        return max(0.0, self.current_time - self.combat_start_time)
+
     def run_timed(self, duration=300.0, target=None):
         """Pops and resolves events in chronological order until ``duration`` is reached or ``target.hp <= 0``."""
         while self.queue:
-            if self.queue[0][0] > duration:
+            stop_time = (self.combat_start_time + duration) if self.combat_start_time is not None else duration
+            if self.queue[0][0] > stop_time:
                 break
             timestamp, seq, event = heapq.heappop(self.queue)
             self.current_time = timestamp
