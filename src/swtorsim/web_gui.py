@@ -1558,6 +1558,10 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     if cand_path.is_file():
                         icon_file = cand_path
                         break
+                    lower_path = cand_dir / icon_name.lower()
+                    if lower_path.is_file():
+                        icon_file = lower_path
+                        break
                 if icon_file is None:
                     self.send_response(404)
                     self.end_headers()

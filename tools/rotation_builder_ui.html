@@ -573,10 +573,29 @@
     align-items: center;
     justify-content: space-between;
     gap: 6px;
+    position: relative;
   }
 
   .ability-item:hover {
     border-color: var(--border);
+    background: var(--bg-card-hover);
+  }
+
+  .palette-item-actions {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    position: absolute;
+    right: 8px;
+    background: var(--bg-card-hover);
+    padding-left: 8px;
+    box-shadow: -8px 0 8px var(--bg-card-hover);
+    border-radius: 4px;
+    z-index: 2;
+  }
+
+  .ability-item:hover .palette-item-actions {
+    display: flex;
   }
 
   .ability-info {
@@ -590,6 +609,14 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
+  }
+
+  .ability-name-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .ability-meta {
@@ -607,6 +634,8 @@
     border-radius: 10px;
     font-weight: 600;
     display: inline-block;
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   .badge-offgcd {
@@ -708,12 +737,38 @@
     min-width: 24px;
   }
 
-  .step-type-pill {
+  .step-type-pill, .step-type-select {
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
     padding: 2px 6px;
     border-radius: 4px;
+    border: 1px solid transparent;
+  }
+
+  .step-type-select {
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    padding-right: 14px;
+    background-repeat: no-repeat;
+    background-position: right 4px center;
+    background-size: 8px 6px;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  }
+
+  .step-type-select:hover {
+    filter: brightness(0.95);
+    border-color: currentColor;
+  }
+
+  .step-type-select option {
+    background: var(--bg-card);
+    color: var(--text-main);
+    font-weight: 600;
   }
 
   .type-priority {
@@ -729,6 +784,85 @@
   .type-fixed {
     background: var(--cyan-bg);
     color: var(--cyan);
+  }
+
+  /* Drag and Drop Styling */
+  .drag-handle {
+    cursor: grab;
+    user-select: none;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1;
+    padding: 2px 4px;
+    border-radius: 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.55;
+    transition: opacity 0.15s, background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .drag-handle:hover {
+    opacity: 1;
+    background: var(--bg-card-hover);
+    color: var(--accent);
+  }
+  .drag-handle:active {
+    cursor: grabbing;
+  }
+
+  .ability-item {
+    cursor: grab;
+    user-select: none;
+  }
+  .ability-item:active {
+    cursor: grabbing;
+  }
+  .ability-item.is-dragging {
+    opacity: 0.45;
+  }
+
+  .step-card.is-dragging {
+    opacity: 0.4;
+  }
+  .pool-row.is-dragging {
+    opacity: 0.35;
+  }
+
+  /* Drop highlights */
+  .step-card.drag-over-top {
+    border-top: 3px solid var(--accent) !important;
+  }
+  .step-card.drag-over-bottom {
+    border-bottom: 3px solid var(--accent) !important;
+  }
+  .step-card.drag-over-upgrade {
+    outline: 2px dashed var(--accent) !important;
+    background: var(--accent-bg) !important;
+  }
+  .pool-row.drag-over-top {
+    border-top: 3px solid var(--purple) !important;
+  }
+  .pool-row.drag-over-bottom {
+    border-bottom: 3px solid var(--purple) !important;
+  }
+
+  .timeline-drop-target {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 8px;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+  .timeline-drop-target.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-bg);
+    color: var(--accent);
+    font-weight: 600;
   }
 
   .step-body {
@@ -1069,7 +1203,7 @@
         <button class="btn-purple" onclick="addPriorityBlock()">+ Priority Block</button>
         <button class="btn-amber" onclick="addOptionalStep()">+ Optional Cast</button>
         <button class="btn-primary" onclick="addFixedStep()">+ Fixed Cast</button>
-        <button onclick="addLoopAnchor()">+ Loop Anchor</button>
+        <button onclick="addLoopAnchor()">+ End Of Opener</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
         <label style="font-size:11px;color:var(--text-muted);">ID Format:</label>
@@ -1190,6 +1324,7 @@ let rotationSteps = [];
 let TIMELINE_VIEW_MODE = "rotation"; // "rotation" or "sub30"
 let SUB30_THRESHOLD = 0.30;
 let SUB30_DEFAULT_ABILITY = "";
+let currentDragData = null; // Drag & drop payload: { kind: 'ability'|'step'|'pool-row', ... }
 let activeBlockIndex = null;
 let collapsedSteps = new Set();
 let savedTemplates = []; // { name, kind: 'step' | 'tail', data }
@@ -1814,7 +1949,8 @@ function getAbilityIconHtml(iconName, extraClass = "") {
     return "";
   }
   const clean = iconName.endsWith(".png") ? iconName : `${iconName}.png`;
-  return `<img src="icons/${escapeAttr(clean)}" class="ability-icon ${extraClass}" onerror="this.style.display='none';" alt="" loading="lazy" />`;
+  const lower = clean.toLowerCase();
+  return `<img src="icons/${escapeAttr(clean)}" class="ability-icon ${extraClass}" onerror="if(this.src.indexOf('${escapeAttr(lower)}') === -1) { this.src='icons/${escapeAttr(lower)}'; } else { this.style.display='none'; }" alt="" loading="lazy" />`;
 }
 
 function switchPaletteTab(tab) {
@@ -1864,6 +2000,27 @@ function renderPalette() {
     for (const abl of abilities) {
       const card = document.createElement("div");
       card.className = "ability-item";
+      card.draggable = true;
+      card.title = "Drag into timeline or priority block, or click +Block / +Opt";
+      card.addEventListener("dragstart", (e) => {
+        const fmt = document.getElementById("idFormatSelect").value;
+        const abId = fmt === "fqn" ? abl.fqn : abl.slug;
+        currentDragData = {
+          kind: "ability",
+          slug: abl.slug,
+          fqn: abl.fqn,
+          ability_id: abId,
+          triggers_gcd: !!abl.triggers_gcd
+        };
+        e.dataTransfer.setData("application/json", JSON.stringify(currentDragData));
+        e.dataTransfer.effectAllowed = "copyMove";
+        card.classList.add("is-dragging");
+      });
+      card.addEventListener("dragend", () => {
+        card.classList.remove("is-dragging");
+        currentDragData = null;
+        clearDropHighlights();
+      });
 
       const gcdBadge = abl.triggers_gcd
         ? '<span class="badge badge-gcd">GCD</span>'
@@ -1878,13 +2035,14 @@ function renderPalette() {
 
       card.innerHTML = `
         <div class="palette-item-with-icon">
+          <span class="drag-handle" title="Drag ability into timeline or block">⋮⋮</span>
           ${getAbilityIconHtml(abl.icon, "palette-icon")}
           <div class="ability-info">
-            <div class="ability-title">${escapeHtml(abl.name)} ${gcdBadge}</div>
+            <div class="ability-title"><span class="ability-name-text">${escapeHtml(abl.name)}</span> ${gcdBadge}</div>
             <div class="ability-meta" title="${escapeHtml(abl.fqn)}">${escapeHtml(metaParts.join(" · "))}</div>
           </div>
         </div>
-        <div style="display:flex;gap:4px;flex-shrink:0;">
+        <div class="palette-item-actions">
           <button class="btn-sm btn-purple" title="Add to active Priority Block" onclick="quickAddAbilityToBlock('${escapeAttr(abl.slug)}', '${escapeAttr(abl.fqn)}')">+Block</button>
           <button class="btn-sm btn-amber" title="Add as Optional Step" onclick="quickAddOptional('${escapeAttr(abl.slug)}', '${escapeAttr(abl.fqn)}')">+Opt</button>
         </div>
@@ -2046,7 +2204,7 @@ function addFixedStep() {
 function addLoopAnchor() {
   const existingIdx = rotationSteps.findIndex(s => s.type === "loop_anchor");
   if (existingIdx !== -1) {
-    showToast("A Loop Anchor already exists in the timeline. Move it using the Up/Down buttons.", true);
+    showToast("An End Of Opener anchor already exists in the timeline. Move it using the Up/Down buttons or dragging.", true);
     return;
   }
   rotationSteps.push({ type: "loop_anchor" });
@@ -2092,6 +2250,359 @@ function moveStep(idx, delta) {
   else if (activeBlockIndex === target) activeBlockIndex = idx;
   renderTimeline();
   renderRightPanel();
+}
+
+function changeStepType(idx, newType) {
+  const step = rotationSteps[idx];
+  if (!step || step.type === newType) return;
+  if (step.type === "loop_anchor" || newType === "loop_anchor") return;
+
+  if (newType === "priority_block") {
+    const ablId = step.ability_id || getDefaultAbilityId(false);
+    const rules = step.rules ? JSON.parse(JSON.stringify(step.rules)) : {};
+    const poolRow = { ability_id: ablId, rules: rules };
+    if (step.lead_time !== undefined) poolRow.lead_time = step.lead_time;
+    rotationSteps[idx] = {
+      type: "priority_block",
+      name: `Priority Window ${idx + 1}`,
+      pool: [poolRow]
+    };
+    activeBlockIndex = idx;
+    showToast(`Converted Step #${idx + 1} to Priority Block.`);
+  } else if (newType === "fixed") {
+    let ablId;
+    if (step.type === "priority_block") {
+      const first = (step.pool && step.pool.length > 0) ? step.pool[0] : null;
+      ablId = first ? first.ability_id : getDefaultAbilityId(false);
+    } else {
+      ablId = step.ability_id || getDefaultAbilityId(false);
+    }
+    const newStep = {
+      type: "fixed",
+      ability_id: ablId
+    };
+    if (step.lead_time !== undefined) newStep.lead_time = step.lead_time;
+    rotationSteps[idx] = newStep;
+    if (activeBlockIndex === idx) activeBlockIndex = null;
+    showToast(`Converted Step #${idx + 1} to Fixed Cast.`);
+  } else if (newType === "optional") {
+    let ablId;
+    let rules = {};
+    let leadTime = undefined;
+    if (step.type === "priority_block") {
+      const first = (step.pool && step.pool.length > 0) ? step.pool[0] : null;
+      ablId = first ? first.ability_id : getDefaultAbilityId(true);
+      rules = (first && first.rules) ? JSON.parse(JSON.stringify(first.rules)) : {};
+      leadTime = first ? first.lead_time : undefined;
+    } else {
+      ablId = step.ability_id || getDefaultAbilityId(true);
+      rules = step.rules ? JSON.parse(JSON.stringify(step.rules)) : {};
+      leadTime = step.lead_time;
+    }
+    const newStep = {
+      type: "optional",
+      ability_id: ablId,
+      rules: rules
+    };
+    if (leadTime !== undefined) newStep.lead_time = leadTime;
+    rotationSteps[idx] = newStep;
+    if (activeBlockIndex === idx) activeBlockIndex = null;
+    showToast(`Converted Step #${idx + 1} to Optional Step.`);
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function clearDropHighlights() {
+  document.querySelectorAll(".drag-over-top, .drag-over-bottom, .drag-over-upgrade, .drag-over").forEach(el => {
+    el.classList.remove("drag-over-top", "drag-over-bottom", "drag-over-upgrade", "drag-over");
+  });
+}
+
+function onStepDragStart(e, idx) {
+  e.stopPropagation();
+  currentDragData = { kind: "step", stepIndex: idx };
+  e.dataTransfer.setData("application/json", JSON.stringify(currentDragData));
+  e.dataTransfer.effectAllowed = "move";
+  const card = document.getElementById(`step-card-${idx}`);
+  if (card) card.classList.add("is-dragging");
+}
+
+function onStepDragEnd(e) {
+  document.querySelectorAll(".is-dragging").forEach(el => el.classList.remove("is-dragging"));
+  currentDragData = null;
+  clearDropHighlights();
+}
+
+function onStepCardDragOver(e, idx) {
+  if (!currentDragData) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const card = document.getElementById(`step-card-${idx}`);
+  if (!card) return;
+
+  const rect = card.getBoundingClientRect();
+  const relY = (e.clientY - rect.top) / rect.height;
+
+  document.querySelectorAll(".step-card").forEach(c => {
+    if (c !== card) c.classList.remove("drag-over-top", "drag-over-bottom", "drag-over-upgrade");
+  });
+
+  const step = rotationSteps[idx];
+
+  if (currentDragData.kind === "step") {
+    if (relY < 0.5) {
+      card.classList.add("drag-over-top");
+      card.classList.remove("drag-over-bottom", "drag-over-upgrade");
+    } else {
+      card.classList.add("drag-over-bottom");
+      card.classList.remove("drag-over-top", "drag-over-upgrade");
+    }
+  } else if (currentDragData.kind === "ability") {
+    if (step.type === "priority_block") {
+      if (relY < 0.2) {
+        card.classList.add("drag-over-top");
+        card.classList.remove("drag-over-bottom", "drag-over-upgrade");
+      } else if (relY > 0.8) {
+        card.classList.add("drag-over-bottom");
+        card.classList.remove("drag-over-top", "drag-over-upgrade");
+      } else {
+        card.classList.add("drag-over-upgrade");
+        card.classList.remove("drag-over-top", "drag-over-bottom");
+      }
+    } else if (step.type === "fixed" || step.type === "optional") {
+      if (relY < 0.25) {
+        card.classList.add("drag-over-top");
+        card.classList.remove("drag-over-bottom", "drag-over-upgrade");
+      } else if (relY > 0.75) {
+        card.classList.add("drag-over-bottom");
+        card.classList.remove("drag-over-top", "drag-over-upgrade");
+      } else {
+        card.classList.add("drag-over-upgrade");
+        card.classList.remove("drag-over-top", "drag-over-bottom");
+      }
+    } else if (step.type === "loop_anchor") {
+      if (relY < 0.5) {
+        card.classList.add("drag-over-top");
+        card.classList.remove("drag-over-bottom", "drag-over-upgrade");
+      } else {
+        card.classList.add("drag-over-bottom");
+        card.classList.remove("drag-over-top", "drag-over-upgrade");
+      }
+    }
+  } else if (currentDragData.kind === "pool-row") {
+    if (step.type === "priority_block") {
+      card.classList.add("drag-over-upgrade");
+    }
+  }
+}
+
+function onStepCardDragLeave(e, idx) {
+  const card = document.getElementById(`step-card-${idx}`);
+  if (card && (!e.relatedTarget || !card.contains(e.relatedTarget))) {
+    card.classList.remove("drag-over-top", "drag-over-bottom", "drag-over-upgrade");
+  }
+}
+
+function onStepCardDrop(e, idx) {
+  if (!currentDragData) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const card = document.getElementById(`step-card-${idx}`);
+  const isTop = card && card.classList.contains("drag-over-top");
+  const isUpgrade = card && card.classList.contains("drag-over-upgrade");
+  clearDropHighlights();
+
+  const data = currentDragData;
+  currentDragData = null;
+
+  if (data.kind === "step") {
+    const fromIdx = data.stepIndex;
+    if (fromIdx === idx) return;
+    let targetIdx = isTop ? idx : idx + 1;
+    if (fromIdx < targetIdx) targetIdx--;
+    const [moved] = rotationSteps.splice(fromIdx, 1);
+    rotationSteps.splice(targetIdx, 0, moved);
+    if (activeBlockIndex === fromIdx) activeBlockIndex = targetIdx;
+    else if (activeBlockIndex !== null) {
+      if (fromIdx < activeBlockIndex && targetIdx >= activeBlockIndex) activeBlockIndex--;
+      else if (fromIdx > activeBlockIndex && targetIdx <= activeBlockIndex) activeBlockIndex++;
+    }
+    renderTimeline();
+    renderRightPanel();
+    showToast(`Moved step to #${targetIdx + 1}`);
+    return;
+  }
+
+  if (data.kind === "ability") {
+    const fmt = document.getElementById("idFormatSelect").value;
+    const abId = fmt === "fqn" ? data.fqn : data.slug;
+    const step = rotationSteps[idx];
+
+    if (isUpgrade && (step.type === "fixed" || step.type === "optional")) {
+      const oldAbId = step.ability_id;
+      const oldRules = step.rules ? JSON.parse(JSON.stringify(step.rules)) : {};
+      const pool = [
+        { ability_id: oldAbId, rules: oldRules },
+        { ability_id: abId, rules: {} }
+      ];
+      rotationSteps[idx] = {
+        type: "priority_block",
+        name: `Priority Window ${idx + 1}`,
+        pool: pool
+      };
+      activeBlockIndex = idx;
+      renderTimeline();
+      renderRightPanel();
+      showToast(`Upgraded Step #${idx + 1} to Priority Block with ${data.slug}.`);
+      return;
+    }
+
+    if (isUpgrade && step.type === "priority_block") {
+      step.pool.push({ ability_id: abId, rules: {} });
+      collapsedSteps.delete(idx);
+      activeBlockIndex = idx;
+      renderTimeline();
+      renderRightPanel();
+      showToast(`Added ${data.slug} to ${step.name || 'Priority Block'}.`);
+      return;
+    }
+
+    let newStep;
+    if (data.triggers_gcd) {
+      newStep = {
+        type: "priority_block",
+        name: `Window ${rotationSteps.filter(s => s.type === "priority_block").length + 1}`,
+        pool: [{ ability_id: abId, rules: {} }]
+      };
+    } else {
+      newStep = {
+        type: "optional",
+        ability_id: abId,
+        rules: {}
+      };
+    }
+
+    const insertIdx = isTop ? idx : idx + 1;
+    rotationSteps.splice(insertIdx, 0, newStep);
+    if (newStep.type === "priority_block") {
+      activeBlockIndex = insertIdx;
+    }
+    renderTimeline();
+    renderRightPanel();
+    showToast(`Inserted ${newStep.type === "optional" ? "Optional Step" : "Priority Block"} at #${insertIdx + 1}.`);
+    return;
+  }
+
+  if (data.kind === "pool-row") {
+    const step = rotationSteps[idx];
+    if (step.type === "priority_block" && data.stepIndex !== idx) {
+      const srcPool = rotationSteps[data.stepIndex].pool;
+      const [movedRow] = srcPool.splice(data.rowIndex, 1);
+      step.pool.push(movedRow);
+      renderTimeline();
+      renderRightPanel();
+      showToast(`Moved ${movedRow.ability_id} to ${step.name || 'Priority Block'}.`);
+    }
+  }
+}
+
+function onPoolRowDragStart(e, stepIdx, rowIdx) {
+  e.stopPropagation();
+  currentDragData = { kind: "pool-row", stepIndex: stepIdx, rowIndex: rowIdx };
+  e.dataTransfer.setData("application/json", JSON.stringify(currentDragData));
+  e.dataTransfer.effectAllowed = "move";
+  const rowEl = document.getElementById(`pool-row-${stepIdx}-${rowIdx}`);
+  if (rowEl) rowEl.classList.add("is-dragging");
+}
+
+function onPoolRowDragEnd(e) {
+  document.querySelectorAll(".is-dragging").forEach(el => el.classList.remove("is-dragging"));
+  currentDragData = null;
+  clearDropHighlights();
+}
+
+function onPoolRowDragOver(e, stepIdx, rowIdx) {
+  if (!currentDragData) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const rowEl = document.getElementById(`pool-row-${stepIdx}-${rowIdx}`);
+  if (!rowEl) return;
+
+  const rect = rowEl.getBoundingClientRect();
+  const relY = (e.clientY - rect.top) / rect.height;
+
+  document.querySelectorAll(".pool-row").forEach(r => {
+    if (r !== rowEl) r.classList.remove("drag-over-top", "drag-over-bottom");
+  });
+
+  if (relY < 0.5) {
+    rowEl.classList.add("drag-over-top");
+    rowEl.classList.remove("drag-over-bottom");
+  } else {
+    rowEl.classList.add("drag-over-bottom");
+    rowEl.classList.remove("drag-over-top");
+  }
+}
+
+function onPoolRowDragLeave(e, stepIdx, rowIdx) {
+  const rowEl = document.getElementById(`pool-row-${stepIdx}-${rowIdx}`);
+  if (rowEl && (!e.relatedTarget || !rowEl.contains(e.relatedTarget))) {
+    rowEl.classList.remove("drag-over-top", "drag-over-bottom");
+  }
+}
+
+function onPoolRowDrop(e, stepIdx, rowIdx) {
+  if (!currentDragData) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const rowEl = document.getElementById(`pool-row-${stepIdx}-${rowIdx}`);
+  const isTop = rowEl && rowEl.classList.contains("drag-over-top");
+  clearDropHighlights();
+
+  const data = currentDragData;
+  currentDragData = null;
+
+  if (data.kind === "pool-row") {
+    const srcStepIdx = data.stepIndex;
+    const srcRowIdx = data.rowIndex;
+    const srcPool = rotationSteps[srcStepIdx].pool;
+    const dstPool = rotationSteps[stepIdx].pool;
+
+    if (srcStepIdx === stepIdx) {
+      if (srcRowIdx === rowIdx) return;
+      let targetRow = isTop ? rowIdx : rowIdx + 1;
+      if (srcRowIdx < targetRow) targetRow--;
+      const [moved] = srcPool.splice(srcRowIdx, 1);
+      dstPool.splice(targetRow, 0, moved);
+      renderTimeline();
+      renderRightPanel();
+      showToast(`Updated priority ranking in ${rotationSteps[stepIdx].name || 'Block'}.`);
+    } else {
+      let targetRow = isTop ? rowIdx : rowIdx + 1;
+      const [moved] = srcPool.splice(srcRowIdx, 1);
+      dstPool.splice(targetRow, 0, moved);
+      renderTimeline();
+      renderRightPanel();
+      showToast(`Moved ${moved.ability_id} to ${rotationSteps[stepIdx].name || 'Block'}.`);
+    }
+    return;
+  }
+
+  if (data.kind === "ability") {
+    const fmt = document.getElementById("idFormatSelect").value;
+    const abId = fmt === "fqn" ? data.fqn : data.slug;
+    const dstPool = rotationSteps[stepIdx].pool;
+    let targetRow = isTop ? rowIdx : rowIdx + 1;
+    dstPool.splice(targetRow, 0, { ability_id: abId, rules: {} });
+    renderTimeline();
+    renderRightPanel();
+    showToast(`Inserted ${data.slug} at priority #${targetRow + 1}.`);
+  }
 }
 
 function updateStepLeadTime(idx, val) {
@@ -2510,12 +3021,51 @@ function renderTimeline() {
 
   if (!rotationSteps.length) {
     container.innerHTML = `
-      <div style="text-align:center;padding:48px 20px;color:var(--text-muted);border:1px dashed var(--border);border-radius:8px;">
+      <div class="timeline-drop-target timeline-empty-drop" id="emptyTimelineDrop" style="padding:48px 20px;">
         <div style="font-size:15px;font-weight:600;color:var(--text-main);margin-bottom:8px;">Rotation Timeline is Empty</div>
-        <div style="margin-bottom:14px;">Click <strong>+ Priority Block</strong>, <strong>+ Optional Cast</strong>, or select an existing rotation from the top bar.</div>
+        <div style="margin-bottom:14px;">Drag an ability from the left palette, click <strong>+ Priority Block</strong>, or select an existing rotation from the top bar.</div>
         <button class="btn-purple" onclick="addPriorityBlock()">+ Create First Priority Block</button>
       </div>
     `;
+    const emptyDrop = document.getElementById("emptyTimelineDrop");
+    if (emptyDrop) {
+      emptyDrop.addEventListener("dragover", (e) => {
+        if (!currentDragData) return;
+        e.preventDefault();
+        e.stopPropagation();
+        emptyDrop.classList.add("drag-over");
+      });
+      emptyDrop.addEventListener("dragleave", () => emptyDrop.classList.remove("drag-over"));
+      emptyDrop.addEventListener("drop", (e) => {
+        if (!currentDragData) return;
+        e.preventDefault();
+        e.stopPropagation();
+        emptyDrop.classList.remove("drag-over");
+        const data = currentDragData;
+        currentDragData = null;
+        if (data.kind === "ability") {
+          const fmt = document.getElementById("idFormatSelect").value;
+          const abId = fmt === "fqn" ? data.fqn : data.slug;
+          if (data.triggers_gcd) {
+            rotationSteps.push({
+              type: "priority_block",
+              name: "Window 1",
+              pool: [{ ability_id: abId, rules: {} }]
+            });
+            activeBlockIndex = 0;
+          } else {
+            rotationSteps.push({
+              type: "optional",
+              ability_id: abId,
+              rules: {}
+            });
+          }
+          renderTimeline();
+          renderRightPanel();
+          showToast(`Added ${abId} to rotation.`);
+        }
+      });
+    }
     return;
   }
 
@@ -2563,9 +3113,16 @@ function renderTimeline() {
     if (step.type === "loop_anchor") {
       const anchorCard = document.createElement("div");
       anchorCard.className = "step-card step-anchor";
+      anchorCard.id = `step-card-${idx}`;
+      anchorCard.ondragover = (e) => onStepCardDragOver(e, idx);
+      anchorCard.ondragleave = (e) => onStepCardDragLeave(e, idx);
+      anchorCard.ondrop = (e) => onStepCardDrop(e, idx);
       anchorCard.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;font-weight:700;color:var(--green);">
-          <span>=== LOOP ANCHOR ===</span>
+          <span class="drag-handle" draggable="true" title="Drag to move End Of Opener"
+                ondragstart="onStepDragStart(event, ${idx})"
+                ondragend="onStepDragEnd(event)">⋮⋮</span>
+          <span>=== END OF OPENER ===</span>
           <span style="font-size:11.5px;font-weight:400;color:var(--text-main);">Steps above run once on pull (Opener); steps below repeat indefinitely.</span>
         </div>
         <div style="display:flex;gap:4px;">
@@ -2580,6 +3137,10 @@ function renderTimeline() {
 
     execStepCounter++;
     const card = document.createElement("div");
+    card.id = `step-card-${idx}`;
+    card.ondragover = (e) => onStepCardDragOver(e, idx);
+    card.ondragleave = (e) => onStepCardDragLeave(e, idx);
+    card.ondrop = (e) => onStepCardDrop(e, idx);
 
     if (step.type === "fixed") {
       card.className = "step-card step-fixed" + (isSub30Mode ? " sub30-step-highlight" : "");
@@ -2610,9 +3171,16 @@ function renderTimeline() {
       card.innerHTML = `
         <div class="step-header">
           <div class="step-header-left">
+            <span class="drag-handle" draggable="true" title="Drag to reorder step"
+                  ondragstart="onStepDragStart(event, ${idx})"
+                  ondragend="onStepDragEnd(event)">⋮⋮</span>
             <span class="step-num">#${execStepCounter}</span>
             ${phaseBadge}
-            <span class="step-type-pill type-fixed">Fixed Cast</span>
+            <select class="step-type-select type-fixed" onchange="changeStepType(${idx}, this.value)" onclick="event.stopPropagation();" title="Change block type">
+              <option value="fixed" selected>Fixed Cast</option>
+              <option value="optional">Optional (Non-Blocking)</option>
+              <option value="priority_block">Priority Block</option>
+            </select>
             ${sub30Badge}
             ${iconHtml}
             ${selectHtml}
@@ -2669,9 +3237,16 @@ function renderTimeline() {
       card.innerHTML = `
         <div class="step-header">
           <div class="step-header-left">
+            <span class="drag-handle" draggable="true" title="Drag to reorder step"
+                  ondragstart="onStepDragStart(event, ${idx})"
+                  ondragend="onStepDragEnd(event)">⋮⋮</span>
             <span class="step-num">#${execStepCounter}</span>
             ${phaseBadge}
-            <span class="step-type-pill type-optional">Optional (Non-Blocking)</span>
+            <select class="step-type-select type-optional" onchange="changeStepType(${idx}, this.value)" onclick="event.stopPropagation();" title="Change block type">
+              <option value="fixed">Fixed Cast</option>
+              <option value="optional" selected>Optional (Non-Blocking)</option>
+              <option value="priority_block">Priority Block</option>
+            </select>
             ${sub30Badge}
             ${iconHtml}
             ${selectHtml}
@@ -2741,7 +3316,13 @@ function renderTimeline() {
           ` : "";
 
           rowsHtml += `
-            <div class="pool-row${sub30RowClass}">
+            <div class="pool-row${sub30RowClass}" id="pool-row-${idx}-${rIdx}"
+                 ondragover="onPoolRowDragOver(event, ${idx}, ${rIdx})"
+                 ondragleave="onPoolRowDragLeave(event, ${idx}, ${rIdx})"
+                 ondrop="onPoolRowDrop(event, ${idx}, ${rIdx})">
+              <span class="drag-handle pool-drag-handle" draggable="true" title="Drag to reorder priority"
+                    ondragstart="onPoolRowDragStart(event, ${idx}, ${rIdx})"
+                    ondragend="onPoolRowDragEnd(event)">⋮⋮</span>
               <div class="pool-rank">${rIdx + 1}.</div>
               <div class="pool-main">
                 <div class="pool-top">
@@ -2798,10 +3379,17 @@ function renderTimeline() {
       card.innerHTML = `
         <div class="step-header">
           <div class="step-header-left">
+            <span class="drag-handle" draggable="true" title="Drag to reorder step"
+                  ondragstart="onStepDragStart(event, ${idx})"
+                  ondragend="onStepDragEnd(event)">⋮⋮</span>
             <button class="btn-sm" onclick="event.stopPropagation(); toggleStepCollapse(${idx})">${isCollapsed ? "▸" : "▾"}</button>
             <span class="step-num">#${execStepCounter}</span>
             ${phaseBadge}
-            <span class="step-type-pill type-priority">Priority Block (${pool.length})</span>
+            <select class="step-type-select type-priority" onchange="changeStepType(${idx}, this.value)" onclick="event.stopPropagation();" title="Change block type">
+              <option value="fixed">Fixed Cast</option>
+              <option value="optional">Optional (Non-Blocking)</option>
+              <option value="priority_block" selected>Priority Block (${pool.length})</option>
+            </select>
             ${sub30Badge}
             <input type="text" value="${escapeAttr(step.name || "")}" onchange="rotationSteps[${idx}].name = this.value; renderRightPanel();" onclick="event.stopPropagation();" style="flex:1;min-width:160px;font-weight:600;">
           </div>
@@ -2820,6 +3408,62 @@ function renderTimeline() {
       container.appendChild(card);
     }
   });
+
+  // Append drop zone at the bottom of the timeline
+  const bottomDrop = document.createElement("div");
+  bottomDrop.className = "timeline-drop-target";
+  bottomDrop.id = "timelineBottomDrop";
+  bottomDrop.innerHTML = `<span>＋ Drop ability here to append to the end of the rotation</span>`;
+
+  bottomDrop.addEventListener("dragover", (e) => {
+    if (!currentDragData) return;
+    e.preventDefault();
+    e.stopPropagation();
+    bottomDrop.classList.add("drag-over");
+  });
+  bottomDrop.addEventListener("dragleave", () => {
+    bottomDrop.classList.remove("drag-over");
+  });
+  bottomDrop.addEventListener("drop", (e) => {
+    if (!currentDragData) return;
+    e.preventDefault();
+    e.stopPropagation();
+    bottomDrop.classList.remove("drag-over");
+    const data = currentDragData;
+    currentDragData = null;
+
+    if (data.kind === "ability") {
+      const fmt = document.getElementById("idFormatSelect").value;
+      const abId = fmt === "fqn" ? data.fqn : data.slug;
+      if (data.triggers_gcd) {
+        rotationSteps.push({
+          type: "priority_block",
+          name: `Window ${rotationSteps.filter(s => s.type === "priority_block").length + 1}`,
+          pool: [{ ability_id: abId, rules: {} }]
+        });
+        activeBlockIndex = rotationSteps.length - 1;
+      } else {
+        rotationSteps.push({
+          type: "optional",
+          ability_id: abId,
+          rules: {}
+        });
+      }
+      renderTimeline();
+      renderRightPanel();
+      showToast(`Appended ${abId} to rotation.`);
+    } else if (data.kind === "step") {
+      const fromIdx = data.stepIndex;
+      if (fromIdx !== rotationSteps.length - 1) {
+        const [moved] = rotationSteps.splice(fromIdx, 1);
+        rotationSteps.push(moved);
+        renderTimeline();
+        renderRightPanel();
+        showToast("Moved step to end of rotation.");
+      }
+    }
+  });
+  container.appendChild(bottomDrop);
 }
 // ---------------------------------------------------------------------------
 // Guided Rule Builder Modal

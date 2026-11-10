@@ -71,6 +71,10 @@ def build_web_release() -> None:
         copied_icons = 0
         for icon_file in icons_src.glob("*.png"):
             shutil.copy2(icon_file, dist_icons / icon_file.name)
+            # Ensure lowercased copy exists for case-sensitive web environments
+            lower_name = icon_file.name.lower()
+            if lower_name != icon_file.name:
+                shutil.copy2(icon_file, dist_icons / lower_name)
             copied_icons += 1
         print(f"[OK] Copied {copied_icons} icons -> dist/icons/")
 

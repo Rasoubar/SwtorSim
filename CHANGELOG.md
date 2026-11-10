@@ -4,6 +4,37 @@
 
 ## Completed Fixes
 
+### 66. Icon Resolution & Archive Hash Collision Fix for Takedown & Creeping Terror (`icons.py`, `rotation_builder.py`, `web_gui.py`, `build_web_release.py`) - [DONE]
+- **Takedown & Subdirectory Hash Collision Resolution (`src/extractor/icons.py`)**:
+  - Root Cause: Takedown and 7 other Agent abilities/talents reference `ablIconSpec: "imperialagent"`. In `hashes.bin`, `/resources/gfx/icons/larger/imperialagent.dds` (non-existent in game archives) overwrote `/resources/gfx/icons/imperialagent.dds` (valid icon).
+  - Fix: Updated `build_icon_hash_index()` to prioritize root `/resources/gfx/icons/<stem>.dds` over subdirectories (`larger/`). Extracted `imperialagent.png` and created `takedown.png` alias in both live and web distribution icon directories.
+- **Creeping Terror Casing & Routing Resilience (`tools/rotation_builder_ui.html`, `rotation_builder.py`, `web_gui.py`, `build_web_release.py`)**:
+  - Root Cause: Blueprints specified `"icon": "creepingTerror.png"` (camelCase) while the DDS in game archives and on disk was `creepingterror.png` (lowercase), causing 404s on case-sensitive servers and web clients.
+  - Fix:
+    - Added automated lowercase retry fallback in `getAbilityIconHtml()` via `onerror`.
+    - Added case-insensitive fallback resolution in both `data/rotation_builder.py` and `src/swtorsim/web_gui.py`.
+    - Added lowercased copies and slug aliases (`creeping_terror.png`, `takedown.png`) in `tools/build_web_release.py`.
+- **Verification**:
+  - Verified presence of `imperialagent.png`, `takedown.png`, `creepingterror.png`, and `creeping_terror.png` in `tools/web/icons` and `dist/icons`.
+  - Rebuilt web release via `tools/build_web_release.py` and confirmed 100% test pass rate (70/70 passing).
+
+### 65. Drag-and-Drop Rotation Workflow & Step Type Switching (`tools/rotation_builder_ui.html`, `dist/rotation_builder.html`) - [DONE]
+- **Full Drag-and-Drop Interaction Support**:
+  - **Palette to Timeline / Block**: Dragging abilities from the palette onto the timeline automatically inserts a step with smart detection (Off-GCD -> Optional Step; On-GCD -> Priority Block). Dropping onto existing Priority Blocks adds candidates at rank; dropping onto Fixed/Optional steps upgrades them to a Priority Block containing both abilities ("folder-style").
+  - **Timeline Step Reordering**: Added draggable grip handles (`⋮⋮`) and top/bottom drop insertion indicators to reorder steps or the End Of Opener anchor.
+  - **Priority Block Candidate Reordering**: Added draggable grip handles to pool rows allowing frictionless reordering of candidate priority ranking or moving candidates between blocks.
+  - **Bottom & Empty Drop Targets**: Added dedicated drop zones to easily append abilities or start empty rotations.
+- **Interactive Step Type Selector**:
+  - Replaced static step type badges with an interactive styled `<select>` (`Fixed Cast`, `Optional (Non-Blocking)`, `Priority Block`).
+  - Seamless, lossless conversion between step types preserving ability selections, lead times, and conditional rules.
+- **Terminology Alignment ("Loop Anchor" -> "End Of Opener")**:
+  - Renamed "+ Loop Anchor" button and "=== LOOP ANCHOR ===" timeline divider card to "+ End Of Opener" and "=== END OF OPENER ===", while preserving underlying `type: "loop_anchor"` JSON engine compatibility.
+- **Palette Action Overlay & Overlap Resolution (Option 2)**:
+  - Configured `+Block` and `+Opt` buttons to appear on card hover (`.palette-item-actions` with clean gradient backdrop overlay), freeing up the full width by default.
+  - Added CSS text truncation (`.ability-name-text`) and `flex-shrink: 0` on badges, completely preventing any overlap or text wrapping on long ability names (e.g. *Countermeasures*, *Ballistic Shield*).
+- **Static Web Distribution**:
+  - Rebuilt `dist/rotation_builder.html` and verified 100% test pass rate across the full regression suite (70/70 passing).
+
 ### 64. Ability & Effect Icon Extraction, Web Serving & Rotation Builder UI Integration - [DONE]
 - **Standalone Icon Extraction Pipeline (`tools/extract_icons.py`)**:
   - Implemented standalone extractor tool that auto-detects SWTOR game asset directories (Steam / EA / standard paths).
