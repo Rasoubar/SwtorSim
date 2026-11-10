@@ -1921,8 +1921,8 @@ def cleanup_channel_effects(channel, sim):
     if not attached:
         return
     for actor, effect_key, eff_inst in list(attached):
-        # Do not clean up effects that have their own independent timer (e.g. duration > 0 with expires_at)
-        if getattr(eff_inst, "duration", 0.0) > 0.0 and getattr(eff_inst, "expires_at", None) is not None:
+        # Do not clean up effects that have their own independent timer or are permanent/passive
+        if getattr(eff_inst, "duration", 0.0) > 0.0 or getattr(eff_inst, "is_passive", False):
             continue
         effects_dict = getattr(actor, "effects", {})
         if effect_key in effects_dict and effects_dict[effect_key] is eff_inst:

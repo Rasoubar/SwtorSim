@@ -679,6 +679,33 @@ class SimulationIntegrationTests(unittest.TestCase):
         self.assertEqual(len(coll), 0)
         self.assertNotIn("Followthrough", coll)
 
+    def test_28_sundered_armor_debuff_no_double_application(self):
+        """Verifies raid armor debuff (Sundered) does not double-stack when applied by an ability."""
+        from src.swtorsim.config_load import load_training_dummy_armor_debuffs, load_complete_loadout
+
+        debuffs = load_training_dummy_armor_debuffs()
+        loadout = load_complete_loadout([
+            "abl.agent.skill.marksmanship.penetrating_blasts",
+        ])
+        stats_config = {"class_name": "sniper", "level": 80, "stats": {}}
+        sim, player, target = prepare_simulation([], stats_config, loadout, 10000000, debuffs, verbose=False)
+        player.is_in_cover = True
+        player.stats["Ranged Accuracy"] = 1.10
+        player.stats["Main Accuracy"] = 1.10
+
+        # Baseline: Target dummy with training dummy debuff has armor reduced by 20% (17225 * 0.80 = 13780)
+        initial_armor = target.stats["Armor"]
+        self.assertAlmostEqual(initial_armor, 13780.0, delta=1.0)
+
+        # Cast Penetrating Blasts (applies effect #4 Sundered Physical)
+        pb = player.ability_db["abl.agent.skill.marksmanship.penetrating_blasts"]
+        pb.cast(player, target, sim)
+        sim.run_timed(duration=2.5, target=target)
+
+        # After PB, armor reduction MUST remain 20% (13780), NOT double-stack to 40% (10335)
+        after_armor = target.stats["Armor"]
+        self.assertAlmostEqual(after_armor, 13780.0, delta=1.0, msg="Sundered must not double-apply on dummy")
+
 
 if __name__ == "__main__":
     unittest.main()

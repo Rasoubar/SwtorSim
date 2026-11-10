@@ -139,6 +139,23 @@ class Entity:
         effect_instance.ticks_remaining = total_ticks
 
         existing = self.effects.get(effect_key)
+        stack_charge = getattr(effect, "stack_charge", None) or {}
+        is_by_tag = bool(stack_charge.get("is_by_tag", False))
+        nr_occurances = int(stack_charge.get("nr_occurances", 1) or 1)
+        rel_tags_raw = stack_charge.get("relevant_tags")
+
+        if is_by_tag and rel_tags_raw and existing is None:
+            rel_tags = {rel_tags_raw} if isinstance(rel_tags_raw, str) else set(rel_tags_raw)
+            for existing_k, existing_eff in list(self.effects.items()):
+                if getattr(existing_eff, "is_expired", False):
+                    continue
+                eff_tags = getattr(existing_eff, "tags", frozenset())
+                if rel_tags & set(eff_tags):
+                    existing = existing_eff
+                    if nr_occurances == 1:
+                        self.effects.pop(existing_k, None)
+                    break
+
         if existing is not None and not getattr(existing, "is_expired", False):
             can_accumulate_stacks = effect_instance.max_stacks > 1 and (
                 effect_instance.scales_with_stacks
@@ -216,7 +233,12 @@ class Entity:
                     "tags": frozenset(effect_tags),
                     "effect_tags": frozenset(effect_tags),
                     "ability_spec": getattr(ability, "fqn", None),
-                    "include_effect_refreshes": (existing is not None and not getattr(existing, "is_expired", False)),
+                    "include_effect_refreshes": (
+                        existing is not None
+                        and not getattr(existing, "is_expired", False)
+                        and getattr(existing, "fqn", None) == effect_instance.fqn
+                        and getattr(existing, "number", None) == effect_instance.number
+                    ),
                 }
                 sim.triggers.dispatch("on_effect_applied", sim, eff_ctx)
                 sim.triggers.dispatch("on_effect_received", sim, eff_ctx)

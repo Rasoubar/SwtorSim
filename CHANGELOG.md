@@ -4,6 +4,19 @@
 
 ## Completed Fixes
 
+### 70. `is_by_tag` Stack Limit Enforcement & Armor Debuff Double-Application Fix (`entities.py`, `abilities.py`) - [DONE]
+- **Root Cause Identified**:
+  - The training dummy initializes with permanent armor debuff `Sundered (Physical)` (-20% armor, tag `tag.abl.debuff.armor_reduced_stacks_by_tag`).
+  - When Penetrating Blasts channeled and applied its own effect #4 (`abl.agent.skill.marksmanship.penetrating_blasts:4`), because both entries had different keys, `Dummy.recalculate_stats` summed both modifiers: `-0.20 + -0.20 = -0.40` (-40% armor reduction). Target armor dropped from 17225 to 10335 instead of 13780, inflating Marksmanship damage.
+  - In SWTOR GOM, debuffs sharing `tag.abl.debuff.armor_reduced_stacks_by_tag` specify `stack_charge.is_by_tag: true` with `nr_occurances: 1`.
+- **Fix (`entities.py :: Entity.apply_effect`, `abilities.py`)**:
+  - Implemented `is_by_tag` stack limit enforcement in `apply_effect`: when an incoming effect has `is_by_tag: true`, any active effect sharing `relevant_tags` is refreshed/superseded rather than stacked, preserving permanent dummy debuff durations (`expires_at is None`).
+  - Fixed `include_effect_refreshes` in `apply_effect` to strictly check matching `fqn` and `number`, ensuring cross-ability by-tag replacements (PB over Snipe Followthrough) still trigger procs.
+  - Fixed channel cleanup in `abilities.py` around line 1925 to skip independent debuffs and passive effects (`duration > 0.0 or is_passive`).
+- **Verification (`tests/test_simulation_integration.py :: test_28_sundered_armor_debuff_no_double_application`)**:
+  - Verified target dummy armor stays strictly at 13780 (-20%) before and after Penetrating Blasts.
+  - Full regression pass: 79/79 tests passing (100% pass rate).
+
 ### 69. Canonical Effect IDs and EffectCollection Dual-Lookup Architecture (`effects.py`, `entities.py`, `abilities.py`, `setup.py`) - [DONE]
 - **Architectural Motivation**:
   - Previously, `entity.effects` was a standard dictionary keyed by effect display name (`effect_key = raw_effect_name`).
