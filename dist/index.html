@@ -28,6 +28,7 @@
     --red-bg: #fee2e2;
     --cyan: #1d72a8;
     --cyan-bg: #d7eefa;
+    --mudkip: #ff7818;
   }
 
   [data-theme="dark"] {
@@ -53,6 +54,7 @@
     --red-bg: rgba(239, 68, 68, 0.14);
     --cyan: #58abdf;
     --cyan-bg: rgba(88, 171, 223, 0.14);
+    --mudkip: #58abdf;
   }
 
   [data-theme="dark"] .brand-badge {
@@ -298,44 +300,136 @@
     margin-top: 6px;
     margin-bottom: 4px;
   }
+  .st-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .st-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .st-count {
+    font-size: 10.5px;
+    padding: 1px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+  }
+  .st-count.incomplete {
+    border-color: #d89b2b;
+    color: #d89b2b;
+  }
   .st-row {
     display: grid;
-    grid-template-columns: 34px 1fr 1fr 1fr;
-    gap: 4px;
-    align-items: center;
-    margin-bottom: 4px;
+    grid-template-columns: 38px repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    align-items: stretch;
+    padding: 5px 0;
+    border-top: 1px solid var(--border-subtle);
   }
-  .st-row:last-child {
-    margin-bottom: 0;
+  .st-row:first-child {
+    border-top: none;
+  }
+  .st-row.unset {
+    box-shadow: inset 2px 0 0 #d89b2b;
   }
   .st-lvl {
     font-size: 11px;
     font-weight: 700;
     color: var(--text-muted);
+    text-align: right;
+    padding-right: 6px;
+    align-self: center;
+  }
+  .st-row.unset .st-lvl {
+    color: #d89b2b;
   }
   .st-btn {
-    padding: 3px 5px;
-    font-size: 10.5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 3px;
+    min-height: 58px;
+    padding: 5px 3px 4px;
+    font-size: 10px;
+    line-height: 1.2;
     text-align: center;
-    white-space: nowrap;
+    white-space: normal;
     overflow: hidden;
-    text-overflow: ellipsis;
-    border-radius: 4px;
+    border-radius: 6px;
     border: 1px solid var(--border);
     background: var(--bg-card);
     color: var(--text-main);
     cursor: pointer;
+    position: relative;
     transition: all 0.15s ease;
   }
   .st-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
   }
+  .st-btn .st-name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .st-btn .st-icon {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: #000000;
+    object-fit: cover;
+    opacity: 0.6;
+  }
+  .st-btn:hover .st-icon {
+    opacity: 1;
+  }
   .st-btn.active {
     background: var(--accent-bg);
     border-color: var(--accent);
     color: var(--accent-hover);
     font-weight: 600;
+  }
+  .st-btn.active .st-icon {
+    opacity: 1;
+    border-color: var(--accent);
+  }
+  .st-btn.active::before {
+    content: "";
+    position: absolute;
+    left: -1px;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 0 2px 2px 0;
+    background: var(--accent);
+  }
+  .st-btn.active::after {
+    content: "\2713";
+    position: absolute;
+    top: 1px;
+    right: 5px;
+    font-size: 10px;
+    color: var(--accent);
+  }
+  .skill-tree-drawer.picked-only .st-row:not(.unset) .st-btn:not(.active) {
+    display: none;
+  }
+  .skill-tree-drawer.picked-only .st-row:not(.unset) .st-btn.active {
+    grid-column: 2 / 5;
+    flex-direction: row;
+    min-height: 40px;
+    gap: 8px;
+    text-align: left;
+    padding: 4px 8px;
   }
 
   .form-grid-2 {
@@ -919,7 +1013,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794426663"></script>
+  <script src="pyodide_client.js?v=1794438003"></script>
 </head>
 <body>
 
@@ -1059,9 +1153,12 @@
           </div>
           <!-- Interactive Skill Tree Drawer -->
           <div id="skillTreeDrawer" class="skill-tree-drawer" style="display:none;">
-            <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;">
-              <span>Skill Tree Choices (Click 1 / 2 / 3)</span>
+            <div class="st-head">
+              <span class="st-title">Skill Tree Choices</span>
+              <span class="st-count" id="skillTreeCount"></span>
+              <span style="flex:1;"></span>
               <span id="stSummaryBadge" style="font-size:10px;color:var(--text-muted);font-weight:normal;"></span>
+              <button class="btn btn-sm" id="skillTreePickedBtn" type="button" style="padding:2px 8px; font-size:11px;" onclick="toggleSkillTreePickedOnly()" title="Show only the chosen option per level">Picked only</button>
             </div>
             <div id="skillTreeRows"></div>
           </div>
@@ -1158,8 +1255,8 @@
             <input type="number" class="stat-input" data-stat="Accuracy Rating" value="2824">
           </div>
           <div class="form-row">
-            <label class="form-label">Armor Pen (0-1)</label>
-            <input type="number" class="stat-input" data-stat="Armor Penetration" value="0" step="0.05">
+            <label class="form-label">Mudkip</label>
+            <div id="mudkipBox" style="display:flex; align-items:center; justify-content:center; gap:6px; height:26px; box-sizing:border-box; padding:0 8px; border:1px solid var(--mudkip); border-radius:5px; font-size:11px; font-weight:700; letter-spacing:0.3px; color:var(--mudkip); white-space:nowrap;">Is the best pokemon</div>
           </div>
           <div class="form-row">
             <label class="form-label">MH Min Dmg</label>
@@ -1878,10 +1975,13 @@
       return;
     }
 
+    let pickedCount = 0;
     levels.forEach(lvl => {
       const slots = tree[lvl] || {};
+      const isSet = ["1", "2", "3"].includes(String(CURRENT_CHOICES[lvl]));
+      if (isSet) pickedCount += 1;
       const row = document.createElement("div");
-      row.className = "st-row";
+      row.className = "st-row" + (isSet ? "" : " unset");
 
       const lvlSpan = document.createElement("span");
       lvlSpan.className = "st-lvl";
@@ -1890,12 +1990,37 @@
 
       ["1", "2", "3"].forEach(slotNum => {
         const entries = slots[slotNum] || [];
-        const label = entries.map(e => e.name).join(" + ") || `Option ${slotNum}`;
+        // The first entry is the option itself. Any further entries are base
+        // abilities the option leaves in place (added by the extractor from the
+        // game's ability-replacement table), so they are not part of the name.
+        const primary = entries[0] || null;
+        const kept = entries.slice(1).map(e => e.name);
+        const label = (primary && primary.name) || `Option ${slotNum}`;
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "st-btn" + (String(CURRENT_CHOICES[lvl]) === slotNum ? " active" : "");
-        btn.textContent = label;
-        btn.title = `Level ${lvl} Option ${slotNum}: ${label}`;
+        if (primary && primary.icon) {
+          const img = document.createElement("img");
+          img.className = "st-icon";
+          img.alt = "";
+          img.loading = "lazy";
+          const clean = primary.icon.endsWith(".png") ? primary.icon : `${primary.icon}.png`;
+          img.src = `icons/${clean}`;
+          img.onerror = () => {
+            if (img.dataset.retried !== "1" && clean !== clean.toLowerCase()) {
+              img.dataset.retried = "1";
+              img.src = `icons/${clean.toLowerCase()}`;
+            } else {
+              img.style.display = "none";
+            }
+          };
+          btn.appendChild(img);
+        }
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "st-name";
+        nameSpan.textContent = label;
+        btn.appendChild(nameSpan);
+        btn.title = `Level ${lvl} Option ${slotNum}: ${label}` + (kept.length ? `\nKeeps: ${kept.join(", ")}` : "");
         btn.onclick = () => {
           CURRENT_CHOICES[lvl] = parseInt(slotNum, 10);
           updateChoicesBadge();
@@ -1905,6 +2030,20 @@
       });
       container.appendChild(row);
     });
+
+    const countEl = document.getElementById("skillTreeCount");
+    if (countEl) {
+      countEl.textContent = `${pickedCount}/${levels.length} chosen`;
+      countEl.classList.toggle("incomplete", pickedCount < levels.length);
+    }
+  }
+
+  function toggleSkillTreePickedOnly() {
+    const drawer = document.getElementById("skillTreeDrawer");
+    if (!drawer) return;
+    const on = drawer.classList.toggle("picked-only");
+    const btn = document.getElementById("skillTreePickedBtn");
+    if (btn) btn.style.borderColor = on ? "var(--accent)" : "";
   }
 
   function updateChoicesBadge() {
