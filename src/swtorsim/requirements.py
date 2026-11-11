@@ -132,6 +132,8 @@ def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str |
     tags_set = set(tags) if tags else set()
 
     for eff in effects.values():
+        if getattr(eff, "is_expired", False):
+            continue
         eff_tags = set(getattr(eff, "tags", []) or getattr(eff, "required_tags", []) or [])
         eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "")
         eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")

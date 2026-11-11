@@ -64,8 +64,12 @@ class Rotation:
             return self.weave[self.weave_pos]
         return None
 
-    def get_next_lead_time(self, player=None, current_time: float = 0.0) -> float:
-        """Returns the lead_time (in seconds) if the upcoming ability is off-GCD and can be cast early."""
+    def get_next_lead_time(self, player=None, current_time: float = 0.0, sim=None) -> float:
+        """Returns the lead_time (in seconds) if the upcoming ability is off-GCD and can be cast early.
+
+        ``sim`` is passed to the priority-pool rule checks so clock-based rules (proc and ability
+        cooldowns) preview the same answer the real evaluation will get.
+        """
         if self.current_step >= len(self.sequence):
             return 0.0
         step = self.pending_weave_step() or self.sequence[self.current_step]
@@ -85,7 +89,7 @@ class Rotation:
             target = getattr(player, "current_target", None)
             for option in getattr(step, "pool", ()):
                 rules = option.get("rules", {})
-                if rules and not validate_all(rules, player, target):
+                if rules and not validate_all(rules, player, target, sim):
                     continue
                 abl_id = option.get("ability_id")
                 ability = player.ability_db.get(abl_id) if abl_id else None

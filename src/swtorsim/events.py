@@ -243,7 +243,7 @@ def schedule_next_decision(player, target, sim) -> None:
         runner.request(sim, sim.current_time)
         return
     target_time = (
-        player.get_next_action_time(sim.current_time)
+        player.get_next_action_time(sim.current_time, sim)
         if hasattr(player, "get_next_action_time")
         else max(sim.current_time, getattr(player, "next_gcd", sim.current_time))
     )
