@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from multiprocessing import Pool, cpu_count
 from pathlib import Path
 from typing import Any
+import urllib.request
 from urllib.parse import parse_qs, urlparse
 
 SWTORSIM_ROOT = Path(__file__).resolve().parents[2]
@@ -1526,6 +1527,15 @@ def aggregate_batch_slices(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 
+def _is_rotation_builder(host: str, port: int) -> bool:
+    """Returns True if the server on host:port serves the Rotation Builder page (matched by <title>; the Simulator page also mentions the builder)."""
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/", timeout=1.0) as resp:
+            return b"<title>SwtorSim - Rotation Builder</title>" in resp.read(65536)
+    except Exception:
+        return False
+
+
 def ensure_rotation_builder_running(host: str = "127.0.0.1", default_port: int = 8765) -> str:
     """Ensures the Rotation Builder HTTP server is running and returns its URL."""
     global _ROTATION_BUILDER_PORT
@@ -1533,16 +1543,20 @@ def ensure_rotation_builder_running(host: str = "127.0.0.1", default_port: int =
         if _ROTATION_BUILDER_PORT is not None:
             return f"http://{host}:{_ROTATION_BUILDER_PORT}"
 
-        # Check if port 8765 is already bound (e.g. started externally)
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.settimeout(0.25)
-            if sock.connect_ex((host, default_port)) == 0:
-                _ROTATION_BUILDER_PORT = default_port
-                return f"http://{host}:{default_port}"
+        # Reuse the default port only if it really serves the Rotation Builder (e.g. started externally);
+        # any other listener is skipped and the next free port is used.
+        if _is_rotation_builder(host, default_port):
+            _ROTATION_BUILDER_PORT = default_port
+            return f"http://{host}:{default_port}"
 
         from data.rotation_builder import RotationBuilderRequestHandler
 
         for candidate in range(default_port, default_port + 20):
+            # Windows' SO_REUSEADDR lets bind() succeed on an occupied port, so probe first.
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.settimeout(0.25)
+                if probe.connect_ex((host, candidate)) == 0:
+                    continue
             try:
                 srv = ThreadingHTTPServer((host, candidate), RotationBuilderRequestHandler)
                 _ROTATION_BUILDER_PORT = candidate

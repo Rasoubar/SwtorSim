@@ -2718,3 +2718,9 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **Native backend**: `web_gui.py` adds `SimulationCancelled`, `request_simulation_cancel`, `POST /api/simulate_cancel`. The parallel path now submits 1%-sized chunks via `apply_async` (`_run_task_chunk`) and polls, so cancel terminates the pool (rebuilt next batch); the in-process path checks per run.
 - **WASM backend**: `tools/web/pyodide_client.js :: cancelActiveSimulation` terminates all workers (Python cannot be interrupted cooperatively), rejects pending requests and boots a fresh primary worker; secondary cores respawn. Not exercised in a browser (needs the dist asset bundle); JS parse-checked only. `dist/` was not rebuilt (`tools/build_web_release.py`).
 - **Tests**: `tests/test_batch_cancel.py` (sequential cancel, real-pool cancel, stale-cancel clearing, normal completion). Verified over HTTP and in the UI against the native server. `carnage_14gcd` BATCH 300 iterations seed 42: mean DPS 23434.2 before and after. Full suite: 118 OK.
+
+## Rotation Builder: skill tree order
+- `tools/rotation_builder_ui.html :: renderSkillTreeDrawer` now lists levels highest-first (L73 -> L23), matching `simulator_ui.html`. Checked in browser with Marauder. `dist/` not rebuilt.
+
+## Rotation Builder launcher hardening
+- `web_gui.py :: ensure_rotation_builder_running` reuses the default port only if it serves the Rotation Builder page (`_is_rotation_builder`, matched by page title); otherwise occupied ports are skipped (probed first, since Windows SO_REUSEADDR lets bind succeed on a busy port). Fixes the Rotation Builder button opening an unrelated server on 8765. Test: `tests/test_rotation_builder_launch.py`. Full suite OK.

@@ -1989,7 +1989,10 @@ function renderSkillTreeDrawer() {
   const tree = currentLoadout.skill_tree || {};
   const choices = currentLoadout.choices || {};
 
-  for (const [lvl, slots] of Object.entries(tree)) {
+  // Highest level first, matching the main simulator page.
+  const levels = Object.keys(tree).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0));
+  for (const lvl of levels) {
+    const slots = tree[lvl] || {};
     const row = document.createElement("div");
     row.className = "st-row";
     const lvlSpan = document.createElement("span");
