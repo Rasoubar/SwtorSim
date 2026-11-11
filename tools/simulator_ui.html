@@ -3343,8 +3343,21 @@
           parsed = parsed.run_config || parsed.config;
         }
 
-        if (validatorFn) {
-          const valErr = validatorFn(parsed);
+        // A rotation file (e.g. downloaded from the Rotation Builder) picked via the Run Config
+        // importer is imported as a rotation instead of being rejected.
+        let importCategory = category;
+        let importSelectId = selectElemId;
+        let importValidator = validatorFn;
+        let importCallback = afterImportCallback;
+        if (category === "run_config" && isRotationFileShape(parsed)) {
+          importCategory = "rotations";
+          importSelectId = "rotationSelect";
+          importValidator = validateRotationFile;
+          importCallback = null;
+        }
+
+        if (importValidator) {
+          const valErr = importValidator(parsed);
           if (valErr) throw new Error(valErr);
         }
 
@@ -3355,7 +3368,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            category,
+            category: importCategory,
             filename: file.name,
             content: parsed,
             class_folder: itemClass,
@@ -3368,13 +3381,13 @@
 
         await loadCatalog(true);
 
-        const sel = document.getElementById(selectElemId);
+        const sel = document.getElementById(importSelectId);
         if (sel) {
           sel.value = data.path;
         }
 
-        if (afterImportCallback) {
-          await afterImportCallback(data.path, parsed);
+        if (importCallback) {
+          await importCallback(data.path, parsed);
         } else if (sel) {
           sel.dispatchEvent(new Event("change"));
         }
@@ -3385,22 +3398,40 @@
     });
   }
 
+  // Rotation files: a bare step array, or the Rotation Builder wrapper
+  // {"pre_combat", "pull_conditions", "pull_max_wait", "sequence"}.
+  function isRotationFileShape(obj) {
+    if (Array.isArray(obj)) return true;
+    if (!obj || typeof obj !== "object") return false;
+    // Run configs may carry their own pre_combat list; class/spec/path keys mark a run config.
+    const runConfigKeys = ["spec", "spec_name", "spec_path", "class_name", "class", "rotation_path", "stats_path"];
+    if (runConfigKeys.some(k => obj[k])) return false;
+    return Array.isArray(obj.sequence) || Array.isArray(obj.pre_combat);
+  }
+
+  function validateRotationFile(obj) {
+    if (Array.isArray(obj)) {
+      if (obj.length === 0) return "Rotation array cannot be empty.";
+      return null;
+    }
+    if (obj && typeof obj === "object") {
+      if (Array.isArray(obj.sequence)) {
+        const hasPre = Array.isArray(obj.pre_combat) && obj.pre_combat.length > 0;
+        if (obj.sequence.length === 0 && !hasPre) return "Rotation 'sequence' cannot be empty.";
+        return null;
+      }
+      if (Array.isArray(obj.rotation) || Array.isArray(obj.steps) || Array.isArray(obj.priority)) return null;
+    }
+    return "Rotation JSON must be an array of steps or contain a 'sequence' / 'steps' / 'rotation' list.";
+  }
+
   // Set up the 4 file importers with schema validation
   setupFileImporter(
     "importRotationBtn",
     "importRotationFile",
     "rotations",
     "rotationSelect",
-    (obj) => {
-      if (Array.isArray(obj)) {
-        if (obj.length === 0) return "Rotation array cannot be empty.";
-        return null;
-      }
-      if (obj && typeof obj === "object") {
-        if (Array.isArray(obj.rotation) || Array.isArray(obj.steps) || Array.isArray(obj.priority)) return null;
-      }
-      return "Rotation JSON must be an array of steps or contain a 'steps' / 'rotation' list.";
-    }
+    validateRotationFile
   );
 
 // importChoicesBtn removed
