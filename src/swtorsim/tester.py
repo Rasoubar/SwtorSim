@@ -247,7 +247,7 @@ class Tester:
                 iterations
             )
 
-            Tester._plot_dps_histogram(summary["all_dps"], avg_dps, summary["std_dev"], iterations)
+        Tester._plot_dps_histogram(summary["all_dps"], avg_dps, summary["std_dev"], iterations)
 
         if summary.get("stalled_runs_count", 0) > 0:
             print("=" * 65)

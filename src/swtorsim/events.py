@@ -52,24 +52,15 @@ class ApplyDamageLand(Event):
         crit_string = " (CRITICAL!)" if self.is_crit else ""
         if sim is not None and getattr(sim, "combat_start_time", None) is None:
             sim.combat_start_time = sim.current_time
-        try:
-            sim.tracker.log_damage(
-                self.ability_name,
-                self.final_damage,
-                self.is_crit,
-                self.target,
-                sim.current_time,
-                attack_type=self.attack_type,
-                damage_type=self.damage_type,
-            )
-        except TypeError:
-            sim.tracker.log_damage(
-                self.ability_name,
-                self.final_damage,
-                self.is_crit,
-                self.target,
-                sim.current_time,
-            )
+        sim.tracker.log_damage(
+            self.ability_name,
+            self.final_damage,
+            self.is_crit,
+            self.target,
+            sim.current_time,
+            attack_type=self.attack_type,
+            damage_type=self.damage_type,
+        )
         self.target.hp -= self.final_damage
         if self.target.hp <= 0 and not getattr(self.target, "is_dead", False):
             self.target.is_dead = True
@@ -232,11 +223,20 @@ def is_pre_combat_active(player) -> bool:
     return runner is not None and runner.active
 
 
+def _decision_generation(player) -> int:
+    """Generation of the player's live ``PlayerReady`` chain (0 until the first hand-off)."""
+    gen = getattr(player, "_decision_gen", 0)
+    return gen if isinstance(gen, int) else 0
+
+
 def schedule_next_decision(player, target, sim) -> None:
     """Single hand-off point after a cast/channel/decision completes.
 
     While a pre-combat sequence is running it resumes that sequence; otherwise it schedules
     ``PlayerReady`` at the player's next action time (unchanged rotation behavior).
+
+    Each hand-off starts a new decision generation, so any ``PlayerReady`` still queued from
+    an earlier hand-off resolves as a no-op: one live decision chain per player.
     """
     runner = getattr(player, "pre_combat", None)
     if runner is not None and runner.active:
@@ -247,7 +247,9 @@ def schedule_next_decision(player, target, sim) -> None:
         if hasattr(player, "get_next_action_time")
         else max(sim.current_time, getattr(player, "next_gcd", sim.current_time))
     )
-    sim.schedule_absolute(target_time, PlayerReady(player, target))
+    generation = _decision_generation(player) + 1
+    player._decision_gen = generation
+    sim.schedule_absolute(target_time, PlayerReady(player, target, generation))
 
 
 class PreCombatRunner:
@@ -461,10 +463,12 @@ class PreCombatEvent(Event):
 
 class PlayerReady(Event):
     """Represents a player's actions/decisions to act"""
-    def __init__(self, player: "Player", target: "Dummy"):
+    def __init__(self, player: "Player", target: "Dummy", generation: int | None = None):
         super().__init__("Player Ready")
         self.player = player
         self.target = target
+        # Chain this event belongs to; defaults to the player's live chain.
+        self.generation = _decision_generation(player) if generation is None else generation
 
     def _get_step_diagnostic(self) -> str:
         """Extracts human-readable identifier of the rotation step currently being evaluated."""
@@ -492,6 +496,8 @@ class PlayerReady(Event):
             return
         if is_pre_combat_active(self.player):
             return  # pre-combat owns decisions; PreCombatRunner.finish schedules the first PlayerReady
+        if self.generation != _decision_generation(self.player):
+            return  # superseded by a later schedule_next_decision hand-off
         acted = self.player.rotation.evaluate(self.player, self.target, sim)
         if acted:
             if getattr(self.player, "_is_stalled", False):
@@ -503,7 +509,7 @@ class PlayerReady(Event):
         else:
             if sim.current_time < self.player.next_gcd:
                 target_time = max(sim.current_time, self.player.next_gcd)
-                sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
+                sim.schedule_absolute(target_time, PlayerReady(self.player, self.target, self.generation))
             else:
                 is_busy_action = (
                     getattr(self.player, "active_channel", None) is not None
@@ -520,7 +526,7 @@ class PlayerReady(Event):
                             step_info=self._get_step_diagnostic(),
                             resource_current=resource_val,
                         )
-                sim.schedule_relative(0.1, PlayerReady(self.player, self.target))
+                sim.schedule_relative(0.1, PlayerReady(self.player, self.target, self.generation))
 
 class EffectExpire(Event):
     """Handles the expiration of player buffs."""
