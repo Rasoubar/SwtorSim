@@ -46,6 +46,7 @@ from src.swtorsim.run_config import (
     resolve_skill_tree_fqns,
 )
 from src.swtorsim.settings import get_extractor_data_dir
+from src.swtorsim.cast_timeline import CastTimelineRecorder, ability_name_to_slug  # noqa: F401
 
 PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "live" / "parsed"
 UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
@@ -72,12 +73,7 @@ class CastableAbility:
     activation_duration: float = 0.0
 
 
-def ability_name_to_slug(name: str, fqn: str = "") -> str:
-    """Converts an ability display name (e.g. 'Assassinate+') into its canonical rotation slug ('assassinate+')."""
-    raw = (name or "").strip()
-    if not raw:
-        raw = fqn.split(".")[-1] if fqn else "unknown"
-    return raw.lower().replace(" ", "_")
+# ability_name_to_slug lives in src/swtorsim/cast_timeline.py (shared with the simulator); re-exported here.
 
 
 def _resolve_workspace_path(rel_or_abs: str | Path) -> Path:
@@ -1066,128 +1062,11 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     )
     player.rotation = Rotation("PreviewRotation", rotation_steps)
 
-    cast_log: list[dict[str, Any]] = []
-    # The player's in-flight timed cast / channel: {"row", "kind", "channel"}. Display-only bookkeeping
-    # that reads engine state (scaled cast time, ActiveChannel, next_gcd); it never changes the sim.
-    pending: dict[str, Any] = {}
-
-    def _close_pending(now: float | None) -> None:
-        """Finalizes the in-flight activation; now=None means it ran to its natural end."""
-        info = pending.pop("cur", None)
-        if not info:
-            return
-        row = info["row"]
-        planned_end = info["start"] + row["busy"]
-        if now is not None and now < planned_end - 1e-6:
-            row["end_time"] = round(now, 3)
-            row["clipped"] = True
-        else:
-            row["end_time"] = round(planned_end, 3)
-        channel = info.get("channel")
-        if channel is not None:
-            done = int(getattr(channel, "current_tick", 0) or 0)
-            row["ticks"] = min(done, row["ticks_total"]) if row.get("clipped") else max(done, row["ticks_total"])
-            interval = row.get("tick_interval") or 0.0
-            # Channel cancelled by its own effects (not by a later cast): end after the last tick.
-            if (
-                not row.get("clipped")
-                and getattr(channel, "is_finished", False)
-                and done < row["ticks_total"]
-                and interval > 0
-            ):
-                row["ticks"] = done
-                row["end_time"] = round(info["start"] + done * interval, 3)
-                row["clipped"] = True
-
-    def _activation_still_running(caster, now: float) -> bool:
-        info = pending.get("cur")
-        if not info:
-            return False
-        if info["kind"] == "channel":
-            ch = info.get("channel")
-            return ch is not None and caster.active_channel is ch and not getattr(ch, "is_finished", False)
-        return caster.active_cast is not None and now < info["start"] + info["row"]["busy"] - 1e-6
-
-    # Wrap ability casts to record exact timeline events
-    for abl in set(player.ability_db.values()):
-        orig_fn = abl.cast
-
-        def _make_wrapper(a, fn):
-            def _wrapped(caster, tgt, s, *args, **kwargs):
-                runner = getattr(caster, "pre_combat", None)
-                in_pre_combat = runner is not None and runner.active
-                if in_pre_combat:
-                    step_idx = max(0, runner.index - 1)
-                    step_label = "Pre-Combat"
-                else:
-                    step_idx = getattr(caster.rotation, "current_step", 0)
-                    step_obj = (
-                        caster.rotation.sequence[step_idx]
-                        if caster.rotation and 0 <= step_idx < len(caster.rotation.sequence)
-                        else None
-                    )
-                    step_label = getattr(step_obj, "name", None) or type(step_obj).__name__
-                act = a.activation or getattr(a.blueprint, "activation", None) or {}
-                act_type = act.get("type") if isinstance(act, dict) else None
-                act_dur = float(act.get("duration", 0.0)) if isinstance(act, dict) else 0.0
-                # Same call Ability.cast makes before resolving the cast (read-only).
-                scaled_cast = (
-                    caster.calculate_cast_time(act_dur, ability=a)
-                    if act_type == "cast" and act_dur > 0.0 and hasattr(caster, "calculate_cast_time")
-                    else 0.0
-                )
-                was_busy = _activation_still_running(caster, s.current_time)
-                ok = fn(caster, tgt, s, *args, **kwargs)
-                if ok:
-                    # A successful cast interrupts whatever was still casting/channeling.
-                    _close_pending(s.current_time if was_busy else None)
-                    channel = caster.active_channel if getattr(caster.active_channel, "ability", None) is a else None
-                    if channel is not None:
-                        kind, busy = "channel", float(channel.duration or 0.0)
-                    elif act_type == "cast" and scaled_cast > 0.0:
-                        kind, busy = "cast", float(scaled_cast)
-                    else:
-                        kind, busy = "instant", 0.0
-                    gcd = max(0.0, float(getattr(caster, "next_gcd", 0.0)) - s.current_time) if a.triggers_gcd else 0.0
-                    active_buffs = [
-                        eff.name
-                        for eff in caster.effects.values()
-                        if not getattr(eff, "is_expired", False)
-                        and not getattr(eff, "is_passive", False)
-                        and not any("lockout" in t for t in getattr(eff, "tags", ()))
-                    ]
-                    row = {
-                        "time": round(s.current_time, 2),
-                        "ability": a.name,
-                        "slug": ability_name_to_slug(a.name, a.fqn),
-                        "triggers_gcd": a.triggers_gcd,
-                        "resource": round(caster.resource.current_value, 1),
-                        "step_index": step_idx + 1,
-                        "step_label": step_label,
-                        "phase": "pre_combat" if in_pre_combat else "rotation",
-                        "buffs": active_buffs[:6],
-                        "activation": kind,
-                        "gcd": round(gcd, 3),
-                        "busy": round(busy, 3),
-                        "end_time": round(s.current_time + busy, 3),
-                        "clipped": False,
-                    }
-                    if kind == "channel":
-                        row["ticks_total"] = int(channel.total_ticks or 0)
-                        row["tick_interval"] = round(float(channel.tick_interval or 0.0), 3)
-                        row["ticks"] = row["ticks_total"]
-                    cast_log.append(row)
-                    if kind != "instant":
-                        pending["cur"] = {"row": row, "kind": kind, "channel": channel, "start": s.current_time}
-                return ok
-
-            return _wrapped
-
-        abl.cast = _make_wrapper(abl, orig_fn)
+    # Per-cast rows (step, resource, buffs, cast/channel timing) for the preview table and Cast Timeline
+    recorder = CastTimelineRecorder(player).install()
 
     schedule_periodic(player, target, sim)
     sim.run_timed(duration=duration)
-    _close_pending(None)
 
     total_dmg = getattr(sim.tracker, "total_damage", 0.0) if hasattr(sim, "tracker") and sim.tracker else (target.max_hp - target.hp)
     combat_dur = sim.get_combat_duration() if getattr(sim, "combat_start_time", None) is not None else duration
@@ -1195,9 +1074,7 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
 
     # T0 = first damage (pre-combat rows get negative combat_time); raw sim time stays in "time"
     t0 = sim.combat_start_time if sim.combat_start_time is not None else (sim.pre_combat_end_time or 0.0)
-    for row in cast_log:
-        row["combat_time"] = round(row["time"] - t0, 2)
-        row["combat_end_time"] = round(row["end_time"] - t0, 3)
+    cast_log = recorder.finalize(t0)
     runner = getattr(player, "pre_combat", None)
     swaps = [
         {**sw, "time": round(sw["t"], 2), "combat_time": round(sw["t"] - t0, 2)}

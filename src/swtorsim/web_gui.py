@@ -30,6 +30,7 @@ SWTORSIM_ROOT = Path(__file__).resolve().parents[2]
 if str(SWTORSIM_ROOT) not in sys.path:
     sys.path.insert(0, str(SWTORSIM_ROOT))
 
+from src.swtorsim.cast_timeline import CastTimelineRecorder, rotation_steps_of
 from src.swtorsim.cli import index_disciplines
 from src.swtorsim.config_load import (
     fqn_to_relative_path,
@@ -77,6 +78,7 @@ from src.swtorsim.setup import prepare_simulation
 
 PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "live" / "parsed"
 SIM_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
+TIMELINE_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 RUN_CONFIG_DIR = SWTORSIM_ROOT / "data" / "run_config"
 
 COMMON_HP_PRESETS = [
@@ -770,6 +772,9 @@ def _run_single_test_detailed(
 
             abl.cast = _make_cast_wrapper(abl, orig_cast)
 
+        # Per-cast rows (step, buffs, cast/channel timing) for the Cast Timeline window (display only)
+        cast_recorder = CastTimelineRecorder(player).install()
+
         # Wrap tracker.log_damage to record min/max hits and structured damage events
         orig_log_damage = sim.tracker.log_damage
 
@@ -967,6 +972,27 @@ def _run_single_test_detailed(
         )
     buff_rows.sort(key=lambda r: (r["is_target"], -r["total_uptime"]))
 
+    # Cast Timeline payload (tools/rotation_timeline_ui.html): casts, rotation snapshot, icon/name maps,
+    # and exact player-buff windows (the 10 with the most uptime) instead of per-cast samples.
+    timeline_casts = cast_recorder.finalize(time_origin)
+    timeline_steps = rotation_steps_of(sim_inputs["rotation_config"])
+    pre_runner = getattr(player, "pre_combat", None)
+    cast_timeline = {
+        "casts": timeline_casts,
+        "rotation": timeline_steps,
+        **cast_recorder.ability_maps(timeline_steps),
+        "buff_windows": [
+            {"name": b["name"], "windows": [[w["start"], w["end"]] for w in b["windows"]]}
+            for b in sorted(
+                (b for b in buff_rows if not b["is_target"]), key=lambda b: -b["total_uptime"]
+            )[:10]
+        ],
+        "tactical_swaps": [
+            {**sw, "combat_time": round(float(sw["t"]) - time_origin, 2)}
+            for sw in (getattr(pre_runner, "swaps", None) or [])
+        ],
+    }
+
     total_hits = sum(int(d.get("hit_count", 0)) for d in sim.tracker.breakdown.values())
     total_crits = sum(int(d.get("crit_count", 0)) for d in sim.tracker.breakdown.values())
     overall_crit_pct = (total_crits / total_hits * 100.0) if total_hits > 0 else 0.0
@@ -995,6 +1021,7 @@ def _run_single_test_detailed(
         "execute_breakdown": exec_rows,
         "buffs": buff_rows,
         "combat_log": combat_events,
+        "cast_timeline": cast_timeline,
         "stalls": {
             "total_stalled_time": round(sim.tracker.total_stalled_time, 2),
             "stall_count": len(sim.tracker.stall_events),
@@ -1612,6 +1639,20 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
         qs = parse_qs(parsed.query)
 
         try:
+            if route in ("/timeline", "/timeline.html"):
+                # Cast Timeline window (shared with the Rotation Builder)
+                if not TIMELINE_UI_HTML_PATH.is_file():
+                    self._send_json({"error": f"UI file not found at {TIMELINE_UI_HTML_PATH}"}, status=500)
+                    return
+                html_bytes = TIMELINE_UI_HTML_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(html_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(html_bytes)
+                return
+
             if route in ("/", "/index.html"):
                 if not SIM_UI_HTML_PATH.is_file():
                     self._send_json(

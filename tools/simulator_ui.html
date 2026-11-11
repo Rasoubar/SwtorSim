@@ -1314,7 +1314,11 @@
           Run History &amp; Compare <span class="tab-badge" id="badgeHistory">0</span>
         </button>
       </div>
-      <div id="wallTimeLabel" style="font-size:11px;color:var(--text-muted);"></div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button type="button" class="btn btn-sm" id="castTimelineBtn" onclick="openCastTimeline()" disabled
+                title="Open the last TEST (Single Run) as a visual cast timeline in its own window">Cast Timeline</button>
+        <div id="wallTimeLabel" style="font-size:11px;color:var(--text-muted);"></div>
+      </div>
     </nav>
 
     <!-- TAB 1: ABILITY DAMAGE BREAKDOWN -->
@@ -2360,6 +2364,71 @@
     renderBuffsTab();
     renderCombatLog();
     renderHistoryAndComparison();
+    castTimelineSync();
+  }
+
+  // -------------------------------------------------------------------------
+  // Cast Timeline window (tools/rotation_timeline_ui.html, served as timeline.html).
+  // Fed over BroadcastChannel "swtorsim-cast-timeline-sim" from the shown TEST result's
+  // cast_timeline payload; the Rotation Builder uses the unsuffixed channel.
+  // -------------------------------------------------------------------------
+  const CAST_TIMELINE_CHANNEL = "swtorsim-cast-timeline-sim";
+  let castTimelineChannel = null;
+  try { castTimelineChannel = new BroadcastChannel(CAST_TIMELINE_CHANNEL); } catch (e) { castTimelineChannel = null; }
+
+  function castTimelineResult() {
+    return ACTIVE_RESULT && ACTIVE_RESULT.mode === "TEST" && ACTIVE_RESULT.cast_timeline ? ACTIVE_RESULT : null;
+  }
+
+  function castTimelinePayload() {
+    const res = castTimelineResult();
+    if (!res) return { type: "state", result: null };
+    const ct = res.cast_timeline;
+    return {
+      type: "state",
+      result: {
+        duration: res.duration,
+        total_damage: res.total_damage,
+        dps: res.dps,
+        casts: ct.casts || [],
+        tactical_swaps: ct.tactical_swaps || [],
+        buff_windows: ct.buff_windows || [],
+        pre_combat_duration: res.pre_combat_duration,
+      },
+      rotation: ct.rotation || [],
+      icons: ct.icons || {},
+      names: ct.names || {},
+      slugs: ct.slugs || {},
+      stale: false,
+      selected: null,
+      loadoutLabel: `${res.class_name} // ${res.spec}${res._rotationLabel ? ` | ${res._rotationLabel}` : ""} | seed ${res.seed}`,
+    };
+  }
+
+  function castTimelineSync() {
+    const btn = document.getElementById("castTimelineBtn");
+    if (btn) btn.disabled = !castTimelineResult();
+    if (castTimelineChannel) castTimelineChannel.postMessage(castTimelinePayload());
+  }
+
+  if (castTimelineChannel) {
+    castTimelineChannel.onmessage = (ev) => {
+      if ((ev.data || {}).type === "hello") castTimelineChannel.postMessage(castTimelinePayload());
+    };
+  }
+
+  function openCastTimeline() {
+    if (!castTimelineChannel) {
+      alert("This browser can't link windows (BroadcastChannel unavailable).");
+      return;
+    }
+    const w = window.open("timeline.html?source=sim", "swtorsim_sim_cast_timeline", "width=1400,height=780");
+    if (!w) {
+      alert("The browser blocked the Cast Timeline window. Allow pop-ups for this page.");
+      return;
+    }
+    w.focus();
+    castTimelineChannel.postMessage(castTimelinePayload());
   }
 
   function renderStallAlert(res) {
