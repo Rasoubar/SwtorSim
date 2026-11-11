@@ -228,6 +228,19 @@ class ActiveEffect:
             for m in self.modifiers
         ]
 
+    def modifier_stats(self) -> frozenset:
+        """Returns the stat ids (as strings) this effect's modifiers carry; stacks never change them.
+
+        Lets callers skip effects that cannot contribute to a stat without building the
+        stack-scaled modifier list. Cached per modifiers list, rebuilt if the list is swapped or resized.
+        """
+        mods = self.modifiers
+        cache = self.__dict__.get("_modifier_stats")
+        if cache is None or cache[0] is not mods or cache[1] != len(mods):
+            cache = (mods, len(mods), frozenset(str(m.stat) for m in mods))
+            self.__dict__["_modifier_stats"] = cache
+        return cache[2]
+
     @classmethod
     def from_stat_changes(cls, data: Dict[str, Any]) -> "ActiveEffect":
         """Constructs a permanent passive from a blueprint containing stat_changes."""

@@ -662,6 +662,8 @@ class Player(Entity):
             for effect in self.effects.values():
                 if getattr(effect, "is_expired", False):
                     continue
+                if not _effect_has_stat(effect, _MAX_CHARGES_STATS):
+                    continue
                 for mod in _effect_modifiers(effect):
                     if str(mod.stat) in ("422", "stat_abl_charges_max", "STAT_abl_charges_max"):
                         if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
@@ -890,6 +892,8 @@ class Player(Entity):
         for effect in self.effects.values():
             if getattr(effect, "is_expired", False):
                 continue
+            if not _effect_has_stat(effect, _RESOURCE_COST_STATS):
+                continue
             for mod in _effect_modifiers(effect):
                 if mod.stat in (
                     "68", "69", "70",
@@ -1034,6 +1038,21 @@ def _effect_modifiers(effect):
     if getter is None:
         return ()
     return getter()
+
+
+_MAX_CHARGES_STATS = frozenset({"422", "stat_abl_charges_max", "STAT_abl_charges_max"})
+_RESOURCE_COST_STATS = frozenset({
+    "68", "69", "70",
+    "STAT_abl_cost_force", "STAT_abl_cost_energy", "STAT_abl_cost_action_points",
+})
+
+
+def _effect_has_stat(effect, stats: frozenset) -> bool:
+    """False only when the effect provably carries no modifier for any of ``stats`` (safe to skip)."""
+    getter = getattr(effect, "modifier_stats", None)
+    if getter is None:
+        return True
+    return not stats.isdisjoint(getter())
 
 
 class Dummy(Entity):

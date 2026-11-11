@@ -8,7 +8,7 @@
 5. **Console output:** ASCII tags (`[OK]`, `[WARN]`, `[FAIL]`), no emojis (cp1252 crashes).
 6. **Line endings:** files are CRLF; preserve it.
 7. **Stem matching** (`assassinate` ~ `assassinate_plus`) must respect `is_stem_matching_enabled()` in `src/swtorsim/settings.py`.
-8. **State files:** `TODO.md` = open work only (remove finished items). `CHANGELOG.md` = completion logs; append, don't read unless investigating regressions. Catalog tool `tools/catalog_game_data.py` is missing; when restored, update and re-run it whenever actions/conditions/stats are modeled. Until then, skip and say so.
+8. **State files:** `TODO.md` = open work only (remove finished items). `CHANGELOG.md` = completion logs; append, don't read unless investigating regressions.
 9. **Protocol:** baseline test run -> implement -> test -> update `CHANGELOG.md`/`TODO.md` -> show diffs with justification. Require 100% pass; name covering tests; report pre-existing failures instead of fixing them unasked. Test counts in docs are stale snapshots. Damage-affecting changes: report mean DPS before/after on an affected `data/run_config/` config, same seed.
 10. **Routing:** read `ARCHITECTURE.md` (authoritative file/function map) before grepping across files. `docs/architecture.md` is long-form narrative; `docs/developer_guide.md` defers to this file.
 11. **Extracted data is ground truth:** never hand-edit `data/extractor/live|pts/` or `src/extractor/data/`; fix the extractor and ask the user to re-extract. User files (`data/builds|rotations|run_config|Choices/`) are edited only when the request is about them.

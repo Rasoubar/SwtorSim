@@ -34,12 +34,37 @@ _CASTER_MATCH_TRIGGERS = frozenset({
 })
 
 
+_RATE_LIMIT_STATS = frozenset({"229", "STAT_eff_trigger_rate_limit_modifier_fixed"})
+_PROC_CHANCE_STATS = frozenset({"228", "STAT_eff_trigger_proc_chance_percent_modifier_fixed"})
+
+
+def _collect_trigger_mods(caster):
+    """Returns the caster's active (rate-limit, proc-chance) trigger modifiers, in effect order."""
+    rate_limit_mods = []
+    proc_chance_mods = []
+    if hasattr(caster, "effects"):
+        for eff in caster.effects.values():
+            if getattr(eff, "is_expired", False):
+                continue
+            getter = getattr(eff, "get_effective_modifiers", None)
+            eff_mods = getter() if getter is not None else getattr(eff, "modifiers", [])
+            for mod in eff_mods:
+                stat = str(mod.stat)
+                if stat in _RATE_LIMIT_STATS:
+                    rate_limit_mods.append(mod)
+                elif stat in _PROC_CHANCE_STATS:
+                    proc_chance_mods.append(mod)
+    return rate_limit_mods, proc_chance_mods
+
+
 class TriggerManager:
     """Manages reactive proc listeners, actor/tag/attack-type filtering, and rate-limit lockouts."""
 
     def __init__(self):
         # Maps event_name -> list of compiled trigger dicts
         self._listeners = {}
+        # Maps owner_id -> events it has listeners on, so unsubscribe only touches those lists
+        self._owner_events = {}
 
     def subscribe(self, owner_id, ability, branch, caster, target, effect_key=None, effect_tags=None):
         """Registers every event-bus trigger rule defined on a branch independently."""
@@ -69,12 +94,20 @@ class TriggerManager:
                 "next_allowed_time": 0.0,
                 "effect_tags": frozenset(effect_tags or ()),
             }
+            # Trigger tags + owning effect tags: what 228/229 modifiers are matched against.
+            entry["all_tags"] = entry["tags"] | entry["effect_tags"]
             self._listeners.setdefault(event, []).append(entry)
+            self._owner_events.setdefault(owner_id, {})[event] = None
 
     def unsubscribe(self, owner_id):
         """Removes all triggers tied to a specific effect or passive instance."""
-        for event, entries in self._listeners.items():
-            self._listeners[event] = [sub for sub in entries if sub["owner_id"] != owner_id]
+        events = self._owner_events.pop(owner_id, None)
+        if not events:
+            return
+        for event in events:
+            entries = self._listeners.get(event)
+            if entries:
+                self._listeners[event] = [sub for sub in entries if sub["owner_id"] != owner_id]
 
     def get_remaining_icd(self, source_fqn: str, current_time: float, caster=None) -> float:
         """Returns the maximum remaining trigger rate-limit lockout for the given ability FQN."""
@@ -97,14 +130,12 @@ class TriggerManager:
             return
 
         event_tags = frozenset(context.get("tags") or [])
+        # Per-caster (rate-limit mods, proc-chance mods), valid until a branch runs and may change effects.
+        trigger_mods = {}
 
         # Snapshot the list to allow cascading actions/triggers during iteration
         for sub in list(entries):
             caster = sub["caster"]
-            abl = sub["ability"]
-            abl_fqn = getattr(abl, "fqn", None)
-            all_sub_tags = set(sub["tags"]) | set(sub.get("effect_tags") or ())
-            frozen_sub_tags = frozenset(all_sub_tags)
 
             # Fast reject if actor context does not match subscriber role
             if event_name in _TARGET_MATCH_TRIGGERS:
@@ -118,24 +149,6 @@ class TriggerManager:
                 sub_caster = sub.get("caster")
                 if ctx_caster is not None and sub_caster is not None and ctx_caster != sub_caster:
                     continue
-
-            # 0. Internal cooldown / rate limit on trigger (STAT_eff_trigger_rate_limit_modifier_fixed / 229)
-            base_min_interval = sub["min_interval"]
-            rate_limit_mod = 0.0
-            if hasattr(caster, "effects"):
-                for eff in caster.effects.values():
-                    if getattr(eff, "is_expired", False):
-                        continue
-                    getter = getattr(eff, "get_effective_modifiers", None)
-                    eff_mods = getter() if getter is not None else getattr(eff, "modifiers", [])
-                    for mod in eff_mods:
-                        if str(mod.stat) in ("229", "STAT_eff_trigger_rate_limit_modifier_fixed"):
-                            if mod.applies_to(ability_fqn=abl_fqn, ability_tags=frozen_sub_tags):
-                                rate_limit_mod += float(mod.value)
-
-            effective_interval = max(0.0, base_min_interval + rate_limit_mod)
-            if effective_interval > 0.0 and sim.current_time < sub["next_allowed_time"]:
-                continue
 
             # 1. Fast reject on excluded tags
             if sub["excluded_tags"] and (event_tags & sub["excluded_tags"]):
@@ -189,24 +202,33 @@ class TriggerManager:
                     if ctx_weapon_mode != req_weapon_mode:
                         continue
 
-            # 5. Proc chance check (STAT_eff_trigger_proc_chance_percent_modifier_fixed / 228)
+            # The pure filters above run first; the modifier lookups below only for surviving listeners.
+            abl_fqn = getattr(sub["ability"], "fqn", None)
+            sub_tags = sub["all_tags"]
+            mods = trigger_mods.get(id(caster))
+            if mods is None:
+                mods = trigger_mods[id(caster)] = _collect_trigger_mods(caster)
+            rate_limit_mods, proc_chance_mods = mods
+
+            # 5. Internal cooldown / rate limit on trigger (STAT_eff_trigger_rate_limit_modifier_fixed / 229)
+            base_min_interval = sub["min_interval"]
+            rate_limit_mod = 0.0
+            for mod in rate_limit_mods:
+                if mod.applies_to(ability_fqn=abl_fqn, ability_tags=sub_tags):
+                    rate_limit_mod += float(mod.value)
+
+            effective_interval = max(0.0, base_min_interval + rate_limit_mod)
+            if effective_interval > 0.0 and sim.current_time < sub["next_allowed_time"]:
+                continue
+
+            # 6. Proc chance check (STAT_eff_trigger_proc_chance_percent_modifier_fixed / 228)
             proc_chance = sub["proc_chance"]
             if proc_chance is not None:
                 bonus_proc = 0.0
-                if hasattr(caster, "effects"):
-                    for eff in caster.effects.values():
-                        if getattr(eff, "is_expired", False):
-                            continue
-                        getter = getattr(eff, "get_effective_modifiers", None)
-                        eff_mods = getter() if getter is not None else getattr(eff, "modifiers", [])
-                        for mod in eff_mods:
-                            if str(mod.stat) in ("228", "STAT_eff_trigger_proc_chance_percent_modifier_fixed"):
-                                if mod.applies_to(ability_fqn=abl_fqn, ability_tags=frozen_sub_tags):
-                                    val = float(mod.value)
-                                    if abs(val) <= 1.0:
-                                        bonus_proc += val * 100.0
-                                    else:
-                                        bonus_proc += val
+                for mod in proc_chance_mods:
+                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=sub_tags):
+                        # Stat 228 is a fraction (0.3 = +30 points); proc_chance is on a 0-100 scale.
+                        bonus_proc += float(mod.value) * 100.0
 
                 effective_proc = min(100.0, max(0.0, proc_chance + bonus_proc))
                 if effective_proc < 100.0:
@@ -231,6 +253,7 @@ class TriggerManager:
                 sub["target"],
                 context=branch_ctx,
             )
+            trigger_mods.clear()  # the branch may have applied, removed or restacked effects
             if ran and getattr(sim, "tracer", None) is not None:
                 sim.tracer.record_proc_dispatch(
                     timestamp=sim.current_time,
