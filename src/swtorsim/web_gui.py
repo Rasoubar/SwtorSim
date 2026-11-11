@@ -752,7 +752,7 @@ def _run_single_test_detailed(
                         combat_events.insert(
                             insert_idx,
                             {
-                                "time": round(float(s.current_time), 2),
+                                "time": round(float(s.current_time), 4),
                                 "category": "cast",
                                 "ability": a_name,
                                 "triggers_gcd": bool(ability_obj.triggers_gcd),
@@ -806,7 +806,7 @@ def _run_single_test_detailed(
             dt_name = DAMAGE_TYPE_NAMES.get(damage_type, "")
             combat_events.append(
                 {
-                    "time": round(float(current_time), 2),
+                    "time": round(float(current_time), 4),
                     "category": "damage",
                     "ability": ability_name,
                     "damage": round(float(dmg_value), 0),
@@ -832,7 +832,8 @@ def _run_single_test_detailed(
                 res_val = round(float(getattr(player.resource, "current_value", 0.0)), 1)
                 hp_pct = round(float(target.hp_ratio) * 100.0, 1)
                 combat_events.append({
-                    "time": round(float(timestamp), 2),
+                    "time": round(float(timestamp), 4),
+                    "_stall_start": float(active["start"]),
                     "category": "stall",
                     "ability": active.get("step_info", "Rotation Stall"),
                     "damage": 0.0,
@@ -841,7 +842,7 @@ def _run_single_test_detailed(
                     "target_hp": round(float(target.hp), 0),
                     "target_hp_pct": hp_pct,
                     "resource": res_val,
-                    "text": f"Rotation stalled for {dur:.2f}s (from {active['start']:.2f}s) on step #{active['step_index']}: {active['step_info']}",
+                    "text": f"Rotation stalled for {dur:.2f}s (from {{start}}s) on step #{active['step_index']}: {active['step_info']}",
                 })
             orig_stall_end(timestamp)
         sim.tracker.log_rotation_stall_end = _wrapped_stall_end
@@ -854,7 +855,8 @@ def _run_single_test_detailed(
                 res_val = round(float(getattr(player.resource, "current_value", 0.0)), 1)
                 hp_pct = round(float(target.hp_ratio) * 100.0, 1)
                 combat_events.append({
-                    "time": round(float(current_time), 2),
+                    "time": round(float(current_time), 4),
+                    "_stall_start": float(active["start"]),
                     "category": "deadlock",
                     "ability": active.get("step_info", "Rotation Deadlock"),
                     "damage": 0.0,
@@ -863,7 +865,7 @@ def _run_single_test_detailed(
                     "target_hp": round(float(target.hp), 0),
                     "target_hp_pct": hp_pct,
                     "resource": res_val,
-                    "text": f"Rotation permanently deadlocked at {active['start']:.2f}s (stalled for {dur:.2f}s) on step #{active['step_index']}: {active['step_info']}",
+                    "text": f"Rotation permanently deadlocked at {{start}}s (stalled for {dur:.2f}s) on step #{active['step_index']}: {active['step_info']}",
                 })
             orig_finalize_stalls(current_time)
         sim.tracker.finalize_stalls = _wrapped_finalize_stalls
@@ -871,6 +873,11 @@ def _run_single_test_detailed(
         sim.run_timed(duration=config.duration, target=target)
         sim.tracker.finalize_effects(sim.current_time)
         combat_events.sort(key=lambda ev: ev["time"])
+        time_origin = sim.time_origin()
+        for ev in combat_events:
+            ev["time"] = round(ev["time"] - time_origin, 2)
+            if "_stall_start" in ev:
+                ev["text"] = ev["text"].replace("{start}", f"{ev.pop('_stall_start') - time_origin:.2f}")
 
     wall_ms = round((time.perf_counter() - t0) * 1000.0, 1)
     combat_start = sim.combat_start_time if getattr(sim, "combat_start_time", None) is not None else 0.0
@@ -890,10 +897,11 @@ def _run_single_test_detailed(
         iterations=1,
     )
 
-    exec_start = getattr(sim.tracker, "execute_start_time", None)
+    exec_start_raw = getattr(sim.tracker, "execute_start_time", None)
+    exec_start = (float(exec_start_raw) - time_origin) if exec_start_raw is not None else None
     exec_total_dmg = float(getattr(sim.tracker, "total_execute_damage", 0.0))
     if exec_start is not None and fight_duration > exec_start and exec_total_dmg > 0:
-        exec_dur = fight_duration - float(exec_start)
+        exec_dur = fight_duration - exec_start
         exec_dps = exec_total_dmg / exec_dur if exec_dur > 0 else 0.0
         exec_rows = _format_ability_breakdown_rows(
             sim.tracker.execute_breakdown,
@@ -924,12 +932,15 @@ def _run_single_test_detailed(
         if not has_proper_effect_name(eff_name):
             continue
         merged_windows: list[dict[str, Any]] = []
+        total_active = 0.0
         for w in windows:
-            s_t = round(float(w["start"]), 2)
-            e_t = round(float(w["end"]), 2)
+            s_t = round(float(w["start"]) - time_origin, 2)
+            e_t = round(float(w["end"]) - time_origin, 2)
             dur = round(max(0.0, float(w["duration"])), 2)
             if dur <= 0.0:
                 continue
+            # Uptime counts only the in-fight part of each window (pre-pull time excluded)
+            total_active += max(0.0, min(e_t, fight_duration) - max(s_t, 0.0))
             merged_windows.append(
                 {
                     "start": s_t,
@@ -940,7 +951,6 @@ def _run_single_test_detailed(
             )
         if not merged_windows:
             continue
-        total_active = sum(w["duration"] for w in merged_windows)
         pct = min(100.0, (total_active / fight_duration) * 100.0) if fight_duration > 0 else 0.0
         max_stacks_overall = max((w["max_stacks"] for w in merged_windows), default=1)
         buff_rows.append(
@@ -971,6 +981,7 @@ def _run_single_test_detailed(
         "seed": config.seed,
         "elapsed_wall_ms": wall_ms,
         "duration": round(fight_duration, 2),
+        "pre_combat_duration": round(max(0.0, time_origin), 2),
         "total_damage": round(total_damage, 0),
         "dps": round(dps, 1),
         "total_hits": total_hits,
@@ -988,7 +999,14 @@ def _run_single_test_detailed(
             "total_stalled_time": round(sim.tracker.total_stalled_time, 2),
             "stall_count": len(sim.tracker.stall_events),
             "permanent_stall": sim.tracker.permanent_stall,
-            "events": sim.tracker.stall_events,
+            "events": [
+                {
+                    **ev,
+                    "start": round(float(ev["start"]) - time_origin, 2),
+                    **({"end": round(float(ev["end"]) - time_origin, 2)} if ev.get("end") is not None else {}),
+                }
+                for ev in sim.tracker.stall_events
+            ],
         },
     }
 
@@ -1131,7 +1149,7 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
     }
 
     execute_start = getattr(sim.tracker, "execute_start_time", None)
-    execute_dur = (elapsed_time - execute_start) if execute_start is not None else 0.0
+    execute_dur = max(0.0, float(sim.current_time) - execute_start) if execute_start is not None else 0.0
 
     return {
         "run_id": run_id + 1,

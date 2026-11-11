@@ -9,6 +9,7 @@ from src.swtorsim.combat_math import accuracy_roll
 from src.swtorsim.entities import Dummy, Player
 from src.swtorsim.events import ChargeRestoreEvent, DamageHit, ResourceGainEvent
 from src.swtorsim.requirements import validate_all
+from src.swtorsim.engine import sim_log
 
 
 
@@ -1201,7 +1202,7 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
     if effect_name and caster.has_effect(effect_name):
         caster.cleanup_expired_effects([effect_name])
         if getattr(sim, "verbose", True):
-            print(f"[{sim.current_time:.3f}] {caster.name} consumed/removed buff: {effect_name}")
+            sim_log(sim, f"{caster.name} consumed/removed buff: {effect_name}")
         return
 
     if action_type == "remove_effect":
@@ -1377,7 +1378,7 @@ class Ability:
 
         self.charges = min(self.max_charges, self.charges + amount)
         if getattr(sim, "verbose", True):
-            print(f"[{sim.current_time:.2f}s] {self.name} charge restored ({self.charges}/{self.max_charges})")
+            sim_log(sim, f"{self.name} charge restored ({self.charges}/{self.max_charges})")
 
         if self.charges == self.max_charges:
             self.active_charge_event = None
@@ -1489,7 +1490,7 @@ class Ability:
 
         if getattr(caster, "active_channel", None) is not None:
             old_channel = caster.active_channel
-            print(f"[{sim.current_time:.3f}] {caster.name} interrupted channel to cast {self.name}!")
+            sim_log(sim, f"{caster.name} interrupted channel to cast {self.name}!")
             old_channel.is_finished = True
             caster.active_channel = None
             caster.is_channeling = False
@@ -1509,7 +1510,7 @@ class Ability:
                 )
 
         if getattr(caster, "active_cast", None) is not None:
-            print(f"[{sim.current_time:.3f}] {caster.name} interrupted cast to cast {self.name}!")
+            sim_log(sim, f"{caster.name} interrupted cast to cast {self.name}!")
             caster.active_cast = None
             caster.is_casting = False
 
@@ -1558,7 +1559,7 @@ class Ability:
                     reason=f"Cast {self.name}",
                 )
         if getattr(sim, "verbose", True):
-            print(f"[{sim.current_time:.2f}s] {caster.name} casts {self.name}")
+            sim_log(sim, f"{caster.name} casts {self.name}")
 
         self.apply_cooldown_locks(caster, sim)
 

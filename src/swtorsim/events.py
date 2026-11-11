@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
 from src.swtorsim.combat_math import calculate_hit
+from src.swtorsim.engine import sim_log
 
 
 if TYPE_CHECKING:
@@ -83,7 +84,7 @@ class ApplyDamageLand(Event):
                 sim.triggers.dispatch("on_death", sim, death_ctx)
                 sim.triggers.dispatch("on_kill", sim, death_ctx)
         if getattr(sim, "verbose", True):
-            print(f"[{sim.current_time:.2f}s] {self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
+            sim_log(sim, f"{self.ability_name} deals {self.final_damage}{crit_string} damage to {self.target.name} (HP: {self.target.hp})")
         if getattr(sim, "tracer", None) is not None:
             from src.swtorsim.metrics import ATTACK_TYPE_NAMES, DAMAGE_TYPE_NAMES
             at_name = ATTACK_TYPE_NAMES.get(self.attack_type, str(self.attack_type)) if self.attack_type else ""
@@ -201,7 +202,7 @@ class PeriodicProcTick(Event):
         from src.swtorsim.abilities import execute_single_action
         for action in getattr(self.proc, 'actions', []):
             if getattr(sim, "verbose", True):
-                print(f'[{sim.current_time}] Temporary Proc test')
+                sim_log(sim, f'Temporary Proc test')
             execute_single_action(sim, self.player, self.target, action, self.proc.name)
         is_affected = getattr(self.proc, 'affected_by_cdr', False)
         interval = self.player.scale_time_modifier(self.proc.icd) if is_affected else self.proc.icd
@@ -324,7 +325,7 @@ class PreCombatRunner:
         self.end_time = round(sim.current_time, 4)
         sim.pre_combat_end_time = self.end_time
         if getattr(sim, "verbose", True):
-            print(f"[{sim.current_time:.3f}] Pre-combat sequence complete; rotation takes over.")
+            sim_log(sim, f"Pre-combat sequence complete; rotation takes over.")
         schedule_next_decision(self.player, self.target, sim)
 
     def run(self, sim) -> None:
@@ -562,7 +563,7 @@ class EffectExpire(Event):
         self.entity.cleanup_expired_effects([self.effect_name])
 
         if getattr(sim, "verbose", True):
-            print(f"[{sim.current_time:.2f}s] Buff expired and cleared: {self.effect_name}")
+            sim_log(sim, f"Buff expired and cleared: {self.effect_name}")
 
 class DotTick(Event):
     """Represents a Dot Tick. Handles action execution, tick's value decrease and following tick scheduling."""
@@ -653,7 +654,7 @@ class DotTick(Event):
                 )
                 label = "DoT" if is_dot else "Buff"
                 if getattr(sim, "verbose", True):
-                    print(f"[{sim.current_time:.2f}s] {label} expired and cleared: {dot_name}")
+                    sim_log(sim, f"{label} expired and cleared: {dot_name}")
             return
 
         # Legacy fallback without blueprint
@@ -671,7 +672,7 @@ class DotTick(Event):
         else:
             self.target.cleanup_expired_effects([dot_name])
             if getattr(sim, "verbose", True):
-                print(f"[{sim.current_time:.2f}s] DoT expired and cleared: {dot_name}")
+                sim_log(sim, f"DoT expired and cleared: {dot_name}")
 
 class ChannelTickEvent(Event):
     """Represents a single tick of a channeled ability.
@@ -741,7 +742,7 @@ class ChannelTickEvent(Event):
             self.source.active_channel = None
             self.source.is_channeling = False
             if getattr(sim, "verbose", True):
-                print(f"[{sim.current_time:.3f}] {self.channel.name} channel over.")
+                sim_log(sim, f"{self.channel.name} channel over.")
             ability = getattr(self.channel, "ability", None)
             if ability is not None:
                 for eff in getattr(ability, "effects", {}).values():
@@ -800,7 +801,7 @@ class CastFinishEvent(Event):
             if final_spend > 0.0:
                 if not resource.spend(final_spend):
                     if getattr(sim, "verbose", True):
-                        print(f"[{sim.current_time:.3f}s] {self.caster.name} failed casting {self.ability.name} (insufficient resource)")
+                        sim_log(sim, f"{self.caster.name} failed casting {self.ability.name} (insufficient resource)")
                     schedule_next_decision(self.caster, getattr(self.caster, "current_target", self.target), sim)
                     return
                 if getattr(sim, "tracer", None) is not None:
@@ -814,7 +815,7 @@ class CastFinishEvent(Event):
                     )
 
         if getattr(sim, "verbose", True):
-            print(f"[{sim.current_time:.3f}s] {self.caster.name} finished casting {self.ability.name}")
+            sim_log(sim, f"{self.caster.name} finished casting {self.ability.name}")
 
         for entry_id in self.entry_effect_ids:
             self.ability.execute_effect(entry_id, self.caster, self.target, sim)

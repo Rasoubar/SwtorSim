@@ -4,7 +4,7 @@
 
 | Module | Responsibility | Primary Classes & Functions |
 |---|---|---|
-| `swtorsim/engine.py` | Event heap & simulation clock (fight duration counts from first damage; pre-combat excluded) | `Simulation :: schedule_relative, schedule_absolute, run_timed, run_until, _stop_time` |
+| `swtorsim/engine.py` | Event heap & simulation clock (fight duration counts from first damage; pre-combat excluded) | `Simulation :: schedule_relative, schedule_absolute, run_timed, run_until, _stop_time, time_origin, relative_time, log, flush_log`; `sim_log` (all verbose console lines; fight-relative times) |
 | `swtorsim/setup.py` | Loadout wiring, passive init, proc registry & tactical swaps | `prepare_simulation, build_proc_registry, schedule_periodic, swap_tactical, prepare_tactical_swaps, validate_tactical_for_class, validate_pre_combat_rules` |
 | `swtorsim/entities.py` | Actors, stats, timers, immunities | `Entity :: apply_effect, cleanup_expired_effects, has_immunity`; `Player :: recalculate_stats, calculate_gcd, calculate_cast_time, calculate_channel_duration, calculate_cooldown, calculate_resource_cost, calculate_resource_regen, calculate_effect_duration, calculate_effect_tick, break_stealth, proc_registry`; `Dummy :: recalculate_stats, hp_ratio` |
 | `swtorsim/class_buffs.py` | Universal class buffs & hidden permanent bonus (+1% acc/crit chance/crit mult) | `apply_class_buffs, load_class_buff_effects, HIDDEN_BONUSES` |
@@ -30,7 +30,9 @@
 | `extractor/eff_triggers.py` | GOM trigger enum decoder | `load_trigger_labels, decode_trigger_name` |
 | `tools/catalog_game_data.py` (MISSING from repo) | Blueprint coverage auditor | `run_catalog, format_report` |
 | `tools/parse_combat_log.py` (MISSING from repo) | Live combat log parser | `parse_log_file, analyze_fight` |
-| `data/rotation_builder.py` | Local Web UI & CLI rotation builder | `discover_loadout_catalog, normalize_rotation_steps, normalize_pre_combat_steps, normalize_pull_gate, build_rotation_file_data, class_tactical_fqns, run_dry_run_preview, launch_web_builder` |
+| `data/rotation_builder.py` | Local Web UI & CLI rotation builder | `discover_loadout_catalog, normalize_rotation_steps, normalize_pre_combat_steps, normalize_pull_gate, build_rotation_file_data, class_tactical_fqns, run_dry_run_preview, launch_web_builder` (serves `/` = builder UI, `/timeline[.html]` = Cast Timeline) |
+| `tools/rotation_builder_ui.html` | Rotation Builder page (incl. Visual Map tab) | `renderTimeline` (step editor), `renderRightPanel`, `renderVisualMapHtml, vizSelectStep, vizStatePayload, openCastTimelineWindow` (BroadcastChannel `swtorsim-cast-timeline`) |
+| `tools/rotation_timeline_ui.html` | Pop-out Cast Timeline window for builder dry-runs | `buildModel, draw, renderDetail, setSelected` (messages: `hello`/`select` out; `state`/`stale`/`select` in) |
 | `swtorsim/web_gui.py` | Local Web GUI simulator dashboard & REST API | `get_simulator_catalog, preview_character_stats, execute_simulation_from_payload, launch_web_simulator, execute_simulation_slice, aggregate_batch_slices, request_simulation_cancel` (cancel: `POST /api/simulate_cancel`) |
 | `swtorsim/pyodide_bridge.py` | Pyodide WASM in-memory action dispatcher | `dispatch :: GET_CATALOG, GET_CLASS_GEAR, LOAD_RUN_CONFIG, PREVIEW_STATS, SIMULATE, SIMULATE_SLICE, AGGREGATE_BATCH` |
 | `tools/web/pyodide_client.js` | Multi-core Web Worker pool & fetch interceptor | `executeBatchMultiCore, cancelActiveSimulation, ensureAllWorkersReady, setTargetPoolSize, updateCoreSelectorUI, updateBackendBadge` |

@@ -5,7 +5,7 @@ import random
 import re
 from pathlib import Path
 from typing import Any
-from src.swtorsim.engine import Simulation
+from src.swtorsim.engine import Simulation, sim_log
 from src.swtorsim.abilities import Ability
 from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick, PreCombatRunner, DEFAULT_PRE_COMBAT_MAX_WAIT
@@ -268,7 +268,7 @@ def swap_tactical(player, new_fqn: str, sim, keep_timed_effects: bool = True) ->
             abl.apply_charge_modifiers(player)
 
     if getattr(sim, "verbose", True):
-        print(f"[{sim.current_time:.3f}] {player.name} swapped tactical {old_fqn or '<none>'} -> {new_fqn}")
+        sim_log(sim, f"{player.name} swapped tactical {old_fqn or '<none>'} -> {new_fqn}")
     tracer = getattr(sim, "tracer", None)
     if tracer is not None and hasattr(tracer, "record_tactical_swap"):
         tracer.record_tactical_swap(

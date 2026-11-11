@@ -113,7 +113,7 @@ class Tester:
             }
 
             execute_start = getattr(sim.tracker, 'execute_start_time', None)
-            execute_dur = (elapsed_time - execute_start) if execute_start is not None else 0.0
+            execute_dur = max(0.0, sim.current_time - execute_start) if execute_start is not None else 0.0
 
             return {
                 "dps": calculated_dps,

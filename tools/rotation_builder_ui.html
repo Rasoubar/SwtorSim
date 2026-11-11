@@ -1130,6 +1130,41 @@
   }
   tr.row-prepull td { opacity: 0.85; }
   tr.row-skip td { color: var(--red); }
+
+  /* Visual Map tab (right panel) */
+  .vmap-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .vmap-note { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
+  .vmap-note.stale { color: var(--amber); font-weight: 600; }
+  .vmap-rail { display: grid; gap: 6px; }
+  .vmap-step { display: grid; gap: 6px; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 7px 9px; cursor: pointer; }
+  .vmap-step:hover { border-color: var(--border); }
+  .vmap-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .vmap-step.optional { border-style: dashed; }
+  .vmap-step.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-bg); }
+  .vmap-step.dead { opacity: 0.62; }
+  .vmap-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .vmap-num { font-family: monospace; font-size: 11px; color: var(--text-muted); width: 18px; text-align: right; flex: none; }
+  .vmap-chip { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; flex: none; }
+  .vmap-chip.priority_block { background: var(--accent-bg); color: var(--accent); }
+  .vmap-chip.optional { background: var(--amber-bg); color: var(--amber); }
+  .vmap-chip.fixed { background: var(--cyan-bg); color: var(--cyan); }
+  .vmap-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .vmap-cnt { font-family: monospace; font-size: 11px; flex: none; }
+  .vmap-cnt.zero { color: var(--red); font-weight: 700; }
+  .vmap-pool { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 25px; }
+  .vmap-entry { position: relative; display: grid; justify-items: center; gap: 2px; width: 50px; }
+  .vmap-entry .ability-icon { width: 28px; height: 28px; border-radius: 4px; border: 1px solid var(--border-subtle); margin: 0; }
+  .vmap-entry.unused .ability-icon { filter: grayscale(1); opacity: 0.45; }
+  .vmap-entry .vmap-ec { position: absolute; top: -4px; right: 3px; font-size: 9.5px; font-family: monospace; background: var(--text-main); color: var(--bg-card); border-radius: 8px; padding: 0 4px; line-height: 13px; }
+  .vmap-entry .vmap-noicon { width: 28px; height: 28px; border-radius: 4px; border: 1px dashed var(--border); font-size: 9px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+  .vmap-badge { font-size: 9px; line-height: 1.25; padding: 1px 3px; border-radius: 3px; text-align: center; max-width: 50px; overflow-wrap: anywhere; }
+  .vmap-badge.hp { background: var(--red-bg); color: var(--red); }
+  .vmap-badge.res { background: var(--cyan-bg); color: var(--cyan); }
+  .vmap-badge.buff { background: var(--green-bg); color: var(--green); }
+  .vmap-badge.cd { background: var(--amber-bg); color: var(--amber); }
+  .vmap-anchor { font-size: 11px; font-weight: 700; color: var(--green); border: 1px dashed var(--green); border-radius: 6px; padding: 4px 8px; text-align: center; }
+  .vmap-loopback { font-size: 11px; color: var(--text-muted); border: 1px dashed var(--border-subtle); border-radius: 6px; padding: 5px 8px; text-align: center; }
+  .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
 </style>
 </head>
 <body>
@@ -1308,6 +1343,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" id="rTabLint" onclick="switchRightTab('lint')">Linter & Clipboard</button>
+      <button class="tab-btn" id="rTabMap" onclick="switchRightTab('map')">Visual Map</button>
       <button class="tab-btn" id="rTabPreview" onclick="switchRightTab('preview')">Dry-Run Sim</button>
       <button class="tab-btn" id="rTabJson" onclick="switchRightTab('json')">Raw JSON</button>
     </div>
@@ -1405,6 +1441,9 @@ let paletteTab = "abilities";
 let rightTab = "lint";
 let lastImportWarnings = [];
 let dryRunResult = null;
+let dryRunRotationJson = null;     // JSON of rotationSteps at the time of the last dry-run (stale detection)
+let dryRunRotationSnapshot = null; // rotationSteps as they were dry-run; the cast step_index values refer to this
+let vizSelectedStep = null;        // 1-based executable step index shared by Visual Map, editor and Cast Timeline
 let ruleModalContext = null; // { stepIndex, poolIndex (optional), editKey (optional) }
 
 // ---------------------------------------------------------------------------
@@ -3316,6 +3355,7 @@ function insertSub30OptionalAt(index) {
 }
 
 function renderTimeline() {
+  queueMicrotask(vizOnRotationChanged);
   renderPreCombat();
   const container = document.getElementById("timelineContainer");
   container.innerHTML = "";
@@ -4047,6 +4087,7 @@ function switchRightTab(tab) {
   rightTab = tab;
   for (const [id, key] of [
     ["rTabLint", "lint"],
+    ["rTabMap", "map"],
     ["rTabPreview", "preview"],
     ["rTabJson", "json"]
   ]) {
@@ -4137,14 +4178,22 @@ function renderRightPanel() {
     return;
   }
 
+  if (rightTab === "map") {
+    container.innerHTML = renderVisualMapHtml();
+    return;
+  }
+
   if (rightTab === "preview") {
     let html = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px;">
         <div>
           <div style="font-weight:700;">Live Dry-Run Cast Preview</div>
           <div style="font-size:11px;color:var(--text-muted);">Runs the pre-combat sequence, then 30s of combat from the pull, to verify cast order</div>
         </div>
-        <button class="btn-primary" onclick="runDryRunSimulation()">Run 30s Preview</button>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <button class="btn-primary" onclick="runDryRunSimulation()">Run 30s Preview</button>
+          <button class="btn-sm" onclick="openCastTimelineWindow()" title="Open the dry-run as a visual timeline in its own window">Open Cast Timeline</button>
+        </div>
       </div>
     `;
 
@@ -4235,6 +4284,224 @@ function renderRightPanel() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Visual Map tab + Cast Timeline window (tools/rotation_timeline_ui.html)
+// Dry-run casts carry step_index = 1-based index into the executable sequence,
+// which skips loop_anchor entries (see Rotation.build_steps).
+// ---------------------------------------------------------------------------
+const VIZ_CHANNEL_NAME = "swtorsim-cast-timeline";
+let vizChannel = null;
+try { vizChannel = new BroadcastChannel(VIZ_CHANNEL_NAME); } catch (e) { vizChannel = null; }
+
+function vizIsStale() {
+  return !!dryRunResult && JSON.stringify(rotationSteps) !== dryRunRotationJson;
+}
+
+// Executable steps (no loop_anchor) with their index in rotationSteps.
+function vizExecSteps(steps) {
+  const out = [];
+  let loopStart = 0;
+  (steps || []).forEach((s, editorIdx) => {
+    if (s.type === "loop_anchor") { loopStart = out.length; return; }
+    out.push({ seq: out.length + 1, editorIdx, step: s });
+  });
+  return { exec: out, loopStart };
+}
+
+function vizSlugOf(abilityId) {
+  const m = resolveAbilityDisplay(abilityId);
+  return m ? m.slug : String(abilityId || "").toLowerCase().replace(/\s+/g, "_");
+}
+
+// Per-step and per-entry cast counts from the last dry-run (null when stale or absent).
+function vizCastCounts() {
+  if (!dryRunResult || vizIsStale()) return null;
+  const { exec } = vizExecSteps(dryRunRotationSnapshot);
+  const step = {}, entry = {};
+  for (const c of dryRunResult.casts || []) {
+    if (c.phase === "pre_combat") continue;
+    step[c.step_index] = (step[c.step_index] || 0) + 1;
+    const e = exec[c.step_index - 1];
+    if (!e) continue;
+    const pool = e.step.pool || [{ ability_id: e.step.ability_id }];
+    const j = pool.findIndex(p => vizSlugOf(p.ability_id) === c.slug);
+    const key = `${c.step_index}:${j}`;
+    entry[key] = (entry[key] || 0) + 1;
+  }
+  return { step, entry };
+}
+
+function vizRuleBadges(rules) {
+  const out = [];
+  for (const [k, v] of Object.entries(rules || {})) {
+    const obj = v && typeof v === "object" && !Array.isArray(v) ? v : null;
+    const list = (x) => (Array.isArray(x) ? x.join(" / ") : String(x));
+    let cls = "cd", txt = k;
+    if (k === "target_hp_below_pct") { cls = "hp"; txt = `HP <= ${Math.round(Number(obj ? obj.pct ?? 0.3 : v) * 100)}%`; }
+    else if (k === "target_hp_above_pct") { cls = "hp"; txt = `HP > ${Math.round(Number(v) * 100)}%`; }
+    else if (k === "caster_energy_below") { cls = "res"; txt = `Res < ${v}`; }
+    else if (k === "caster_energy_above") { cls = "res"; txt = `Res >= ${v}`; }
+    else if (k === "caster_has_buff") { cls = "buff"; txt = `has ${list(v)}`; }
+    else if (k === "caster_does_not_have_buff") { cls = "buff"; txt = `no ${list(v)}`; }
+    else if (k === "target_has_debuff") { cls = "buff"; txt = `tgt ${list(v)}`; }
+    else if (k === "target_doesnt_have_debuff") { cls = "buff"; txt = `tgt no ${list(v)}`; }
+    else if (k === "proc_cooldown_above" && obj) { txt = `${obj.name} ICD > ${obj.value}s`; }
+    else if (k === "ability_cooldown_under" && obj) { txt = `${obj.name} CD < ${obj.value}s`; }
+    else if (k === "ability_cooldown_above" && obj) { txt = `${obj.name} CD > ${obj.value}s`; }
+    else if (k.includes("stacks") || k.includes("charges")) { cls = "buff"; txt = k.replace(/_/g, " "); }
+    const full = formatRulePillText(k, v).replace(/<[^>]+>/g, "");
+    out.push(`<span class="vmap-badge ${cls}" title="${escapeAttr(full)}">${escapeHtml(txt)}</span>`);
+  }
+  return out.join("");
+}
+
+function renderVisualMapHtml() {
+  const stale = vizIsStale();
+  const counts = vizCastCounts();
+  const { exec, loopStart } = vizExecSteps(rotationSteps);
+  let html = `
+    <div class="vmap-toolbar">
+      <div style="font-weight:700;">Rotation Map (${exec.length} steps)</div>
+      <button class="btn-sm" onclick="openCastTimelineWindow()" title="Open the dry-run as a visual timeline in its own window">Open Cast Timeline</button>
+    </div>`;
+  if (!dryRunResult) {
+    html += `<div class="vmap-note">Run a dry-run in the <strong>Dry-Run Sim</strong> tab to add cast counts. Click a step to jump to it in the editor.</div>`;
+  } else if (stale) {
+    html += `<div class="vmap-note stale">Cast counts hidden: the rotation changed since the last dry-run.</div>`;
+  } else {
+    html += `<div class="vmap-note">Counts are from the last ${Number(dryRunResult.duration || 30).toFixed(0)}s dry-run. Casts are credited to the first entry with that ability. Click a step to jump to it and filter the Cast Timeline.</div>`;
+  }
+  if (!exec.length) {
+    return html + `<div style="color:var(--text-muted);text-align:center;padding:30px 10px;">The rotation has no steps yet.</div>`;
+  }
+  html += `<div class="vmap-rail">`;
+  exec.forEach((e, i) => {
+    if (loopStart > 0 && i === loopStart) {
+      html += `<div class="vmap-anchor">End of Opener: the loop restarts here</div>`;
+    }
+    const s = e.step;
+    const pool = s.pool || [{ ability_id: s.ability_id, rules: s.rules || {} }];
+    const n = counts ? (counts.step[e.seq] || 0) : null;
+    const label = s.type === "priority_block" ? "Priority" : s.type === "optional" ? "Optional" : s.type === "fixed" ? "Fixed" : s.type;
+    const name = s.name || resolveAbilityDisplay(s.ability_id)?.name || s.ability_id || "";
+    const entries = pool.map((p, j) => {
+      const m = resolveAbilityDisplay(p.ability_id);
+      const ec = counts ? (counts.entry[`${e.seq}:${j}`] || 0) : null;
+      const ablName = m ? m.name : String(p.ability_id || "?");
+      const icon = m && m.icon ? getAbilityIconHtml(m.icon) : `<span class="vmap-noicon">?</span>`;
+      const tip = `${ablName}${ec === null ? "" : ec ? ` - ${ec} cast${ec > 1 ? "s" : ""}` : " - never cast"}`;
+      return `<div class="vmap-entry${ec === 0 ? " unused" : ""}" title="${escapeAttr(tip)}">
+        ${ec ? `<span class="vmap-ec">${ec}</span>` : ""}${icon}${vizRuleBadges(p.rules)}
+      </div>`;
+    }).join("");
+    const cnt = n === null ? "" : `<span class="vmap-cnt${n ? "" : " zero"}">${n ? `${n}x` : "never"}</span>`;
+    html += `
+      <button type="button" class="vmap-step ${escapeAttr(s.type)}${n === 0 ? " dead" : ""}${vizSelectedStep === e.seq ? " sel" : ""}" onclick="vizSelectStep(${e.seq}, true)">
+        <div class="vmap-head">
+          <span class="vmap-num">${e.seq}</span>
+          <span class="vmap-chip ${escapeAttr(s.type)}">${escapeHtml(label)}</span>
+          <span class="vmap-name" title="${escapeAttr(name)}">${escapeHtml(name)}</span>
+          ${cnt}
+        </div>
+        <div class="vmap-pool">${entries}</div>
+      </button>`;
+  });
+  html += `<div class="vmap-loopback">Loops back to step ${loopStart + 1}</div></div>`;
+  return html;
+}
+
+// Select a step (1-based executable index). fromBuilder=true scrolls the editor and notifies the timeline window.
+function vizSelectStep(seq, fromBuilder) {
+  vizSelectedStep = vizSelectedStep === seq && fromBuilder ? null : (seq || null);
+  if (rightTab === "map") renderRightPanel();
+  if (vizSelectedStep) {
+    // Map the dry-run's step index onto the editor; use the current rotation when the run is stale or absent.
+    const source = fromBuilder || !dryRunRotationSnapshot ? rotationSteps : dryRunRotationSnapshot;
+    const e = vizExecSteps(source).exec[vizSelectedStep - 1];
+    const card = e ? document.getElementById(`step-card-${e.editorIdx}`) : null;
+    if (card && (fromBuilder || !vizIsStale())) {
+      card.scrollIntoView({ block: "center", behavior: "smooth" });
+      card.classList.add("viz-flash");
+      setTimeout(() => card.classList.remove("viz-flash"), 1200);
+    }
+  }
+  if (fromBuilder && vizChannel) vizChannel.postMessage({ type: "select", step: vizSelectedStep });
+}
+
+function vizStatePayload() {
+  if (!dryRunResult) return { type: "state", result: null };
+  const r = dryRunResult;
+  const icons = {}, names = {}, slugs = {};
+  const remember = (id) => {
+    if (!id || id in slugs) return;
+    const m = resolveAbilityDisplay(id);
+    const slug = m ? m.slug : id;
+    slugs[id] = slug;
+    names[id] = m ? m.name : id;
+    names[slug] = names[id];
+    if (m && m.icon) icons[slug] = m.icon;
+  };
+  (dryRunRotationSnapshot || []).forEach(s => (s.pool || [s]).forEach(p => remember(p.ability_id)));
+  (r.casts || []).forEach(c => {
+    remember(c.slug);
+    if (!names[c.slug]) names[c.slug] = c.ability;
+  });
+  return {
+    type: "state",
+    result: {
+      duration: r.duration,
+      total_damage: r.total_damage,
+      dps: r.dps,
+      casts: r.casts,
+      tactical_swaps: r.tactical_swaps || [],
+      pre_combat_skipped: r.pre_combat_skipped || [],
+      pre_combat_duration: r.pre_combat_duration,
+    },
+    rotation: dryRunRotationSnapshot || [],
+    icons, names, slugs,
+    stale: vizIsStale(),
+    selected: vizSelectedStep,
+    loadoutLabel: [currentLoadout.class_name, currentLoadout.spec_name].filter(Boolean).join(" // "),
+  };
+}
+
+function vizBroadcastState() {
+  if (vizChannel) vizChannel.postMessage(vizStatePayload());
+}
+
+let vizLastStale = null;
+function vizOnRotationChanged() {
+  if (rightTab === "map") renderRightPanel();
+  const stale = vizIsStale();
+  if (vizChannel && dryRunResult && stale !== vizLastStale) vizChannel.postMessage({ type: "stale", stale });
+  vizLastStale = stale;
+}
+
+if (vizChannel) {
+  vizChannel.onmessage = (ev) => {
+    const msg = ev.data || {};
+    if (msg.type === "hello") vizBroadcastState();
+    else if (msg.type === "select") vizSelectStep(msg.step, false);
+  };
+}
+
+function openCastTimelineWindow() {
+  if (!vizChannel) {
+    showToast("This browser can't link windows (BroadcastChannel unavailable).", true);
+    return;
+  }
+  // timeline.html: served by the local builder server and copied into dist/ by build_web_release.py
+  const w = window.open("timeline.html", "swtorsim_cast_timeline", "width=1400,height=780");
+  if (!w) {
+    showToast("The browser blocked the Cast Timeline window. Allow pop-ups for this page.", true);
+    return;
+  }
+  w.focus();
+  // A freshly opened window says hello on load; an already-open one gets the current state now.
+  vizBroadcastState();
+  if (!dryRunResult) showToast("Cast Timeline opened. Run a dry-run to fill it.");
+}
+
 function insertSavedStepTemplate(tIdx) {
   const tmpl = savedTemplates[tIdx];
   if (!tmpl || tmpl.kind !== "step") return;
@@ -4270,7 +4537,10 @@ async function runDryRunSimulation() {
     return;
   }
   dryRunResult = data;
+  dryRunRotationJson = JSON.stringify(rotationSteps);
+  dryRunRotationSnapshot = JSON.parse(dryRunRotationJson);
   renderRightPanel();
+  vizBroadcastState();
   showToast(`Simulated 30s: ${data.casts.length} casts (${data.dps.toLocaleString()} DPS)`);
 }
 

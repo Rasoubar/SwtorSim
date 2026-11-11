@@ -19,6 +19,7 @@ DIST_DIR = SWTORSIM_ROOT / "dist"
 WEB_TOOLS_DIR = SWTORSIM_ROOT / "tools" / "web"
 SIM_UI_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
 ROT_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
+TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 
 # Import bundle builder
 sys.path.insert(0, str(SWTORSIM_ROOT))
@@ -94,6 +95,13 @@ def build_web_release() -> None:
         injected_rot = inject_pyodide_client(rot_html, version=build_version)
         (DIST_DIR / "rotation_builder.html").write_text(injected_rot, encoding="utf-8")
         print("[OK] Generated dist/rotation_builder.html (Rotation Builder)")
+
+    # 5. Copy the Cast Timeline pop-out (static page; talks to the builder over BroadcastChannel)
+    if TIMELINE_UI_PATH.is_file():
+        shutil.copy2(TIMELINE_UI_PATH, DIST_DIR / "timeline.html")
+        print("[OK] Copied dist/timeline.html (Cast Timeline window)")
+    else:
+        print(f"[FAIL] rotation_timeline_ui.html not found at {TIMELINE_UI_PATH}")
 
     print("\n" + "=" * 65)
     print("  [OK] WEB RELEASE BUILD COMPLETE!")

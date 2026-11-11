@@ -2671,8 +2671,12 @@
       const segCls = b.is_target ? "gantt-seg target-debuff" : "gantt-seg player-buff";
       let segs = "";
       for (const w of (b.windows || [])) {
-        const leftPct = Math.max(0, Math.min(100, (w.start / dur) * 100));
-        const widthPct = Math.max(0.3, Math.min(100 - leftPct, (w.duration / dur) * 100));
+        // Times are fight-relative (0 = first damage); clip pre-pull parts of windows to the fight
+        const visStart = Math.max(0, w.start);
+        const visEnd = Math.min(dur, w.end);
+        if (visEnd <= visStart) continue;
+        const leftPct = Math.max(0, Math.min(100, (visStart / dur) * 100));
+        const widthPct = Math.max(0.3, Math.min(100 - leftPct, ((visEnd - visStart) / dur) * 100));
         const stackStr = w.max_stacks > 1 ? ` (x${w.max_stacks})` : "";
         segs += `<div class="${segCls}" style="left:${leftPct.toFixed(2)}%;width:${widthPct.toFixed(2)}%;" title="${b.name}: ${w.start.toFixed(2)}s - ${w.end.toFixed(2)}s (${w.duration.toFixed(2)}s)${stackStr}"></div>`;
       }
@@ -2794,7 +2798,7 @@
       }
       html += `
         <tr>
-          <td style="color:var(--text-muted);">${ev.time.toFixed(2)}s</td>
+          <td style="color:var(--text-muted);">${ev.time.toFixed(2)}s${ev.time < 0 ? ' <span style="font-size:10px;opacity:0.8;">pre-pull</span>' : ''}</td>
           <td>${catBadge}</td>
           <td style="font-weight:600;">${ev.ability}</td>
           <td class="${ev.is_crit ? 'crit-tag' : ''}">${ev.text}</td>
