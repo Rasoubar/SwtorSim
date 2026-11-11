@@ -14,8 +14,13 @@ class Rotation:
         self.current_step = 0
         self.loop_start_index = 0
         self.loop = loop
+        # Loop-only "always weave" entries: each is tried like an optional step before every
+        # sequence step from the loop anchor on. weave_pos = entries already resolved at this step.
+        self.weave = []
+        self.weave_pos = 0
 
         self.build_steps(steps_config)
+        self.build_weave(steps_config)
 
     def build_steps(self, steps_config):
         """On setup builds the rotation according to config"""
@@ -44,11 +49,26 @@ class Rotation:
                 self.loop_start_index = len(self.sequence)
                 continue
 
+    def build_weave(self, steps_config):
+        """Builds the loop-only weave entries from the 'weave' list of a dict rotation config."""
+        raw_weave = steps_config.get("weave") if isinstance(steps_config, dict) else None
+        for entry in raw_weave or []:
+            if not isinstance(entry, dict) or not entry.get("ability_id"):
+                continue
+            lead = entry.get("lead_time") if "lead_time" in entry else entry.get("pre_cast_offset")
+            self.weave.append(OptionalAbilityStep(entry["ability_id"], entry.get("rules", {}), lead_time=lead))
+
+    def pending_weave_step(self):
+        """The weave entry to try before the current sequence step, or None (opener, or all tried)."""
+        if self.weave and self.weave_pos < len(self.weave) and self.current_step >= self.loop_start_index:
+            return self.weave[self.weave_pos]
+        return None
+
     def get_next_lead_time(self, player=None, current_time: float = 0.0) -> float:
         """Returns the lead_time (in seconds) if the upcoming ability is off-GCD and can be cast early."""
         if self.current_step >= len(self.sequence):
             return 0.0
-        step = self.sequence[self.current_step]
+        step = self.pending_weave_step() or self.sequence[self.current_step]
 
         # 1. Direct step with ability_id (FixedAbilityStep or OptionalAbilityStep)
         ability_id = getattr(step, "ability_id", None)
@@ -93,8 +113,16 @@ class Rotation:
         """
         if self.current_step >= len(self.sequence):
             return False
+        weave_step = self.pending_weave_step()
+        if weave_step is not None:
+            # Same contract as an optional step placed here: resolves when cast or skipped at ready time.
+            if weave_step.evaluate(player, target, sim):
+                self.weave_pos += 1
+                return True
+            return False
         step = self.sequence[self.current_step]
         if step.evaluate(player, target, sim): #evaluates different step kinds acording to their class rules
+            self.weave_pos = 0
             self.current_step += 1
             if self.loop and self.current_step >= len(self.sequence):
                 self.current_step = self.loop_start_index

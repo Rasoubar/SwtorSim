@@ -73,7 +73,6 @@
   #info { font-size: 12px; opacity: .9; }
   main { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
   .note { font-size: 12px; color: var(--text-muted); }
-  .note.stale { color: var(--amber); font-weight: 600; }
   .empty { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center; color: var(--text-muted); }
   .empty strong { color: var(--text-main); }
 
@@ -97,20 +96,17 @@
   .step { flex: none; width: 176px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 7px; display: flex; flex-direction: column; }
   .step.optional { width: 140px; border-style: dashed; }
   .step.fixed { width: 140px; }
-  .step.dead { opacity: .6; }
   .step.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
   /* off-GCD steps: smaller cards on the lower row */
   .step.mini { width: 128px; border: 1px solid var(--amber); border-style: dashed; }
   .step.mini .step-head { padding: 3px 6px; gap: 4px; }
   .step.mini .num { font-size: 10px; padding: 0 4px; }
   .step.mini .name { font-size: 10.5px; }
-  .step.mini .cnt { font-size: 10px; }
   .step.mini .entries { padding: 2px; }
-  .step.mini .entry { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 4px; padding: 2px 3px; }
+  .step.mini .entry { grid-template-columns: 22px minmax(0, 1fr); gap: 4px; padding: 2px 3px; }
   .step.mini .entry img, .step.mini .entry .noicon { width: 22px; height: 22px; }
   .step.mini .entry .an { font-size: 10px; }
   .step.mini .badge { font-size: 8.5px; }
-  .step.mini .ec { font-size: 9.5px; }
   .step-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-input); border-radius: 7px 7px 0 0; cursor: pointer; text-align: left; font: inherit; color: inherit; border-top: 0; border-left: 0; border-right: 0; width: 100%; }
   .step-head:hover { background: var(--accent-bg); }
   .num { font-family: monospace; font-size: 11px; font-weight: 700; color: #fff; border-radius: 4px; padding: 1px 5px; }
@@ -118,15 +114,12 @@
   .num.optional { background: var(--amber); }
   .num.fixed { background: var(--cyan); }
   .name { font-weight: 600; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cnt { font-family: monospace; font-size: 11px; }
-  .cnt.zero { color: var(--red); font-weight: 700; }
   .entries { display: flex; flex-direction: column; padding: 4px; gap: 2px; }
-  .entry { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; cursor: pointer; background: none; border: 0; font: inherit; color: inherit; text-align: left; width: 100%; }
+  .entry { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; cursor: pointer; background: none; border: 0; font: inherit; color: inherit; text-align: left; width: 100%; }
   .entry:hover { background: var(--accent-bg); }
   .entry:focus-visible, .step-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .entry img, .entry .noicon { width: 30px; height: 30px; border-radius: 4px; display: block; }
   .entry .noicon { border: 1px dashed var(--border); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
-  .entry.unused img { filter: grayscale(1); opacity: .45; }
   .entry .meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .entry .an { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badges { display: flex; flex-wrap: wrap; gap: 2px; }
@@ -135,10 +128,14 @@
   .badge.res { background: var(--cyan-bg); color: var(--cyan); }
   .badge.buff { background: var(--green-bg); color: var(--green); }
   .badge.cd { background: var(--amber-bg); color: var(--amber); }
-  .ec { font-family: monospace; font-size: 10.5px; font-weight: 700; color: var(--text-muted); }
-  .ec.hit { color: var(--text-main); }
-  .ec.zero { color: var(--red); }
   .loopback { flex: none; margin-top: 2px; border: 1px dashed var(--green); color: var(--green); border-radius: 7px; padding: 10px 12px; font-size: 12px; font-weight: 700; text-align: center; width: 110px; }
+  .lane-body { min-width: 0; display: flex; flex-direction: column; }
+  .weave-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 12px; border-bottom: 1px dashed var(--amber); font-size: 11.5px; }
+  .weave-title { font-weight: 700; color: var(--amber); text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
+  .weave-hint { color: var(--text-muted); }
+  .wchip { display: inline-flex; align-items: center; gap: 5px; border: 1px dashed var(--amber); border-radius: 6px; padding: 2px 6px 2px 2px; background: var(--bg-card); }
+  .wchip img, .wchip .noicon { width: 22px; height: 22px; border-radius: 4px; display: block; }
+  .wchip .noicon { border: 1px dashed var(--border); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--text-muted); }
   .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
 </style>
@@ -178,28 +175,21 @@ const iconUrl = (name) => {
   return `icons/${encodeURIComponent(clean)}`;
 };
 
+// The map shows the rotation's structure only; dry-run results live in the Cast Timeline window.
 function stepHtml(st, mini = false) {
-  const counts = STATE.hasCounts;
-  const n = counts ? (st.count || 0) : null;
   const label = st.type === "priority_block" ? "Priority" : st.type === "optional" ? "Optional" : st.type === "fixed" ? "Fixed" : st.type;
   const entries = st.entries.map((e, j) => {
-    const ec = counts ? (e.count || 0) : null;
     const icon = e.icon ? `<img src="${iconUrl(e.icon)}" alt="" loading="lazy">` : `<span class="noicon">?</span>`;
     const badges = (e.rules || []).map((r) => `<span class="badge ${esc(r.cls)}" title="${esc(r.full)}">${esc(r.txt)}</span>`).join("");
-    const ecHtml = ec === null ? "" : `<span class="ec${ec ? " hit" : " zero"}">${ec}x</span>`;
-    const tip = `${e.name}${ec === null ? "" : ec ? ` - ${ec} cast${ec > 1 ? "s" : ""}` : " - never cast"} (click to open this row in the editor)`;
-    return `<button type="button" class="entry${ec === 0 ? " unused" : ""}" data-step="${st.seq}" data-entry="${j}" title="${esc(tip)}">
+    return `<button type="button" class="entry" data-step="${st.seq}" data-entry="${j}" title="${esc(e.name)} (click to open this row in the editor)">
       ${icon}
       <span class="meta"><span class="an">${esc(e.name)}</span>${badges ? `<span class="badges">${badges}</span>` : ""}</span>
-      ${ecHtml}
     </button>`;
   }).join("");
-  const cnt = n === null ? "" : `<span class="cnt${n ? "" : " zero"}">${n ? `${n}x` : "never"}</span>`;
-  return `<div class="step ${esc(st.type)}${mini ? " mini" : ""}${n === 0 ? " dead" : ""}${selected === st.seq ? " sel" : ""}" id="step-${st.seq}">
+  return `<div class="step ${esc(st.type)}${mini ? " mini" : ""}${selected === st.seq ? " sel" : ""}" id="step-${st.seq}">
     <button type="button" class="step-head" data-step="${st.seq}" title="${esc(label)}: ${esc(st.name)} (click to open in the editor)">
       <span class="num ${esc(st.type)}">${st.seq}</span>
       <span class="name">${esc(st.name)}</span>
-      ${cnt}
     </button>
     <div class="entries">${entries}</div>
   </div>`;
@@ -238,8 +228,20 @@ function laneHtml(kind, steps, tail) {
   if (tail) html += `<div class="cell" style="grid-column:${col}">${tail}</div>`;
   return `<section class="lane ${kind}" aria-label="${label}">
     <div class="lane-label">${label}</div>
-    <div class="track">${html}</div>
+    <div class="lane-body">${kind === "loop" ? weaveHtml() : ""}<div class="track">${html}</div></div>
   </section>`;
+}
+
+// Loop-only "always weave" abilities: listed once above the loop instead of in every gap.
+function weaveHtml() {
+  const weave = (STATE && STATE.weave) || [];
+  if (!weave.length) return "";
+  const chips = weave.map((w) => {
+    const icon = w.icon ? `<img src="${iconUrl(w.icon)}" alt="" loading="lazy">` : `<span class="noicon">?</span>`;
+    const badges = (w.rules || []).map((r) => `<span class="badge ${esc(r.cls)}" title="${esc(r.full)}">${esc(r.txt)}</span>`).join("");
+    return `<span class="wchip" title="${esc(w.name)}: tried before every loop step">${icon}<span class="an">${esc(w.name)}</span>${badges}</span>`;
+  }).join("");
+  return `<div class="weave-strip"><span class="weave-title">Use on cooldown</span>${chips}<span class="weave-hint">tried in every gap of the loop</span></div>`;
 }
 
 function render() {
@@ -253,10 +255,7 @@ function render() {
   }
   const opener = steps.filter((s) => s.seq <= STATE.loopStart);
   const loop = steps.filter((s) => s.seq > STATE.loopStart);
-  let note;
-  if (!STATE.hasRun) note = `<div class="note">Run a dry-run in the builder to add cast counts. Click a step or an ability to open it in the editor.</div>`;
-  else if (STATE.stale) note = `<div class="note stale">Cast counts hidden: the rotation changed since the last dry-run.</div>`;
-  else note = `<div class="note">Counts are from the last ${Number(STATE.duration || 30).toFixed(0)}s dry-run; casts are credited to the first entry with that ability. Click a step or an ability to open it in the editor.</div>`;
+  const note = `<div class="note">Click a step or an ability to open it in the editor.</div>`;
   const loopTail = `<div class="loopback">&#8634; back to step ${STATE.loopStart + 1}</div>`;
   main.innerHTML = `
     ${note}

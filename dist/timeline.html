@@ -208,6 +208,8 @@ function buildModel(state) {
   const stepCount = {}, entryCount = {};
   const slugOf = (id) => state.slugs[id] || id;
   rot.forEach((c) => {
+    // Weave casts (loop-only "always weave" list) fire before a step; they are not that step's casts.
+    if (c.phase === "weave") { c.entry = -1; return; }
     stepCount[c.step_index] = (stepCount[c.step_index] || 0) + 1;
     const st = seq[c.step_index - 1];
     c.entry = st ? st.pool.findIndex((p) => slugOf(p.ability_id) === c.slug) : -1;
@@ -370,6 +372,7 @@ const row = (k) => ROWS.find((r) => r.key === k);
 
 function stepColor(c) {
   if (c.phase === "pre_combat") return "var(--text-muted)";
+  if (c.phase === "weave") return "var(--amber)";
   const st = MODEL.seq[c.step_index - 1];
   if (!st) return "var(--accent)";
   return st.type === "optional" ? "var(--amber)" : st.type === "fixed" ? "var(--cyan)" : "var(--accent)";
@@ -463,7 +466,7 @@ function draw() {
 
   const iconTile = (c, x, y, s) => {
     const icon = iconUrl(STATE.icons[c.slug]);
-    const stepTxt = c.phase === "pre_combat" ? `P${c.step_index}` : String(c.step_index);
+    const stepTxt = c.phase === "pre_combat" ? `P${c.step_index}` : c.phase === "weave" ? "W" : String(c.step_index);
     let out = `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${R}" fill="var(--bg-input)"/>`;
     if (icon) out += `<image href="${icon}" x="${x}" y="${y}" width="${s}" height="${s}" style="clip-path: inset(0 round ${R}px)" preserveAspectRatio="xMidYMid slice"/>`;
     out += `<rect x="${x + 0.5}" y="${y + 0.5}" width="${s - 1}" height="${s - 1}" rx="${R}" fill="none" stroke="var(--border-subtle)"/>`;
@@ -476,7 +479,7 @@ function draw() {
   };
 
   m.all.forEach((c) => {
-    const dim = selected && (c.phase === "pre_combat" || c.step_index !== selected) ? " dim" : "";
+    const dim = selected && (c.phase !== "rotation" || c.step_index !== selected) ? " dim" : "";
     const x = X(c.t);
     const onGcd = !!c.triggers_gcd;
     const rowR = onGcd ? gr : or;
@@ -488,7 +491,7 @@ function draw() {
   // drawn on top so it stays visible over a GCD icon or bar.
   m.all.forEach((c) => {
     if (c.triggers_gcd) return;
-    const dim = selected && (c.phase === "pre_combat" || c.step_index !== selected) ? " dim" : "";
+    const dim = selected && (c.phase !== "rotation" || c.step_index !== selected) ? " dim" : "";
     const x = X(c.t) + 0.75;
     const yIcon = or.y + (or.h - offIcon) / 2 + 2;
     g += `<g class="cast${dim}" data-id="${c.id}"><line x1="${x}" x2="${x}" y1="${gr.y + 2}" y2="${yIcon}" stroke="var(--amber)" stroke-width="1.5"/></g>`;
@@ -578,6 +581,8 @@ function bindTimeline() {
     const st = c.phase === "pre_combat" ? null : MODEL.seq[c.step_index - 1];
     const stepLine = c.phase === "pre_combat"
       ? `Pre-combat step ${c.step_index}`
+      : c.phase === "weave"
+      ? `Always weave (fired before step ${c.step_index}${st ? `: ${esc(st.name)}` : ""})`
       : `Step ${c.step_index}: ${esc(st ? st.name : c.step_label)}${st && st.type === "priority_block" && c.entry >= 0 ? ` (entry ${c.entry + 1} of ${st.pool.length})` : ""}`;
     let actLine = "";
     if (c.activation === "cast") {
@@ -606,7 +611,7 @@ function bindTimeline() {
     const gEl = e.target.closest(".cast");
     if (!gEl) return;
     const c = MODEL.all[+gEl.dataset.id];
-    if (c.phase === "pre_combat") return;
+    if (c.phase === "pre_combat" || c.phase === "weave") return;
     setSelected(selected === c.step_index ? null : c.step_index, true);
   });
 }

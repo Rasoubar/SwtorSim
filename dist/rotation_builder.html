@@ -1135,7 +1135,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794413632"></script>
+  <script src="pyodide_client.js?v=1794426663"></script>
 </head>
 <body>
 
@@ -1291,6 +1291,7 @@
     </div>
 
     <div class="pre-combat-panel" id="preCombatPanel"></div>
+    <div class="pre-combat-panel" id="weavePanel"></div>
 
     <div class="panel-body" id="timelineContainer"></div>
   </div>
@@ -1398,6 +1399,8 @@ let currentLoadout = {
 
 let rotationSteps = [];
 let preCombatSteps = []; // [{ability, target?, wait_for_cooldown?} | {swap_tactical, keep_timed_effects?} | {wait} | {wait_until, max_wait?}]
+let weaveSteps = []; // loop-only "always weave": [{ability_id, rules, lead_time?}] tried before every loop step
+let dryRunWeaveJson = "[]"; // JSON of weaveSteps at the time of the last dry-run (stale detection)
 let pullConditions = {}; // fight-start gate: rotation-style rules that must hold before the rotation starts
 let pullMaxWait = 60;    // seconds; the run fails if the pull conditions are still false after this
 let TIMELINE_VIEW_MODE = "rotation"; // "rotation" or "sub30"
@@ -1945,6 +1948,7 @@ async function onSelectExistingRotation(rotPath) {
   }
   rotationSteps = data.steps || [];
   preCombatSteps = Array.isArray(data.pre_combat) ? data.pre_combat : [];
+  weaveSteps = Array.isArray(data.weave) ? data.weave : [];
   pullConditions = (data.pull_conditions && typeof data.pull_conditions === "object") ? data.pull_conditions : {};
   pullMaxWait = data.pull_max_wait !== undefined && data.pull_max_wait !== null ? Number(data.pull_max_wait) : 60;
   lastImportWarnings = data.warnings || [];
@@ -2130,7 +2134,7 @@ function renderPalette() {
           </div>
         </div>
         <div class="palette-item-actions">
-          <button class="btn-sm btn-purple" title="Add to active Priority Block" onclick="quickAddAbilityToBlock('${escapeAttr(abl.slug)}', '${escapeAttr(abl.fqn)}')">+Block</button>
+          <button class="btn-sm btn-purple" title="Add as a new Priority Block" onclick="quickAddAbilityToBlock('${escapeAttr(abl.slug)}', '${escapeAttr(abl.fqn)}')">+Block</button>
           <button class="btn-sm btn-amber" title="Add as Optional Step" onclick="quickAddOptional('${escapeAttr(abl.slug)}', '${escapeAttr(abl.fqn)}')">+Opt</button>
         </div>
       `;
@@ -2228,18 +2232,13 @@ function quickAddAbilityToBlock(slug, fqn) {
   const fmt = document.getElementById("idFormatSelect").value;
   const abId = fmt === "fqn" ? fqn : slug;
 
-  if (activeBlockIndex !== null && rotationSteps[activeBlockIndex] && rotationSteps[activeBlockIndex].type === "priority_block") {
-    rotationSteps[activeBlockIndex].pool.push({ ability_id: abId, rules: {} });
-    collapsedSteps.delete(activeBlockIndex);
-  } else {
-    // Create a new priority block and make it active
-    rotationSteps.push({
-      type: "priority_block",
-      name: `Priority Window ${rotationSteps.length + 1}`,
-      pool: [{ ability_id: abId, rules: {} }]
-    });
-    activeBlockIndex = rotationSteps.length - 1;
-  }
+  // Always create a new priority block and make it active
+  rotationSteps.push({
+    type: "priority_block",
+    name: `Priority Window ${rotationSteps.filter(s => s.type === "priority_block").length + 1}`,
+    pool: [{ ability_id: abId, rules: {} }]
+  });
+  activeBlockIndex = rotationSteps.length - 1;
   renderTimeline();
   renderRightPanel();
 }
@@ -2300,9 +2299,10 @@ function addLoopAnchor() {
 }
 
 function clearRotation() {
-  if (!rotationSteps.length && !preCombatSteps.length && !Object.keys(pullConditions).length) return;
+  if (!rotationSteps.length && !preCombatSteps.length && !weaveSteps.length && !Object.keys(pullConditions).length) return;
   rotationSteps = [];
   preCombatSteps = [];
+  weaveSteps = [];
   pullConditions = {};
   pullMaxWait = 60;
   activeBlockIndex = null;
@@ -2323,10 +2323,11 @@ function pullGatePayload() {
 }
 
 function rotationFileData() {
-  if (!preCombatSteps.length && !hasPullGate()) return rotationSteps;
+  if (!preCombatSteps.length && !hasPullGate() && !weaveSteps.length) return rotationSteps;
   const data = {};
   if (preCombatSteps.length) data.pre_combat = preCombatSteps;
   Object.assign(data, pullGatePayload());
+  if (weaveSteps.length) data.weave = weaveSteps;
   data.sequence = rotationSteps;
   return data;
 }
@@ -2335,6 +2336,7 @@ function applyRotationFileData(parsed) {
   if (Array.isArray(parsed)) {
     rotationSteps = parsed;
     preCombatSteps = [];
+    weaveSteps = [];
     pullConditions = {};
     pullMaxWait = 60;
     return;
@@ -2342,11 +2344,12 @@ function applyRotationFileData(parsed) {
   if (parsed && typeof parsed === "object" && Array.isArray(parsed.sequence || parsed.steps)) {
     rotationSteps = parsed.sequence || parsed.steps;
     preCombatSteps = Array.isArray(parsed.pre_combat) ? parsed.pre_combat : [];
+    weaveSteps = Array.isArray(parsed.weave) ? parsed.weave.filter(w => w && w.ability_id) : [];
     pullConditions = (parsed.pull_conditions && typeof parsed.pull_conditions === "object") ? parsed.pull_conditions : {};
     pullMaxWait = parsed.pull_max_wait !== undefined ? Number(parsed.pull_max_wait) : 60;
     return;
   }
-  throw new Error("Rotation JSON must be an array of steps or an object with 'sequence' (and optional 'pre_combat').");
+  throw new Error("Rotation JSON must be an array of steps or an object with 'sequence' (and optional 'pre_combat' / 'weave').");
 }
 
 function tacticalDisplayName(fqn) {
@@ -2385,7 +2388,7 @@ function renderScopedRulesHtml(rulesObj, scope, stepIdx) {
   const entries = Object.entries(rulesObj || {});
   let html = '<div class="rules-container">';
   if (!entries.length) {
-    html += `<span class="rule-unconditional">${scope === "pull" ? "No conditions (pull immediately)" : "Always (passes at once)"}</span>`;
+    html += `<span class="rule-unconditional">${scope === "pull" ? "No conditions (pull immediately)" : scope === "weave" ? "Whenever it is ready" : "Always (passes at once)"}</span>`;
   }
   for (const [k, v] of entries) {
     html += `
@@ -2400,7 +2403,9 @@ function renderScopedRulesHtml(rulesObj, scope, stepIdx) {
 }
 
 function deleteScopedRule(scope, stepIdx, key) {
-  const host = scope === "pull" ? pullConditions : (preCombatSteps[stepIdx] || {}).wait_until;
+  const host = scope === "pull" ? pullConditions
+    : scope === "weave" ? (weaveSteps[stepIdx] || {}).rules
+    : (preCombatSteps[stepIdx] || {}).wait_until;
   if (host) delete host[key];
   renderTimeline();
   renderRightPanel();
@@ -2527,6 +2532,77 @@ function renderPreCombat() {
       ${hasPullGate() ? `<label style="font-size:11px;color:var(--text-muted);">max wait
         <input type="number" min="0.1" step="0.5" value="${Number(pullMaxWait)}" style="width:60px;" onchange="setPullMaxWait(this.value)">s</label>` : ""}
     </div>
+  `;
+}
+
+// ---------------------------------------------------------------------------
+// Always Weave (loop only): abilities tried before every loop step, like an optional step in every gap
+// ---------------------------------------------------------------------------
+function addWeaveStep() {
+  weaveSteps.push({ ability_id: getDefaultAbilityId(true), rules: {} });
+  renderTimeline();
+  renderRightPanel();
+}
+
+function updateWeaveStep(idx, field, value) {
+  const entry = weaveSteps[idx];
+  if (!entry) return;
+  if (field === "lead_time") {
+    const v = parseFloat(value);
+    if (isFinite(v) && v >= 0) entry.lead_time = v; else delete entry.lead_time;
+  } else {
+    entry[field] = value;
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function moveWeaveStep(idx, dir) {
+  const j = idx + dir;
+  if (j < 0 || j >= weaveSteps.length) return;
+  [weaveSteps[idx], weaveSteps[j]] = [weaveSteps[j], weaveSteps[idx]];
+  renderTimeline();
+  renderRightPanel();
+}
+
+function removeWeaveStep(idx) {
+  weaveSteps.splice(idx, 1);
+  renderTimeline();
+  renderRightPanel();
+}
+
+function renderWeave() {
+  const el = document.getElementById("weavePanel");
+  if (!el) return;
+  const abilities = currentLoadout.abilities || [];
+  const rows = weaveSteps.map((entry, idx) => {
+    const found = resolveAbilityDisplay(entry.ability_id);
+    const opts = (found ? "" : `<option value="${escapeAttr(entry.ability_id)}" selected>${escapeHtml(entry.ability_id)} (not in loadout)</option>`)
+      + abilities.map(a => `<option value="${escapeAttr(a.slug)}" ${found && found.fqn === a.fqn ? "selected" : ""}>${escapeHtml(a.name)}${a.triggers_gcd ? " [on GCD]" : " [off-GCD]"}</option>`).join("");
+    const onGcd = found && found.triggers_gcd !== false;
+    return `
+      <div class="pre-combat-row">
+        <span class="pc-idx">${idx + 1}.</span>
+        <span class="pc-kind pc-kind-ability">Weave</span>
+        <select style="max-width:230px;" onchange="updateWeaveStep(${idx}, 'ability_id', this.value)">${opts}</select>
+        ${renderScopedRulesHtml(entry.rules || {}, "weave", idx)}
+        <label title="How long before the GCD ends an off-GCD ability may fire (default 0.4s)">lead
+          <input type="number" min="0" step="0.1" value="${entry.lead_time !== undefined ? Number(entry.lead_time) : ""}" placeholder="0.4" style="width:54px;" onchange="updateWeaveStep(${idx}, 'lead_time', this.value)">s
+        </label>
+        ${onGcd ? '<span class="badge badge-sub30" title="This ability uses the GCD: it will take a whole GCD in front of the next loop step whenever it is ready">uses GCD</span>' : ""}
+        <span class="pc-spacer"></span>
+        <button class="btn-sm" title="Higher priority" onclick="moveWeaveStep(${idx}, -1)" ${idx === 0 ? "disabled" : ""}>&uarr;</button>
+        <button class="btn-sm" title="Lower priority" onclick="moveWeaveStep(${idx}, 1)" ${idx === weaveSteps.length - 1 ? "disabled" : ""}>&darr;</button>
+        <button class="btn-sm btn-danger" title="Remove" onclick="removeWeaveStep(${idx})">X</button>
+      </div>`;
+  }).join("");
+  el.innerHTML = `
+    <div class="pre-combat-head">
+      <span class="pre-combat-title">Always Weave (loop only) &mdash; ${weaveSteps.length} abilit${weaveSteps.length === 1 ? "y" : "ies"}</span>
+      <button class="btn-sm btn-primary" onclick="addWeaveStep()">+ Ability</button>
+    </div>
+    ${weaveSteps.length ? "" : '<div class="pre-combat-hint">Optional. For off-GCD abilities you want used on cooldown: each one is tried before every step after the End of Opener anchor, so you do not have to place it between the steps by hand. The opener is not affected.</div>'}
+    ${rows}
   `;
 }
 
@@ -3327,6 +3403,7 @@ function insertSub30OptionalAt(index) {
 function renderTimeline() {
   queueMicrotask(vizOnRotationChanged);
   renderPreCombat();
+  renderWeave();
   const container = document.getElementById("timelineContainer");
   container.innerHTML = "";
 
@@ -3781,6 +3858,12 @@ function renderTimeline() {
 // ---------------------------------------------------------------------------
 function ruleHostFor(ctx, create = false) {
   if (ctx.scope === "pull") return pullConditions;
+  if (ctx.scope === "weave") {
+    const entry = weaveSteps[ctx.stepIndex];
+    if (!entry) return {};
+    if (!entry.rules && create) entry.rules = {};
+    return entry.rules || {};
+  }
   if (ctx.scope === "pre") {
     const step = preCombatSteps[ctx.stepIndex];
     if (!step) return {};
@@ -4218,7 +4301,7 @@ function renderRightPanel() {
                     <strong>${escapeHtml(c.ability)}</strong>
                     ${c.triggers_gcd ? "" : '<span class="badge badge-offgcd">Off-GCD</span>'}
                   </td>
-                  <td style="color:var(--text-muted);">${c.phase === "pre_combat" ? `Pre-Combat #${c.step_index}` : `#${c.step_index} (${escapeHtml(c.step_label)})`}</td>
+                  <td style="color:var(--text-muted);">${c.phase === "pre_combat" ? `Pre-Combat #${c.step_index}` : c.phase === "weave" ? `Weave (before #${c.step_index})` : `#${c.step_index} (${escapeHtml(c.step_label)})`}</td>
                   <td>${c.resource}</td>
                 </tr>`;
               }).join("")}
@@ -4258,7 +4341,8 @@ let vizChannel = null;
 try { vizChannel = new BroadcastChannel(VIZ_CHANNEL_NAME); } catch (e) { vizChannel = null; }
 
 function vizIsStale() {
-  return !!dryRunResult && JSON.stringify(rotationSteps) !== dryRunRotationJson;
+  return !!dryRunResult
+    && (JSON.stringify(rotationSteps) !== dryRunRotationJson || JSON.stringify(weaveSteps) !== dryRunWeaveJson);
 }
 
 // Executable steps (no loop_anchor) with their index in rotationSteps.
@@ -4270,29 +4354,6 @@ function vizExecSteps(steps) {
     out.push({ seq: out.length + 1, editorIdx, step: s });
   });
   return { exec: out, loopStart };
-}
-
-function vizSlugOf(abilityId) {
-  const m = resolveAbilityDisplay(abilityId);
-  return m ? m.slug : String(abilityId || "").toLowerCase().replace(/\s+/g, "_");
-}
-
-// Per-step and per-entry cast counts from the last dry-run (null when stale or absent).
-function vizCastCounts() {
-  if (!dryRunResult || vizIsStale()) return null;
-  const { exec } = vizExecSteps(dryRunRotationSnapshot);
-  const step = {}, entry = {};
-  for (const c of dryRunResult.casts || []) {
-    if (c.phase === "pre_combat") continue;
-    step[c.step_index] = (step[c.step_index] || 0) + 1;
-    const e = exec[c.step_index - 1];
-    if (!e) continue;
-    const pool = e.step.pool || [{ ability_id: e.step.ability_id }];
-    const j = pool.findIndex(p => vizSlugOf(p.ability_id) === c.slug);
-    const key = `${c.step_index}:${j}`;
-    entry[key] = (entry[key] || 0) + 1;
-  }
-  return { step, entry };
 }
 
 function vizRuleList(rules) {
@@ -4318,10 +4379,9 @@ function vizRuleList(rules) {
   return out;
 }
 
-// Rotation Map window payload: the current rotation (not the dry-run snapshot), with cast counts when
-// the last dry-run still matches it.
+// Rotation Map window payload: the current rotation only. Dry-run results stay in the Cast Timeline;
+// the map looks the same before and after a preview.
 function vizMapPayload() {
-  const counts = vizCastCounts();
   const { exec, loopStart } = vizExecSteps(rotationSteps);
   return {
     type: "state",
@@ -4335,23 +4395,22 @@ function vizMapPayload() {
         // Every ability in the step is known and off the GCD: the map draws it below the GCD line.
         offGcd: resolved.length > 0 && resolved.every(m => m && m.triggers_gcd === false),
         name: s.name || resolveAbilityDisplay(s.ability_id)?.name || s.ability_id || "",
-        count: counts ? (counts.step[e.seq] || 0) : null,
         entries: pool.map((p, j) => {
           const m = resolveAbilityDisplay(p.ability_id);
           return {
             name: m ? m.name : String(p.ability_id || "?"),
             icon: m && m.icon ? m.icon : "",
             rules: vizRuleList(p.rules),
-            count: counts ? (counts.entry[`${e.seq}:${j}`] || 0) : null,
           };
         }),
       };
     }),
     loopStart,
-    hasCounts: !!counts,
-    hasRun: !!dryRunResult,
-    stale: vizIsStale(),
-    duration: dryRunResult ? dryRunResult.duration : null,
+    // Loop-only "always weave" entries: the map lists them once above the Loop lane.
+    weave: weaveSteps.map(w => {
+      const m = resolveAbilityDisplay(w.ability_id);
+      return { name: m ? m.name : String(w.ability_id || "?"), icon: m && m.icon ? m.icon : "", rules: vizRuleList(w.rules) };
+    }),
     selected: vizSelectedStep,
     loadoutLabel: [currentLoadout.class_name, currentLoadout.spec_name].filter(Boolean).join(" // "),
   };
@@ -4513,6 +4572,7 @@ async function runDryRunSimulation() {
       relic_fqns: getSelectedRelics(),
       rotation: rotationSteps,
       pre_combat: preCombatSteps,
+      weave: weaveSteps,
       ...pullGatePayload(),
       duration: 30.0
     })
@@ -4524,10 +4584,10 @@ async function runDryRunSimulation() {
   }
   dryRunResult = data;
   dryRunRotationJson = JSON.stringify(rotationSteps);
+  dryRunWeaveJson = JSON.stringify(weaveSteps);
   dryRunRotationSnapshot = JSON.parse(dryRunRotationJson);
   renderRightPanel();
   vizBroadcastState();
-  vizBroadcastMap();
   showToast(`Simulated 30s: ${data.casts.length} casts (${data.dps.toLocaleString()} DPS)`);
 }
 
@@ -4573,6 +4633,7 @@ async function saveRotationToDisk() {
       filename: filename,
       steps: rotationSteps,
       pre_combat: preCombatSteps,
+      weave: weaveSteps,
       ...pullGatePayload()
     })
   });

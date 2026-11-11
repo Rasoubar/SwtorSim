@@ -829,6 +829,25 @@ def normalize_pre_combat_steps(raw: Any) -> list[dict[str, Any]]:
     return clean
 
 
+def normalize_weave_steps(raw: Any) -> list[dict[str, Any]]:
+    """Extracts the loop-only "always weave" entries from a rotation file (``[]`` for bare arrays).
+
+    Accepts the file wrapper (``{"weave": [...]}``) or the entry list itself. Each entry is
+    ``{"ability_id", "rules"}`` plus an optional ``lead_time``, like an optional step without a position.
+    """
+    entries = raw.get("weave") if isinstance(raw, dict) else raw
+    clean: list[dict[str, Any]] = []
+    for entry in entries if isinstance(entries, list) else []:
+        if not isinstance(entry, dict) or entry.get("type") or not entry.get("ability_id"):
+            continue
+        out: dict[str, Any] = {"ability_id": str(entry["ability_id"]), "rules": dict(entry.get("rules") or {})}
+        lead_val = entry.get("lead_time") if "lead_time" in entry else entry.get("pre_cast_offset")
+        if lead_val is not None:
+            out["lead_time"] = float(lead_val)
+        clean.append(out)
+    return clean
+
+
 def normalize_pull_gate(raw: Any) -> dict[str, Any]:
     """Extracts ``pull_conditions`` / ``pull_max_wait`` from a rotation file (empty dict when unset)."""
     if not isinstance(raw, dict):
@@ -847,17 +866,21 @@ def build_rotation_file_data(
     pre_combat: list[dict[str, Any]] | None,
     pull_conditions: dict[str, Any] | None = None,
     pull_max_wait: float | None = None,
+    weave: list[dict[str, Any]] | None = None,
 ) -> Any:
-    """Rotation file payload: a bare step array, or a ``{"pre_combat", "pull_conditions", "sequence"}``
-    wrapper when pre-combat steps or fight-start (pull) conditions are set."""
+    """Rotation file payload: a bare step array, or a ``{"pre_combat", "pull_conditions", "weave", "sequence"}``
+    wrapper when pre-combat steps, fight-start (pull) conditions or loop-only weave entries are set."""
     pre = normalize_pre_combat_steps({"pre_combat": pre_combat or []})
     gate = normalize_pull_gate({"pull_conditions": pull_conditions, "pull_max_wait": pull_max_wait})
-    if not pre and not gate:
+    weave_entries = normalize_weave_steps(weave or [])
+    if not pre and not gate and not weave_entries:
         return steps
     data: dict[str, Any] = {}
     if pre:
         data["pre_combat"] = pre
     data.update(gate)
+    if weave_entries:
+        data["weave"] = weave_entries
     data["sequence"] = steps
     return data
 
@@ -1020,6 +1043,10 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     legendary_fqns = payload.get("legendary_fqns") or []
     relic_fqns = payload.get("relic_fqns") or []
     rotation_steps = payload.get("rotation") or []
+    weave_entries = normalize_weave_steps(payload.get("weave") or [])
+    if weave_entries:
+        # Loop-only weave entries travel with the steps in the dict form Rotation understands.
+        rotation_steps = {"sequence": rotation_steps, "weave": weave_entries}
     duration = min(120.0, max(5.0, float(payload.get("duration") or 30.0)))
 
     builds = _resolve_workspace_path(BUILDS_DIR)
@@ -1209,6 +1236,7 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                         "filename": target_file.name,
                         "steps": steps,
                         "pre_combat": normalize_pre_combat_steps(raw_data),
+                        "weave": normalize_weave_steps(raw_data),
                         **normalize_pull_gate(raw_data),
                         "warnings": warnings,
                     }
@@ -1285,7 +1313,8 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 full_path = custom_dir / filename
 
                 file_data = build_rotation_file_data(
-                    steps, payload.get("pre_combat"), payload.get("pull_conditions"), payload.get("pull_max_wait")
+                    steps, payload.get("pre_combat"), payload.get("pull_conditions"), payload.get("pull_max_wait"),
+                    weave=payload.get("weave"),
                 )
                 formatted = json.dumps(file_data, indent=4, ensure_ascii=False)
                 # Write with Windows CRLF line endings per Rule #6

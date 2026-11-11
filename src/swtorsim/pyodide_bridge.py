@@ -35,6 +35,7 @@ from data.rotation_builder import (
     get_workspace_catalog,
     normalize_pre_combat_steps,
     normalize_pull_gate,
+    normalize_weave_steps,
     normalize_rotation_steps,
     run_dry_run_preview,
 )
@@ -120,6 +121,7 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
                 "filename": target_file.name,
                 "steps": steps,
                 "pre_combat": normalize_pre_combat_steps(raw_data),
+                "weave": normalize_weave_steps(raw_data),
                 **normalize_pull_gate(raw_data),
                 "warnings": warnings,
             }
@@ -159,7 +161,8 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
             target_dir.mkdir(parents=True, exist_ok=True)
             full_path = target_dir / filename
             file_data = build_rotation_file_data(
-                steps, data.get("pre_combat"), data.get("pull_conditions"), data.get("pull_max_wait")
+                steps, data.get("pre_combat"), data.get("pull_conditions"), data.get("pull_max_wait"),
+                weave=data.get("weave"),
             )
             formatted = json.dumps(file_data, indent=4, ensure_ascii=False)
             formatted_crlf = formatted.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n"

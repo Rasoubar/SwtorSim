@@ -29,7 +29,8 @@ def rotation_steps_of(rotation_config: Any) -> list[dict]:
 class CastTimelineRecorder:
     """Wraps the player's abilities and records one row per successful cast.
 
-    Row fields: time, ability, slug, triggers_gcd, resource, step_index, step_label, phase, buffs,
+    Row fields: time, ability, slug, triggers_gcd, resource, step_index, step_label,
+    phase ('pre_combat' | 'rotation' | 'weave'; a weave row's step_index is the step it fired before), buffs,
     activation ('instant' | 'cast' | 'channel'), gcd, busy, end_time, clipped, and for channels
     ticks / ticks_total / tick_interval. `finalize(time_origin)` adds combat_time / combat_end_time.
     """
@@ -79,15 +80,19 @@ class CastTimelineRecorder:
             return ch is not None and caster.active_channel is ch and not getattr(ch, "is_finished", False)
         return caster.active_cast is not None and now < info["start"] + info["row"]["busy"] - 1e-6
 
-    def _step_info(self, caster: Any) -> tuple[int, str, bool]:
+    def _step_info(self, caster: Any) -> tuple[int, str, str]:
+        """(0-based step index, label, phase). Weave casts report the sequence step they fire before."""
         runner = getattr(caster, "pre_combat", None)
         if runner is not None and runner.active:
-            return max(0, runner.index - 1), "Pre-Combat", True
+            return max(0, runner.index - 1), "Pre-Combat", "pre_combat"
         rotation = getattr(caster, "rotation", None)
         step_idx = getattr(rotation, "current_step", 0)
+        pending = getattr(rotation, "pending_weave_step", None)
+        if pending is not None and pending() is not None:
+            return step_idx, "Weave", "weave"
         seq = getattr(rotation, "sequence", None) or []
         step_obj = seq[step_idx] if 0 <= step_idx < len(seq) else None
-        return step_idx, (getattr(step_obj, "name", None) or type(step_obj).__name__), False
+        return step_idx, (getattr(step_obj, "name", None) or type(step_obj).__name__), "rotation"
 
     # -- installation -------------------------------------------------------------------------
     def install(self) -> "CastTimelineRecorder":
@@ -98,7 +103,7 @@ class CastTimelineRecorder:
 
     def _make_wrapper(self, a: Any, fn: Any):
         def _wrapped(caster, tgt, s, *args, **kwargs):
-            step_idx, step_label, in_pre_combat = self._step_info(caster)
+            step_idx, step_label, phase = self._step_info(caster)
             act = a.activation or getattr(a.blueprint, "activation", None) or {}
             act_type = act.get("type") if isinstance(act, dict) else None
             act_dur = float(act.get("duration", 0.0)) if isinstance(act, dict) else 0.0
@@ -136,7 +141,7 @@ class CastTimelineRecorder:
                     "resource": round(caster.resource.current_value, 1),
                     "step_index": step_idx + 1,
                     "step_label": step_label,
-                    "phase": "pre_combat" if in_pre_combat else "rotation",
+                    "phase": phase,
                     "buffs": active_buffs[: self.max_buffs],
                     "activation": kind,
                     "gcd": round(gcd, 3),
