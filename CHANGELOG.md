@@ -2852,3 +2852,29 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - Latent only: probed on `hatred_14gcd`, `carnage_14gcd`, `sniper_marksmanship_config_test` and `annitest` (seeds 42 / 43 / 44, 871 to 9,119 calls per run), the function was never called while an expired effect was in the collection.
 - Tests: new `tests/test_entity_has_effect.py` (3 tests: active effect found by tag, name, fqn and stack count; effect that lost its last stack is not present; an expired instance does not hide an active one). Full suite: 172 pass (169 before).
 - Same-seed check on the same configs and seeds: every damage event, the event count and the RNG state after the run are identical before and after, so DPS is unchanged (seed 42: 31000.17 / 22740.44 / 28896.21 / 3341.47).
+
+## Extractor: Skill Tree Reads Renamed Discipline Field
+- `src/extractor/disciplines.py :: _build_discipline_payload` now looks up `disDisciplineUnlockLevelToListOfUtilityChoices` first (the game renamed `disDisciplineUnlockLevelToUtilityBits`), keeping the old names as fallbacks. With the old name only, every Live `skill_tree` was extracted as `{}`. `src/extractor/README.md` updated.
+- Live re-extracted: 1205 skill tree entries restored, and every skill tree talent now has an icon name. 107 entries still point to PNGs not on disk until `tools/extract_icons.py --copy-to-web` is run.
+- Tests: no new test; the existing suite passes (172 pass) once Live is re-extracted. PTS not re-extracted.
+
+## Rotation Builder: Skill Tree Drawer Gets Icons
+- `src/swtorsim/web_gui.py :: get_class_gear_options` now copies the parsed talent/ability `icon` into each `skill_tree` entry, which `tools/rotation_builder_ui.html :: renderSkillTreeDrawer` already read via `e.icon` but never received.
+- Checked on the Live discipline files: 1205 of 1205 entries carry an icon. Full suite: 172 pass. Drawer not yet checked visually in the browser.
+
+## Rotation Builder: Skill Tree Drawer Redesign
+- `tools/rotation_builder_ui.html :: renderSkillTreeDrawer` and the `.st-*` CSS: icon tile above a two-line name per option, orange bar, check mark and full-color icon on the chosen option (others dimmed), right-aligned level column with row dividers, `n/N chosen` counter, amber marker on levels with no choice, and a "Picked only" toggle.
+- Option names now use only the first entry of a slot. Later entries are base abilities the option leaves in place (the extractor appends them from the replacement table), so they moved into the tooltip as "Keeps: ...". Example: Marauder Annihilation L39 shows Blood Wave, Force Fracture, Rupturing Rage.
+- Checked in the running builder (Marauder Annihilation): 24 of 24 options have icons, no clipped names, and clicking a level 73 option changes `currentLoadout.choices`. Full suite: 172 pass. No reset button, since the loadout has no defined default choice.
+
+## Simulator Page: Skill Tree Drawer Redesign
+- `tools/simulator_ui.html :: renderSkillTreeDrawer` and the `.st-*` CSS now match the Rotation Builder drawer: icon above a two-line name, highlighted chosen option, level column with dividers, `n/N chosen` counter, amber marker on levels with no choice, "Picked only" toggle, and "Keeps: ..." in the tooltip instead of "A + B" names (first entry of a slot is the option, later entries are retained base abilities).
+- Buttons are built with DOM nodes and read `icon` from the `skill_tree` payload (`web_gui.py` already supplies it). Icons load from `icons/<name>.png`, falling back to the lowercase name and then hiding.
+- Checked in the running simulator (Marauder Annihilation): 24 options, 24 icons served as image/png, no clipped names, L39 shows Blood Wave / Force Fracture / Rupturing Rage, and clicking L73 option 3 updates `CURRENT_CHOICES` and the badge. Full suite: 172 pass. No reset button, since the page already defaults every level to option 1.
+
+## Simulator Page: Armor Penetration Removed From Character Stats
+- Removed the "Armor Pen (0-1)" input from `tools/simulator_ui.html`, and `"Armor Penetration"` from `DEFAULT_STAT_KEYS` and `armor_pen_pct` from the character summary in `src/swtorsim/web_gui.py`. Nothing in the UI read `armor_pen_pct`.
+- Engine untouched: `handle_mitigation` still reads `caster.stats["Armor Penetration"]` (default 0.0) plus any `bonus_armor_pen` from stat 166 modifiers. Every saved build and run config had the value at 0, so damage is unchanged. The saved `"Armor Penetration": 0` keys in `data/builds` and `data/run_config` are left as they are and are ignored by the page.
+- Full suite: 172 pass.
+
+- Follow-up: an outlined box (a "Mudkip" label above it like the other fields, the text "Is the best pokemon", border and text colored by a new `--mudkip` variable: orange in the light theme, light blue `#58abdf` in the dark theme; no fill, same 26px height as the inputs) now fills the empty cell next to Accuracy Rating in the Character Stats grid, so MH Min / MH Max and OH Min / OH Max sit on the same row again after the Armor Pen input was removed.

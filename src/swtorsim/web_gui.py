@@ -101,7 +101,6 @@ DEFAULT_STAT_KEYS = (
     "Main_hand_max",
     "Off_hand_min",
     "Off_hand_max",
-    "Armor Penetration",
 )
 
 _ROTATION_BUILDER_LOCK = threading.Lock()
@@ -374,14 +373,19 @@ def get_class_gear_options(spec_path: str, env: str = "live") -> dict[str, Any]:
                     bp_path = parsed_dir / fqn_to_relative_path(fqn)
                     bp_name = fqn.split(".")[-1].replace("_", " ").title()
                     bp_type = "ability"
+                    bp_icon = ""
                     if bp_path.is_file():
                         try:
                             bp_data = load_json_file(str(bp_path))
                             bp_name = bp_data.get("name") or bp_name
                             bp_type = bp_data.get("type") or bp_type
+                            bp_icon = bp_data.get("icon") or ""
                         except Exception:
                             pass
-                    entries.append({"fqn": fqn, "name": bp_name, "type": bp_type})
+                    entry = {"fqn": fqn, "name": bp_name, "type": bp_type}
+                    if bp_icon:
+                        entry["icon"] = bp_icon
+                    entries.append(entry)
                 skill_tree_info[lvl_str][str(slot_key)] = entries
 
     return {
@@ -489,7 +493,6 @@ def _extract_computed_player_stats(player: Any) -> dict[str, Any]:
         "crit_multiplier_pct": round(float(st.get("Critical Modifier", 0.0)) * 100.0, 2),
         "alacrity_pct": round(float(st.get("Alacrity", 0.0)) * 100.0, 2),
         "accuracy_pct": round(float(st.get("Main Accuracy", 1.0)) * 100.0, 2),
-        "armor_pen_pct": round(float(st.get("Armor Penetration", 0.0)) * 100.0, 2),
         "gcd_seconds": round(float(gcd_val), 2),
         "main_hand_min": round(float(st.get("Main_hand_min", 0.0)), 1),
         "main_hand_max": round(float(st.get("Main_hand_max", 0.0)), 1),

@@ -240,6 +240,7 @@ def _build_discipline_payload(
     level_to_abilities = (
         _first_field_value(
             record,
+            "disDisciplineUnlockLevelToListOfUtilityChoices",
             "disDisciplineUnlockLevelToUtilityBits",
             "disLevelToAbilities",
         )
