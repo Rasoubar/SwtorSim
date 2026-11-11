@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwtorSim - Rotation Map</title>
+<style>
+  /* Pop-out companion to the Rotation Builder: the rotation laid out left to right, opener and loop on
+     separate lanes. Same tokens as rotation_builder_ui.html. */
+  :root {
+    --bg-base: #c2e4f6;
+    --bg-panel: #58abdf;
+    --bg-card: #ffffff;
+    --bg-input: #f0f7fc;
+    --border: #388bc2;
+    --border-subtle: #c5e2f5;
+    --text-main: #0c2138;
+    --text-muted: #496885;
+    --accent: #ff7818;
+    --accent-bg: #ffeada;
+    --amber: #d97706;
+    --amber-bg: #fef3c7;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --cyan: #1d72a8;
+    --cyan-bg: #d7eefa;
+  }
+  [data-theme="dark"] {
+    --bg-base: #0e121a;
+    --bg-panel: #141a24;
+    --bg-card: #1c2331;
+    --bg-input: #10141d;
+    --border: #263144;
+    --border-subtle: #222b3a;
+    --text-main: #f1f5f9;
+    --text-muted: #869ab3;
+    --accent: #ff7818;
+    --accent-bg: rgba(255, 120, 24, 0.14);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245, 158, 11, 0.14);
+    --green: #22c55e;
+    --green-bg: rgba(34, 197, 94, 0.14);
+    --red: #ef4444;
+    --red-bg: rgba(239, 68, 68, 0.14);
+    --cyan: #58abdf;
+    --cyan-bg: rgba(88, 171, 223, 0.14);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg-base);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--bg-panel);
+    color: #fff;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  [data-theme="dark"] header { color: var(--text-main); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 15px; margin: 0; }
+  #info { font-size: 12px; opacity: .9; }
+  main { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .note { font-size: 12px; color: var(--text-muted); }
+  .note.stale { color: var(--amber); font-weight: 600; }
+  .empty { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center; color: var(--text-muted); }
+  .empty strong { color: var(--text-main); }
+
+  .lane { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; display: grid; grid-template-columns: 34px minmax(0, 1fr); min-width: 0; }
+  .lane-label { writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; border-right: 1px solid var(--border-subtle); padding: 8px 0; }
+  .lane.opener .lane-label { color: var(--cyan); background: var(--cyan-bg); border-radius: 0 7px 7px 0; }
+  .lane.loop .lane-label { color: var(--green); background: var(--green-bg); border-radius: 0 7px 7px 0; }
+  /* GCD steps joined by arrows; off-GCD steps hang just below the arrow (slot) where they fire, in
+     smaller cards, linked to it by a dashed amber line. */
+  .track { display: grid; grid-template-rows: auto; grid-auto-columns: auto; align-items: start; overflow-x: auto; padding: 12px 12px 14px; }
+  .cell { grid-row: 1; }
+  .slot-top { position: relative; align-self: stretch; min-width: 28px; }
+  .slot-top .hline { position: absolute; left: 4px; right: 6px; top: 14px; border-top: 1.5px solid var(--text-muted); }
+  .slot-top .hline::after { content: ""; position: absolute; right: -6px; top: -5px; border: 4.5px solid transparent; border-left: 6px solid var(--text-muted); }
+  .slot-top.has-off::after { content: ""; position: absolute; left: 50%; top: 14px; height: 24px; border-left: 1.5px dashed var(--amber); }
+  .slot-top .branch { position: absolute; left: calc(50% - 4px); top: 10px; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); z-index: 1; }
+  .slot-bottom { grid-row: 1; position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 38px 8px 0; }
+  .slot-bottom .step + .step { position: relative; }
+  .slot-bottom .step + .step::before { content: ""; position: absolute; left: 50%; top: -9px; height: 8px; border-left: 1.5px dashed var(--amber); }
+
+  .step { flex: none; width: 176px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 7px; display: flex; flex-direction: column; }
+  .step.optional { width: 140px; border-style: dashed; }
+  .step.fixed { width: 140px; }
+  .step.dead { opacity: .6; }
+  .step.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  /* off-GCD steps: smaller cards on the lower row */
+  .step.mini { width: 128px; border: 1px solid var(--amber); border-style: dashed; }
+  .step.mini .step-head { padding: 3px 6px; gap: 4px; }
+  .step.mini .num { font-size: 10px; padding: 0 4px; }
+  .step.mini .name { font-size: 10.5px; }
+  .step.mini .cnt { font-size: 10px; }
+  .step.mini .entries { padding: 2px; }
+  .step.mini .entry { grid-template-columns: 22px minmax(0, 1fr) auto; gap: 4px; padding: 2px 3px; }
+  .step.mini .entry img, .step.mini .entry .noicon { width: 22px; height: 22px; }
+  .step.mini .entry .an { font-size: 10px; }
+  .step.mini .badge { font-size: 8.5px; }
+  .step.mini .ec { font-size: 9.5px; }
+  .step-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-input); border-radius: 7px 7px 0 0; cursor: pointer; text-align: left; font: inherit; color: inherit; border-top: 0; border-left: 0; border-right: 0; width: 100%; }
+  .step-head:hover { background: var(--accent-bg); }
+  .num { font-family: monospace; font-size: 11px; font-weight: 700; color: #fff; border-radius: 4px; padding: 1px 5px; }
+  .num.priority_block { background: var(--accent); }
+  .num.optional { background: var(--amber); }
+  .num.fixed { background: var(--cyan); }
+  .name { font-weight: 600; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cnt { font-family: monospace; font-size: 11px; }
+  .cnt.zero { color: var(--red); font-weight: 700; }
+  .entries { display: flex; flex-direction: column; padding: 4px; gap: 2px; }
+  .entry { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; cursor: pointer; background: none; border: 0; font: inherit; color: inherit; text-align: left; width: 100%; }
+  .entry:hover { background: var(--accent-bg); }
+  .entry:focus-visible, .step-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .entry img, .entry .noicon { width: 30px; height: 30px; border-radius: 4px; display: block; }
+  .entry .noicon { border: 1px dashed var(--border); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+  .entry.unused img { filter: grayscale(1); opacity: .45; }
+  .entry .meta { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .entry .an { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badges { display: flex; flex-wrap: wrap; gap: 2px; }
+  .badge { font-size: 9.5px; line-height: 1.3; padding: 0 4px; border-radius: 3px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .badge.hp { background: var(--red-bg); color: var(--red); }
+  .badge.res { background: var(--cyan-bg); color: var(--cyan); }
+  .badge.buff { background: var(--green-bg); color: var(--green); }
+  .badge.cd { background: var(--amber-bg); color: var(--amber); }
+  .ec { font-family: monospace; font-size: 10.5px; font-weight: 700; color: var(--text-muted); }
+  .ec.hit { color: var(--text-main); }
+  .ec.zero { color: var(--red); }
+  .loopback { flex: none; margin-top: 2px; border: 1px dashed var(--green); color: var(--green); border-radius: 7px; padding: 10px 12px; font-size: 12px; font-weight: 700; text-align: center; width: 110px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--text-muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Rotation Map</h1>
+  <span id="info"></span>
+</header>
+<main id="main">
+  <div class="empty"><strong>Waiting for the Rotation Builder.</strong><br>Keep the builder open; the map follows its rotation as you edit.</div>
+</main>
+
+<script>
+(function initTheme() {
+  const apply = (t) => {
+    if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    else document.documentElement.removeAttribute("data-theme");
+  };
+  let saved = "light";
+  try { saved = localStorage.getItem("swtorsim_theme") || "light"; } catch (e) {}
+  apply(saved);
+  window.addEventListener("storage", (e) => { if (e.key === "swtorsim_theme") apply(e.newValue || "light"); });
+})();
+
+const MAP_CHANNEL_NAME = "swtorsim-rotation-map";
+let channel = null;
+try { channel = new BroadcastChannel(MAP_CHANNEL_NAME); } catch (e) { channel = null; }
+
+let STATE = null;
+let selected = null;
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+const iconUrl = (name) => {
+  if (!name) return "";
+  const clean = name.toLowerCase().endsWith(".png") ? name : `${name}.png`;
+  return `icons/${encodeURIComponent(clean)}`;
+};
+
+function stepHtml(st, mini = false) {
+  const counts = STATE.hasCounts;
+  const n = counts ? (st.count || 0) : null;
+  const label = st.type === "priority_block" ? "Priority" : st.type === "optional" ? "Optional" : st.type === "fixed" ? "Fixed" : st.type;
+  const entries = st.entries.map((e, j) => {
+    const ec = counts ? (e.count || 0) : null;
+    const icon = e.icon ? `<img src="${iconUrl(e.icon)}" alt="" loading="lazy">` : `<span class="noicon">?</span>`;
+    const badges = (e.rules || []).map((r) => `<span class="badge ${esc(r.cls)}" title="${esc(r.full)}">${esc(r.txt)}</span>`).join("");
+    const ecHtml = ec === null ? "" : `<span class="ec${ec ? " hit" : " zero"}">${ec}x</span>`;
+    const tip = `${e.name}${ec === null ? "" : ec ? ` - ${ec} cast${ec > 1 ? "s" : ""}` : " - never cast"} (click to open this row in the editor)`;
+    return `<button type="button" class="entry${ec === 0 ? " unused" : ""}" data-step="${st.seq}" data-entry="${j}" title="${esc(tip)}">
+      ${icon}
+      <span class="meta"><span class="an">${esc(e.name)}</span>${badges ? `<span class="badges">${badges}</span>` : ""}</span>
+      ${ecHtml}
+    </button>`;
+  }).join("");
+  const cnt = n === null ? "" : `<span class="cnt${n ? "" : " zero"}">${n ? `${n}x` : "never"}</span>`;
+  return `<div class="step ${esc(st.type)}${mini ? " mini" : ""}${n === 0 ? " dead" : ""}${selected === st.seq ? " sel" : ""}" id="step-${st.seq}">
+    <button type="button" class="step-head" data-step="${st.seq}" title="${esc(label)}: ${esc(st.name)} (click to open in the editor)">
+      <span class="num ${esc(st.type)}">${st.seq}</span>
+      <span class="name">${esc(st.name)}</span>
+      ${cnt}
+    </button>
+    <div class="entries">${entries}</div>
+  </div>`;
+}
+
+// Off-GCD steps leave the main line: each run of them hangs below the arrow between the GCD steps
+// around it (where they fire), in smaller cards.
+function laneHtml(kind, steps, tail) {
+  const label = kind === "opener" ? "Opener" : "Loop";
+  const cols = [];
+  let pending = [];
+  steps.forEach((st) => {
+    if (st.offGcd) { pending.push(st); return; }
+    cols.push({ slot: pending });
+    cols.push({ card: st });
+    pending = [];
+  });
+  cols.push({ slot: pending, last: true });
+  let html = "";
+  let col = 1;
+  cols.forEach((c) => {
+    if (c.card) {
+      html += `<div class="cell" style="grid-column:${col}">${stepHtml(c.card)}</div>`;
+      col += 1;
+      return;
+    }
+    const off = c.slot;
+    if (!off.length && (col === 1 || (c.last && !tail))) return; // no bare arrow at either end
+    html += `<div class="cell slot-top${off.length ? " has-off" : ""}" style="grid-column:${col}" aria-hidden="true">
+      <div class="hline"></div>${off.length ? '<span class="branch"></span>' : ""}</div>`;
+    if (off.length) {
+      html += `<div class="slot-bottom" style="grid-column:${col}" title="Off-GCD: fires between the steps around this arrow">${off.map((st) => stepHtml(st, true)).join("")}</div>`;
+    }
+    col += 1;
+  });
+  if (tail) html += `<div class="cell" style="grid-column:${col}">${tail}</div>`;
+  return `<section class="lane ${kind}" aria-label="${label}">
+    <div class="lane-label">${label}</div>
+    <div class="track">${html}</div>
+  </section>`;
+}
+
+function render() {
+  const main = document.getElementById("main");
+  if (!STATE) return;
+  document.getElementById("info").textContent = STATE.loadoutLabel || "";
+  const steps = STATE.steps || [];
+  if (!steps.length) {
+    main.innerHTML = `<div class="empty"><strong>The rotation has no steps yet.</strong><br>Add steps in the builder and they will appear here.</div>`;
+    return;
+  }
+  const opener = steps.filter((s) => s.seq <= STATE.loopStart);
+  const loop = steps.filter((s) => s.seq > STATE.loopStart);
+  let note;
+  if (!STATE.hasRun) note = `<div class="note">Run a dry-run in the builder to add cast counts. Click a step or an ability to open it in the editor.</div>`;
+  else if (STATE.stale) note = `<div class="note stale">Cast counts hidden: the rotation changed since the last dry-run.</div>`;
+  else note = `<div class="note">Counts are from the last ${Number(STATE.duration || 30).toFixed(0)}s dry-run; casts are credited to the first entry with that ability. Click a step or an ability to open it in the editor.</div>`;
+  const loopTail = `<div class="loopback">&#8634; back to step ${STATE.loopStart + 1}</div>`;
+  main.innerHTML = `
+    ${note}
+    ${opener.length ? laneHtml("opener", opener, "") : `<div class="note">No End of Opener anchor: the whole rotation loops.</div>`}
+    ${loop.length ? laneHtml("loop", loop, loopTail) : `<div class="note">Nothing after the End of Opener anchor: the loop is empty.</div>`}
+    <div class="legend">
+      <span><i style="background:var(--accent)"></i>Priority block</span>
+      <span><i style="background:var(--amber)"></i>Optional</span>
+      <span><i style="background:var(--cyan)"></i>Fixed</span>
+      <span><i style="border:1.5px dashed var(--amber)"></i>Off-GCD (below the arrow where it fires)</span>
+      <span><i style="background:var(--red-bg);border:1px solid var(--red)"></i>Target HP rule</span>
+      <span><i style="background:var(--cyan-bg);border:1px solid var(--cyan)"></i>Resource rule</span>
+      <span><i style="background:var(--green-bg);border:1px solid var(--green)"></i>Buff / debuff rule</span>
+      <span><i style="background:var(--amber-bg);border:1px solid var(--amber)"></i>Cooldown rule</span>
+    </div>`;
+}
+
+function applySelection(seq, scroll) {
+  selected = seq || null;
+  document.querySelectorAll(".step.sel").forEach((el) => el.classList.remove("sel"));
+  if (!selected) return;
+  const el = document.getElementById(`step-${selected}`);
+  if (!el) return;
+  el.classList.add("sel");
+  if (scroll) el.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+}
+
+document.getElementById("main").addEventListener("click", (e) => {
+  const entry = e.target.closest(".entry");
+  const head = e.target.closest(".step-head");
+  const target = entry || head;
+  if (!target) return;
+  const step = +target.dataset.step;
+  applySelection(step, false);
+  if (channel) channel.postMessage({ type: "goto", step, entry: entry ? +entry.dataset.entry : null });
+});
+
+if (channel) {
+  channel.onmessage = (ev) => {
+    const msg = ev.data || {};
+    if (msg.type === "state") {
+      STATE = msg;
+      selected = msg.selected || null;
+      render();
+    } else if (msg.type === "select") {
+      applySelection(msg.step, true);
+    }
+  };
+  channel.postMessage({ type: "hello" });
+} else {
+  document.getElementById("main").innerHTML = `<div class="empty"><strong>This browser can't link windows (BroadcastChannel is unavailable).</strong></div>`;
+}
+</script>
+</body>
+</html>

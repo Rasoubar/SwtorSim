@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwtorSim - Cast Timeline</title>
+<style>
+  /* Pop-out companion to the Rotation Builder. Same tokens as rotation_builder_ui.html. */
+  :root {
+    --bg-base: #c2e4f6;
+    --bg-panel: #58abdf;
+    --bg-card: #ffffff;
+    --bg-input: #f0f7fc;
+    --border: #388bc2;
+    --border-subtle: #c5e2f5;
+    --text-main: #0c2138;
+    --text-muted: #496885;
+    --accent: #ff7818;
+    --accent-bg: #ffeada;
+    --amber: #d97706;
+    --amber-bg: #fef3c7;
+    --green: #16a34a;
+    --green-bg: #dcfce7;
+    --red: #dc2626;
+    --red-bg: #fee2e2;
+    --cyan: #1d72a8;
+    --cyan-bg: #d7eefa;
+    --grid: #dbeaf5;
+    --gap: rgba(220, 38, 38, 0.13);
+    --prepull: rgba(73, 104, 133, 0.10);
+    --cast: #6fb3e0;
+    --cast-ink: #0c2138;
+    --channel: #1d72a8;
+    --channel-ink: #ffffff;
+  }
+  [data-theme="dark"] {
+    --bg-base: #0e121a;
+    --bg-panel: #141a24;
+    --bg-card: #1c2331;
+    --bg-input: #10141d;
+    --border: #263144;
+    --border-subtle: #222b3a;
+    --text-main: #f1f5f9;
+    --text-muted: #869ab3;
+    --accent: #ff7818;
+    --accent-bg: rgba(255, 120, 24, 0.14);
+    --amber: #f59e0b;
+    --amber-bg: rgba(245, 158, 11, 0.14);
+    --green: #22c55e;
+    --green-bg: rgba(34, 197, 94, 0.14);
+    --red: #ef4444;
+    --red-bg: rgba(239, 68, 68, 0.14);
+    --cyan: #58abdf;
+    --cyan-bg: rgba(88, 171, 223, 0.14);
+    --grid: #222b3a;
+    --gap: rgba(239, 68, 68, 0.16);
+    --prepull: rgba(134, 154, 179, 0.10);
+    --cast: #2c6a96;
+    --cast-ink: #f1f5f9;
+    --channel: #58abdf;
+    --channel-ink: #0e121a;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg-base);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: var(--bg-panel);
+    color: #fff;
+    padding: 8px 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  [data-theme="dark"] header { color: var(--text-main); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 15px; margin: 0; }
+  header .spacer { flex: 1; }
+  header label { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  header input[type=range] { width: 130px; accent-color: var(--accent); }
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 10px 14px 14px; overflow: auto; }
+  .stats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .stat { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 6px 10px; min-width: 100px; }
+  .stat b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .stat.warn b { color: var(--red); }
+  .banner { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); border-radius: 6px; padding: 6px 10px; font-weight: 600; }
+  .empty { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center; color: var(--text-muted); }
+  .empty strong { color: var(--text-main); }
+  .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+  .tl { display: grid; grid-template-columns: 112px minmax(0, 1fr); }
+  .labels { border-right: 1px solid var(--border-subtle); }
+  .labels div { font-size: 11px; color: var(--text-muted); padding-right: 8px; display: flex; align-items: center; justify-content: flex-end; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .labels div.grp { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: 10px; color: var(--text-main); }
+  .scroll { overflow-x: auto; position: relative; }
+  svg text { font-family: inherit; }
+  .cast { cursor: pointer; }
+  .cast.dim { opacity: .2; }
+  .tip { position: absolute; pointer-events: none; background: var(--text-main); color: var(--bg-card); font-size: 12px; padding: 8px 10px; border-radius: 6px; max-width: 280px; z-index: 5; line-height: 1.45; }
+  .tip b { color: var(--accent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 12px; border-top: 1px solid var(--border-subtle); font-size: 11.5px; color: var(--text-muted); }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+  .detail { padding: 10px 12px; display: grid; gap: 8px; }
+  .detail h2 { font-size: 13px; margin: 0; }
+  .detail .muted { color: var(--text-muted); font-size: 12px; }
+  .entries { display: flex; flex-wrap: wrap; gap: 6px; }
+  .entry { display: flex; align-items: center; gap: 6px; border: 1px solid var(--border-subtle); border-radius: 6px; padding: 4px 8px 4px 4px; background: var(--bg-input); }
+  .entry img { width: 26px; height: 26px; border-radius: 4px; }
+  .entry.unused { opacity: .5; }
+  .entry .n { font-family: monospace; font-weight: 700; }
+  .entry .n.zero { color: var(--red); }
+  button { font: inherit; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-main); border-radius: 5px; padding: 3px 9px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Cast Timeline</h1>
+  <span id="runInfo" style="font-size:12px;opacity:.9;"></span>
+  <span class="spacer"></span>
+  <button type="button" id="clearSelBtn" hidden>Clear step filter</button>
+  <label for="zoom">Zoom <input id="zoom" type="range" min="12" max="80" value="32"></label>
+</header>
+<main id="main">
+  <div class="empty" id="waiting">
+    <strong id="waitTitle">Waiting for the Rotation Builder.</strong><br>
+    <span id="waitHint">Run a dry-run from the builder's <strong>Dry-Run Sim</strong> tab and it will appear here.</span>
+  </div>
+</main>
+
+<script>
+(function initTheme() {
+  const apply = (t) => {
+    if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    else document.documentElement.removeAttribute("data-theme");
+  };
+  let saved = "light";
+  try { saved = localStorage.getItem("swtorsim_theme") || "light"; } catch (e) {}
+  apply(saved);
+  window.addEventListener("storage", (e) => { if (e.key === "swtorsim_theme") apply(e.newValue || "light"); });
+})();
+
+// Who feeds this window: the Rotation Builder (default) or the Combat Simulator (?source=sim).
+// Each source gets its own channel, since both pages share one origin in the static web release.
+const SOURCE = new URLSearchParams(location.search).get("source") === "sim" ? "sim" : "builder";
+const CHANNEL_BASE = "swtorsim-cast-timeline";
+const CHANNEL_NAME = SOURCE === "sim" ? `${CHANNEL_BASE}-sim` : CHANNEL_BASE;
+const TEXT = SOURCE === "sim"
+  ? {
+      waitTitle: "Waiting for the Combat Simulator.",
+      empty: "No single run yet.",
+      hint: "Run a <strong>TEST (Single Run)</strong> in the Combat Simulator and it will appear here.",
+      runKind: "single run",
+      detailHint: "Click a cast to filter the timeline to one step and see which of its entries fired.",
+    }
+  : {
+      waitTitle: "Waiting for the Rotation Builder.",
+      empty: "No dry-run yet.",
+      hint: "Run a dry-run from the builder's <strong>Dry-Run Sim</strong> tab and it will appear here.",
+      runKind: "dry-run",
+      detailHint: "Click a cast, or a step in the builder's Visual Map tab, to filter the timeline to one step and see which of its entries fired.",
+    };
+document.getElementById("waitTitle").textContent = TEXT.waitTitle;
+document.getElementById("waitHint").innerHTML = TEXT.hint;
+let channel = null;
+try { channel = new BroadcastChannel(CHANNEL_NAME); } catch (e) { channel = null; }
+
+let STATE = null;     // last state message from the builder
+let MODEL = null;     // derived view model
+let selected = null;  // 1-based sequence step index (matches cast.step_index)
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+const iconUrl = (name) => {
+  if (!name) return "";
+  const clean = name.toLowerCase().endsWith(".png") ? name : `${name}.png`;
+  return `icons/${encodeURIComponent(clean)}`;
+};
+
+function buildModel(state) {
+  const res = state.result;
+  const rotation = state.rotation || [];
+  const seq = [];
+  let loopStart = 0;
+  rotation.forEach((s) => {
+    if (s.type === "loop_anchor") { loopStart = seq.length; return; }
+    seq.push({
+      idx: seq.length + 1,
+      type: s.type,
+      name: s.name || (state.names[s.ability_id] || s.ability_id),
+      pool: s.pool ? s.pool : [{ ability_id: s.ability_id, rules: s.rules || {} }],
+    });
+  });
+
+  const tOf = (r) => (r.combat_time !== undefined ? r.combat_time : r.time);
+  const all = (res.casts || []).map((c, i) => ({ ...c, id: i, t: tOf(c) }));
+  const rot = all.filter((c) => c.phase !== "pre_combat");
+
+  // Attribute rotation casts to steps and to the first pool entry with that ability.
+  const stepCount = {}, entryCount = {};
+  const slugOf = (id) => state.slugs[id] || id;
+  rot.forEach((c) => {
+    stepCount[c.step_index] = (stepCount[c.step_index] || 0) + 1;
+    const st = seq[c.step_index - 1];
+    c.entry = st ? st.pool.findIndex((p) => slugOf(p.ability_id) === c.slug) : -1;
+    const key = `${c.step_index}:${c.entry}`;
+    entryCount[key] = (entryCount[key] || 0) + 1;
+  });
+
+  // Passes through the sequence: a new pass begins whenever the step index goes backwards.
+  const passes = [];
+  rot.forEach((c, i) => { if (i === 0 || c.step_index < rot[i - 1].step_index) passes.push(c.t); });
+
+  // Activation timing (dry-run fields gcd / busy / combat_end_time). Older payloads lack them:
+  // then the GCD is inferred from cast spacing and casts/channels are assumed to fit in one GCD.
+  const hasTiming = all.length > 0 && all.every((c) => c.activation !== undefined);
+  const mode = (vals) => {
+    const n = {};
+    vals.forEach((v) => { const k = Math.round(v * 100) / 100; n[k] = (n[k] || 0) + 1; });
+    return Number(Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0]) || 0;
+  };
+  const gcdCasts = all.filter((c) => c.triggers_gcd);
+  let gcd;
+  if (hasTiming) {
+    gcd = mode(gcdCasts.map((c) => c.gcd).filter((g) => g > 0.5)) || 1.5;
+  } else {
+    const spacing = [];
+    for (let i = 1; i < gcdCasts.length; i++) {
+      const d = gcdCasts[i].t - gcdCasts[i - 1].t;
+      if (d > 0.5 && d < 3) spacing.push(d);
+    }
+    gcd = mode(spacing) || 1.5;
+  }
+  all.forEach((c) => {
+    c.g = hasTiming && c.triggers_gcd ? (c.gcd || 0) : (c.triggers_gcd ? gcd : 0);
+    c.busy = hasTiming ? (c.busy || 0) : 0;
+    c.end = hasTiming && c.combat_end_time !== undefined ? c.combat_end_time : c.t + c.busy;
+  });
+
+  // Idle = after the GCD is back AND the cast/channel has finished, until the next GCD cast.
+  const gaps = [];
+  let gapTotal = 0;
+  gcdCasts.forEach((c, i) => {
+    const next = gcdCasts[i + 1];
+    const g = c.g || gcd;
+    c.w = next ? Math.min(g, next.t - c.t) : g;
+    if (next && c.t >= 0) {
+      const free = Math.max(c.t + g, c.end);
+      if (next.t - free > 0.05) { gaps.push([free, next.t]); gapTotal += next.t - free; }
+    }
+  });
+  const activations = all.filter((c) => c.activation === "cast" || c.activation === "channel");
+
+  // Buff lanes: exact windows when the source sends them (simulator), else the buffs seen most often
+  // in the per-cast samples (dry-run).
+  const buffWindows = Array.isArray(res.buff_windows) ? res.buff_windows : null;
+  let buffs;
+  if (buffWindows) {
+    buffs = buffWindows.map((b) => b.name);
+  } else {
+    const freq = {};
+    rot.forEach((c) => (c.buffs || []).forEach((b) => { freq[b] = (freq[b] || 0) + 1; }));
+    buffs = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([b]) => b);
+  }
+
+  const thresholds = new Set();
+  rotation.forEach((s) => (s.pool || [s]).forEach((p) => {
+    const r = p.rules || {};
+    if (typeof r.caster_energy_below === "number") thresholds.add(r.caster_energy_below);
+    if (typeof r.caster_energy_above === "number") thresholds.add(r.caster_energy_above);
+  }));
+
+  const tMin = Math.min(0, ...all.map((c) => c.t));
+  const tMax = Math.max(res.duration || 30, ...all.map((c) => Math.max(c.t + 0.5, c.end)));
+  const resMax = Math.max(100, ...all.map((c) => Number(c.resource) || 0));
+
+  return {
+    res, seq, loopStart, all, rot, stepCount, buffWindows, entryCount, passes, gcd, gaps, gapTotal, buffs, hasTiming, activations,
+    thresholds: [...thresholds].sort((a, b) => a - b),
+    tMin, tMax, resMax: Math.ceil(resMax / 10) * 10,
+    swaps: res.tactical_swaps || [], skipped: res.pre_combat_skipped || [],
+  };
+}
+
+function render() {
+  const main = document.getElementById("main");
+  if (!STATE || !STATE.result) {
+    main.innerHTML = `<div class="empty"><strong>${TEXT.empty}</strong><br>${TEXT.hint}</div>`;
+    document.getElementById("runInfo").textContent = "";
+    return;
+  }
+  MODEL = buildModel(STATE);
+  const m = MODEL;
+  document.getElementById("runInfo").textContent =
+    `${STATE.loadoutLabel || ""}${STATE.loadoutLabel ? " | " : ""}${(m.res.duration || 0).toFixed(0)}s ${TEXT.runKind}`;
+
+  const dead = m.seq.filter((s) => !m.stepCount[s.idx]);
+  const stats = [
+    ["DPS", Number(m.res.dps || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })],
+    ["Total damage", Number(m.res.total_damage || 0).toLocaleString()],
+    ["Casts", m.all.length],
+    ["Passes", m.passes.length],
+    [m.hasTiming ? "GCD" : "GCD (inferred)", `${m.gcd.toFixed(2)}s`],
+    [m.hasTiming ? "Idle time" : "Gaps > 1 GCD", `${m.gapTotal.toFixed(1)}s`, m.gapTotal > 0.5],
+    ...(m.hasTiming ? [["Casts / channels", `${m.activations.filter((c) => c.activation === "cast").length} / ${m.activations.filter((c) => c.activation === "channel").length}`]] : []),
+    ...(m.activations.some((c) => c.clipped) ? [["Cut short", m.activations.filter((c) => c.clipped).length, true]] : []),
+    ["Steps never fired", `${dead.length} / ${m.seq.length}`, dead.length > 0],
+  ];
+  main.innerHTML = `
+    ${STATE.stale ? `<div class="banner">The rotation was edited after this dry-run. Run it again in the builder to refresh.</div>` : ""}
+    <div class="stats">${stats.map(([l, v, w]) => `<div class="stat${w ? " warn" : ""}"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("")}</div>
+    <div class="card">
+      <div class="tl">
+        <div class="labels" id="labels"></div>
+        <div class="scroll" id="scroll"><svg id="svg" role="img" aria-label="Dry-run cast timeline"></svg><div class="tip" id="tip" hidden></div></div>
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>Step badge: priority block</span>
+        <span><i style="background:var(--amber)"></i>optional</span>
+        <span><i style="background:var(--cyan)"></i>fixed</span>
+        <span><i style="background:var(--text-muted)"></i>pre-combat</span>
+        ${m.hasTiming
+          ? `<span><i style="background:var(--cast)"></i>Cast</span>
+             <span><i style="background:var(--channel)"></i>Channel (faint red line = tick)</span>
+             <span><i style="border:1.5px dashed var(--channel)"></i>Lost when cut short</span>
+             <span><i style="background:var(--red);width:4px"></i>Cut short</span>
+             <span><i style="background:var(--gap)"></i>Idle (GCD ready, nothing casting)</span>`
+          : `<span><i style="background:var(--gap)"></i>Gap longer than one GCD (idle, or a cast/channel longer than the GCD)</span>`}
+        <span><i style="background:var(--amber);width:3px"></i>Off-GCD cast</span>
+        <span><i style="background:var(--green);opacity:.5"></i>${m.buffWindows ? "Buff active" : "Buff active (sampled at each cast)"}</span>
+        <span><i style="border:1px dashed var(--text-muted)"></i>Resource threshold used by a rule</span>
+      </div>
+    </div>
+    <div class="card detail" id="detail"></div>
+  `;
+  bindTimeline();
+  draw();
+  renderDetail();
+}
+
+let ROWS = [];
+function layoutRows() {
+  const m = MODEL;
+  ROWS = [
+    { key: "axis", h: 24, label: "" },
+    { key: "pass", h: 20, label: "Pass" },
+    { key: "gcd", h: 46, label: "GCD" },
+    { key: "off", h: 34, label: "Off-GCD" },
+    ...(m.buffs.length ? [{ key: "bhead", h: 18, label: "Buffs", grp: true }] : []),
+    ...m.buffs.map((b) => ({ key: `buff:${b}`, h: 14, label: b })),
+    { key: "sp", h: 8, label: "" },
+    { key: "res", h: 110, label: "Resource" },
+    { key: "pad", h: 8, label: "" },
+  ];
+  let y = 0;
+  ROWS.forEach((r) => { r.y = y; y += r.h; });
+  document.getElementById("labels").innerHTML = ROWS.map((r) =>
+    `<div class="${r.grp ? "grp" : ""}" style="height:${r.h}px" title="${esc(r.label)}">${esc(r.label)}</div>`).join("");
+  return y;
+}
+const row = (k) => ROWS.find((r) => r.key === k);
+
+function stepColor(c) {
+  if (c.phase === "pre_combat") return "var(--text-muted)";
+  const st = MODEL.seq[c.step_index - 1];
+  if (!st) return "var(--accent)";
+  return st.type === "optional" ? "var(--amber)" : st.type === "fixed" ? "var(--cyan)" : "var(--accent)";
+}
+
+function draw() {
+  const m = MODEL;
+  const svg = document.getElementById("svg");
+  if (!svg) return;
+  const H = layoutRows();
+  const px = +document.getElementById("zoom").value;
+  const PAD = 12;
+  const W = Math.ceil((m.tMax - m.tMin) * px) + PAD * 2;
+  const X = (t) => PAD + (t - m.tMin) * px;
+  svg.setAttribute("width", W);
+  svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let g = "";
+
+  if (m.tMin < 0) {
+    g += `<rect x="${X(m.tMin)}" y="14" width="${X(0) - X(m.tMin)}" height="${H - 14}" fill="var(--prepull)"/>`;
+    g += `<text x="${X(m.tMin) + 4}" y="${row("pass").y + 14}" font-size="10" fill="var(--text-muted)">Pre-pull</text>`;
+  }
+  for (let t = Math.ceil(m.tMin); t <= m.tMax; t++) {
+    const major = t % 5 === 0;
+    g += `<line x1="${X(t)}" x2="${X(t)}" y1="${major ? 14 : 19}" y2="${H}" stroke="var(--grid)" stroke-width="${major ? 1 : 0.5}"/>`;
+    if (major) g += `<text x="${X(t)}" y="11" font-size="10" text-anchor="middle" fill="var(--text-muted)">${t}s</text>`;
+  }
+  const gr = row("gcd"), or = row("off"), pr = row("pass");
+  m.gaps.forEach(([a, b]) => {
+    g += `<rect x="${X(a)}" y="${gr.y}" width="${X(b) - X(a)}" height="${or.y + or.h - gr.y}" fill="var(--gap)"/>`;
+  });
+  m.passes.forEach((t, i) => {
+    const end = m.passes[i + 1] ?? m.tMax;
+    const label = i === 0 && m.loopStart > 0 ? "Opener + pass 1" : `Pass ${i + 1}`;
+    g += `<rect x="${X(t) + 1}" y="${pr.y + 3}" width="${Math.max(0, X(end) - X(t) - 2)}" height="${pr.h - 6}" rx="3" fill="var(--bg-input)" stroke="var(--border-subtle)"/>`;
+    g += `<text x="${X(t) + 6}" y="${pr.y + pr.h - 6}" font-size="10" fill="var(--text-muted)">${esc(label)}</text>`;
+    if (i) g += `<line x1="${X(t)}" x2="${X(t)}" y1="${pr.y}" y2="${H}" stroke="var(--text-muted)" stroke-dasharray="3 3"/>`;
+  });
+  m.swaps.forEach((sw) => {
+    const t = sw.combat_time ?? sw.time;
+    g += `<line x1="${X(t)}" x2="${X(t)}" y1="14" y2="${H}" stroke="var(--green)" stroke-width="1.5"/>`;
+    g += `<text x="${X(t) + 3}" y="${pr.y + pr.h - 6}" font-size="9" fill="var(--green)">swap</text>`;
+  });
+
+  // One shape per activation: a fixed-size icon tile, with the cast / channel bar running out of it
+  // at the same height and corner radius. Channels are one continuous bar with a faint red line at
+  // each tick; when cut short, the part it lost stays as a dashed outline and a red notch marks the stop.
+  const R = 4;
+  const gcdIcon = Math.round(Math.max(14, Math.min(32, m.gcd * px - 4)));
+  const offIcon = Math.round(Math.max(12, Math.min(24, gcdIcon - 6)));
+
+  const activationShape = (c, x, y, s) => {
+    if (c.activation !== "cast" && c.activation !== "channel") return "";
+    const isChan = c.activation === "channel";
+    const color = isChan ? "var(--channel)" : "var(--cast)";
+    const ink = isChan ? "var(--channel-ink)" : "var(--cast-ink)";
+    const xEnd = X(c.end);
+    const xPlan = X(c.t + c.busy);
+    let out = "";
+    const solid = (a, b, rx) => (b - a > 0.5 ? `<rect x="${a}" y="${y}" width="${b - a}" height="${s}" rx="${rx}" fill="${color}"/>` : "");
+    const ghost = (a, b, rx) => (b - a > 1.5
+      ? `<rect x="${a + 0.75}" y="${y + 0.75}" width="${b - a - 1.5}" height="${s - 1.5}" rx="${rx}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="3 2" opacity="0.7"/>`
+      : "");
+    out += solid(x, Math.max(x, xEnd), R);
+    if (c.clipped) out += ghost(xEnd, xPlan, R);
+    if (isChan && c.tick_interval > 0 && (c.ticks_total || 0) > 0) {
+      // Ticks land every tick_interval after the channel starts; the last one is at the planned end.
+      for (let k = 1; k <= c.ticks_total; k++) {
+        const tx = Math.min(X(c.t + k * c.tick_interval), xPlan - 1.5);
+        if (tx <= x + s) continue; // hidden behind the icon
+        const landed = !c.clipped || k <= c.ticks;
+        out += `<line x1="${tx}" x2="${tx}" y1="${y + 3}" y2="${y + s - 3}" stroke="var(--red)" stroke-width="1.5" stroke-linecap="round" opacity="${landed ? 0.45 : 0.25}"/>`;
+      }
+    }
+    if (c.clipped) {
+      out += `<rect x="${xEnd - 1.5}" y="${y - 3}" width="3" height="${s + 6}" rx="1.5" fill="var(--red)"/>`;
+    }
+    // Labels: cast time centred in the visible bar; a channel's tick lines already show its ticks,
+    // so only a cut-short channel is labelled ("3/5"), centred in the part that ran.
+    const label = (lbl, a, b) => (b - a >= 8 + lbl.length * 6
+      ? `<text x="${(a + b) / 2}" y="${y + s / 2 + 3.5}" font-size="10" text-anchor="middle" fill="${ink}" font-weight="700" pointer-events="none">${lbl}</text>`
+      : "");
+    if (!isChan) {
+      out += label(`${c.busy.toFixed(2)}s`, x + s, xEnd);
+    } else if (c.clipped && c.ticks > 0 && c.tick_interval > 0) {
+      out += label(`${c.ticks}/${c.ticks_total}`, x + s, xEnd - 2);
+    }
+    return out;
+  };
+
+  const iconTile = (c, x, y, s) => {
+    const icon = iconUrl(STATE.icons[c.slug]);
+    const stepTxt = c.phase === "pre_combat" ? `P${c.step_index}` : String(c.step_index);
+    let out = `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${R}" fill="var(--bg-input)"/>`;
+    if (icon) out += `<image href="${icon}" x="${x}" y="${y}" width="${s}" height="${s}" style="clip-path: inset(0 round ${R}px)" preserveAspectRatio="xMidYMid slice"/>`;
+    out += `<rect x="${x + 0.5}" y="${y + 0.5}" width="${s - 1}" height="${s - 1}" rx="${R}" fill="none" stroke="var(--border-subtle)"/>`;
+    if (s >= 18) {
+      const bw = Math.max(12, 5 + stepTxt.length * 5.5);
+      out += `<rect x="${x - 2}" y="${y - 3}" width="${bw}" height="12" rx="3" fill="${stepColor(c)}" stroke="var(--bg-card)" stroke-width="1"/>`;
+      out += `<text x="${x - 2 + bw / 2}" y="${y + 6}" font-size="8.5" text-anchor="middle" fill="#fff" font-weight="700" pointer-events="none">${stepTxt}</text>`;
+    }
+    return out;
+  };
+
+  m.all.forEach((c) => {
+    const dim = selected && (c.phase === "pre_combat" || c.step_index !== selected) ? " dim" : "";
+    const x = X(c.t);
+    const onGcd = !!c.triggers_gcd;
+    const rowR = onGcd ? gr : or;
+    const s = onGcd ? gcdIcon : offIcon;
+    const y = rowR.y + (rowR.h - s) / 2 + 2;
+    g += `<g class="cast${dim}" data-id="${c.id}">${activationShape(c, x, y, s)}${iconTile(c, x, y, s)}</g>`;
+  });
+  // Off-GCD marker: an amber line through the GCD row at the moment the off-GCD ability went out,
+  // drawn on top so it stays visible over a GCD icon or bar.
+  m.all.forEach((c) => {
+    if (c.triggers_gcd) return;
+    const dim = selected && (c.phase === "pre_combat" || c.step_index !== selected) ? " dim" : "";
+    const x = X(c.t) + 0.75;
+    const yIcon = or.y + (or.h - offIcon) / 2 + 2;
+    g += `<g class="cast${dim}" data-id="${c.id}"><line x1="${x}" x2="${x}" y1="${gr.y + 2}" y2="${yIcon}" stroke="var(--amber)" stroke-width="1.5"/></g>`;
+  });
+
+  (m.buffWindows || []).forEach((b) => {
+    const r = row(`buff:${b.name}`);
+    (b.windows || []).forEach(([a, e]) => {
+      const x0 = X(Math.max(a, m.tMin)), x1 = X(Math.min(e, m.tMax));
+      if (x1 - x0 > 0.3) g += `<rect x="${x0}" y="${r.y + 3}" width="${x1 - x0}" height="${r.h - 6}" fill="var(--green)" opacity="0.5"/>`;
+    });
+  });
+  if (!m.buffWindows) m.buffs.forEach((b) => {
+    const r = row(`buff:${b}`);
+    m.all.forEach((c, i) => {
+      if (!(c.buffs || []).includes(b)) return;
+      const end = m.all[i + 1] ? m.all[i + 1].t : Math.min(m.tMax, c.t + m.gcd);
+      if (end <= c.t) return;
+      g += `<rect x="${X(c.t)}" y="${r.y + 3}" width="${X(end) - X(c.t)}" height="${r.h - 6}" fill="var(--green)" opacity="0.5"/>`;
+    });
+  });
+
+  const rr = row("res");
+  const RY = (v) => rr.y + 6 + (1 - v / m.resMax) * (rr.h - 12);
+  [0, m.resMax / 2, m.resMax].forEach((v) => {
+    g += `<line x1="${PAD}" x2="${W - PAD}" y1="${RY(v)}" y2="${RY(v)}" stroke="var(--grid)"/>`;
+    g += `<text x="${X(0) + 2}" y="${RY(v) - 2}" font-size="9" fill="var(--text-muted)">${v}</text>`;
+  });
+  m.thresholds.forEach((v) => {
+    g += `<line x1="${PAD}" x2="${W - PAD}" y1="${RY(v)}" y2="${RY(v)}" stroke="var(--text-muted)" stroke-dasharray="4 3" stroke-width="0.8"/>`;
+    g += `<text x="${W - PAD - 2}" y="${RY(v) - 2}" font-size="9" text-anchor="end" fill="var(--text-muted)">${v}</text>`;
+  });
+  if (m.all.length) {
+    const pts = m.all.map((c) => `${X(c.t)},${RY(Number(c.resource) || 0)}`).join(" ");
+    g += `<polygon points="${X(m.all[0].t)},${RY(0)} ${pts} ${X(m.all[m.all.length - 1].t)},${RY(0)}" fill="var(--cyan)" opacity="0.14"/>`;
+    g += `<polyline points="${pts}" fill="none" stroke="var(--cyan)" stroke-width="1.8" stroke-linejoin="round"/>`;
+    m.all.forEach((c) => {
+      const dim = selected && c.step_index !== selected;
+      g += `<circle cx="${X(c.t)}" cy="${RY(Number(c.resource) || 0)}" r="2.6" fill="${dim ? "var(--bg-card)" : "var(--cyan)"}" stroke="var(--cyan)"/>`;
+    });
+  }
+  svg.innerHTML = g;
+}
+
+function renderDetail() {
+  const el = document.getElementById("detail");
+  if (!el) return;
+  const m = MODEL;
+  document.getElementById("clearSelBtn").hidden = !selected;
+  if (!selected || !m.seq[selected - 1]) {
+    el.innerHTML = `<h2>Step detail</h2><div class="muted">${TEXT.detailHint}</div>`;
+    return;
+  }
+  const st = m.seq[selected - 1];
+  const n = m.stepCount[st.idx] || 0;
+  el.innerHTML = `
+    <h2>Step ${st.idx}: ${esc(st.name)} <span class="muted">(${st.type.replace("_", " ")}, ${n ? `${n} cast${n > 1 ? "s" : ""}` : "never fired"})</span></h2>
+    <div class="entries">${st.pool.map((p, j) => {
+      const c = m.entryCount[`${st.idx}:${j}`] || 0;
+      const slug = STATE.slugs[p.ability_id] || p.ability_id;
+      const icon = iconUrl(STATE.icons[slug] || STATE.icons[p.ability_id]);
+      return `<div class="entry${c ? "" : " unused"}" title="${esc(Object.keys(p.rules || {}).join(", ") || "no conditions")}">
+        ${icon ? `<img src="${icon}" alt="">` : ""}
+        <span>${esc(STATE.names[p.ability_id] || p.ability_id)}</span>
+        <span class="n${c ? "" : " zero"}">${c}x</span>
+      </div>`;
+    }).join("")}</div>
+    <div class="muted">Casts are credited to the first entry with the same ability; the ${TEXT.runKind} does not record which entry's rules matched.</div>
+  `;
+}
+
+function setSelected(stepIdx, notify) {
+  selected = stepIdx || null;
+  draw();
+  renderDetail();
+  if (notify && channel) channel.postMessage({ type: "select", step: selected });
+}
+
+function bindTimeline() {
+  const svg = document.getElementById("svg");
+  const tip = document.getElementById("tip");
+  const scroller = document.getElementById("scroll");
+  svg.addEventListener("mousemove", (e) => {
+    const gEl = e.target.closest(".cast");
+    if (!gEl) { tip.hidden = true; return; }
+    const c = MODEL.all[+gEl.dataset.id];
+    const st = c.phase === "pre_combat" ? null : MODEL.seq[c.step_index - 1];
+    const stepLine = c.phase === "pre_combat"
+      ? `Pre-combat step ${c.step_index}`
+      : `Step ${c.step_index}: ${esc(st ? st.name : c.step_label)}${st && st.type === "priority_block" && c.entry >= 0 ? ` (entry ${c.entry + 1} of ${st.pool.length})` : ""}`;
+    let actLine = "";
+    if (c.activation === "cast") {
+      actLine = `Cast ${c.busy.toFixed(2)}s${c.clipped ? `, <b>interrupted at ${c.end.toFixed(2)}s</b>` : ""}<br>`;
+    } else if (c.activation === "channel") {
+      actLine = `Channel ${c.busy.toFixed(2)}s: ${c.ticks}/${c.ticks_total} ticks every ${Number(c.tick_interval).toFixed(2)}s`
+        + `${c.clipped ? `, <b>cut short at ${c.end.toFixed(2)}s</b>` : ""}<br>`;
+    } else if (c.activation === "instant") {
+      actLine = "Instant<br>";
+    }
+    const gcdLine = c.triggers_gcd
+      ? `On GCD${MODEL.hasTiming ? ` (${(c.gcd || 0).toFixed(2)}s)` : ""}`
+      : "Off GCD";
+    tip.innerHTML = `<b>${esc(c.ability)}</b> at ${c.t.toFixed(2)}s<br>${stepLine}<br>
+      ${actLine}Resource after cast: ${esc(c.resource)}<br>${gcdLine}<br>
+      <span style="opacity:.8">Buffs: ${esc((c.buffs || []).join(", ") || "none")}</span>`;
+    tip.hidden = false;
+    const r = scroller.getBoundingClientRect();
+    let left = e.clientX - r.left + scroller.scrollLeft + 14;
+    if (left > scroller.scrollLeft + scroller.clientWidth - 290) left -= 300;
+    tip.style.left = `${Math.max(scroller.scrollLeft + 4, left)}px`;
+    tip.style.top = `${Math.min(svg.clientHeight - 120, e.clientY - r.top + 12)}px`;
+  });
+  svg.addEventListener("mouseleave", () => { tip.hidden = true; });
+  svg.addEventListener("click", (e) => {
+    const gEl = e.target.closest(".cast");
+    if (!gEl) return;
+    const c = MODEL.all[+gEl.dataset.id];
+    if (c.phase === "pre_combat") return;
+    setSelected(selected === c.step_index ? null : c.step_index, true);
+  });
+}
+
+document.getElementById("zoom").addEventListener("input", () => { if (MODEL) draw(); });
+document.getElementById("clearSelBtn").addEventListener("click", () => setSelected(null, true));
+
+if (channel) {
+  channel.onmessage = (e) => {
+    const msg = e.data || {};
+    if (msg.type === "state") {
+      STATE = msg;
+      selected = msg.selected || null;
+      render();
+    } else if (msg.type === "stale" && STATE) {
+      if (STATE.stale !== msg.stale) { STATE.stale = msg.stale; render(); }
+    } else if (msg.type === "select" && MODEL) {
+      selected = msg.step || null;
+      draw();
+      renderDetail();
+    }
+  };
+  channel.postMessage({ type: "hello" });
+} else {
+  document.getElementById("waiting").innerHTML = "<strong>This browser can't link windows (BroadcastChannel is unavailable).</strong>";
+}
+</script>
+</body>
+</html>
