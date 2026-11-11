@@ -20,6 +20,7 @@ WEB_TOOLS_DIR = SWTORSIM_ROOT / "tools" / "web"
 SIM_UI_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
 ROT_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
 TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
+MAP_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_map_ui.html"
 
 # Import bundle builder
 sys.path.insert(0, str(SWTORSIM_ROOT))
@@ -102,6 +103,13 @@ def build_web_release() -> None:
         print("[OK] Copied dist/timeline.html (Cast Timeline window)")
     else:
         print(f"[FAIL] rotation_timeline_ui.html not found at {TIMELINE_UI_PATH}")
+
+    # 6. Copy the Rotation Map pop-out (static page; talks to the builder over BroadcastChannel)
+    if MAP_UI_PATH.is_file():
+        shutil.copy2(MAP_UI_PATH, DIST_DIR / "map.html")
+        print("[OK] Copied dist/map.html (Rotation Map window)")
+    else:
+        print(f"[FAIL] rotation_map_ui.html not found at {MAP_UI_PATH}")
 
     print("\n" + "=" * 65)
     print("  [OK] WEB RELEASE BUILD COMPLETE!")

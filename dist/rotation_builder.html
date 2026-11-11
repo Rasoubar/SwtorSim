@@ -1130,8 +1130,12 @@
   }
   tr.row-prepull td { opacity: 0.85; }
   tr.row-skip td { color: var(--red); }
+
+  /* Flash for "open in editor" from the Rotation Map / Cast Timeline windows */
+  .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
+  .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794400165"></script>
+  <script src="pyodide_client.js?v=1794412554"></script>
 </head>
 <body>
 
@@ -1309,6 +1313,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" id="rTabLint" onclick="switchRightTab('lint')">Linter & Clipboard</button>
+      <button class="tab-btn" id="rBtnMap" onclick="openVisualMapWindow()" title="Open the rotation map in its own window">Visual Map &#8599;</button>
       <button class="tab-btn" id="rTabPreview" onclick="switchRightTab('preview')">Dry-Run Sim</button>
       <button class="tab-btn" id="rTabJson" onclick="switchRightTab('json')">Raw JSON</button>
     </div>
@@ -1406,6 +1411,9 @@ let paletteTab = "abilities";
 let rightTab = "lint";
 let lastImportWarnings = [];
 let dryRunResult = null;
+let dryRunRotationJson = null;     // JSON of rotationSteps at the time of the last dry-run (stale detection)
+let dryRunRotationSnapshot = null; // rotationSteps as they were dry-run; the cast step_index values refer to this
+let vizSelectedStep = null;        // 1-based executable step index shared by Visual Map, editor and Cast Timeline
 let ruleModalContext = null; // { stepIndex, poolIndex (optional), editKey (optional) }
 
 // ---------------------------------------------------------------------------
@@ -1990,7 +1998,10 @@ function renderSkillTreeDrawer() {
   const tree = currentLoadout.skill_tree || {};
   const choices = currentLoadout.choices || {};
 
-  for (const [lvl, slots] of Object.entries(tree)) {
+  // Highest level first, matching the main simulator page.
+  const levels = Object.keys(tree).sort((a, b) => (parseInt(b, 10) || 0) - (parseInt(a, 10) || 0));
+  for (const lvl of levels) {
+    const slots = tree[lvl] || {};
     const row = document.createElement("div");
     row.className = "st-row";
     const lvlSpan = document.createElement("span");
@@ -3314,6 +3325,7 @@ function insertSub30OptionalAt(index) {
 }
 
 function renderTimeline() {
+  queueMicrotask(vizOnRotationChanged);
   renderPreCombat();
   const container = document.getElementById("timelineContainer");
   container.innerHTML = "";
@@ -4137,12 +4149,15 @@ function renderRightPanel() {
 
   if (rightTab === "preview") {
     let html = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:6px;">
         <div>
           <div style="font-weight:700;">Live Dry-Run Cast Preview</div>
           <div style="font-size:11px;color:var(--text-muted);">Runs the pre-combat sequence, then 30s of combat from the pull, to verify cast order</div>
         </div>
-        <button class="btn-primary" onclick="runDryRunSimulation()">Run 30s Preview</button>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <button class="btn-primary" onclick="runDryRunSimulation()">Run 30s Preview</button>
+          <button class="btn-sm" onclick="openCastTimelineWindow()" title="Open the dry-run as a visual timeline in its own window">Open Cast Timeline</button>
+        </div>
       </div>
     `;
 
@@ -4233,6 +4248,246 @@ function renderRightPanel() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Visual Map tab + Cast Timeline window (tools/rotation_timeline_ui.html)
+// Dry-run casts carry step_index = 1-based index into the executable sequence,
+// which skips loop_anchor entries (see Rotation.build_steps).
+// ---------------------------------------------------------------------------
+const VIZ_CHANNEL_NAME = "swtorsim-cast-timeline";
+let vizChannel = null;
+try { vizChannel = new BroadcastChannel(VIZ_CHANNEL_NAME); } catch (e) { vizChannel = null; }
+
+function vizIsStale() {
+  return !!dryRunResult && JSON.stringify(rotationSteps) !== dryRunRotationJson;
+}
+
+// Executable steps (no loop_anchor) with their index in rotationSteps.
+function vizExecSteps(steps) {
+  const out = [];
+  let loopStart = 0;
+  (steps || []).forEach((s, editorIdx) => {
+    if (s.type === "loop_anchor") { loopStart = out.length; return; }
+    out.push({ seq: out.length + 1, editorIdx, step: s });
+  });
+  return { exec: out, loopStart };
+}
+
+function vizSlugOf(abilityId) {
+  const m = resolveAbilityDisplay(abilityId);
+  return m ? m.slug : String(abilityId || "").toLowerCase().replace(/\s+/g, "_");
+}
+
+// Per-step and per-entry cast counts from the last dry-run (null when stale or absent).
+function vizCastCounts() {
+  if (!dryRunResult || vizIsStale()) return null;
+  const { exec } = vizExecSteps(dryRunRotationSnapshot);
+  const step = {}, entry = {};
+  for (const c of dryRunResult.casts || []) {
+    if (c.phase === "pre_combat") continue;
+    step[c.step_index] = (step[c.step_index] || 0) + 1;
+    const e = exec[c.step_index - 1];
+    if (!e) continue;
+    const pool = e.step.pool || [{ ability_id: e.step.ability_id }];
+    const j = pool.findIndex(p => vizSlugOf(p.ability_id) === c.slug);
+    const key = `${c.step_index}:${j}`;
+    entry[key] = (entry[key] || 0) + 1;
+  }
+  return { step, entry };
+}
+
+function vizRuleList(rules) {
+  const out = [];
+  for (const [k, v] of Object.entries(rules || {})) {
+    const obj = v && typeof v === "object" && !Array.isArray(v) ? v : null;
+    const list = (x) => (Array.isArray(x) ? x.join(" / ") : String(x));
+    let cls = "cd", txt = k;
+    if (k === "target_hp_below_pct") { cls = "hp"; txt = `HP <= ${Math.round(Number(obj ? obj.pct ?? 0.3 : v) * 100)}%`; }
+    else if (k === "target_hp_above_pct") { cls = "hp"; txt = `HP > ${Math.round(Number(v) * 100)}%`; }
+    else if (k === "caster_energy_below") { cls = "res"; txt = `Res < ${v}`; }
+    else if (k === "caster_energy_above") { cls = "res"; txt = `Res >= ${v}`; }
+    else if (k === "caster_has_buff") { cls = "buff"; txt = `has ${list(v)}`; }
+    else if (k === "caster_does_not_have_buff") { cls = "buff"; txt = `no ${list(v)}`; }
+    else if (k === "target_has_debuff") { cls = "buff"; txt = `tgt ${list(v)}`; }
+    else if (k === "target_doesnt_have_debuff") { cls = "buff"; txt = `tgt no ${list(v)}`; }
+    else if (k === "proc_cooldown_above" && obj) { txt = `${obj.name} ICD > ${obj.value}s`; }
+    else if (k === "ability_cooldown_under" && obj) { txt = `${obj.name} CD < ${obj.value}s`; }
+    else if (k === "ability_cooldown_above" && obj) { txt = `${obj.name} CD > ${obj.value}s`; }
+    else if (k.includes("stacks") || k.includes("charges")) { cls = "buff"; txt = k.replace(/_/g, " "); }
+    out.push({ cls, txt, full: formatRulePillText(k, v).replace(/<[^>]+>/g, "") });
+  }
+  return out;
+}
+
+// Rotation Map window payload: the current rotation (not the dry-run snapshot), with cast counts when
+// the last dry-run still matches it.
+function vizMapPayload() {
+  const counts = vizCastCounts();
+  const { exec, loopStart } = vizExecSteps(rotationSteps);
+  return {
+    type: "state",
+    steps: exec.map(e => {
+      const s = e.step;
+      const pool = s.pool || [{ ability_id: s.ability_id, rules: s.rules || {} }];
+      const resolved = pool.map(p => resolveAbilityDisplay(p.ability_id));
+      return {
+        seq: e.seq,
+        type: s.type,
+        // Every ability in the step is known and off the GCD: the map draws it below the GCD line.
+        offGcd: resolved.length > 0 && resolved.every(m => m && m.triggers_gcd === false),
+        name: s.name || resolveAbilityDisplay(s.ability_id)?.name || s.ability_id || "",
+        count: counts ? (counts.step[e.seq] || 0) : null,
+        entries: pool.map((p, j) => {
+          const m = resolveAbilityDisplay(p.ability_id);
+          return {
+            name: m ? m.name : String(p.ability_id || "?"),
+            icon: m && m.icon ? m.icon : "",
+            rules: vizRuleList(p.rules),
+            count: counts ? (counts.entry[`${e.seq}:${j}`] || 0) : null,
+          };
+        }),
+      };
+    }),
+    loopStart,
+    hasCounts: !!counts,
+    hasRun: !!dryRunResult,
+    stale: vizIsStale(),
+    duration: dryRunResult ? dryRunResult.duration : null,
+    selected: vizSelectedStep,
+    loadoutLabel: [currentLoadout.class_name, currentLoadout.spec_name].filter(Boolean).join(" // "),
+  };
+}
+
+// Select a step (1-based executable index) and open it in the editor.
+// fromBuilder=true: the click came from the Rotation Map (indexes refer to the current rotation);
+// false: from the Cast Timeline (indexes refer to the dry-run snapshot).
+// entry: pool row to flash inside the step (Rotation Map ability clicks).
+function vizSelectStep(seq, fromBuilder, entry = null) {
+  vizSelectedStep = seq || null;
+  if (vizSelectedStep) {
+    // Map the dry-run's step index onto the editor; use the current rotation when the run is stale or absent.
+    const source = fromBuilder || !dryRunRotationSnapshot ? rotationSteps : dryRunRotationSnapshot;
+    const e = vizExecSteps(source).exec[vizSelectedStep - 1];
+    const card = e ? document.getElementById(`step-card-${e.editorIdx}`) : null;
+    if (card && (fromBuilder || !vizIsStale())) {
+      if (collapsedSteps.has(e.editorIdx)) toggleStepCollapse(e.editorIdx);
+      const row = entry !== null && e.step.pool ? document.getElementById(`pool-row-${e.editorIdx}-${entry}`) : null;
+      const target = row || document.getElementById(`step-card-${e.editorIdx}`) || card;
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      target.classList.add("viz-flash");
+      setTimeout(() => target.classList.remove("viz-flash"), 1200);
+    }
+  }
+  if (fromBuilder && vizChannel) vizChannel.postMessage({ type: "select", step: vizSelectedStep });
+  if (!fromBuilder && vizMapChannel) vizMapChannel.postMessage({ type: "select", step: vizSelectedStep });
+}
+
+function vizStatePayload() {
+  if (!dryRunResult) return { type: "state", result: null };
+  const r = dryRunResult;
+  const icons = {}, names = {}, slugs = {};
+  const remember = (id) => {
+    if (!id || id in slugs) return;
+    const m = resolveAbilityDisplay(id);
+    const slug = m ? m.slug : id;
+    slugs[id] = slug;
+    names[id] = m ? m.name : id;
+    names[slug] = names[id];
+    if (m && m.icon) icons[slug] = m.icon;
+  };
+  (dryRunRotationSnapshot || []).forEach(s => (s.pool || [s]).forEach(p => remember(p.ability_id)));
+  (r.casts || []).forEach(c => {
+    remember(c.slug);
+    if (!names[c.slug]) names[c.slug] = c.ability;
+  });
+  return {
+    type: "state",
+    result: {
+      duration: r.duration,
+      total_damage: r.total_damage,
+      dps: r.dps,
+      casts: r.casts,
+      tactical_swaps: r.tactical_swaps || [],
+      pre_combat_skipped: r.pre_combat_skipped || [],
+      pre_combat_duration: r.pre_combat_duration,
+    },
+    rotation: dryRunRotationSnapshot || [],
+    icons, names, slugs,
+    stale: vizIsStale(),
+    selected: vizSelectedStep,
+    loadoutLabel: [currentLoadout.class_name, currentLoadout.spec_name].filter(Boolean).join(" // "),
+  };
+}
+
+function vizBroadcastState() {
+  if (vizChannel) vizChannel.postMessage(vizStatePayload());
+}
+
+let vizLastStale = null;
+function vizOnRotationChanged() {
+  vizBroadcastMap();
+  const stale = vizIsStale();
+  if (vizChannel && dryRunResult && stale !== vizLastStale) vizChannel.postMessage({ type: "stale", stale });
+  vizLastStale = stale;
+}
+
+if (vizChannel) {
+  vizChannel.onmessage = (ev) => {
+    const msg = ev.data || {};
+    if (msg.type === "hello") vizBroadcastState();
+    else if (msg.type === "select") vizSelectStep(msg.step, false);
+  };
+}
+
+// Rotation Map window (tools/rotation_map_ui.html): own channel; it asks for state with "hello" and
+// sends "goto" {step, entry} when a step or ability is clicked.
+const MAP_CHANNEL_NAME = "swtorsim-rotation-map";
+let vizMapChannel = null;
+try { vizMapChannel = new BroadcastChannel(MAP_CHANNEL_NAME); } catch (e) { vizMapChannel = null; }
+
+function vizBroadcastMap() {
+  if (vizMapChannel) vizMapChannel.postMessage(vizMapPayload());
+}
+
+if (vizMapChannel) {
+  vizMapChannel.onmessage = (ev) => {
+    const msg = ev.data || {};
+    if (msg.type === "hello") vizBroadcastMap();
+    else if (msg.type === "goto") vizSelectStep(msg.step, true, msg.entry ?? null);
+  };
+}
+
+function openVisualMapWindow() {
+  if (!vizMapChannel) {
+    showToast("This browser can't link windows (BroadcastChannel unavailable).", true);
+    return;
+  }
+  // map.html: served by the local builder server and copied into dist/ by build_web_release.py
+  const w = window.open("map.html", "swtorsim_rotation_map", "width=1500,height=700");
+  if (!w) {
+    showToast("The browser blocked the Rotation Map window. Allow pop-ups for this page.", true);
+    return;
+  }
+  w.focus();
+  vizBroadcastMap();
+}
+
+function openCastTimelineWindow() {
+  if (!vizChannel) {
+    showToast("This browser can't link windows (BroadcastChannel unavailable).", true);
+    return;
+  }
+  // timeline.html: served by the local builder server and copied into dist/ by build_web_release.py
+  const w = window.open("timeline.html", "swtorsim_cast_timeline", "width=1400,height=780");
+  if (!w) {
+    showToast("The browser blocked the Cast Timeline window. Allow pop-ups for this page.", true);
+    return;
+  }
+  w.focus();
+  // A freshly opened window says hello on load; an already-open one gets the current state now.
+  vizBroadcastState();
+  if (!dryRunResult) showToast("Cast Timeline opened. Run a dry-run to fill it.");
+}
+
 function insertSavedStepTemplate(tIdx) {
   const tmpl = savedTemplates[tIdx];
   if (!tmpl || tmpl.kind !== "step") return;
@@ -4268,7 +4523,11 @@ async function runDryRunSimulation() {
     return;
   }
   dryRunResult = data;
+  dryRunRotationJson = JSON.stringify(rotationSteps);
+  dryRunRotationSnapshot = JSON.parse(dryRunRotationJson);
   renderRightPanel();
+  vizBroadcastState();
+  vizBroadcastMap();
   showToast(`Simulated 30s: ${data.casts.length} casts (${data.dps.toLocaleString()} DPS)`);
 }
 

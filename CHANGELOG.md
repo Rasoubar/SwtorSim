@@ -2767,3 +2767,14 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **DPS** (single run, seed 42, with vs without the recorder): `hatred_14gcd` 31000.2 / 31000.2; `carnage_14gcd` 22740.4 / 22740.4; `sniper_marksmanship_config_test` 28896.2 / 28896.2.
 - **Observation, not changed**: in the Sniper single run (346 s) Penetrating Blasts (step 21, execute phase) ends itself after 1-2 of 5 ticks five times (at 223, 242, 273, 315, 334 s) with no cast interrupting it, and the next cast follows 0.7-3.4 s later. The timeline shows these as cut short.
 - **Tests**: `tests/test_rotation_timeline_window.py` (`SimulatorCastTimelineTests`: payload fields, casts match combat-log casts, simulator server serves the page; channel contract now covers the `-sim` channel). Checked in browser against the simulator server. Full suite: 133 run, 133 pass.
+
+## Rotation Map: pop-out window, horizontal, opener on its own lane
+- The Visual Map tab in the builder's right panel is replaced by a "Visual Map" button that opens new `tools/rotation_map_ui.html` (served at `/map` and `/map.html` by `data/rotation_builder.py`; copied to `dist/map.html` by `tools/build_web_release.py`).
+- Layout: steps run left to right. Steps before the End of Opener anchor sit on an "Opener" lane, the rest on a "Loop" lane that ends with "back to step N". Priority entries stack top to bottom inside each step card with rule badges and cast counts.
+- Clicking a step header opens that step in the editor (expanding it if collapsed); clicking an ability also flashes its pool row (`pool-row-<step>-<row>`). Selection also reaches the Cast Timeline window, and timeline selections highlight the step in the map.
+- Builder (`tools/rotation_builder_ui.html`): `vizMapPayload`, `vizRuleList`, `openVisualMapWindow`, BroadcastChannel `swtorsim-rotation-map` (messages: `hello`/`goto` in, `state`/`select` out). The map follows every rotation edit and dry-run. Removed `renderVisualMapHtml`, `vizRuleBadges` and the `.vmap-*` CSS.
+- Tests: `tests/test_rotation_timeline_window.py` (map route, map channel contract, button wiring). Full suite passes. Not yet checked in a browser.
+
+## Rotation Map: off-GCD steps below the line
+- `tools/rotation_map_ui.html :: laneHtml`: steps whose abilities are all off the GCD (builder `vizMapPayload` now sends `offGcd`) leave the main line. Each run of them hangs just below the arrow between the GCD steps around it, in smaller dashed amber cards, joined to the arrow by an amber dot and dashed line. Clicking them still opens the step / pool row in the editor. Legend updated.
+- Checked in the browser on `hatred_14gcd` (Recklessness steps 6, 8, 12 drop below the line; a temporary End of Opener anchor showed the Opener and Loop lanes, including an off-GCD step at the start of the loop). Map clicks flash the right editor card and pool row. This also covers the previously unchecked Rotation Map window.

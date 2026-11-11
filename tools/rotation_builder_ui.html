@@ -1131,40 +1131,9 @@
   tr.row-prepull td { opacity: 0.85; }
   tr.row-skip td { color: var(--red); }
 
-  /* Visual Map tab (right panel) */
-  .vmap-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-  .vmap-note { font-size: 11px; color: var(--text-muted); margin-bottom: 8px; }
-  .vmap-note.stale { color: var(--amber); font-weight: 600; }
-  .vmap-rail { display: grid; gap: 6px; }
-  .vmap-step { display: grid; gap: 6px; width: 100%; text-align: left; font: inherit; color: inherit; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 7px 9px; cursor: pointer; }
-  .vmap-step:hover { border-color: var(--border); }
-  .vmap-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  .vmap-step.optional { border-style: dashed; }
-  .vmap-step.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--accent-bg); }
-  .vmap-step.dead { opacity: 0.62; }
-  .vmap-head { display: flex; align-items: center; gap: 7px; min-width: 0; }
-  .vmap-num { font-family: monospace; font-size: 11px; color: var(--text-muted); width: 18px; text-align: right; flex: none; }
-  .vmap-chip { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 1px 5px; border-radius: 3px; flex: none; }
-  .vmap-chip.priority_block { background: var(--accent-bg); color: var(--accent); }
-  .vmap-chip.optional { background: var(--amber-bg); color: var(--amber); }
-  .vmap-chip.fixed { background: var(--cyan-bg); color: var(--cyan); }
-  .vmap-name { font-weight: 600; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .vmap-cnt { font-family: monospace; font-size: 11px; flex: none; }
-  .vmap-cnt.zero { color: var(--red); font-weight: 700; }
-  .vmap-pool { display: flex; flex-wrap: wrap; gap: 4px; padding-left: 25px; }
-  .vmap-entry { position: relative; display: grid; justify-items: center; gap: 2px; width: 50px; }
-  .vmap-entry .ability-icon { width: 28px; height: 28px; border-radius: 4px; border: 1px solid var(--border-subtle); margin: 0; }
-  .vmap-entry.unused .ability-icon { filter: grayscale(1); opacity: 0.45; }
-  .vmap-entry .vmap-ec { position: absolute; top: -4px; right: 3px; font-size: 9.5px; font-family: monospace; background: var(--text-main); color: var(--bg-card); border-radius: 8px; padding: 0 4px; line-height: 13px; }
-  .vmap-entry .vmap-noicon { width: 28px; height: 28px; border-radius: 4px; border: 1px dashed var(--border); font-size: 9px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
-  .vmap-badge { font-size: 9px; line-height: 1.25; padding: 1px 3px; border-radius: 3px; text-align: center; max-width: 50px; overflow-wrap: anywhere; }
-  .vmap-badge.hp { background: var(--red-bg); color: var(--red); }
-  .vmap-badge.res { background: var(--cyan-bg); color: var(--cyan); }
-  .vmap-badge.buff { background: var(--green-bg); color: var(--green); }
-  .vmap-badge.cd { background: var(--amber-bg); color: var(--amber); }
-  .vmap-anchor { font-size: 11px; font-weight: 700; color: var(--green); border: 1px dashed var(--green); border-radius: 6px; padding: 4px 8px; text-align: center; }
-  .vmap-loopback { font-size: 11px; color: var(--text-muted); border: 1px dashed var(--border-subtle); border-radius: 6px; padding: 5px 8px; text-align: center; }
+  /* Flash for "open in editor" from the Rotation Map / Cast Timeline windows */
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
+  .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
 </head>
 <body>
@@ -1343,7 +1312,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" id="rTabLint" onclick="switchRightTab('lint')">Linter & Clipboard</button>
-      <button class="tab-btn" id="rTabMap" onclick="switchRightTab('map')">Visual Map</button>
+      <button class="tab-btn" id="rBtnMap" onclick="openVisualMapWindow()" title="Open the rotation map in its own window">Visual Map &#8599;</button>
       <button class="tab-btn" id="rTabPreview" onclick="switchRightTab('preview')">Dry-Run Sim</button>
       <button class="tab-btn" id="rTabJson" onclick="switchRightTab('json')">Raw JSON</button>
     </div>
@@ -4087,7 +4056,6 @@ function switchRightTab(tab) {
   rightTab = tab;
   for (const [id, key] of [
     ["rTabLint", "lint"],
-    ["rTabMap", "map"],
     ["rTabPreview", "preview"],
     ["rTabJson", "json"]
   ]) {
@@ -4175,11 +4143,6 @@ function renderRightPanel() {
     }
     html += `</div>`;
     container.innerHTML = html;
-    return;
-  }
-
-  if (rightTab === "map") {
-    container.innerHTML = renderVisualMapHtml();
     return;
   }
 
@@ -4331,7 +4294,7 @@ function vizCastCounts() {
   return { step, entry };
 }
 
-function vizRuleBadges(rules) {
+function vizRuleList(rules) {
   const out = [];
   for (const [k, v] of Object.entries(rules || {})) {
     const obj = v && typeof v === "object" && !Array.isArray(v) ? v : null;
@@ -4349,83 +4312,72 @@ function vizRuleBadges(rules) {
     else if (k === "ability_cooldown_under" && obj) { txt = `${obj.name} CD < ${obj.value}s`; }
     else if (k === "ability_cooldown_above" && obj) { txt = `${obj.name} CD > ${obj.value}s`; }
     else if (k.includes("stacks") || k.includes("charges")) { cls = "buff"; txt = k.replace(/_/g, " "); }
-    const full = formatRulePillText(k, v).replace(/<[^>]+>/g, "");
-    out.push(`<span class="vmap-badge ${cls}" title="${escapeAttr(full)}">${escapeHtml(txt)}</span>`);
+    out.push({ cls, txt, full: formatRulePillText(k, v).replace(/<[^>]+>/g, "") });
   }
-  return out.join("");
+  return out;
 }
 
-function renderVisualMapHtml() {
-  const stale = vizIsStale();
+// Rotation Map window payload: the current rotation (not the dry-run snapshot), with cast counts when
+// the last dry-run still matches it.
+function vizMapPayload() {
   const counts = vizCastCounts();
   const { exec, loopStart } = vizExecSteps(rotationSteps);
-  let html = `
-    <div class="vmap-toolbar">
-      <div style="font-weight:700;">Rotation Map (${exec.length} steps)</div>
-      <button class="btn-sm" onclick="openCastTimelineWindow()" title="Open the dry-run as a visual timeline in its own window">Open Cast Timeline</button>
-    </div>`;
-  if (!dryRunResult) {
-    html += `<div class="vmap-note">Run a dry-run in the <strong>Dry-Run Sim</strong> tab to add cast counts. Click a step to jump to it in the editor.</div>`;
-  } else if (stale) {
-    html += `<div class="vmap-note stale">Cast counts hidden: the rotation changed since the last dry-run.</div>`;
-  } else {
-    html += `<div class="vmap-note">Counts are from the last ${Number(dryRunResult.duration || 30).toFixed(0)}s dry-run. Casts are credited to the first entry with that ability. Click a step to jump to it and filter the Cast Timeline.</div>`;
-  }
-  if (!exec.length) {
-    return html + `<div style="color:var(--text-muted);text-align:center;padding:30px 10px;">The rotation has no steps yet.</div>`;
-  }
-  html += `<div class="vmap-rail">`;
-  exec.forEach((e, i) => {
-    if (loopStart > 0 && i === loopStart) {
-      html += `<div class="vmap-anchor">End of Opener: the loop restarts here</div>`;
-    }
-    const s = e.step;
-    const pool = s.pool || [{ ability_id: s.ability_id, rules: s.rules || {} }];
-    const n = counts ? (counts.step[e.seq] || 0) : null;
-    const label = s.type === "priority_block" ? "Priority" : s.type === "optional" ? "Optional" : s.type === "fixed" ? "Fixed" : s.type;
-    const name = s.name || resolveAbilityDisplay(s.ability_id)?.name || s.ability_id || "";
-    const entries = pool.map((p, j) => {
-      const m = resolveAbilityDisplay(p.ability_id);
-      const ec = counts ? (counts.entry[`${e.seq}:${j}`] || 0) : null;
-      const ablName = m ? m.name : String(p.ability_id || "?");
-      const icon = m && m.icon ? getAbilityIconHtml(m.icon) : `<span class="vmap-noicon">?</span>`;
-      const tip = `${ablName}${ec === null ? "" : ec ? ` - ${ec} cast${ec > 1 ? "s" : ""}` : " - never cast"}`;
-      return `<div class="vmap-entry${ec === 0 ? " unused" : ""}" title="${escapeAttr(tip)}">
-        ${ec ? `<span class="vmap-ec">${ec}</span>` : ""}${icon}${vizRuleBadges(p.rules)}
-      </div>`;
-    }).join("");
-    const cnt = n === null ? "" : `<span class="vmap-cnt${n ? "" : " zero"}">${n ? `${n}x` : "never"}</span>`;
-    html += `
-      <button type="button" class="vmap-step ${escapeAttr(s.type)}${n === 0 ? " dead" : ""}${vizSelectedStep === e.seq ? " sel" : ""}" onclick="vizSelectStep(${e.seq}, true)">
-        <div class="vmap-head">
-          <span class="vmap-num">${e.seq}</span>
-          <span class="vmap-chip ${escapeAttr(s.type)}">${escapeHtml(label)}</span>
-          <span class="vmap-name" title="${escapeAttr(name)}">${escapeHtml(name)}</span>
-          ${cnt}
-        </div>
-        <div class="vmap-pool">${entries}</div>
-      </button>`;
-  });
-  html += `<div class="vmap-loopback">Loops back to step ${loopStart + 1}</div></div>`;
-  return html;
+  return {
+    type: "state",
+    steps: exec.map(e => {
+      const s = e.step;
+      const pool = s.pool || [{ ability_id: s.ability_id, rules: s.rules || {} }];
+      const resolved = pool.map(p => resolveAbilityDisplay(p.ability_id));
+      return {
+        seq: e.seq,
+        type: s.type,
+        // Every ability in the step is known and off the GCD: the map draws it below the GCD line.
+        offGcd: resolved.length > 0 && resolved.every(m => m && m.triggers_gcd === false),
+        name: s.name || resolveAbilityDisplay(s.ability_id)?.name || s.ability_id || "",
+        count: counts ? (counts.step[e.seq] || 0) : null,
+        entries: pool.map((p, j) => {
+          const m = resolveAbilityDisplay(p.ability_id);
+          return {
+            name: m ? m.name : String(p.ability_id || "?"),
+            icon: m && m.icon ? m.icon : "",
+            rules: vizRuleList(p.rules),
+            count: counts ? (counts.entry[`${e.seq}:${j}`] || 0) : null,
+          };
+        }),
+      };
+    }),
+    loopStart,
+    hasCounts: !!counts,
+    hasRun: !!dryRunResult,
+    stale: vizIsStale(),
+    duration: dryRunResult ? dryRunResult.duration : null,
+    selected: vizSelectedStep,
+    loadoutLabel: [currentLoadout.class_name, currentLoadout.spec_name].filter(Boolean).join(" // "),
+  };
 }
 
-// Select a step (1-based executable index). fromBuilder=true scrolls the editor and notifies the timeline window.
-function vizSelectStep(seq, fromBuilder) {
-  vizSelectedStep = vizSelectedStep === seq && fromBuilder ? null : (seq || null);
-  if (rightTab === "map") renderRightPanel();
+// Select a step (1-based executable index) and open it in the editor.
+// fromBuilder=true: the click came from the Rotation Map (indexes refer to the current rotation);
+// false: from the Cast Timeline (indexes refer to the dry-run snapshot).
+// entry: pool row to flash inside the step (Rotation Map ability clicks).
+function vizSelectStep(seq, fromBuilder, entry = null) {
+  vizSelectedStep = seq || null;
   if (vizSelectedStep) {
     // Map the dry-run's step index onto the editor; use the current rotation when the run is stale or absent.
     const source = fromBuilder || !dryRunRotationSnapshot ? rotationSteps : dryRunRotationSnapshot;
     const e = vizExecSteps(source).exec[vizSelectedStep - 1];
     const card = e ? document.getElementById(`step-card-${e.editorIdx}`) : null;
     if (card && (fromBuilder || !vizIsStale())) {
-      card.scrollIntoView({ block: "center", behavior: "smooth" });
-      card.classList.add("viz-flash");
-      setTimeout(() => card.classList.remove("viz-flash"), 1200);
+      if (collapsedSteps.has(e.editorIdx)) toggleStepCollapse(e.editorIdx);
+      const row = entry !== null && e.step.pool ? document.getElementById(`pool-row-${e.editorIdx}-${entry}`) : null;
+      const target = row || document.getElementById(`step-card-${e.editorIdx}`) || card;
+      target.scrollIntoView({ block: "center", behavior: "smooth" });
+      target.classList.add("viz-flash");
+      setTimeout(() => target.classList.remove("viz-flash"), 1200);
     }
   }
   if (fromBuilder && vizChannel) vizChannel.postMessage({ type: "select", step: vizSelectedStep });
+  if (!fromBuilder && vizMapChannel) vizMapChannel.postMessage({ type: "select", step: vizSelectedStep });
 }
 
 function vizStatePayload() {
@@ -4471,7 +4423,7 @@ function vizBroadcastState() {
 
 let vizLastStale = null;
 function vizOnRotationChanged() {
-  if (rightTab === "map") renderRightPanel();
+  vizBroadcastMap();
   const stale = vizIsStale();
   if (vizChannel && dryRunResult && stale !== vizLastStale) vizChannel.postMessage({ type: "stale", stale });
   vizLastStale = stale;
@@ -4483,6 +4435,39 @@ if (vizChannel) {
     if (msg.type === "hello") vizBroadcastState();
     else if (msg.type === "select") vizSelectStep(msg.step, false);
   };
+}
+
+// Rotation Map window (tools/rotation_map_ui.html): own channel; it asks for state with "hello" and
+// sends "goto" {step, entry} when a step or ability is clicked.
+const MAP_CHANNEL_NAME = "swtorsim-rotation-map";
+let vizMapChannel = null;
+try { vizMapChannel = new BroadcastChannel(MAP_CHANNEL_NAME); } catch (e) { vizMapChannel = null; }
+
+function vizBroadcastMap() {
+  if (vizMapChannel) vizMapChannel.postMessage(vizMapPayload());
+}
+
+if (vizMapChannel) {
+  vizMapChannel.onmessage = (ev) => {
+    const msg = ev.data || {};
+    if (msg.type === "hello") vizBroadcastMap();
+    else if (msg.type === "goto") vizSelectStep(msg.step, true, msg.entry ?? null);
+  };
+}
+
+function openVisualMapWindow() {
+  if (!vizMapChannel) {
+    showToast("This browser can't link windows (BroadcastChannel unavailable).", true);
+    return;
+  }
+  // map.html: served by the local builder server and copied into dist/ by build_web_release.py
+  const w = window.open("map.html", "swtorsim_rotation_map", "width=1500,height=700");
+  if (!w) {
+    showToast("The browser blocked the Rotation Map window. Allow pop-ups for this page.", true);
+    return;
+  }
+  w.focus();
+  vizBroadcastMap();
 }
 
 function openCastTimelineWindow() {
@@ -4541,6 +4526,7 @@ async function runDryRunSimulation() {
   dryRunRotationSnapshot = JSON.parse(dryRunRotationJson);
   renderRightPanel();
   vizBroadcastState();
+  vizBroadcastMap();
   showToast(`Simulated 30s: ${data.casts.length} casts (${data.dps.toLocaleString()} DPS)`);
 }
 

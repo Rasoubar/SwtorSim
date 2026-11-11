@@ -51,6 +51,7 @@ from src.swtorsim.cast_timeline import CastTimelineRecorder, ability_name_to_slu
 PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "live" / "parsed"
 UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
 TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
+MAP_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_map_ui.html"
 
 
 # ---------------------------------------------------------------------------
@@ -1137,6 +1138,8 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 "/index.html": UI_HTML_PATH,
                 "/timeline": TIMELINE_UI_PATH,
                 "/timeline.html": TIMELINE_UI_PATH,
+                "/map": MAP_UI_PATH,
+                "/map.html": MAP_UI_PATH,
             }.get(route)
             if page_path is not None:
                 if not page_path.is_file():
