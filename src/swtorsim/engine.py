@@ -6,6 +6,9 @@ from src.swtorsim.triggers import TriggerManager
 
 class Simulation:
     """Manages the event queue and core combat timeline."""
+
+    _PRE_COMBAT_HARD_CAP: float = 600.0
+
     def __init__(
         self,
         in_flashpoint_operation: bool | None = None,
@@ -16,6 +19,8 @@ class Simulation:
         self.queue = []
         self.current_time = 0.0
         self.combat_start_time = None
+        self.pre_combat_runner = None
+        self.pre_combat_end_time = None
         self.event_counter = 0
         self.seed = seed
         self.tracer = tracer
@@ -46,11 +51,33 @@ class Simulation:
             return 0.0
         return max(0.0, self.current_time - self.combat_start_time)
 
+    def _stop_time(self, duration: float) -> float | None:
+        """Fight end time: ``duration`` after the first damage; pre-combat time never counts.
+
+        Before combat starts: unbounded while a pre-combat runner is active (hard-capped at
+        ``_PRE_COMBAT_HARD_CAP + duration`` as a deadlock guard), else ``duration`` after the
+        pre-combat phase ended (``duration`` when there was none).
+        """
+        if self.combat_start_time is not None:
+            return self.combat_start_time + duration
+        if getattr(self, "pre_combat_runner", None) is not None and self.pre_combat_runner.active:
+            return self._PRE_COMBAT_HARD_CAP + duration
+        return (self.pre_combat_end_time or 0.0) + duration
+
+    def run_until(self, absolute_time: float, target=None):
+        """Resolves events up to ``absolute_time`` on the raw simulation clock (no finalization)."""
+        while self.queue and self.queue[0][0] <= absolute_time:
+            timestamp, seq, event = heapq.heappop(self.queue)
+            self.current_time = timestamp
+            event.resolve(self)
+            if target is not None and getattr(target, "hp", 1) <= 0:
+                break
+
     def run_timed(self, duration=300.0, target=None):
-        """Pops and resolves events in chronological order until ``duration`` is reached or ``target.hp <= 0``."""
+        """Pops and resolves events in chronological order until ``duration`` of combat is reached or ``target.hp <= 0``."""
         while self.queue:
-            stop_time = (self.combat_start_time + duration) if self.combat_start_time is not None else duration
-            if self.queue[0][0] > stop_time:
+            stop_time = self._stop_time(duration)
+            if stop_time is not None and self.queue[0][0] > stop_time:
                 break
             timestamp, seq, event = heapq.heappop(self.queue)
             self.current_time = timestamp
@@ -62,4 +89,8 @@ class Simulation:
         if hasattr(self, "tracker") and hasattr(self.tracker, "finalize_stalls"):
             self.tracker.finalize_stalls(self.current_time)
         if getattr(self, "tracer", None) is not None:
-            self.tracer.finalize(self.current_time, metrics=getattr(self, "tracker", None))
+            self.tracer.finalize(
+                self.current_time,
+                metrics=getattr(self, "tracker", None),
+                pre_combat_end=self.pre_combat_end_time,
+            )

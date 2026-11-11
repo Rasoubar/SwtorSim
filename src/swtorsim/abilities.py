@@ -1210,6 +1210,10 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
         if owner_key and owner_entity is not None and owner_key in getattr(owner_entity, "effects", {}):
             owner_entity.cleanup_expired_effects([owner_key])
             return
+        if owner_key:
+            # The owning effect is already gone: nothing left to remove. Never fall through to the
+            # ability-wide sweep, which would strip unrelated sibling effects (e.g. Hidden Power).
+            return
         if ability is not None:
             for actor in (caster, target):
                 effects_dict = getattr(actor, "effects", {})
@@ -1705,13 +1709,8 @@ class Ability:
         if getattr(channel, "is_finished", False):
             cleanup_channel_effects(channel, sim)
             if sim is not None:
-                from src.swtorsim.events import PlayerReady
-                target_time = (
-                    caster.get_next_action_time(sim.current_time)
-                    if hasattr(caster, "get_next_action_time")
-                    else max(sim.current_time, getattr(caster, "next_gcd", sim.current_time))
-                )
-                sim.schedule_absolute(target_time, PlayerReady(caster, ability_target))
+                from src.swtorsim.events import schedule_next_decision
+                schedule_next_decision(caster, ability_target, sim)
             return
 
         # Schedule the first periodic tick event

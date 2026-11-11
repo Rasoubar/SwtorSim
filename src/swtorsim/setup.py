@@ -3,11 +3,12 @@
 import copy
 import random
 import re
+from pathlib import Path
 from typing import Any
 from src.swtorsim.engine import Simulation
 from src.swtorsim.abilities import Ability
 from src.swtorsim.entities import Player, Dummy
-from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick, PreCombatEvent
+from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick, PreCombatRunner, DEFAULT_PRE_COMBAT_MAX_WAIT
 from src.swtorsim.combat_curves import player_standard_health
 from src.swtorsim.rotation import Rotation
 from src.swtorsim.class_buffs import apply_class_buffs
@@ -105,6 +106,178 @@ def schedule_periodic(player, target, sim):
             first_tick = random.uniform(0.0, interval)
             sim.schedule_absolute(first_tick, PeriodicProcTick(player, target, proc))
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+_TACTICAL_BP_CACHE: dict[tuple[str, str], Any] = {}
+
+
+def _register_passive_blueprint(player, bp, sim):
+    """Pass 1 for one passive: registers it in ``passive_db`` and applies flat ``stat_changes``."""
+    from src.swtorsim.effects import ActiveEffect
+    passive_abl = Ability(bp)
+    player.passive_db[bp.fqn] = passive_abl
+    if passive_abl.name:
+        player.passive_db[passive_abl.name.lower().replace(" ", "_")] = passive_abl
+    if getattr(bp, "stat_changes", None):
+        eff = ActiveEffect.from_stat_changes(
+            {
+                "fqn": bp.fqn,
+                "name": bp.name,
+                "tags": list(bp.tags or []),
+                "stat_changes": bp.stat_changes,
+            }
+        )
+        eff.is_passive = True
+        eff_key = bp.name or bp.fqn
+        player.effects[eff_key] = eff
+        sim.tracker.log_effect_applied(
+            player.name,
+            eff_key,
+            sim.current_time,
+            stacks=getattr(eff, "stacks", 1),
+            is_passive=True,
+        )
+    return passive_abl
+
+
+def _load_tactical_blueprint(fqn: str):
+    """Loads (and caches) a tactical blueprint from the active environment's parsed data."""
+    from src.swtorsim.abilities import AbilityBlueprint
+    from src.swtorsim.config_load import fqn_to_relative_path
+    from src.swtorsim.settings import get_extractor_data_dir
+
+    parsed_dir = get_extractor_data_dir() / "parsed"
+    if not parsed_dir.is_absolute():
+        parsed_dir = _PROJECT_ROOT / parsed_dir
+    key = (str(parsed_dir), fqn)
+    if key not in _TACTICAL_BP_CACHE:
+        path = parsed_dir / fqn_to_relative_path(fqn)
+        if not path.is_file():
+            raise ValueError(f"Tactical blueprint not found for '{fqn}': {path}")
+        _TACTICAL_BP_CACHE[key] = AbilityBlueprint.from_file(path)
+    return _TACTICAL_BP_CACHE[key]
+
+
+def validate_tactical_for_class(fqn: str, class_name: str | None) -> None:
+    """Raises ValueError unless ``fqn`` is a tactical usable by ``class_name`` (or generic)."""
+    from src.swtorsim.run_config import CLASS_FQN_KEYWORDS, TACTICAL_PREFIX
+
+    if not isinstance(fqn, str) or not fqn.startswith(TACTICAL_PREFIX):
+        raise ValueError(f"swap_tactical target '{fqn}' is not a tactical ({TACTICAL_PREFIX}*).")
+    keywords = CLASS_FQN_KEYWORDS.get(str(class_name or "").lower())
+    if keywords is not None and "generic" not in fqn and not any(k in fqn for k in keywords):
+        raise ValueError(f"Tactical '{fqn}' is not available to class '{class_name}'.")
+
+
+def validate_pre_combat_rules(steps: list[dict], pull_conditions: dict | None) -> None:
+    """Raises ValueError for unknown rule keys in ``wait_until`` steps or pull conditions."""
+    from src.swtorsim.requirements import CONDITION_REGISTRY
+
+    def _check(rules, label):
+        if not rules:
+            return
+        if not isinstance(rules, dict):
+            raise ValueError(f"{label} must be a rules object, got {type(rules).__name__}.")
+        if "list" in rules and "logic" in rules:
+            return  # extracted AST condition format
+        unknown = [k for k in rules if k not in CONDITION_REGISTRY]
+        if unknown:
+            raise ValueError(f"{label} uses unknown condition(s): {', '.join(unknown)}.")
+
+    for idx, step in enumerate(steps or []):
+        if isinstance(step, dict) and "wait_until" in step:
+            _check(step.get("wait_until"), f"Pre-combat step {idx + 1} wait_until")
+    _check(pull_conditions, "pull_conditions")
+
+
+def prepare_tactical_swaps(player, steps: list[dict], class_name: str | None) -> None:
+    """Validates every ``swap_tactical`` step and preloads its blueprint into ``player.gear_library``."""
+    for step in steps:
+        fqn = step.get("swap_tactical") if isinstance(step, dict) else None
+        if not fqn:
+            continue
+        validate_tactical_for_class(fqn, class_name)
+        if fqn not in player.gear_library:
+            player.gear_library[fqn] = _load_tactical_blueprint(fqn)
+
+
+def _unequip_passive(player, fqn: str, sim, keep_timed_effects: bool = True) -> None:
+    """Removes a passive's registration, permanent effects (and timed ones unless kept) and procs."""
+    old_abl = player.passive_db.pop(fqn, None)
+    if old_abl is not None and getattr(old_abl, "name", None):
+        alias = old_abl.name.lower().replace(" ", "_")
+        if player.passive_db.get(alias) is old_abl:
+            player.passive_db.pop(alias, None)
+    old_name = getattr(old_abl, "name", None) if old_abl is not None else None
+
+    for entity in (player, getattr(player, "current_target", None)):
+        if entity is None:
+            continue
+        entity._sim_ref = sim
+        doomed = []
+        for key, eff in list(entity.effects.items()):
+            from_source = (
+                str(key).startswith(f"{fqn}:")
+                or getattr(eff, "fqn", None) == fqn
+                or (entity is player and old_name and key == old_name and getattr(eff, "is_passive", False))
+            )
+            if not from_source:
+                continue
+            is_timed = getattr(eff, "expires_at", None) is not None
+            if is_timed and keep_timed_effects:
+                continue
+            doomed.append(key)
+        entity.cleanup_expired_effects(doomed)
+
+    player.proc_registry = {
+        name: info for name, info in (player.proc_registry or {}).items() if info.get("source_fqn") != fqn
+    }
+
+
+def _equip_passive(player, bp, sim) -> None:
+    """Pass 1 + Pass 2 for a single newly equipped passive, then refreshes its proc registry."""
+    passive_abl = _register_passive_blueprint(player, bp, sim)
+    for entry_id in passive_abl.entry_effect_ids:
+        passive_abl.execute_effect(entry_id, player, player, sim)
+    player.proc_registry.update(build_proc_registry({bp.fqn: bp}))
+
+
+def swap_tactical(player, new_fqn: str, sim, keep_timed_effects: bool = True) -> bool:
+    """Instant, off-GCD, zero-cost tactical swap. Returns False when ``new_fqn`` is already equipped.
+
+    Unequips the current tactical (registration, permanent effects, triggers, proc registry;
+    timed effects it already produced are kept unless ``keep_timed_effects`` is False), equips
+    the new one exactly like loadout setup does, and recalculates stats.
+    """
+    new_fqn = str(new_fqn or "").strip()
+    old_fqn = getattr(player, "tactical_fqn", "") or ""
+    if not new_fqn or new_fqn == old_fqn:
+        return False
+    bp = player.gear_library.get(new_fqn)
+    if bp is None:
+        bp = _load_tactical_blueprint(new_fqn)
+        player.gear_library[new_fqn] = bp
+
+    player._sim_ref = sim
+    if old_fqn:
+        _unequip_passive(player, old_fqn, sim, keep_timed_effects=keep_timed_effects)
+    _equip_passive(player, bp, sim)
+    player.tactical_fqn = new_fqn
+    player.recalculate_stats()
+    for abl in player.ability_db.values():
+        if hasattr(abl, "apply_charge_modifiers"):
+            abl.apply_charge_modifiers(player)
+
+    if getattr(sim, "verbose", True):
+        print(f"[{sim.current_time:.3f}] {player.name} swapped tactical {old_fqn or '<none>'} -> {new_fqn}")
+    tracer = getattr(sim, "tracer", None)
+    if tracer is not None and hasattr(tracer, "record_tactical_swap"):
+        tracer.record_tactical_swap(
+            sim.current_time, player.name, old_fqn, new_fqn,
+            new_name=str(getattr(bp, "name", None) or new_fqn),
+        )
+    return True
+
+
 def prepare_simulation(
     rotation_config,
     stats_config,
@@ -117,6 +290,8 @@ def prepare_simulation(
     config=None,
     precast: str | dict | None = None,
     pre_combat: list | None = None,
+    pull_conditions: dict | None = None,
+    pull_max_wait: float | None = None,
 ):
     """Prepares simulation entities from unified loadout blueprints."""
     active_abilities = {}
@@ -171,33 +346,9 @@ def prepare_simulation(
     # Pass 1: Register all passive blueprints in `player.passive_db` and apply flat `stat_changes`
     # before executing any `entry_effect_ids` so cross-passive `has_ability` checks (e.g. Blood Tracker)
     # are independent of dictionary iteration order. After Pass 1 completes, Pass 2 runs `entry_effect_ids`.
-    from src.swtorsim.effects import ActiveEffect
-    instantiated_passives = []
-    for fqn, bp in passive_blueprints.items():
-        passive_abl = Ability(bp)
-        player.passive_db[fqn] = passive_abl
-        if passive_abl.name:
-            player.passive_db[passive_abl.name.lower().replace(" ", "_")] = passive_abl
-        instantiated_passives.append(passive_abl)
-        if getattr(bp, "stat_changes", None):
-            eff = ActiveEffect.from_stat_changes(
-                {
-                    "fqn": bp.fqn,
-                    "name": bp.name,
-                    "tags": list(bp.tags or []),
-                    "stat_changes": bp.stat_changes,
-                }
-            )
-            eff.is_passive = True
-            eff_key = bp.name or bp.fqn
-            player.effects[eff_key] = eff
-            sim.tracker.log_effect_applied(
-                player.name,
-                eff_key,
-                0.0,
-                stacks=getattr(eff, "stacks", 1),
-                is_passive=True,
-            )
+    instantiated_passives = [
+        _register_passive_blueprint(player, bp, sim) for bp in passive_blueprints.values()
+    ]
 
     for passive_abl in instantiated_passives:
         for entry_id in passive_abl.entry_effect_ids:
@@ -225,9 +376,36 @@ def prepare_simulation(
     resolved_pre_combat = pre_combat or cfg_pre_combat or rot_pre_combat
     pre_combat_steps = normalize_pre_combat(resolved_precast, resolved_pre_combat)
 
+    # Track the equipped tactical so pre-combat swaps can unequip it, and validate/preload swap targets
+    from src.swtorsim.run_config import TACTICAL_PREFIX
+    cfg_tactical = getattr(config, "tactical_fqn", "") if config else ""
+    player.tactical_fqn = cfg_tactical or next(
+        (f for f in passive_blueprints if str(f).startswith(TACTICAL_PREFIX)), ""
+    )
+    player.starting_tactical_fqn = player.tactical_fqn
+    if player.tactical_fqn and player.tactical_fqn in passive_blueprints:
+        player.gear_library[player.tactical_fqn] = passive_blueprints[player.tactical_fqn]
+    prepare_tactical_swaps(player, pre_combat_steps, stats_config.get("class_name"))
+
+    # Fight-start (pull) gate: rotation-style rules that must hold before the rotation starts
+    rot_pull = rotation_config.get("pull_conditions") if isinstance(rotation_config, dict) else None
+    rot_pull_wait = rotation_config.get("pull_max_wait") if isinstance(rotation_config, dict) else None
+    resolved_pull = pull_conditions if pull_conditions is not None else (rot_pull or {})
+    resolved_pull_wait = pull_max_wait if pull_max_wait is not None else rot_pull_wait
+    validate_pre_combat_rules(pre_combat_steps, resolved_pull)
+
     # Schedule initial lifecycle events
-    if pre_combat_steps:
-        sim.schedule_absolute(0.0, PreCombatEvent(player, target, pre_combat_steps, index=0))
+    if pre_combat_steps or resolved_pull:
+        runner = PreCombatRunner(
+            player,
+            target,
+            pre_combat_steps,
+            pull_conditions=resolved_pull,
+            pull_max_wait=float(resolved_pull_wait) if resolved_pull_wait is not None else DEFAULT_PRE_COMBAT_MAX_WAIT,
+        )
+        player.pre_combat = runner
+        sim.pre_combat_runner = runner
+        runner.request(sim, 0.0)
     else:
         sim.schedule_absolute(0.0, PlayerReady(player, target))
     first_regen_tick = random.uniform(0.0, 1.0)

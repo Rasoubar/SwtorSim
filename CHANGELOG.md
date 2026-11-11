@@ -4,6 +4,13 @@
 
 ## Completed Fixes
 
+### 72. Agent Instructions Overhaul (`AGENTS.md`, `CLAUDE.md`, docs) - [DONE]
+- `AGENTS.md`: added §0 (no git commits; ask when ambiguous); widened §1 so ALL combat math formulas are frozen (combat_math, curves, entities timing formulas), with stat routing changes only on explicit request; documented the exact unittest command in §4; flagged missing `Stat_IDs.xlsx` / catalog tool in §3 and §8; §9 now requires a baseline run, pre-existing failure reporting, and before/after DPS for damage-affecting changes; §10 defines document roles; new §11 (extracted game data is ground truth) and §12 (no debug output in repo root).
+- Added `CLAUDE.md` (`@AGENTS.md`) so Claude Code loads the rules automatically.
+- `docs/developer_guide.md` / `ARCHITECTURE.md`: fixed the pytest command, marked tools and tests that are missing from the repo, and aligned the formula invariant with `AGENTS.md`.
+- `.gitignore`: ignore root `debug_*.html` / `debug_*.json` from `tools/debug_sim.py`.
+- Verification: no code changes. Suite baseline 83 run, 81 pass, 2 import errors in untracked WIP tests (tracked in `TODO.md`).
+
 ### 71. `is_by_tag` Stack Limit Enforcement & Armor Debuff Double-Application Fix (`entities.py`, `abilities.py`) - [DONE]
 - **Root Cause Identified**:
   - The training dummy initializes with permanent armor debuff `Sundered (Physical)` (-20% armor, tag `tag.abl.debuff.armor_reduced_stacks_by_tag`).
@@ -2651,3 +2658,63 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - **Verification**:
   - All 80/80 unit tests pass via `.\tools\pyclean.exe -m unittest discover -s tests`.
   - Benchmarked against user parse (`test.json`): restored DPS from 32,110.7 to 33,515.3 (204 PB hits, matching baseline `88fdede` 33,511.5 DPS).
+
+## 2026-11-11 -- Time-Driven Pre-Combat Phase, Tactical Swaps & Builder Support
+- **`src/swtorsim/events.py`**:
+  - Replaced the old `PreCombatEvent` step chain with `PreCombatRunner` (+ thin `PreCombatEvent` resume event). Steps run in order on the sim clock: `{"ability"}` (optional `target`, `wait_for_cooldown`, `max_wait`), `{"swap_tactical"}` (optional `keep_timed_effects`, default true), `{"wait": seconds}`. Failed casts are skipped with `[WARN]` and logged on `runner.skipped`; 300s safety cap.
+  - Added `schedule_next_decision`, the single hand-off used by `CastFinishEvent`, `ChannelTickEvent` and the channel-cancel path in `abilities.py :: _start_channel`. While pre-combat is active it resumes the runner instead of scheduling `PlayerReady`, so channels always run every tick, casts finish, and the rotation never starts mid-sequence (previously both a `PreCombatEvent` and a `PlayerReady` chain ran after each pre-combat cast/channel, and the next step was timed from `activation.duration`, which could clip a channel's last tick).
+  - `PlayerReady.resolve` is a no-op while pre-combat is active.
+- **`src/swtorsim/setup.py`**:
+  - Added `swap_tactical(player, fqn, sim, keep_timed_effects=True)`: instant, off-GCD, zero-cost. Unequips the old tactical (passive registration, permanent effects + their trigger subscriptions, proc registry) while keeping timed effects it already produced unless told otherwise, then equips the new one with the same pass-1/pass-2 flow as loadout setup and recalculates stats/charges.
+  - Added `validate_tactical_for_class` / `prepare_tactical_swaps`: swap targets are validated (tactical prefix, class keywords or generic) and preloaded into `player.gear_library` at setup; invalid targets raise `ValueError`.
+  - Pass 1 passive registration factored into `_register_passive_blueprint` (behavior unchanged). Swaps after combat starts are rejected (out-of-combat only).
+- **`src/swtorsim/entities.py` (`Player.__init__`)**: added `tactical_fqn`, `starting_tactical_fqn`, `gear_library`, `pre_combat`.
+- **`src/swtorsim/run_config.py` (`normalize_pre_combat`)**: keeps `swap_tactical` and `wait` steps (previously silently dropped).
+- **`src/swtorsim/engine.py`**: pre-combat time no longer counts toward fight duration (`_stop_time`: unbounded while pre-combat runs, hard cap 600s; `duration` after the first hit, or after pre-combat end if no hit yet). Added `run_until(absolute_time)` for raw-clock stepping.
+- **`src/swtorsim/debug/tracer.py` & `html_reporter.py`**: clock model A -- all reported times are relative to T0 (first damage), pre-combat events are negative. Added `record_tactical_swap`, summary `t_start`/`pre_combat_end`/`tactical_swaps`/`combat_start_raw`; report duration/DPS/APM use combat time. Timeline shows a shaded PRE-PULL region, PULL marker and tactical swap markers; event log tags pre-pull rows; tactical card lists swaps; new Pre-Pull KPI.
+- **Rotation builder (`data/rotation_builder.py`, `tools/rotation_builder_ui.html`, `src/swtorsim/pyodide_bridge.py`, `tools/web/pyodide_client.js`)**:
+  - New `normalize_pre_combat_steps`, `build_rotation_file_data`, `class_tactical_fqns`. Loading returns `pre_combat`; saving writes `{"pre_combat", "sequence"}` when pre-combat steps exist (bare array otherwise), in local and web mode.
+  - UI: Pre-Combat editor panel above the timeline (Ability / Tactical Swap / Wait rows, reorder, target, wait-if-not-ready, keep-timed-buffs, "tactical at pull"); import/Raw JSON/copy/download handle the wrapper format.
+  - Dry-run preview runs the pre-combat sequence, returns `combat_time` (relative to the pull), `phase`, `tactical_swaps`, `pre_combat_skipped`, `pre_combat_duration`, `final_tactical`; the preview table shows pre-pull rows, swaps and skipped steps.
+- **Tests**: `tests/test_precast.py` adds `PreCombatRunnerTests` (channel runs every tick before next step, no rotation evaluation during pre-combat / single loop, wait step + fight clock from first hit, wait_for_cooldown vs skip, swap rejected in combat, pre-pull swap recorded with negative tracer time). `test_pre_combat_buff_staging_and_stealth_break` now steps with `run_until(0.1)` because `run_timed` no longer stops inside pre-combat. `tests/test_tactical_swap.py` and `tests/test_builder_pre_combat.py` now import and run.
+- **Verification**: 100 run, 99 pass, 1 fail -- `test_tactical_swap.test_force_camouflage_hidden_power_swap_persists_across_damage`: the swap correctly keeps `Force Camouflage_6` (expires 25.0s), but an orphaned listener of Force Camouflage `:2` (replaced by `:3` through the `is_by_tag` branch of `Entity.apply_effect`, which pops without unsubscribing) fires `remove_effect` at the first hit (16.1s); its owner effect is gone, so the `handle_buff_remove_action` fallback removes every effect of that ability. Pre-existing, not changed here.
+- **DPS (20 seeds, 42+i, `Tester.execute_single_worker_task`)**: `hatred_14gcd` 31062.11 -> 31062.11; `carnage_14gcd` 23377.07 -> 23377.07 (no pre-combat: unchanged). Annihilation + `Annihilation_Rotation.json` (pre-combat with swaps; ad-hoc config): 0.00 -> 39.03 (previously the rotation never acted; now it acts but rage-starves -- rotation has no builder).
+- Catalog tool `tools/catalog_game_data.py` is missing; catalog not updated.
+
+## 2026-11-11 -- Fix Orphaned Triggers on is_by_tag Replacement & Over-Broad remove_effect Fallback
+- **`src/swtorsim/entities.py` (`Entity.apply_effect`, new `Entity._drop_replaced_effect`)**: an effect superseded through the `is_by_tag` branch (`nr_occurances == 1`) was dropped with a bare `self.effects.pop`, leaving its trigger subscriptions live. It is now removed via `_drop_replaced_effect`, which unsubscribes its triggers, logs the removal to tracker/tracer, and recalculates stats if it carried modifiers. The instance is still not marked expired so the replacement keeps inheriting its stacks/expiry. Its `on_pre_remove` branches are still not run (unchanged).
+- **`src/swtorsim/abilities.py` (`handle_buff_remove_action`)**: `remove_effect` with an `owner_effect_key` whose effect is already gone is now a no-op; the ability-wide sweep only runs when there is no owner context at all.
+- **Root case**: Force Camouflage `:3` replaced `:2` by tag (`tag.abl.buff.stealth`); `:2`'s orphaned `on_damage_dealt` `remove_effect` fired at the first hit and the fallback stripped Hidden Power (`Force Camouflage_6`).
+- **Tests**: `tests/test_tactical_swap.py` adds `ByTagReplacementCleanupTests` (`test_by_tag_replaced_effect_loses_its_triggers`, `test_remove_effect_with_vanished_owner_is_noop`); `test_force_camouflage_hidden_power_swap_persists_across_damage` now passes. Full suite: 102 run, 102 pass.
+- **DPS (20 seeds, 42+i)**: `hatred_14gcd` 31062.11 -> 31062.11; `carnage_14gcd` 23377.07 -> 23377.07; Annihilation + `Annihilation_Rotation.json` (ad-hoc config) 39.03 -> 369.17 (Hidden Power rage now delivered; rotation still rage-starved, no builder).
+
+## Debugger: optional-step rotation decisions
+- **Fix**: `rotation.py :: OptionalAbilityStep.evaluate` now records `step_type="optional"` entries via `tracer.record_rotation_evaluation` (cast, or skipped with reason) when a tracer is attached; early/busy retries are not logged. Behaviour without a tracer is unchanged.
+- **Verification**: `debug_sim.py carnage_14gcd -d 30` shows optional decisions (Frenzy cast etc.). Test suite: 102 run, same 2 pre-existing failures in `test_tactical_swap.ByTagReplacementCleanupTests` before and after. No new test added.
+
+## Test hardening: ByTagReplacementCleanupTests
+- `tests/test_tactical_swap.py`: pinned build to tracked `L80_14gcd_red.json` (was first-alphabetical glob, which picked up the untracked marauder build and shifted timing); replaced fixed `run_until(15.01)` with `_run_until_effect` (steps until `force_camouflage:3` is active, clear setup message on failure); no-op removal test now asserts the active effect set is unchanged. Skip guard includes the build file. Full suite: 102 OK.
+
+## 2026-11-11 -- Pre-Combat Conditional Waits & Fight-Start (Pull) Gate
+- **`src/swtorsim/events.py` (`PreCombatRunner`)**:
+  - New step `{"wait_until": rules, "max_wait": s}`: holds the sequence (polling every `CONDITION_POLL_INTERVAL` = 0.1s) until the rotation-style rules pass via `requirements.py :: validate_all`; after `max_wait` (default 60s) it is skipped with `[WARN]` and logged on `runner.skipped`.
+  - New `pull_conditions` / `pull_max_wait` gate: after the last step the runner holds the fight start until the rules pass (`runner.pull_gate_start`, `runner.pull_time`). If still false after `pull_max_wait` (default 60s) the run fails with the new `PullConditionsNotMetError`. If combat already started during pre-combat the gate is ignored with `[WARN]`. A runner is created when there are steps or pull conditions.
+- **`src/swtorsim/setup.py`**: `prepare_simulation(..., pull_conditions=None, pull_max_wait=None)`; also read from rotation file wrapper keys `pull_conditions` / `pull_max_wait`. New `validate_pre_combat_rules` rejects unknown condition keys in `wait_until` steps and pull conditions at setup (`ValueError`).
+- **`src/swtorsim/run_config.py` (`normalize_pre_combat`)**: keeps `wait_until` steps.
+- **Rotation builder** (`data/rotation_builder.py`, `tools/rotation_builder_ui.html`, `src/swtorsim/pyodide_bridge.py`, `tools/web/pyodide_client.js`):
+  - New `normalize_pull_gate`; `build_rotation_file_data(steps, pre_combat, pull_conditions, pull_max_wait)` writes the wrapper when either pre-combat steps or pull conditions exist; load/save (local and web mode) carry `pull_conditions` / `pull_max_wait`; dry-run preview passes them and returns `pull_gate_wait`; an unmet gate surfaces as a preview error.
+  - UI: `+ Wait Until` pre-combat step and a "Fight starts when" box, both edited with the existing condition modal (`openRuleModal` gained a `scope` of rotation / pre / pull); per-step and pull max-wait inputs; preview summary shows "Pull gate held".
+- **Tests**: `tests/test_precast.py` `WaitUntilAndPullGateTests` (7: wait_until holds until cooldown ready, wait_until timeout skip, pull gate delays first hit, pull gate from rotation wrapper, gate without steps, unmet gate raises `PullConditionsNotMetError`, unknown rule keys rejected); `tests/test_builder_pre_combat.py` `BuilderPullGateTests` (4). Full suite: 113 run, 113 pass.
+- **DPS (20 seeds, 42+i)**: `hatred_14gcd` 31062.11 -> 31062.11; `carnage_14gcd` 23377.07 -> 23377.07 (no wait_until / pull gate: unchanged). Annihilation ad-hoc config not comparable: `Annihilation_Rotation.json` and `src/swtorsim/rotation.py` were edited outside this change in the meantime (now 1030.54).
+- Run configs (`RunConfig`) do not carry `pull_conditions`; they come from the rotation file or the `prepare_simulation` argument.
+
+## 2026-11-11 -- Reject Unknown Pre-Combat Steps Instead of Dropping Them
+- **`src/swtorsim/run_config.py` (`normalize_pre_combat`)**: any step it cannot interpret now raises `ValueError` naming the step position and the supported kinds (unknown dict keys, empty ability / tactical, non-numeric or <= 0 `wait` / `max_wait`, non-object `wait_until`, unsupported types). Previously such steps were silently dropped -- e.g. a `wait_until` step sent to a simulator process started before `wait_until` existed simply vanished, pulling early. The error reaches the builder (load / dry-run preview error), `prepare_simulation`, and run configs. `{"wait": 0}` is now an error instead of being ignored.
+- **Tests**: `tests/test_precast.py :: test_normalize_pre_combat_rejects_unknown_or_invalid_steps` (9 invalid cases + `prepare_simulation` refusal). Full suite: 114 run, 114 pass. All dict-format rotation files and run configs in `data/` still normalize.
+- **DPS (20 seeds, 42+i)**: `hatred_14gcd` 31062.11 -> 31062.11; `carnage_14gcd` 23377.07 -> 23377.07.
+
+## Cancel a running batch
+- **Feature**: Combat Simulator shows a Cancel button during BATCH runs. UI: `tools/simulator_ui.html` (`cancelSimulation`, `cancelSimBtn`; `{"cancelled": true}` response resets status to Cancelled without adding to run history).
+- **Native backend**: `web_gui.py` adds `SimulationCancelled`, `request_simulation_cancel`, `POST /api/simulate_cancel`. The parallel path now submits 1%-sized chunks via `apply_async` (`_run_task_chunk`) and polls, so cancel terminates the pool (rebuilt next batch); the in-process path checks per run.
+- **WASM backend**: `tools/web/pyodide_client.js :: cancelActiveSimulation` terminates all workers (Python cannot be interrupted cooperatively), rejects pending requests and boots a fresh primary worker; secondary cores respawn. Not exercised in a browser (needs the dist asset bundle); JS parse-checked only. `dist/` was not rebuilt (`tools/build_web_release.py`).
+- **Tests**: `tests/test_batch_cancel.py` (sequential cancel, real-pool cancel, stale-cancel clearing, normal completion). Verified over HTTP and in the UI against the native server. `carnage_14gcd` BATCH 300 iterations seed 42: mean DPS 23434.2 before and after. Full suite: 118 OK.

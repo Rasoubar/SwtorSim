@@ -1062,8 +1062,76 @@
     display: none;
     z-index: 2000;
   }
+  /* Pre-Combat (pre-pull) editor */
+  .pre-combat-panel {
+    flex-shrink: 0;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    max-height: 36%;
+    overflow-y: auto;
+    background: var(--bg-card);
+  }
+  .pre-combat-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .pre-combat-title { font-weight: 700; font-size: 12.5px; color: var(--text-main); }
+  .pre-combat-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+  .pre-combat-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 4px 6px;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    background: var(--bg-input);
+  }
+  .pre-combat-row select, .pre-combat-row input[type="number"] { font-size: 11.5px; padding: 2px 4px; }
+  .pre-combat-row label { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text-muted); }
+  .pc-idx { font-family: monospace; color: var(--text-muted); min-width: 22px; }
+  .pc-kind {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .pc-kind-ability { background: var(--cyan-bg); color: var(--cyan); }
+  .pc-kind-swap { background: var(--amber-bg); color: var(--amber); }
+  .pc-kind-wait { background: var(--border-subtle); color: var(--text-muted); }
+  .pc-kind-until { background: var(--green-bg); color: var(--green); }
+  .pull-gate-box {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .pull-gate-box .rules-container { margin-top: 4px; }
+  .pc-spacer { flex: 1; }
+  .pc-footer { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .badge-prepull {
+    background: var(--border-subtle);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+  .badge-swap {
+    background: var(--amber-bg);
+    color: var(--amber);
+    border: 1px solid rgba(217, 119, 6, 0.4);
+  }
+  tr.row-prepull td { opacity: 0.85; }
+  tr.row-skip td { color: var(--red); }
 </style>
-  <script src="pyodide_client.js?v=1794328092"></script>
+  <script src="pyodide_client.js?v=1794400165"></script>
 </head>
 <body>
 
@@ -1218,6 +1286,8 @@
       </div>
     </div>
 
+    <div class="pre-combat-panel" id="preCombatPanel"></div>
+
     <div class="panel-body" id="timelineContainer"></div>
   </div>
 
@@ -1322,6 +1392,9 @@ let currentLoadout = {
 };
 
 let rotationSteps = [];
+let preCombatSteps = []; // [{ability, target?, wait_for_cooldown?} | {swap_tactical, keep_timed_effects?} | {wait} | {wait_until, max_wait?}]
+let pullConditions = {}; // fight-start gate: rotation-style rules that must hold before the rotation starts
+let pullMaxWait = 60;    // seconds; the run fails if the pull conditions are still false after this
 let TIMELINE_VIEW_MODE = "rotation"; // "rotation" or "sub30"
 let SUB30_THRESHOLD = 0.30;
 let SUB30_DEFAULT_ABILITY = "";
@@ -1863,6 +1936,9 @@ async function onSelectExistingRotation(rotPath) {
     return;
   }
   rotationSteps = data.steps || [];
+  preCombatSteps = Array.isArray(data.pre_combat) ? data.pre_combat : [];
+  pullConditions = (data.pull_conditions && typeof data.pull_conditions === "object") ? data.pull_conditions : {};
+  pullMaxWait = data.pull_max_wait !== undefined && data.pull_max_wait !== null ? Number(data.pull_max_wait) : 60;
   lastImportWarnings = data.warnings || [];
   collapsedSteps.clear();
   activeBlockIndex = rotationSteps.findIndex(s => s.type === "priority_block");
@@ -1887,8 +1963,7 @@ function handleLocalFileImport(ev) {
   reader.onload = (e) => {
     try {
       const parsed = JSON.parse(e.target.result);
-      if (!Array.isArray(parsed)) throw new Error("Rotation JSON must be an array of steps.");
-      rotationSteps = parsed;
+      applyRotationFileData(parsed);
       collapsedSteps.clear();
       document.getElementById("saveFilename").value = file.name;
       renderTimeline();
@@ -2214,12 +2289,234 @@ function addLoopAnchor() {
 }
 
 function clearRotation() {
-  if (!rotationSteps.length) return;
+  if (!rotationSteps.length && !preCombatSteps.length && !Object.keys(pullConditions).length) return;
   rotationSteps = [];
+  preCombatSteps = [];
+  pullConditions = {};
+  pullMaxWait = 60;
   activeBlockIndex = null;
   collapsedSteps.clear();
   renderTimeline();
   renderRightPanel();
+}
+
+// ---------------------------------------------------------------------------
+// Pre-Combat (pre-pull) sequence editor
+// ---------------------------------------------------------------------------
+function hasPullGate() {
+  return Object.keys(pullConditions || {}).length > 0;
+}
+
+function pullGatePayload() {
+  return hasPullGate() ? { pull_conditions: pullConditions, pull_max_wait: pullMaxWait } : {};
+}
+
+function rotationFileData() {
+  if (!preCombatSteps.length && !hasPullGate()) return rotationSteps;
+  const data = {};
+  if (preCombatSteps.length) data.pre_combat = preCombatSteps;
+  Object.assign(data, pullGatePayload());
+  data.sequence = rotationSteps;
+  return data;
+}
+
+function applyRotationFileData(parsed) {
+  if (Array.isArray(parsed)) {
+    rotationSteps = parsed;
+    preCombatSteps = [];
+    pullConditions = {};
+    pullMaxWait = 60;
+    return;
+  }
+  if (parsed && typeof parsed === "object" && Array.isArray(parsed.sequence || parsed.steps)) {
+    rotationSteps = parsed.sequence || parsed.steps;
+    preCombatSteps = Array.isArray(parsed.pre_combat) ? parsed.pre_combat : [];
+    pullConditions = (parsed.pull_conditions && typeof parsed.pull_conditions === "object") ? parsed.pull_conditions : {};
+    pullMaxWait = parsed.pull_max_wait !== undefined ? Number(parsed.pull_max_wait) : 60;
+    return;
+  }
+  throw new Error("Rotation JSON must be an array of steps or an object with 'sequence' (and optional 'pre_combat').");
+}
+
+function tacticalDisplayName(fqn) {
+  if (!fqn) return "(No Tactical)";
+  const t = (currentLoadout.tacticals || []).find(x => x.fqn === fqn);
+  return t ? t.name : String(fqn).split(".").pop();
+}
+
+function preCombatTacticalBefore(idx) {
+  let tac = document.getElementById("tacticalSelect")?.value || "";
+  for (let i = 0; i < idx && i < preCombatSteps.length; i++) {
+    if (preCombatSteps[i].swap_tactical) tac = preCombatSteps[i].swap_tactical;
+  }
+  return tac;
+}
+
+function addPreCombatStep(kind) {
+  if (kind === "ability") {
+    preCombatSteps.push({ ability: getDefaultAbilityId(false) });
+  } else if (kind === "swap") {
+    const tacs = currentLoadout.tacticals || [];
+    const current = preCombatTacticalBefore(preCombatSteps.length);
+    const pick = tacs.find(t => t.fqn !== current) || tacs[0];
+    if (!pick) return showToast("No tacticals available for this class.", true);
+    preCombatSteps.push({ swap_tactical: pick.fqn });
+  } else if (kind === "until") {
+    preCombatSteps.push({ wait_until: {} });
+  } else {
+    preCombatSteps.push({ wait: 1.0 });
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function renderScopedRulesHtml(rulesObj, scope, stepIdx) {
+  const entries = Object.entries(rulesObj || {});
+  let html = '<div class="rules-container">';
+  if (!entries.length) {
+    html += `<span class="rule-unconditional">${scope === "pull" ? "No conditions (pull immediately)" : "Always (passes at once)"}</span>`;
+  }
+  for (const [k, v] of entries) {
+    html += `
+      <span class="rule-pill" onclick="openRuleModal(${stepIdx}, null, '${escapeAttr(k)}', '${scope}')" style="cursor:pointer;" title="Click to edit condition">
+        ${formatRulePillText(k, v)}
+        <span class="rule-del" onclick="event.stopPropagation(); deleteScopedRule('${scope}', ${stepIdx}, '${escapeAttr(k)}')">&times;</span>
+      </span>`;
+  }
+  html += `<button class="btn-sm" onclick="openRuleModal(${stepIdx}, null, null, '${scope}')">+ Condition</button>`;
+  html += "</div>";
+  return html;
+}
+
+function deleteScopedRule(scope, stepIdx, key) {
+  const host = scope === "pull" ? pullConditions : (preCombatSteps[stepIdx] || {}).wait_until;
+  if (host) delete host[key];
+  renderTimeline();
+  renderRightPanel();
+}
+
+function setPullMaxWait(value) {
+  const v = parseFloat(value);
+  pullMaxWait = isFinite(v) && v > 0 ? v : 60;
+  renderRightPanel();
+}
+
+function updatePreCombatStep(idx, field, value) {
+  const step = preCombatSteps[idx];
+  if (!step) return;
+  if (field === "wait") {
+    const v = parseFloat(value);
+    step.wait = isFinite(v) && v > 0 ? v : 0.1;
+  } else if (field === "max_wait") {
+    const v = parseFloat(value);
+    if (isFinite(v) && v > 0) step.max_wait = v; else delete step.max_wait;
+  } else if (field === "keep_timed_effects") {
+    if (value) delete step.keep_timed_effects; else step.keep_timed_effects = false;
+  } else if (field === "wait_for_cooldown") {
+    if (value) step.wait_for_cooldown = true; else delete step.wait_for_cooldown;
+  } else if (field === "target") {
+    if (value === "self" || value === "target") step.target = value; else delete step.target;
+  } else {
+    step[field] = value;
+  }
+  renderTimeline();
+  renderRightPanel();
+}
+
+function movePreCombatStep(idx, dir) {
+  const j = idx + dir;
+  if (j < 0 || j >= preCombatSteps.length) return;
+  [preCombatSteps[idx], preCombatSteps[j]] = [preCombatSteps[j], preCombatSteps[idx]];
+  renderTimeline();
+  renderRightPanel();
+}
+
+function removePreCombatStep(idx) {
+  preCombatSteps.splice(idx, 1);
+  renderTimeline();
+  renderRightPanel();
+}
+
+function renderPreCombat() {
+  const el = document.getElementById("preCombatPanel");
+  if (!el) return;
+  const abilities = currentLoadout.abilities || [];
+  const tacticals = currentLoadout.tacticals || [];
+
+  const rows = preCombatSteps.map((step, idx) => {
+    let kindHtml = "";
+    let body = "";
+    if (step.swap_tactical) {
+      kindHtml = '<span class="pc-kind pc-kind-swap">Swap Tactical</span>';
+      const known = tacticals.some(t => t.fqn === step.swap_tactical);
+      const opts = (known ? "" : `<option value="${escapeAttr(step.swap_tactical)}" selected>${escapeHtml(tacticalDisplayName(step.swap_tactical))} (not in class list)</option>`)
+        + tacticals.map(t => `<option value="${escapeAttr(t.fqn)}" ${t.fqn === step.swap_tactical ? "selected" : ""}>${escapeHtml(t.name)}</option>`).join("");
+      body = `
+        <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(tacticalDisplayName(preCombatTacticalBefore(idx)))} &rarr;</span>
+        <select style="max-width:260px;" onchange="updatePreCombatStep(${idx}, 'swap_tactical', this.value)">${opts}</select>
+        <label title="Keep timed buffs the old tactical already produced (e.g. Hidden Power)">
+          <input type="checkbox" ${step.keep_timed_effects === false ? "" : "checked"} onchange="updatePreCombatStep(${idx}, 'keep_timed_effects', this.checked)"> keep timed buffs
+        </label>`;
+    } else if (step.wait_until !== undefined) {
+      kindHtml = '<span class="pc-kind pc-kind-until">Wait Until</span>';
+      body = `
+        ${renderScopedRulesHtml(step.wait_until, "pre", idx)}
+        <label title="Give up (skip with a warning) after this many seconds">max
+          <input type="number" min="0.1" step="0.5" value="${step.max_wait !== undefined ? Number(step.max_wait) : 60}" style="width:60px;" onchange="updatePreCombatStep(${idx}, 'max_wait', this.value)">s
+        </label>`;
+    } else if (step.wait !== undefined) {
+      kindHtml = '<span class="pc-kind pc-kind-wait">Wait</span>';
+      body = `<input type="number" min="0.1" step="0.1" value="${Number(step.wait)}" style="width:70px;" onchange="updatePreCombatStep(${idx}, 'wait', this.value)"> <span style="font-size:11px;color:var(--text-muted);">seconds</span>`;
+    } else {
+      kindHtml = '<span class="pc-kind pc-kind-ability">Ability</span>';
+      const found = resolveAbilityDisplay(step.ability);
+      const opts = (found ? "" : `<option value="${escapeAttr(step.ability)}" selected>${escapeHtml(step.ability)} (not in loadout)</option>`)
+        + abilities.map(a => `<option value="${escapeAttr(a.slug)}" ${found && found.fqn === a.fqn ? "selected" : ""}>${escapeHtml(a.name)}${a.activation_type === "channel" ? " [channel]" : a.activation_type === "cast" ? " [cast]" : ""}${a.triggers_gcd ? "" : " [off-GCD]"}</option>`).join("");
+      body = `
+        <select style="max-width:230px;" onchange="updatePreCombatStep(${idx}, 'ability', this.value)">${opts}</select>
+        <select title="Target" onchange="updatePreCombatStep(${idx}, 'target', this.value)">
+          <option value="" ${!step.target ? "selected" : ""}>auto target</option>
+          <option value="self" ${step.target === "self" ? "selected" : ""}>self</option>
+          <option value="target" ${step.target === "target" ? "selected" : ""}>enemy</option>
+        </select>
+        <label title="Hold this step until cooldown / charges / resource allow it (max 60s) instead of skipping it">
+          <input type="checkbox" ${step.wait_for_cooldown ? "checked" : ""} onchange="updatePreCombatStep(${idx}, 'wait_for_cooldown', this.checked)"> wait if not ready
+        </label>`;
+    }
+    return `
+      <div class="pre-combat-row">
+        <span class="pc-idx">${idx + 1}.</span>
+        ${kindHtml}
+        ${body}
+        <span class="pc-spacer"></span>
+        <button class="btn-sm" title="Move up" onclick="movePreCombatStep(${idx}, -1)" ${idx === 0 ? "disabled" : ""}>&uarr;</button>
+        <button class="btn-sm" title="Move down" onclick="movePreCombatStep(${idx}, 1)" ${idx === preCombatSteps.length - 1 ? "disabled" : ""}>&darr;</button>
+        <button class="btn-sm btn-danger" title="Remove step" onclick="removePreCombatStep(${idx})">X</button>
+      </div>`;
+  }).join("");
+
+  const pullTac = preCombatTacticalBefore(preCombatSteps.length);
+  el.innerHTML = `
+    <div class="pre-combat-head">
+      <span class="pre-combat-title">Pre-Combat (before pull) &mdash; ${preCombatSteps.length} step${preCombatSteps.length === 1 ? "" : "s"}</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-sm btn-primary" onclick="addPreCombatStep('ability')">+ Ability</button>
+        <button class="btn-sm btn-amber" onclick="addPreCombatStep('swap')">+ Tactical Swap</button>
+        <button class="btn-sm" onclick="addPreCombatStep('wait')">+ Wait</button>
+        <button class="btn-sm" onclick="addPreCombatStep('until')">+ Wait Until</button>
+      </div>
+    </div>
+    ${preCombatSteps.length ? "" : '<div class="pre-combat-hint">Optional. Steps run in order on the sim clock before the rotation: casts and channels finish fully, cooldowns and buffs tick, and tactical swaps are instant (out of combat only). The fight clock (T0) starts at the first damage.</div>'}
+    ${rows}
+    ${preCombatSteps.some(s => s.swap_tactical) ? `<div class="pc-footer">Tactical at pull: <strong>${escapeHtml(tacticalDisplayName(pullTac))}</strong></div>` : ""}
+    <div class="pull-gate-box">
+      <strong>Fight starts when</strong>
+      <span style="color:var(--text-muted);font-size:11px;">(checked after the last pre-combat step; the run <strong>fails</strong> if still false after the max wait)</span>
+      ${renderScopedRulesHtml(pullConditions, "pull", 0)}
+      ${hasPullGate() ? `<label style="font-size:11px;color:var(--text-muted);">max wait
+        <input type="number" min="0.1" step="0.5" value="${Number(pullMaxWait)}" style="width:60px;" onchange="setPullMaxWait(this.value)">s</label>` : ""}
+    </div>
+  `;
 }
 
 function expandCollapseAll(collapse) {
@@ -3017,6 +3314,7 @@ function insertSub30OptionalAt(index) {
 }
 
 function renderTimeline() {
+  renderPreCombat();
   const container = document.getElementById("timelineContainer");
   container.innerHTML = "";
 
@@ -3469,8 +3767,23 @@ function renderTimeline() {
 // ---------------------------------------------------------------------------
 // Guided Rule Builder Modal
 // ---------------------------------------------------------------------------
-function openRuleModal(stepIdx, poolIdx = null, editKey = null) {
-  ruleModalContext = { stepIndex: stepIdx, poolIndex: poolIdx, editKey: editKey };
+function ruleHostFor(ctx, create = false) {
+  if (ctx.scope === "pull") return pullConditions;
+  if (ctx.scope === "pre") {
+    const step = preCombatSteps[ctx.stepIndex];
+    if (!step) return {};
+    if (!step.wait_until && create) step.wait_until = {};
+    return step.wait_until || {};
+  }
+  const obj = ctx.poolIndex === null || ctx.poolIndex === undefined
+    ? rotationSteps[ctx.stepIndex]
+    : rotationSteps[ctx.stepIndex].pool[ctx.poolIndex];
+  if (!obj.rules && create) obj.rules = {};
+  return obj.rules || {};
+}
+
+function openRuleModal(stepIdx, poolIdx = null, editKey = null, scope = "rotation") {
+  ruleModalContext = { stepIndex: stepIdx, poolIndex: poolIdx, editKey: editKey, scope: scope };
   const conditions = (workspaceCatalog && workspaceCatalog.conditions) || [];
   const sel = document.getElementById("ruleKeySelect");
   sel.innerHTML = "";
@@ -3482,9 +3795,7 @@ function openRuleModal(stepIdx, poolIdx = null, editKey = null) {
     sel.appendChild(opt);
   }
 
-  const targetRules = poolIdx === null
-    ? (rotationSteps[stepIdx].rules || {})
-    : (rotationSteps[stepIdx].pool[poolIdx].rules || {});
+  const targetRules = ruleHostFor(ruleModalContext);
 
   let initialVal = null;
   if (editKey && editKey in targetRules) {
@@ -3716,15 +4027,11 @@ function commitRuleFromModal() {
     value = { name, value: sec };
   }
 
-  const targetObj = poolIndex === null
-    ? rotationSteps[stepIndex]
-    : rotationSteps[stepIndex].pool[poolIndex];
-
-  if (!targetObj.rules) targetObj.rules = {};
+  const host = ruleHostFor(ruleModalContext, true);
   if (editKey && editKey !== key) {
-    delete targetObj.rules[editKey];
+    delete host[editKey];
   }
-  targetObj.rules[key] = value;
+  host[key] = value;
 
   closeRuleModal();
   renderTimeline();
@@ -3833,19 +4140,35 @@ function renderRightPanel() {
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div>
           <div style="font-weight:700;">Live Dry-Run Cast Preview</div>
-          <div style="font-size:11px;color:var(--text-muted);">Simulates 30s with SwtorSim engine to verify cast order</div>
+          <div style="font-size:11px;color:var(--text-muted);">Runs the pre-combat sequence, then 30s of combat from the pull, to verify cast order</div>
         </div>
         <button class="btn-primary" onclick="runDryRunSimulation()">Run 30s Preview</button>
       </div>
     `;
 
     if (dryRunResult) {
+      const tOf = (r) => (r.combat_time !== undefined ? r.combat_time : r.time);
+      const previewRows = [
+        ...dryRunResult.casts.map(c => ({ kind: "cast", t: tOf(c), raw: c.time, data: c })),
+        ...(dryRunResult.tactical_swaps || []).map(sw => ({ kind: "swap", t: tOf(sw), raw: sw.time, data: sw })),
+        ...(dryRunResult.pre_combat_skipped || []).map(sk => ({ kind: "skip", t: tOf(sk), raw: sk.time, data: sk })),
+      ];
+      // Same-timestamp order: pre-combat casts, then swaps/skips, then rotation casts
+      const rowRank = (r) => (r.kind === "cast" ? (r.data.phase === "pre_combat" ? 0 : 2) : 1);
+      previewRows.sort((a, b) => (a.raw - b.raw) || (rowRank(a) - rowRank(b)));
+      const timeCell = (t) => `${t.toFixed(2)}s${t < 0 ? ' <span class="badge badge-prepull">pre-pull</span>' : ""}`;
+      dryRunResult._rows = previewRows;
+      dryRunResult._timeCell = timeCell;
       html += `
-        <div class="lint-box lint-ok" style="display:flex;justify-content:space-between;">
+        <div class="lint-box lint-ok" style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px;">
           <span><strong>Casts:</strong> ${dryRunResult.casts.length}</span>
           <span><strong>Total Damage:</strong> ${dryRunResult.total_damage.toLocaleString()}</span>
           <span><strong>Simulated DPS:</strong> ${dryRunResult.dps.toLocaleString()}</span>
+          ${dryRunResult.pre_combat_duration ? `<span><strong>Pre-pull:</strong> ${dryRunResult.pre_combat_duration.toFixed(2)}s</span>` : ""}
+          ${(dryRunResult.tactical_swaps || []).length ? `<span><strong>Tactical at pull:</strong> ${escapeHtml(tacticalDisplayName(dryRunResult.final_tactical))}</span>` : ""}
+          ${dryRunResult.pull_gate_wait !== null && dryRunResult.pull_gate_wait !== undefined ? `<span><strong>Pull gate held:</strong> ${dryRunResult.pull_gate_wait.toFixed(2)}s</span>` : ""}
         </div>
+        <div style="font-size:11px;color:var(--text-muted);margin:-4px 0 6px;">Times are relative to the pull (0.00s = first damage); negative times are pre-combat.</div>
         <div style="max-height:460px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
           <table class="cast-table">
             <thead>
@@ -3857,17 +4180,33 @@ function renderRightPanel() {
               </tr>
             </thead>
             <tbody>
-              ${dryRunResult.casts.map(c => `
-                <tr>
-                  <td style="font-family:monospace;color:var(--text-muted);">${c.time.toFixed(2)}s</td>
+              ${dryRunResult._rows.map(r => {
+                const c = r.data;
+                if (r.kind === "swap") return `
+                <tr class="row-prepull">
+                  <td style="font-family:monospace;color:var(--text-muted);">${dryRunResult._timeCell(r.t)}</td>
+                  <td><span class="badge badge-swap">Tactical Swap</span> ${escapeHtml(tacticalDisplayName(c.from))} &rarr; <strong>${escapeHtml(tacticalDisplayName(c.to))}</strong></td>
+                  <td style="color:var(--text-muted);">Pre-Combat</td>
+                  <td></td>
+                </tr>`;
+                if (r.kind === "skip") return `
+                <tr class="row-skip">
+                  <td style="font-family:monospace;">${dryRunResult._timeCell(r.t)}</td>
+                  <td>Skipped <strong>${escapeHtml(c.label)}</strong>: ${escapeHtml(c.reason)}</td>
+                  <td>Pre-Combat #${c.step}</td>
+                  <td></td>
+                </tr>`;
+                return `
+                <tr class="${c.phase === "pre_combat" ? "row-prepull" : ""}">
+                  <td style="font-family:monospace;color:var(--text-muted);">${dryRunResult._timeCell(r.t)}</td>
                   <td>
                     <strong>${escapeHtml(c.ability)}</strong>
                     ${c.triggers_gcd ? "" : '<span class="badge badge-offgcd">Off-GCD</span>'}
                   </td>
-                  <td style="color:var(--text-muted);">#${c.step_index} (${escapeHtml(c.step_label)})</td>
+                  <td style="color:var(--text-muted);">${c.phase === "pre_combat" ? `Pre-Combat #${c.step_index}` : `#${c.step_index} (${escapeHtml(c.step_label)})`}</td>
                   <td>${c.resource}</td>
-                </tr>
-              `).join("")}
+                </tr>`;
+              }).join("")}
             </tbody>
           </table>
         </div>
@@ -3880,7 +4219,7 @@ function renderRightPanel() {
   }
 
   if (rightTab === "json") {
-    const jsonStr = JSON.stringify(rotationSteps, null, 4);
+    const jsonStr = JSON.stringify(rotationFileData(), null, 4);
     container.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <span style="font-weight:700;">Live Rotation JSON</span>
@@ -3905,7 +4244,7 @@ function insertSavedStepTemplate(tIdx) {
 
 async function runDryRunSimulation() {
   if (!rotationSteps.length) {
-    return showToast("Add at least one step before running preview.", true);
+    return showToast("Add at least one rotation step before running preview.", true);
   }
   const res = await fetch("/api/preview", {
     method: "POST",
@@ -3918,6 +4257,8 @@ async function runDryRunSimulation() {
       legendary_fqns: getSelectedLegendaries(),
       relic_fqns: getSelectedRelics(),
       rotation: rotationSteps,
+      pre_combat: preCombatSteps,
+      ...pullGatePayload(),
       duration: 30.0
     })
   });
@@ -3932,7 +4273,7 @@ async function runDryRunSimulation() {
 }
 
 function copyJsonToClipboard() {
-  const str = JSON.stringify(rotationSteps, null, 4);
+  const str = JSON.stringify(rotationFileData(), null, 4);
   navigator.clipboard.writeText(str);
   showToast("Copied rotation JSON to clipboard.");
 }
@@ -3942,8 +4283,7 @@ function applyEditedJson() {
   if (!el) return;
   try {
     const parsed = JSON.parse(el.value);
-    if (!Array.isArray(parsed)) throw new Error("Root JSON must be an array.");
-    rotationSteps = parsed;
+    applyRotationFileData(parsed);
     renderTimeline();
     renderRightPanel();
     showToast("Applied JSON changes to timeline.");
@@ -3972,7 +4312,9 @@ async function saveRotationToDisk() {
       class_folder: classFolder,
       spec_folder: specFolder,
       filename: filename,
-      steps: rotationSteps
+      steps: rotationSteps,
+      pre_combat: preCombatSteps,
+      ...pullGatePayload()
     })
   });
   const data = await res.json();
@@ -3996,7 +4338,7 @@ function downloadRotationJson() {
   if (!filename.endsWith(".json")) filename += ".json";
   filename = filename.replace(/^.*[\\/]/, "");
 
-  const blob = new Blob([JSON.stringify(rotationSteps, null, 4)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(rotationFileData(), null, 4)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = filename;

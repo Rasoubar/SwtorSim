@@ -117,6 +117,17 @@ _SIM_PROGRESS: dict[str, Any] = {
 
 _SIM_PROGRESS_CALLBACK: Any = None
 
+_SIM_CANCEL = threading.Event()
+
+
+class SimulationCancelled(Exception):
+    """Raised when the user cancels an in-flight batch simulation."""
+
+
+def request_simulation_cancel() -> None:
+    """Asks the active batch simulation to stop at the next opportunity."""
+    _SIM_CANCEL.set()
+
 
 def set_simulation_progress_callback(callback: Any) -> None:
     """Registers an optional callback for simulation progress events (e.g. Pyodide Web Workers)."""
@@ -1031,6 +1042,11 @@ def cleanup_simulation_pool() -> None:
 atexit.register(cleanup_simulation_pool)
 
 
+def _run_task_chunk(task_fn: Any, chunk: list) -> list[dict[str, Any]]:
+    """Runs a chunk of batch payloads in a pool worker (chunks let the parent poll for cancellation)."""
+    return [task_fn(p) for p in chunk]
+
+
 def _batch_worker_task(args: tuple) -> dict[str, Any]:
     """Worker function for parallel Monte Carlo simulations."""
     if len(args) == 4:
@@ -1226,6 +1242,7 @@ def _run_batch_monte_carlo_detailed(
         for i in range(iterations)
     ]
 
+    _SIM_CANCEL.clear()
     _update_simulation_progress(True, "BATCH", 0, iterations)
     harvested: list[dict[str, Any]] = []
     try:
@@ -1234,6 +1251,8 @@ def _run_batch_monte_carlo_detailed(
             global _WORKER_SIM_CONTEXT
             _WORKER_SIM_CONTEXT = sim_context
             for idx, p in enumerate(payloads, 1):
+                if _SIM_CANCEL.is_set():
+                    raise SimulationCancelled()
                 harvested.append(_batch_worker_task(p))
                 _update_simulation_progress(True, "BATCH", idx, iterations)
         else:
@@ -1242,12 +1261,26 @@ def _run_batch_monte_carlo_detailed(
             chunk_size = max(1, int(round(iterations * 0.01)))
             pool = get_or_create_simulation_pool(cores, sim_context, pool_key)
             print(f"Using {cores} CPU Cores (Warm Persistent Pool, chunksize={chunk_size})")
-            for idx, res in enumerate(
-                pool.imap_unordered(_parallel_worker, payloads, chunksize=chunk_size), 1
-            ):
-                harvested.append(res)
-                if idx % chunk_size == 0 or idx == iterations:
-                    _update_simulation_progress(True, "BATCH", idx, iterations)
+            pending = [
+                pool.apply_async(_run_task_chunk, (_parallel_worker, payloads[i : i + chunk_size]))
+                for i in range(0, iterations, chunk_size)
+            ]
+            while pending:
+                if _SIM_CANCEL.is_set():
+                    # Terminating the pool drops queued runs; it is rebuilt on the next batch.
+                    cleanup_simulation_pool()
+                    raise SimulationCancelled()
+                still_pending = []
+                for async_res in pending:
+                    if async_res.ready():
+                        harvested.extend(async_res.get())
+                    else:
+                        still_pending.append(async_res)
+                if len(still_pending) != len(pending):
+                    _update_simulation_progress(True, "BATCH", len(harvested), iterations)
+                pending = still_pending
+                if pending:
+                    time.sleep(0.05)
             harvested.sort(key=lambda r: r["run_id"])
             print(f"Runs completed in {time.perf_counter() - t0:.3f} seconds!")
     finally:
@@ -1645,8 +1678,16 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
             payload = self._read_json_body()
 
             if route == "/api/simulate":
-                result = execute_simulation_from_payload(payload)
+                try:
+                    result = execute_simulation_from_payload(payload)
+                except SimulationCancelled:
+                    result = {"cancelled": True}
                 self._send_json(result)
+                return
+
+            if route == "/api/simulate_cancel":
+                request_simulation_cancel()
+                self._send_json({"ok": True})
                 return
 
             if route == "/api/preview_stats":

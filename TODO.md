@@ -3,6 +3,8 @@
 ## 1. Active Roadmap & Backlog
 - [ ] **Additional Class Disciplines Verification**: Continue verifying and testing combat parses across additional classes and disciplines (e.g. Deception Assassin, Sorcerer, Operative).
 - [ ] **Stack Modification Target Resolution Optimization**: Investigate whether effect target type (`Target Type: Self` per Jedipedia / GOM ability/effect root targeting rules) can be extracted directly into blueprints to bypass participant fallback iteration (`caster`/`target`) in `handle_modify_stack_charge`.
+- [ ] **Restore Missing Tools**: `tools/catalog_game_data.py` (+ `data/catalog_summary.md`), `tools/parse_combat_log.py`, `tools/validate_modifiers_vs_log.py`, and `tests/test_modifier_multipliers.py` / `tests/test_validate_modifiers_vs_log.py` are referenced by the docs but were never committed. Only a stale `tools/__pycache__/parse_combat_log.cpython-313.pyc` remains locally.
+- [ ] **Out-of-combat resource behavior in pre-combat**: pools are treated as in combat during the pre-pull phase (e.g. Rage decay / OOC regen not modeled). Decide whether to model it.
 
 ## 2. Current Architectural State
 - **Dual-Mode Engine**: Standalone zero-install WebAssembly release (`dist/`) running via Pyodide 0.27.2 and multi-threaded Web Worker pool, alongside full-speed native desktop CPython 3.13 (`python run_sim.py`, `python -m swtorsim.web_gui`).

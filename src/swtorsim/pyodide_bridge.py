@@ -30,8 +30,11 @@ from src.swtorsim.web_gui import (
 )
 from data.rotation_builder import (
     _resolve_workspace_path,
+    build_rotation_file_data,
     discover_loadout_catalog,
     get_workspace_catalog,
+    normalize_pre_combat_steps,
+    normalize_pull_gate,
     normalize_rotation_steps,
     run_dry_run_preview,
 )
@@ -116,6 +119,8 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
                 "path": rel_path,
                 "filename": target_file.name,
                 "steps": steps,
+                "pre_combat": normalize_pre_combat_steps(raw_data),
+                **normalize_pull_gate(raw_data),
                 "warnings": warnings,
             }
 
@@ -153,7 +158,10 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
             target_dir = SWTORSIM_ROOT / "data" / "rotations" / class_folder / spec_folder
             target_dir.mkdir(parents=True, exist_ok=True)
             full_path = target_dir / filename
-            formatted = json.dumps(steps, indent=4, ensure_ascii=False)
+            file_data = build_rotation_file_data(
+                steps, data.get("pre_combat"), data.get("pull_conditions"), data.get("pull_max_wait")
+            )
+            formatted = json.dumps(file_data, indent=4, ensure_ascii=False)
             formatted_crlf = formatted.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n"
             full_path.write_bytes(formatted_crlf.encode("utf-8"))
             rel_saved = full_path.relative_to(SWTORSIM_ROOT).as_posix()

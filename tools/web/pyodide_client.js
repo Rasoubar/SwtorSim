@@ -106,7 +106,8 @@
     isReady: isNativeServer,
     readyPromise: isNativeServer ? Promise.resolve() : readyPromise,
     customFiles: loadCustomFilesFromStorage(),
-    latestProgress: { running: false, mode: "TEST", completed: 0, total: 1, pct: 0.0 }
+    latestProgress: { running: false, mode: "TEST", completed: 0, total: 1, pct: 0.0 },
+    cancelRequested: false
   };
 
   // --- UI Helpers ---
@@ -333,11 +334,14 @@
       rejectWorkerReady = rej;
     });
 
+    workerReadyPromise.catch(() => {}); // a cancelled/terminated worker settles this; avoid unhandled-rejection noise
+
     const wState = {
       index,
       worker: new Worker("sim_worker.js"),
       isReady: false,
       readyPromise: workerReadyPromise,
+      rejectReady: rejectWorkerReady,
       pendingRequests: new Map(),
       requestId: 0,
       completedRuns: 0
@@ -489,6 +493,32 @@
   async function callPrimaryWorker(action, payload) {
     await state.readyPromise;
     return await callSpecificWorker(state.workers[0], action, payload);
+  }
+
+  // --- Cancellation ---
+
+  // Workers run synchronous Python and cannot be interrupted cooperatively, so cancelling terminates
+  // every worker and boots a fresh primary (secondary cores re-spawn once it is ready).
+  function cancelActiveSimulation() {
+    state.cancelRequested = true;
+    const cancelErr = new Error("Simulation cancelled");
+    const old = state.workers;
+    state.workers = [];
+    old.forEach(w => {
+      try { w.worker.terminate(); } catch (_e) {}
+      w.pendingRequests.forEach(({ reject }) => reject(cancelErr));
+      w.pendingRequests.clear();
+      if (!w.isReady && w.rejectReady) w.rejectReady(cancelErr);
+    });
+    state.latestProgress.running = false;
+    state.isReady = false;
+    state.readyPromise = new Promise((resolve, reject) => {
+      resolveReady = resolve;
+      rejectReady = reject;
+    });
+    secondaryWorkersStarted = false;
+    updateBackendBadge("Pyodide [Warming Cores: 0/" + state.targetPoolSize + "]", "badge-wasm");
+    state.workers.push(createWorkerInstance(0));
   }
 
   // --- Multi-Core Parallel Batch Dispatcher ---
@@ -693,7 +723,20 @@
         if (!filename.endsWith(".json")) filename += ".json";
         filename = filename.replace(/^.*[\\/]/, "");
 
-        const contentStr = JSON.stringify(payload.steps || [], null, 4);
+        const preCombat = Array.isArray(payload.pre_combat) ? payload.pre_combat : [];
+        const pullConds = (payload.pull_conditions && typeof payload.pull_conditions === "object") ? payload.pull_conditions : {};
+        const hasPull = Object.keys(pullConds).length > 0;
+        let fileData = payload.steps || [];
+        if (preCombat.length || hasPull) {
+          fileData = {};
+          if (preCombat.length) fileData.pre_combat = preCombat;
+          if (hasPull) {
+            fileData.pull_conditions = pullConds;
+            if (payload.pull_max_wait !== undefined && payload.pull_max_wait !== null) fileData.pull_max_wait = Number(payload.pull_max_wait);
+          }
+          fileData.sequence = payload.steps || [];
+        }
+        const contentStr = JSON.stringify(fileData, null, 4);
 
         const customPath = `data/rotations/custom/${classFolder}/${specFolder}/${filename}`;
 
@@ -730,22 +773,42 @@
         });
       }
 
+      if (pathname === "/api/simulate_cancel") {
+        cancelActiveSimulation();
+        return new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+
       if (pathname === "/api/simulate") {
         const payload = JSON.parse(options.body || "{}");
         let result;
+        state.cancelRequested = false;
 
-        if (payload.mode === "BATCH" && (parseInt(payload.iterations, 10) || 50) > 1) {
-          result = await executeBatchMultiCore(payload);
-        } else {
-          state.latestProgress = {
-            running: true,
-            mode: "TEST",
-            completed: 0,
-            total: 1,
-            pct: 0.0
-          };
-          result = await callPrimaryWorker("SIMULATE", payload);
-          state.latestProgress.running = false;
+        try {
+          if (payload.mode === "BATCH" && (parseInt(payload.iterations, 10) || 50) > 1) {
+            result = await executeBatchMultiCore(payload);
+          } else {
+            state.latestProgress = {
+              running: true,
+              mode: "TEST",
+              completed: 0,
+              total: 1,
+              pct: 0.0
+            };
+            result = await callPrimaryWorker("SIMULATE", payload);
+            state.latestProgress.running = false;
+          }
+        } catch (err) {
+          if (state.cancelRequested) {
+            state.latestProgress.running = false;
+            return new Response(JSON.stringify({ cancelled: true }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" }
+            });
+          }
+          throw err;
         }
 
         const isError = result && (result.error !== undefined);

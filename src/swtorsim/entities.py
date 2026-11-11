@@ -75,6 +75,28 @@ class Entity:
             interrupted = True
         return interrupted
 
+    def _drop_replaced_effect(self, key, eff, sim) -> None:
+        """Removes an effect superseded by an ``is_by_tag`` replacement without expiring it.
+
+        The instance stays un-expired so the replacement can inherit its stacks/expiry, but its
+        trigger subscriptions are removed (otherwise they keep firing for an effect that no longer
+        exists), the removal is logged, and stats are recalculated if it carried modifiers.
+        """
+        if self.effects.get(key) is not eff:
+            return
+        self.effects.pop(key, None)
+        owner_id = getattr(eff, "owner_id", None)
+        if sim is not None and owner_id and hasattr(sim, "triggers"):
+            sim.triggers.unsubscribe(owner_id)
+        if sim is not None:
+            display_name = getattr(eff, "name", None) or getattr(eff, "fqn", None) or key
+            if getattr(sim, "tracker", None) is not None and hasattr(sim.tracker, "log_effect_removed"):
+                sim.tracker.log_effect_removed(self.name, display_name, getattr(sim, "current_time", 0.0))
+            if getattr(sim, "tracer", None) is not None:
+                sim.tracer.record_buff_expired(getattr(sim, "current_time", 0.0), self.name, display_name)
+        if getattr(eff, "modifiers", None) and hasattr(self, "recalculate_stats"):
+            self.recalculate_stats()
+
     def apply_effect(self, sim, ability, effect, caster=None): #can be improved on the refresh
         """Applies or refreshes an extracted ActiveEffect, calculates expiration, and triggers stat updates if needed."""
         current_time = sim.current_time if sim is not None else 0.0
@@ -153,7 +175,7 @@ class Entity:
                 if rel_tags & set(eff_tags):
                     existing = existing_eff
                     if nr_occurances == 1:
-                        self.effects.pop(existing_k, None)
+                        self._drop_replaced_effect(existing_k, existing_eff, sim)
                     break
 
         if existing is not None and not getattr(existing, "is_expired", False):
@@ -339,6 +361,10 @@ class Player(Entity):
         self.proc_registry: dict[str, dict[str, Any]] = {}
         self.passive_blueprints = passives or {}
         self.passive_db = {}
+        self.tactical_fqn = ""
+        self.starting_tactical_fqn = ""
+        self.gear_library: dict[str, Any] = {}  # preloaded tactical blueprints for pre-combat swaps
+        self.pre_combat = None  # PreCombatRunner while the pre-pull sequence owns decisions
         self.ability_db = self.build_ability_db(abilities or {})
         self.level = 85
         self.rotation = None

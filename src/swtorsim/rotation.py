@@ -248,16 +248,48 @@ class OptionalAbilityStep:
         )
         should_wait = is_early or is_channeling_or_casting
 
+        tracer = getattr(sim, "tracer", None)
+        ability = player.ability_db.get(self.ability_id)
+        reason = None
         wanna_cast = validate_all(self.rules, player, target, sim=sim)
         if wanna_cast:
-            ability = player.ability_db.get(self.ability_id)
             if is_channeling_or_casting and (not ability or not getattr(ability, "allow_clip", False)):
                 return False
             if is_early and (not ability or getattr(ability, "triggers_gcd", True)):
                 return False
             if ability and ability.can_cast(player, target, sim):
+                if tracer is not None:
+                    self._trace(tracer, sim, ability, True, True, "Cast initiated", self.ability_id)
                 ability.cast(player, target, sim)
                 return True
+            if tracer is not None and not should_wait:
+                if ability and hasattr(ability, "check_cast_eligibility"):
+                    reason = ability.check_cast_eligibility(player, target, sim)[1]
+                else:
+                    reason = "Cannot cast"
+        elif tracer is not None and not should_wait:
+            reason = "Optional rules not satisfied"
         if should_wait:
             return False
+        if tracer is not None:
+            self._trace(tracer, sim, ability, bool(wanna_cast), False, reason or "Skipped", None)
         return True
+
+    def _trace(self, tracer, sim, ability, rules_passed, accepted, reason, chosen):
+        """Records an optional-step decision (cast or skipped) for the debugger."""
+        name = ability.name if ability else self.ability_id
+        tracer.record_rotation_evaluation(
+            timestamp=sim.current_time,
+            step_index=getattr(self, "step_index", 0),
+            step_type="optional",
+            step_name=name,
+            candidates=[{
+                "ability": name,
+                "rules_passed": rules_passed,
+                "can_cast": accepted,
+                "reason": reason,
+                "accepted": accepted,
+            }],
+            chosen_ability=name if chosen else None,
+            is_stall=False,
+        )

@@ -131,29 +131,76 @@ def normalize_pre_combat(
     precast: str | dict | list | None = None,
     pre_combat: list | None = None,
 ) -> list[dict]:
-    """Normalizes precast ability and pre-combat sequences into a list of step dicts."""
+    """Normalizes precast ability and pre-combat sequences into a list of step dicts.
+
+    Step kinds: ``{"ability": id}`` (optional ``target``, ``wait_for_cooldown``),
+    ``{"swap_tactical": fqn}`` (optional ``keep_timed_effects``), ``{"wait": seconds}``, and
+    ``{"wait_until": rules}`` (optional ``max_wait``).
+
+    Raises ValueError for any step it cannot interpret (unknown kind, empty ability, bad wait
+    value), so an unsupported step never silently disappears from the sequence.
+    """
     steps: list[dict] = []
 
-    def _append_item(item: Any) -> None:
-        if isinstance(item, str) and item.strip():
+    def _bad(item: Any, where: str, reason: str) -> ValueError:
+        return ValueError(
+            f"Pre-combat {where} is invalid ({reason}): {item!r}. Supported steps: "
+            '"ability_id" / {"ability": id}, {"swap_tactical": fqn}, {"wait": seconds}, {"wait_until": rules}.'
+        )
+
+    def _seconds(item: Any, key: str, where: str) -> float:
+        try:
+            val = float(item[key])
+        except (TypeError, ValueError):
+            raise _bad(item, where, f"'{key}' must be a number of seconds") from None
+        if val <= 0.0:
+            raise _bad(item, where, f"'{key}' must be greater than 0")
+        return val
+
+    def _append_item(item: Any, where: str) -> None:
+        if isinstance(item, str):
             abl_str = item.strip()
+            if not abl_str:
+                raise _bad(item, where, "empty ability name")
             if not steps or steps[-1].get("ability") != abl_str:
                 steps.append({"ability": abl_str})
-        elif isinstance(item, dict) and item.get("ability"):
-            steps.append(dict(item))
+        elif isinstance(item, dict):
+            if "ability" in item:
+                if not isinstance(item["ability"], str) or not item["ability"].strip():
+                    raise _bad(item, where, "empty ability name")
+                steps.append(dict(item))
+            elif "swap_tactical" in item:
+                if not isinstance(item["swap_tactical"], str) or not item["swap_tactical"].strip():
+                    raise _bad(item, where, "empty tactical FQN")
+                step = dict(item)
+                step["swap_tactical"] = item["swap_tactical"].strip()
+                steps.append(step)
+            elif "wait_until" in item:
+                if not isinstance(item["wait_until"], dict):
+                    raise _bad(item, where, "'wait_until' must be a rules object")
+                step = {"wait_until": dict(item["wait_until"])}
+                if item.get("max_wait") is not None:
+                    step["max_wait"] = _seconds(item, "max_wait", where)
+                steps.append(step)
+            elif "wait" in item:
+                steps.append({"wait": _seconds(item, "wait", where)})
+            else:
+                raise _bad(item, where, "unknown step kind")
         elif isinstance(item, (list, tuple)):
-            for sub in item:
-                _append_item(sub)
+            for sub_idx, sub in enumerate(item):
+                _append_item(sub, f"{where}.{sub_idx + 1}")
+        else:
+            raise _bad(item, where, f"unsupported type {type(item).__name__}")
 
     if pre_combat:
         if isinstance(pre_combat, (list, tuple)):
-            for entry in pre_combat:
-                _append_item(entry)
+            for idx, entry in enumerate(pre_combat):
+                _append_item(entry, f"step {idx + 1}")
         else:
-            _append_item(pre_combat)
+            _append_item(pre_combat, "step 1")
 
     if precast:
-        _append_item(precast)
+        _append_item(precast, "precast")
 
     return steps
 

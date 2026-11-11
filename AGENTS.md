@@ -1,52 +1,15 @@
-# SwtorSim Engine Rules & Architectural Constraints
+# SwtorSim Agent Rules
 
-This document serves as the authoritative specification of core simulation invariants, development rules, codepage standards, and operational protocols for the SWTOR Combat Simulation Engine (`SwtorSim`).
-
----
-
-### 1. CRITICAL FORMULA RULE
-- **NEVER touch or alter the critical damage multiplier formula** in `combat_math.py`.
-- The critical damage multiplier formula is calibrated strictly against SWTOR live combat logs and theoretical foundations.
-
-### 2. NO HEURISTIC GUESSING
-- **Strictly honor `mod.is_percent` and the parsed blueprint structure.**
-- **NEVER** use magnitude heuristics like:
-  ```python
-  # FORBIDDEN:
-  val / 100.0 if abs(val) > 1.0 else val
-  ```
-- Percentages in parsed blueprints are already canonical decimal fractions (e.g., `0.05` for 5%). Any value passed with `is_percent=True` represents a decimal fraction.
-
-### 3. AUTHORITATIVE IDS
-- **Always cross-reference against `Stat_IDs.xlsx` and `src/extractor/mod_stats.py`.**
-- **NEVER** invent, guess, or assign unverified stat IDs.
-- Ensure all stat modifications map to their true GOM global IDs and semantic channels.
-
-### 4. PYTHON RUNNER
-- **Always execute tests and scripts via `.\tools\pyclean.exe` from the `SwtorSim/` directory.**
-- `pyclean.exe` is a CPython 3.13 transparent runner that enforces UTF-8 console I/O (`PYTHONUTF8=1`, `PYTHONIOENCODING=utf-8`) and prevents Windows AppContainer C runtime stderr warnings (`Failed to find real location of C:\Python 3.13.9\python.exe`).
-
-### 5. TERMINAL / CODEPAGE SAFETY
-- **Use ASCII indicators (`[OK]`, `[WARN]`, `[FAIL]`) instead of Unicode emojis** (e.g., do not use `✅` or `⚠️`).
-- This prevents Windows console `cp1252` encoding crashes and ensures clean terminal logging across all environments.
-
-### 6. LINE ENDINGS (CRLF)
-- **Workspace files use Windows CRLF (`\r\n`).**
-- Be vigilant when writing or patching files to preserve CRLF line endings and avoid mixed/mismatched line endings across git repositories.
-
-### 7. STEM MATCHING
-- **Respect `is_stem_matching_enabled()` in `src/swtorsim/settings.py` for ability stems** (e.g. `_plus` suffixes such as `assassinate` matching `assassinate_plus`).
-- Stem matching behavior must never bypass the global setting toggle.
-
-### 8. STATE, CHANGELOG, & CATALOG INTEGRITY
-- **Catalog:** Always update `tools/catalog_game_data.py` whenever actions, conditions, or stats are modeled, and re-run it via `pyclean.exe` to regenerate `data/catalog_summary.md`.
-- **State Separation (Token Efficiency):**
-  - **`TODO.md` (Active Queue Only):** Strictly reserved for uncompleted tasks, failing test assertions, active roadmaps, and current architectural state. Once a task is completed, REMOVE its detailed implementation log from `TODO.md`.
-  - **`CHANGELOG.md` (Archive Only):** Append detailed completion logs, historical bug fixes, and verification benchmarks here. Do not read `CHANGELOG.md` into context unless specifically investigating historical regressions.
-
-### 9. PROTOCOL
-- **Cycle**: Implement -> Test via `pyclean.exe` -> Update `CHANGELOG.md` & prune `TODO.md` -> Show exact code diffs and justify them.
-- Ensure 100% test pass rates across the full regression suite before finalizing any task.
-
-### 10. ARCHITECTURAL ROUTING
-- **ARCHITECTURAL ROUTING:** Before scanning or grepping across multiple source files to locate a mechanic, read `ARCHITECTURE.md` to identify the exact target file and function.
+0. **No git commits** (incl. amend, merge, rebase, cherry-pick, revert). Editing files is fine; leave changes uncommitted. If a request or rule is ambiguous, ask; don't assume.
+1. **Combat math formulas are frozen.** They passed extensive live-log testing; never alter, "fix", refactor, or replace them, even if they look wrong. Scope: all formulas in `combat_math.py`, `combat_math_unbucketed.py`, `combat_curves.py`, `combat_curves.json`, and `entities.py` `Player.recalculate_stats` / `calculate_gcd|cast_time|channel_duration|cooldown|effect_duration|effect_tick`. Stat routing (`_CASTER_DAMAGE_DISPATCH`, `_CRIT_CHANCE_DISPATCH`, `_CRIT_DAMAGE_DISPATCH`, `_SKIP_BASE_STATS`, `handle_target_debuffs`, stat inputs to those `entities.py` methods) changes only on explicit user request, routing entry only. Suspect a formula? Assume bad inputs first; otherwise report evidence to the user and stop.
+2. **No magnitude heuristics.** Honor `mod.is_percent`; `is_percent=True` values are already decimal fractions (`0.05` = 5%). Forbidden: `val / 100.0 if abs(val) > 1.0 else val`.
+3. **Stat IDs:** verify against `src/extractor/mod_stats.py` (user's `Stat_IDs.xlsx` is not in the repo; ask for it). Never invent or guess IDs.
+4. **Runner:** run everything from `SwtorSim/` via `.\tools\pyclean.exe` (CPython 3.13, forces UTF-8; untracked in git). Tests use unittest (no pytest): `.\tools\pyclean.exe -m unittest discover -s tests -p "*test*.py"`
+5. **Console output:** ASCII tags (`[OK]`, `[WARN]`, `[FAIL]`), no emojis (cp1252 crashes).
+6. **Line endings:** files are CRLF; preserve it.
+7. **Stem matching** (`assassinate` ~ `assassinate_plus`) must respect `is_stem_matching_enabled()` in `src/swtorsim/settings.py`.
+8. **State files:** `TODO.md` = open work only (remove finished items). `CHANGELOG.md` = completion logs; append, don't read unless investigating regressions. Catalog tool `tools/catalog_game_data.py` is missing; when restored, update and re-run it whenever actions/conditions/stats are modeled. Until then, skip and say so.
+9. **Protocol:** baseline test run -> implement -> test -> update `CHANGELOG.md`/`TODO.md` -> show diffs with justification. Require 100% pass; name covering tests; report pre-existing failures instead of fixing them unasked. Test counts in docs are stale snapshots. Damage-affecting changes: report mean DPS before/after on an affected `data/run_config/` config, same seed.
+10. **Routing:** read `ARCHITECTURE.md` (authoritative file/function map) before grepping across files. `docs/architecture.md` is long-form narrative; `docs/developer_guide.md` defers to this file.
+11. **Extracted data is ground truth:** never hand-edit `data/extractor/live|pts/` or `src/extractor/data/`; fix the extractor and ask the user to re-extract. User files (`data/builds|rotations|run_config|Choices/`) are edited only when the request is about them.
+12. **No clutter:** no debug/scratch output or ad-hoc scripts in the repo; use `tools/debug_sim.py --output <temp path> --no-browser`.

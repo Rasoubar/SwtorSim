@@ -6,22 +6,22 @@ This handbook covers the core architectural invariants, file routing, and step-b
 
 ## 1. Core Simulation Invariants (`AGENTS.md`)
 
-All contributions must strictly adhere to the project's architectural rules defined in [`AGENTS.md`](../AGENTS.md):
+All contributions must strictly adhere to the project's architectural rules defined in [`AGENTS.md`](../AGENTS.md). This section is a summary; if it ever disagrees with `AGENTS.md`, `AGENTS.md` wins.
 
-1. **Critical Damage Multiplier Formula Invariant**:
-   - **NEVER** modify or alter the critical damage multiplier / supercrit formula in [`combat_math.py :: calculate_crit`](../src/swtorsim/combat_math.py#L730-L745). It is calibrated against live SWTOR combat logs and theoretical foundations.
+1. **Combat Math Formulas Are Frozen**:
+   - **NEVER** modify, "fix", or replace any combat math formula (damage, buckets, mitigation, accuracy, crit chance, crit multiplier / supercrit, DR curves, alacrity/timing scaling). They have passed extensive testing against live SWTOR combat logs. See `AGENTS.md` §1 for the exact scope.
 2. **No Magnitude Heuristics (`mod.is_percent`)**:
    - Strictly honor `mod.is_percent` and the parsed blueprint structure.
    - All percentage values in parsed blueprints are canonical decimal fractions (`0.05` = `5%`). Never write magnitude heuristics such as `val / 100.0 if abs(val) > 1.0 else val`.
 3. **Authoritative GOM Stat IDs**:
-   - Always cross-reference stat IDs against `Stat_IDs.xlsx` and [`src/extractor/mod_stats.py`](../src/extractor/mod_stats.py). Never invent or guess unverified stat IDs.
+   - Always cross-reference stat IDs against [`src/extractor/mod_stats.py`](../src/extractor/mod_stats.py) and the maintainer's `Stat_IDs.xlsx` sheet (not stored in the repo). Never invent or guess unverified stat IDs.
 4. **Ability Stem Matching Toggle**:
    - Any FQN stem matching (such as matching `assassinate` to `assassinate_plus`) must respect [`is_stem_matching_enabled()`](../src/swtorsim/settings.py#L40-L42).
 5. **Terminal Codepage & Line Endings**:
    - Use ASCII status tags (`[OK]`, `[WARN]`, `[FAIL]`) in console output instead of Unicode emojis so Windows `cp1252` terminals never crash.
    - Preserve Windows CRLF (`\r\n`) line endings across all repository files.
 6. **Catalog & State Hygiene**:
-   - Whenever new actions, conditions, triggers, or stats are modeled, update [`tools/catalog_game_data.py`](../tools/catalog_game_data.py) and re-run it to regenerate [`data/catalog_summary.md`](../data/catalog_summary.md).
+   - Whenever new actions, conditions, triggers, or stats are modeled, update `tools/catalog_game_data.py` and re-run it to regenerate `data/catalog_summary.md`. **Note:** that tool is currently missing from the repo; skip this step until it is restored.
 
 ---
 
@@ -65,7 +65,7 @@ When a talent, buff, debuff, or implant modifies a stat (`stat_changes` or `init
      - If it is a caster buff, add it to `_CASTER_DAMAGE_DISPATCH`, `_CRIT_CHANCE_DISPATCH`, or `_CRIT_DAMAGE_DISPATCH` in [`src/swtorsim/combat_math.py`](../src/swtorsim/combat_math.py#L74-L181) under the appropriate bucket (`BUCKET_NORMAL`, `BUCKET_EXECUTE`, `BUCKET_CHANNEL`, `BUCKET_DAMAGE_TYPE`, `BUCKET_TAG`, or `BUCKET_TARGET_STATE`).
      - If it is a target debuff, route it in [`handle_target_debuffs()`](../src/swtorsim/combat_math.py#L334-L645).
 3. **Update the Catalog & Add a Unit Test**:
-   - Register the stat in [`tools/catalog_game_data.py`](../tools/catalog_game_data.py) and add a test case in [`tests/test_modifier_multipliers.py`](../tests/test_modifier_multipliers.py).
+   - Register the stat in `tools/catalog_game_data.py` (currently missing from the repo) and add a unit test under [`tests/`](../tests/).
 
 ---
 
@@ -76,7 +76,7 @@ When a parsed ability branch contains an `action_type` not yet handled in [`abil
 1. Write a dedicated `handle_<action_name>(sim, caster, target, action, ...)` function in [`src/swtorsim/abilities.py`](../src/swtorsim/abilities.py).
 2. Add the `elif action_type == "<action_name>":` branch in `execute_single_action()`.
    - If the action is a visual/positional/PVP-only effect that has no impact on PvE dummy DPS, add it to `NOOP_ACTION_TYPES` (`abilities.py` lines 423–456).
-3. Update `HANDLED_ACTIONS` / `NOOP_ACTIONS` in [`tools/catalog_game_data.py`](../tools/catalog_game_data.py) and add a test in [`tests/test_ability_execution.py`](../tests/test_ability_execution.py).
+3. Update `HANDLED_ACTIONS` / `NOOP_ACTIONS` in `tools/catalog_game_data.py` (currently missing from the repo) and add a test in [`tests/test_ability_execution.py`](../tests/test_ability_execution.py).
 
 ---
 
@@ -87,7 +87,7 @@ All blueprint and rotation conditions are dispatched through [`src/swtorsim/requ
 1. Implement a `check_<condition_name>(data, caster, target, sim=None, context=None, **_kwargs) -> bool` function in [`src/swtorsim/requirements.py`](../src/swtorsim/requirements.py).
    - Note that blueprint conditions (`cbtRequirement*` / `effRequirement*`) may include `"negated": True` inside `data`; `validate_all()` automatically inverts the return value when `data.get("negated")` is `True` (unless the handler is listed in `_SELF_NEGATING_HANDLERS`).
 2. Register the condition key in `CONDITION_DISPATCH`.
-3. Add a unit test in [`tests/requirements_test.py`](../tests/requirements_test.py) and update [`tools/catalog_game_data.py`](../tools/catalog_game_data.py).
+3. Add a unit test in [`tests/requirements_test.py`](../tests/requirements_test.py) and update `tools/catalog_game_data.py` (currently missing from the repo).
 
 ---
 
@@ -104,7 +104,7 @@ Because all disciplines, abilities, talents, tacticals, and legendary implants a
 4. **Build a Rotation (`data/rotations/<spec>_rotation.json`)**:
    - Launch `.\.venv\Scripts\python.exe data/rotation_builder.py --ui`, select the new discipline and choices, and construct the opener and priority list.
 5. **Validate Against a Live Combat Log**:
-   - Run a single `TEST` simulation (`run_sim.py --config ...`) and compare hit sizes, tick counts, and buff uptimes against a live StarParse log using `tools/parse_combat_log.py` and `tools/validate_modifiers_vs_log.py`.
+   - Run a single `TEST` simulation (`run_sim.py --config ...`) and compare hit sizes, tick counts, and buff uptimes against a live StarParse log. (The log tools `tools/parse_combat_log.py` and `tools/validate_modifiers_vs_log.py` are currently missing from the repo.)
 
 ---
 
@@ -113,19 +113,16 @@ Because all disciplines, abilities, talents, tacticals, and legendary implants a
 Run the full test suite before finalizing any change:
 
 ```powershell
-# Run all unit and integration tests
-.\.venv\Scripts\python.exe -X utf8 -m pytest
-
-# Regenerate the game data coverage catalog
-.\.venv\Scripts\python.exe -X utf8 tools/catalog_game_data.py
+# Run all unit and integration tests (unittest; pytest is not installed)
+.\tools\pyclean.exe -m unittest discover -s tests -p "*test*.py"
 ```
+
+The coverage catalog tool (`tools/catalog_game_data.py`) is currently missing from the repo.
 
 ### Test Suite Overview (`tests/`)
 
 | Test File | Coverage |
 | :--- | :--- |
 | [`tests/test_ability_execution.py`](../tests/test_ability_execution.py) | Blueprint hydration, instant/cast/channel execution, projectiles, stack charges, cooldown reductions, immunities, and action handlers. |
-| [`tests/test_modifier_multipliers.py`](../tests/test_modifier_multipliers.py) | All 6 multiplicative damage buckets, crit chance/surge dispatch, armor penetration, off-hand penalties, and conditional tag modifiers. |
 | [`tests/requirements_test.py`](../tests/requirements_test.py) | All 36 condition evaluators (`CONDITION_DISPATCH`), negation handling, stack comparisons, and rotation rules. |
 | [`tests/test_simulation_integration.py`](../tests/test_simulation_integration.py) | Full-fight deterministic and Monte Carlo integration tests across disciplines (Hatred, Madness, Annihilation, etc.). |
-| [`tests/test_validate_modifiers_vs_log.py`](../tests/test_validate_modifiers_vs_log.py) | Verification of live combat log parsing and modifier parity checks. |

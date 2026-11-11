@@ -8,3 +8,7 @@ data/extractor/
 # Generated plots
 figures/
 .idea/
+
+# Debug simulator output (tools/debug_sim.py default output path)
+/debug_*.html
+/debug_*.json

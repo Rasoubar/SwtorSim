@@ -207,68 +207,256 @@ class PeriodicProcTick(Event):
         interval = self.player.scale_time_modifier(self.proc.icd) if is_affected else self.proc.icd
         sim.schedule_relative(interval, PeriodicProcTick(self.player, self.target, self.proc))
 
-class PreCombatEvent(Event):
-    """Executes pre-combat opener actions (e.g. stealth, pre-buffs, hard-cast openers) before the rotation begins.
+MAX_PRE_COMBAT_SECONDS: float = 300.0
+DEFAULT_PRE_COMBAT_MAX_WAIT: float = 60.0
+CONDITION_POLL_INTERVAL: float = 0.1
+_WAITABLE_REASON_PREFIXES = ("On GCD", "On cooldown", "No charges", "Insufficient resource")
 
-    When all pre-combat steps conclude, schedules PlayerReady at max(sim.current_time, player.next_gcd)
-    so the rotation takes over immediately off-GCD.
+
+class PullConditionsNotMetError(RuntimeError):
+    """Raised when the fight-start (pull) conditions are still false after ``pull_max_wait`` seconds."""
+
+
+def _is_busy(player) -> bool:
+    """True while the player has a cast bar or channel in flight."""
+    return (
+        getattr(player, "active_channel", None) is not None
+        or getattr(player, "active_cast", None) is not None
+    )
+
+
+def is_pre_combat_active(player) -> bool:
+    """True while the player's pre-combat sequence still owns decision making."""
+    runner = getattr(player, "pre_combat", None)
+    return runner is not None and runner.active
+
+
+def schedule_next_decision(player, target, sim) -> None:
+    """Single hand-off point after a cast/channel/decision completes.
+
+    While a pre-combat sequence is running it resumes that sequence; otherwise it schedules
+    ``PlayerReady`` at the player's next action time (unchanged rotation behavior).
+    """
+    runner = getattr(player, "pre_combat", None)
+    if runner is not None and runner.active:
+        runner.request(sim, sim.current_time)
+        return
+    target_time = (
+        player.get_next_action_time(sim.current_time)
+        if hasattr(player, "get_next_action_time")
+        else max(sim.current_time, getattr(player, "next_gcd", sim.current_time))
+    )
+    sim.schedule_absolute(target_time, PlayerReady(player, target))
+
+
+class PreCombatRunner:
+    """Owns the pre-combat (pre-pull) step sequence, run on the simulation clock.
+
+    Steps run strictly in order and are resumed by completion events (cast finish, channel end)
+    through ``schedule_next_decision``, so channels always run to their final tick and the
+    rotation never starts before the sequence is done. Supported steps:
+    ``{"ability": id}``, ``{"swap_tactical": fqn}``, ``{"wait": seconds}``,
+    ``{"wait_until": rules, "max_wait": s}`` (rotation-style rules; skipped with [WARN] on timeout).
+
+    ``pull_conditions`` (rotation-style rules) gate the fight start: after the last step the runner
+    holds until they are true, and raises ``PullConditionsNotMetError`` after ``pull_max_wait``.
     """
 
-    def __init__(self, player: "Player", target: "Dummy", sequence: list[dict], index: int = 0):
+    def __init__(
+        self,
+        player: "Player",
+        target: "Dummy",
+        steps: list[dict],
+        pull_conditions: dict | None = None,
+        pull_max_wait: float = DEFAULT_PRE_COMBAT_MAX_WAIT,
+    ):
+        self.player = player
+        self.target = target
+        self.steps = list(steps or [])
+        self.pull_conditions = dict(pull_conditions or {})
+        self.pull_max_wait = float(pull_max_wait)
+        self.index = 0
+        self.active = bool(self.steps or self.pull_conditions)
+        self.pending = False
+        self.start_time: float | None = None
+        self.end_time: float | None = None
+        self.pull_gate_start: float | None = None
+        self.pull_time: float | None = None
+        self._wait_started: float | None = None
+        self.swaps: list[dict] = []
+        self.skipped: list[dict] = []
+
+    def request(self, sim, at_time: float) -> None:
+        """Schedules the next runner evaluation unless one is already queued."""
+        if not self.active or self.pending:
+            return
+        self.pending = True
+        sim.schedule_absolute(round(max(sim.current_time, at_time), 4), PreCombatEvent(self.player, self.target))
+
+    def _skip(self, sim, label: str, reason: str) -> None:
+        if getattr(sim, "verbose", True):
+            print(f"[WARN] Pre-combat step {self.index + 1} '{label}' skipped: {reason}")
+        self.skipped.append({"t": round(sim.current_time, 4), "step": self.index + 1, "label": label, "reason": reason})
+        self.index += 1
+        self._wait_started = None
+
+    def _resolve_ability(self, abl_key: str):
+        db = getattr(self.player, "ability_db", {}) or {}
+        return db.get(abl_key) or db.get(abl_key.lower().replace(" ", "_"))
+
+    def _retry_time(self, abl, reason: str, now: float) -> float:
+        if reason.startswith("On cooldown"):
+            return max(now + 0.01, float(self.player.cooldowns.get(abl.name, now)))
+        if reason.startswith("On GCD"):
+            return max(now + 0.01, float(getattr(self.player, "next_gcd", now)))
+        if reason.startswith("No charges"):
+            recharge = getattr(abl, "recharge_target_time", None)
+            if recharge is not None and recharge > now:
+                return float(recharge)
+        return now + 0.1
+
+    def finish(self, sim) -> None:
+        """Ends the pre-combat phase and hands control to the rotation."""
+        if not self.active:
+            return
+        self.active = False
+        self.pending = False
+        self.end_time = round(sim.current_time, 4)
+        sim.pre_combat_end_time = self.end_time
+        if getattr(sim, "verbose", True):
+            print(f"[{sim.current_time:.3f}] Pre-combat sequence complete; rotation takes over.")
+        schedule_next_decision(self.player, self.target, sim)
+
+    def run(self, sim) -> None:
+        """Executes steps until one blocks (GCD, cast, channel, wait) or the sequence ends."""
+        player = self.player
+        now = sim.current_time
+        if self.start_time is None:
+            self.start_time = now
+        if _is_busy(player):
+            return  # cast/channel completion resumes the runner
+        if now - self.start_time > MAX_PRE_COMBAT_SECONDS:
+            if getattr(sim, "verbose", True):
+                print(f"[WARN] Pre-combat exceeded {MAX_PRE_COMBAT_SECONDS:.0f}s; remaining steps dropped.")
+            self.index = len(self.steps)
+
+        while self.index < len(self.steps):
+            step = self.steps[self.index]
+
+            if step.get("swap_tactical"):
+                new_fqn = step["swap_tactical"]
+                if getattr(player, "in_combat", False) or getattr(sim, "combat_start_time", None) is not None:
+                    self._skip(sim, f"swap_tactical {new_fqn}", "tacticals cannot be swapped in combat")
+                    continue
+                from src.swtorsim.setup import swap_tactical
+                old_fqn = getattr(player, "tactical_fqn", "")
+                if swap_tactical(player, new_fqn, sim, keep_timed_effects=step.get("keep_timed_effects", True)):
+                    self.swaps.append({"t": round(now, 4), "from": old_fqn, "to": new_fqn})
+                self.index += 1
+                continue
+
+            if "wait" in step:
+                self.index += 1
+                self.request(sim, now + max(0.0, float(step.get("wait") or 0.0)))
+                return
+
+            if "wait_until" in step:
+                from src.swtorsim.requirements import validate_all
+                if validate_all(step.get("wait_until") or {}, player, self.target, sim=sim):
+                    self._wait_started = None
+                    self.index += 1
+                    continue
+                if self._wait_started is None:
+                    self._wait_started = now
+                max_wait = float(step.get("max_wait", DEFAULT_PRE_COMBAT_MAX_WAIT))
+                if now - self._wait_started < max_wait - 1e-9:
+                    self.request(sim, now + CONDITION_POLL_INTERVAL)
+                    return
+                self._skip(sim, "wait_until", f"conditions not met after {max_wait:.1f}s")
+                continue
+
+            abl_key = str(step.get("ability") or "")
+            abl = self._resolve_ability(abl_key) if abl_key else None
+            if abl is None:
+                self._skip(sim, abl_key or "<empty>", "ability not found in player abilities")
+                continue
+
+            if getattr(abl, "triggers_gcd", True) and now < getattr(player, "next_gcd", 0.0) - 1e-4:
+                self.request(sim, player.next_gcd)
+                return
+
+            tgt_pref = step.get("target")
+            if tgt_pref == "self":
+                tgt = player
+            elif tgt_pref == "target":
+                tgt = self.target
+            else:
+                is_offensive = getattr(abl, "is_offensive", True) or "target" in str(getattr(abl, "target_type", "")).lower()
+                tgt = self.target if is_offensive else player
+
+            ok, reason = abl.check_cast_eligibility(player, tgt, sim)
+            if not ok:
+                if step.get("wait_for_cooldown") and reason.startswith(_WAITABLE_REASON_PREFIXES):
+                    if self._wait_started is None:
+                        self._wait_started = now
+                    max_wait = float(step.get("max_wait", DEFAULT_PRE_COMBAT_MAX_WAIT))
+                    if now - self._wait_started < max_wait:
+                        self.request(sim, self._retry_time(abl, reason, now))
+                        return
+                    reason = f"{reason} (waited {max_wait:.1f}s)"
+                self._skip(sim, abl_key, reason)
+                continue
+
+            self._wait_started = None
+            self.index += 1
+            if not abl.cast(player, tgt, sim):
+                self.index -= 1
+                self._skip(sim, abl_key, "cast rejected")
+                continue
+            if self.pending or _is_busy(player):
+                return
+
+        if self.pull_conditions and not self._pull_gate_open(sim, now):
+            return
+        self.finish(sim)
+
+    def _pull_gate_open(self, sim, now: float) -> bool:
+        """True once the pull conditions hold; polls while waiting, raises after ``pull_max_wait``."""
+        if getattr(sim, "combat_start_time", None) is not None:
+            if getattr(sim, "verbose", True):
+                print("[WARN] Pull conditions ignored: combat already started during pre-combat.")
+            return True
+        from src.swtorsim.requirements import validate_all
+        if self.pull_gate_start is None:
+            self.pull_gate_start = now
+        if validate_all(self.pull_conditions, self.player, self.target, sim=sim):
+            self.pull_time = round(now, 4)
+            return True
+        if now - self.pull_gate_start >= self.pull_max_wait - 1e-9:
+            raise PullConditionsNotMetError(
+                f"Pull conditions {self.pull_conditions} not met after {self.pull_max_wait:.1f}s "
+                f"(pre-combat steps ended at {self.pull_gate_start:.2f}s)."
+            )
+        self.request(sim, now + CONDITION_POLL_INTERVAL)
+        return False
+
+
+class PreCombatEvent(Event):
+    """Resumes the player's ``PreCombatRunner`` at a scheduled time."""
+
+    def __init__(self, player: "Player", target: "Dummy"):
         super().__init__("Pre-Combat Step")
         self.player = player
         self.target = target
-        self.sequence = sequence
-        self.index = index
 
     def resolve(self, sim):
-        """Executes the next pre-combat step or hands off execution to PlayerReady."""
-        if self.index >= len(self.sequence):
-            target_time = (
-                self.player.get_next_action_time(sim.current_time)
-                if hasattr(self.player, "get_next_action_time")
-                else max(sim.current_time, self.player.next_gcd)
-            )
-            sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
+        """Clears the pending flag and lets the runner execute its next steps."""
+        runner = getattr(self.player, "pre_combat", None)
+        if runner is None or not runner.active:
             return
+        runner.pending = False
+        runner.run(sim)
 
-        step = self.sequence[self.index]
-        abl_key = step.get("ability")
-        if not abl_key:
-            sim.schedule_relative(0.0, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
-            return
-
-        abl = self.player.ability_db.get(abl_key) or self.player.ability_db.get(abl_key.lower().replace(" ", "_"))
-        if abl is None:
-            if sim.verbose:
-                print(f"[WARN] Pre-combat ability '{abl_key}' not found in player abilities.")
-            sim.schedule_relative(0.0, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
-            return
-
-        tgt_pref = step.get("target")
-        if tgt_pref == "self":
-            tgt = self.player
-        elif tgt_pref == "target":
-            tgt = self.target
-        else:
-            tgt = self.target if (getattr(abl, "is_offensive", True) or "target" in getattr(abl, "target_type", "").lower()) else self.player
-
-        abl.cast(self.player, tgt, sim)
-
-        activation = getattr(abl, "activation", None) or getattr(getattr(abl, "blueprint", None), "activation", None) or {}
-        act_dur = float(activation.get("duration", 0.0)) if isinstance(activation, dict) else 0.0
-
-        if getattr(self.player, "active_cast", None) is not None:
-            cast_dur = self.player.calculate_cast_time(act_dur, ability=abl) if hasattr(self.player, "calculate_cast_time") else act_dur
-            next_time = max(sim.current_time + cast_dur, self.player.next_gcd)
-            sim.schedule_absolute(next_time, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
-        elif getattr(self.player, "active_channel", None) is not None:
-            chan_dur = self.player.calculate_channel_duration(act_dur, ability=abl) if hasattr(self.player, "calculate_channel_duration") else act_dur
-            next_time = max(sim.current_time + chan_dur, self.player.next_gcd)
-            sim.schedule_absolute(next_time, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
-        else:
-            next_time = max(sim.current_time, self.player.next_gcd)
-            sim.schedule_absolute(next_time, PreCombatEvent(self.player, self.target, self.sequence, self.index + 1))
 
 class PlayerReady(Event):
     """Represents a player's actions/decisions to act"""
@@ -301,6 +489,8 @@ class PlayerReady(Event):
          tries again 0.1seconds later."""
         if getattr(self.player, "rotation", None) is None:
             return
+        if is_pre_combat_active(self.player):
+            return  # pre-combat owns decisions; PreCombatRunner.finish schedules the first PlayerReady
         acted = self.player.rotation.evaluate(self.player, self.target, sim)
         if acted:
             if getattr(self.player, "_is_stalled", False):
@@ -308,12 +498,7 @@ class PlayerReady(Event):
                     sim.tracker.log_rotation_stall_end(sim.current_time)
                 self.player._is_stalled = False
 
-            target_time = (
-                self.player.get_next_action_time(sim.current_time)
-                if hasattr(self.player, "get_next_action_time")
-                else max(sim.current_time, self.player.next_gcd)
-            )
-            sim.schedule_absolute(target_time, PlayerReady(self.player, self.target))
+            schedule_next_decision(self.player, self.target, sim)
         else:
             if sim.current_time < self.player.next_gcd:
                 target_time = max(sim.current_time, self.player.next_gcd)
@@ -545,12 +730,7 @@ class ChannelTickEvent(Event):
                 self.source.is_channeling = False
             from src.swtorsim.abilities import cleanup_channel_effects
             cleanup_channel_effects(self.channel, sim)
-            target_time = (
-                self.source.get_next_action_time(sim.current_time)
-                if hasattr(self.source, "get_next_action_time")
-                else max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
-            )
-            sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
+            schedule_next_decision(self.source, self.target, sim)
             return
 
         if self.channel.remaining_ticks > 0:
@@ -589,12 +769,7 @@ class ChannelTickEvent(Event):
                 )
             from src.swtorsim.abilities import cleanup_channel_effects
             cleanup_channel_effects(self.channel, sim)
-            target_time = (
-                self.source.get_next_action_time(sim.current_time)
-                if hasattr(self.source, "get_next_action_time")
-                else max(sim.current_time, getattr(self.source, "next_gcd", sim.current_time))
-            )
-            sim.schedule_absolute(target_time, PlayerReady(self.source, self.target))
+            schedule_next_decision(self.source, self.target, sim)
 
 class CastFinishEvent(Event):
     """Fired when an ability with a cast time finishes casting."""
@@ -626,12 +801,7 @@ class CastFinishEvent(Event):
                 if not resource.spend(final_spend):
                     if getattr(sim, "verbose", True):
                         print(f"[{sim.current_time:.3f}s] {self.caster.name} failed casting {self.ability.name} (insufficient resource)")
-                    target_time = (
-                        self.caster.get_next_action_time(sim.current_time)
-                        if hasattr(self.caster, "get_next_action_time")
-                        else max(sim.current_time, getattr(self.caster, "next_gcd", sim.current_time))
-                    )
-                    sim.schedule_absolute(target_time, PlayerReady(self.caster, getattr(self.caster, "current_target", self.target)))
+                    schedule_next_decision(self.caster, getattr(self.caster, "current_target", self.target), sim)
                     return
                 if getattr(sim, "tracer", None) is not None:
                     sim.tracer.record_resource_change(
@@ -663,12 +833,7 @@ class CastFinishEvent(Event):
                 },
             )
 
-        target_time = (
-            self.caster.get_next_action_time(sim.current_time)
-            if hasattr(self.caster, "get_next_action_time")
-            else max(sim.current_time, getattr(self.caster, "next_gcd", sim.current_time))
-        )
-        sim.schedule_absolute(target_time, PlayerReady(self.caster, getattr(self.caster, "current_target", self.target)))
+        schedule_next_decision(self.caster, getattr(self.caster, "current_target", self.target), sim)
 
 class ResourceTick(Event):
     """Represents the passive energy regen events"""

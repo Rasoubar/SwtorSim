@@ -919,7 +919,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794328092"></script>
+  <script src="pyodide_client.js?v=1794400165"></script>
 </head>
 <body>
 
@@ -934,6 +934,7 @@
       </div>
       <span id="simProgressText" class="sim-progress-text">0 / 0 (0%)</span>
     </div>
+    <button class="btn" id="cancelSimBtn" type="button" style="display:none;padding:3px 9px;font-size:11px;" title="Cancel the running batch">&#10005; Cancel</button>
   </div>
 
   <div class="header-controls">
@@ -2196,8 +2197,24 @@
     txt.textContent = `${safeComp} / ${safeTotal} (${pct}%)`;
   }
 
+  async function cancelSimulation() {
+    const cancelBtn = document.getElementById("cancelSimBtn");
+    cancelBtn.disabled = true;
+    setStatus("Cancelling...", "running");
+    try {
+      await fetch("/api/simulate_cancel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   async function runSimulation() {
     const runBtn = document.getElementById("runSimBtn");
+    const cancelBtn = document.getElementById("cancelSimBtn");
     let progressTimer = null;
     try {
       const payload = buildPayloadFromForm();
@@ -2210,6 +2227,8 @@
       runBtn.textContent = "⏳ Running...";
       if (CURRENT_MODE === "BATCH") {
         const totalIter = payload.iterations || 50;
+        cancelBtn.disabled = false;
+        cancelBtn.style.display = "";
         updateSimProgressUI(0, totalIter, true);
         setStatus(`Simulating 0 / ${totalIter} fights...`, "running");
         progressTimer = setInterval(async () => {
@@ -2241,6 +2260,11 @@
         progressTimer = null;
       }
       const result = await res.json();
+      if (result && result.cancelled) {
+        updateSimProgressUI(0, 1, false);
+        setStatus("Cancelled", "ready");
+        return;
+      }
       if (!res.ok || (result && result.error)) {
         throw new Error(result.error || "Simulation failed");
       }
@@ -2273,6 +2297,7 @@
       if (progressTimer) {
         clearInterval(progressTimer);
       }
+      cancelBtn.style.display = "none";
       runBtn.disabled = false;
       runBtn.textContent = "▶ Run Simulation";
     }
@@ -3148,6 +3173,7 @@
   }
   document.getElementById("reloadCatalogBtn").addEventListener("click", () => loadCatalog(true));
   document.getElementById("runSimBtn").addEventListener("click", () => runSimulation());
+  document.getElementById("cancelSimBtn").addEventListener("click", () => cancelSimulation());
 
   document.getElementById("openRotationBuilderBtn").addEventListener("click", async () => {
     try {

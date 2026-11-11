@@ -40,6 +40,7 @@ from src.swtorsim.run_config import (
     get_disciplines_dir,
     get_gear_path,
     get_relics_path,
+    normalize_pre_combat,
     relic_menu_label,
     resolve_env_extractor_path,
     resolve_skill_tree_fqns,
@@ -798,6 +799,78 @@ def normalize_rotation_steps(raw_steps: Any) -> tuple[list[dict[str, Any]], list
     return normalized, warnings
 
 
+def normalize_pre_combat_steps(raw: Any) -> list[dict[str, Any]]:
+    """Extracts the canonical pre-combat step list from a rotation file (``[]`` for bare arrays).
+
+    Keeps only known keys per step kind and drops defaults (``keep_timed_effects: true``,
+    ``wait_for_cooldown: false``) so saved files stay minimal.
+    """
+    if not isinstance(raw, dict):
+        return []
+    clean: list[dict[str, Any]] = []
+    for step in normalize_pre_combat(raw.get("precast"), raw.get("pre_combat")):
+        if step.get("swap_tactical"):
+            out: dict[str, Any] = {"swap_tactical": str(step["swap_tactical"])}
+            if step.get("keep_timed_effects", True) is False:
+                out["keep_timed_effects"] = False
+        elif "wait_until" in step:
+            out = {"wait_until": dict(step.get("wait_until") or {})}
+            if step.get("max_wait") is not None:
+                out["max_wait"] = float(step["max_wait"])
+        elif "wait" in step:
+            out = {"wait": float(step["wait"])}
+        else:
+            out = {"ability": str(step.get("ability"))}
+            if step.get("target") in ("self", "target"):
+                out["target"] = step["target"]
+            if step.get("wait_for_cooldown"):
+                out["wait_for_cooldown"] = True
+                if step.get("max_wait") is not None:
+                    out["max_wait"] = float(step["max_wait"])
+        clean.append(out)
+    return clean
+
+
+def normalize_pull_gate(raw: Any) -> dict[str, Any]:
+    """Extracts ``pull_conditions`` / ``pull_max_wait`` from a rotation file (empty dict when unset)."""
+    if not isinstance(raw, dict):
+        return {}
+    conds = raw.get("pull_conditions")
+    if not isinstance(conds, dict) or not conds:
+        return {}
+    gate: dict[str, Any] = {"pull_conditions": dict(conds)}
+    if raw.get("pull_max_wait") is not None:
+        gate["pull_max_wait"] = float(raw["pull_max_wait"])
+    return gate
+
+
+def build_rotation_file_data(
+    steps: list[dict[str, Any]],
+    pre_combat: list[dict[str, Any]] | None,
+    pull_conditions: dict[str, Any] | None = None,
+    pull_max_wait: float | None = None,
+) -> Any:
+    """Rotation file payload: a bare step array, or a ``{"pre_combat", "pull_conditions", "sequence"}``
+    wrapper when pre-combat steps or fight-start (pull) conditions are set."""
+    pre = normalize_pre_combat_steps({"pre_combat": pre_combat or []})
+    gate = normalize_pull_gate({"pull_conditions": pull_conditions, "pull_max_wait": pull_max_wait})
+    if not pre and not gate:
+        return steps
+    data: dict[str, Any] = {}
+    if pre:
+        data["pre_combat"] = pre
+    data.update(gate)
+    data["sequence"] = steps
+    return data
+
+
+def class_tactical_fqns(class_name: str, env: str = "live") -> list[str]:
+    """Tactical FQNs available to ``class_name`` (class-specific and generic)."""
+    gear_path = _resolve_workspace_path(get_gear_path(str(env).lower().strip()))
+    gear_data = load_json_file(str(gear_path)) if gear_path.is_file() else {}
+    return sorted(filter_gear_for_class(gear_data, TACTICAL_PREFIX, class_name).values())
+
+
 def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
     """Returns available disciplines, choices files, run configs, existing rotations, and relics."""
     active_env = str(env).lower().strip()
@@ -978,6 +1051,7 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
 
     precast_opt = payload.get("precast")
     pre_combat_opt = payload.get("pre_combat")
+    gate = normalize_pull_gate(payload)
     sim, player, target = prepare_simulation(
         rotation_steps,
         stats_cfg,
@@ -986,6 +1060,8 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
         debuff_mod,
         precast=precast_opt,
         pre_combat=pre_combat_opt,
+        pull_conditions=gate.get("pull_conditions"),
+        pull_max_wait=gate.get("pull_max_wait"),
     )
     player.rotation = Rotation("PreviewRotation", rotation_steps)
 
@@ -998,13 +1074,19 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
 
         def _make_wrapper(a, fn):
             def _wrapped(caster, tgt, s):
-                step_idx = getattr(caster.rotation, "current_step", 0)
-                step_obj = (
-                    caster.rotation.sequence[step_idx]
-                    if caster.rotation and 0 <= step_idx < len(caster.rotation.sequence)
-                    else None
-                )
-                step_label = getattr(step_obj, "name", None) or type(step_obj).__name__
+                runner = getattr(caster, "pre_combat", None)
+                in_pre_combat = runner is not None and runner.active
+                if in_pre_combat:
+                    step_idx = max(0, runner.index - 1)
+                    step_label = "Pre-Combat"
+                else:
+                    step_idx = getattr(caster.rotation, "current_step", 0)
+                    step_obj = (
+                        caster.rotation.sequence[step_idx]
+                        if caster.rotation and 0 <= step_idx < len(caster.rotation.sequence)
+                        else None
+                    )
+                    step_label = getattr(step_obj, "name", None) or type(step_obj).__name__
                 ok = fn(caster, tgt, s)
                 if ok:
                     active_buffs = [
@@ -1023,6 +1105,7 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
                             "resource": round(caster.resource.current_value, 1),
                             "step_index": step_idx + 1,
                             "step_label": step_label,
+                            "phase": "pre_combat" if in_pre_combat else "rotation",
                             "buffs": active_buffs[:6],
                         }
                     )
@@ -1039,11 +1122,35 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     combat_dur = sim.get_combat_duration() if getattr(sim, "combat_start_time", None) is not None else duration
     dps = total_dmg / combat_dur if combat_dur > 0 else 0.0
 
+    # T0 = first damage (pre-combat rows get negative combat_time); raw sim time stays in "time"
+    t0 = sim.combat_start_time if sim.combat_start_time is not None else (sim.pre_combat_end_time or 0.0)
+    for row in cast_log:
+        row["combat_time"] = round(row["time"] - t0, 2)
+    runner = getattr(player, "pre_combat", None)
+    swaps = [
+        {**sw, "time": round(sw["t"], 2), "combat_time": round(sw["t"] - t0, 2)}
+        for sw in (getattr(runner, "swaps", None) or [])
+    ]
+    skipped = [
+        {**sk, "time": round(sk["t"], 2), "combat_time": round(sk["t"] - t0, 2)}
+        for sk in (getattr(runner, "skipped", None) or [])
+    ]
+
     return {
         "duration": duration,
         "total_damage": round(total_dmg, 0),
         "dps": round(dps, 1),
         "casts": cast_log,
+        "combat_start_time": round(t0, 2),
+        "pre_combat_duration": round(max(0.0, t0), 2),
+        "tactical_swaps": swaps,
+        "pre_combat_skipped": skipped,
+        "final_tactical": getattr(player, "tactical_fqn", ""),
+        "pull_gate_wait": (
+            round(runner.pull_time - runner.pull_gate_start, 2)
+            if runner is not None and runner.pull_time is not None and runner.pull_gate_start is not None
+            else None
+        ),
     }
 
 
@@ -1143,6 +1250,8 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                         "path": rel_path,
                         "filename": target_file.name,
                         "steps": steps,
+                        "pre_combat": normalize_pre_combat_steps(raw_data),
+                        **normalize_pull_gate(raw_data),
                         "warnings": warnings,
                     }
                 )
@@ -1217,7 +1326,10 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 custom_dir.mkdir(parents=True, exist_ok=True)
                 full_path = custom_dir / filename
 
-                formatted = json.dumps(steps, indent=4, ensure_ascii=False)
+                file_data = build_rotation_file_data(
+                    steps, payload.get("pre_combat"), payload.get("pull_conditions"), payload.get("pull_max_wait")
+                )
+                formatted = json.dumps(file_data, indent=4, ensure_ascii=False)
                 # Write with Windows CRLF line endings per Rule #6
                 formatted_crlf = formatted.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n"
                 full_path.write_bytes(formatted_crlf.encode("utf-8"))
