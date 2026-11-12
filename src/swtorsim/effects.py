@@ -187,6 +187,7 @@ class ActiveEffect:
     is_expired: bool = False
     total_ticks: int = 0
     ticks_remaining: int = 0
+    tick_generation: int = 0  # bumped by reset_timer so a pending DotTick on the old tick phase is discarded
     owner_id: Optional[str] = None
     effect_blueprint: Any = field(default=None, repr=False, compare=False)
     ability_ref: Any = field(default=None, repr=False, compare=False)

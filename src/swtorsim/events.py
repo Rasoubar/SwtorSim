@@ -580,6 +580,7 @@ class DotTick(Event):
         self.target = target
         self.instance_ref = instance_ref
         self.effect_key = effect_key or instance_ref.name
+        self.tick_generation = getattr(instance_ref, "tick_generation", 0)
 
     def resolve(self, sim):
         """If it's instance's DoT has not been overlapped:
@@ -594,6 +595,8 @@ class DotTick(Event):
                 return
             if getattr(self.instance_ref, "is_expired", False):
                 return
+            if self.tick_generation != getattr(self.instance_ref, "tick_generation", 0):
+                return  # superseded by a reset_timer that restarted the tick phase
 
             total_ticks = getattr(self.instance_ref, "total_ticks", 0)
             current_tick = (total_ticks - self.instance_ref.ticks_remaining + 1) if total_ticks > 0 else 1

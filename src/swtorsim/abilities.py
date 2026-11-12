@@ -1847,6 +1847,17 @@ def handle_reset_timer(sim, caster, target, action, ability=None, context=None):
     total_ticks = getattr(active_effect, "total_ticks", 0)
     if total_ticks > 0:
         active_effect.ticks_remaining = total_ticks
+        tick_interval = getattr(active_effect, "tick_interval", None)
+        if sim is not None and tick_interval and tick_interval > 0.0:
+            # Parsed logs show the next natural tick lands one full tick interval after a reset, so
+            # restart the tick phase: invalidate the pending DotTick and schedule a fresh one.
+            from src.swtorsim.events import DotTick
+            active_effect.tick_generation = getattr(active_effect, "tick_generation", 0) + 1
+            source = getattr(active_effect, "caster_ref", None) or caster
+            sim.schedule_absolute(
+                current_time + tick_interval,
+                DotTick(source, owner_entity, active_effect, effect_key=effect_key),
+            )
 
 def handle_modify_active_duration(sim, caster, target, action, ability=None, context=None):
     """Modifies the active duration of target effect(s) by adding action['duration'] seconds."""

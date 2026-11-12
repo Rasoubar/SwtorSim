@@ -4,6 +4,13 @@
 
 ## Completed Fixes
 
+### 73. `reset_timer` Restarts DoT Tick Phase (`abilities.py`, `events.py`, `effects.py`, `test_simulation_integration.py`) - [DONE]
+- A Parsely log of the Sniper Marksmanship parse (Corrosive Dart with Agitating Energies) showed every natural Dart tick landing exactly one tick interval (2.8s with alacrity) after the previous Dart hit, i.e. a `reset_timer` proc (Followthrough / Penetrating Blasts) restarts the tick cadence. The sim kept the original tick phase, producing ~40 extra natural ticks per 290s.
+- `handle_reset_timer` now bumps `ActiveEffect.tick_generation` and schedules a fresh `DotTick` one `tick_interval` after the reset; `DotTick` discards events from a stale generation. Applies to every ticking effect reset by `reset_timer`; buffs without ticks are unchanged.
+- Added `test_12b_reset_timer_restarts_dot_tick_phase` to `tests/test_simulation_integration.py`.
+- Validation (`sniper_marksmanship_config_test.json`, first 144s): natural Dart tick gaps are now all 2.8s (before: 0.1s-2.8s); Dart hits 163 -> 141 over 144s. PB/FT proc counts and per-hit values unchanged.
+- Known: the full-length DPS comparison (290s, seed 42: 29.8k -> 16.9k) is dominated by a rotation deadlock that the changed timing exposes (`Sub 30: Takedown / Followthrough` step waits forever on a Followthrough buff after a Penetrating Blasts cast at ~148s ends after 0.37s with a single hit; cause not yet investigated; Corrosive Dart then expires, 144s stalled vs 31.6s before). Not caused by the tick change itself; needs a rotation/engine decision.
+
 ### 72. Agent Instructions Overhaul (`AGENTS.md`, `CLAUDE.md`, docs) - [DONE]
 - `AGENTS.md`: added §0 (no git commits; ask when ambiguous); widened §1 so ALL combat math formulas are frozen (combat_math, curves, entities timing formulas), with stat routing changes only on explicit request; documented the exact unittest command in §4; flagged missing `Stat_IDs.xlsx` / catalog tool in §3 and §8; §9 now requires a baseline run, pre-existing failure reporting, and before/after DPS for damage-affecting changes; §10 defines document roles; new §11 (extracted game data is ground truth) and §12 (no debug output in repo root).
 - Added `CLAUDE.md` (`@AGENTS.md`) so Claude Code loads the rules automatically.

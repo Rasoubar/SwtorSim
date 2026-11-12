@@ -534,6 +534,43 @@ class SimulationIntegrationTests(unittest.TestCase):
         hits_after = sim.tracker.breakdown["Corrosive Dart"]["hit_count"]
         self.assertGreater(hits_after, hits_before, "Followthrough must trigger an extra tick of Corrosive Dart")
 
+    def test_12b_reset_timer_restarts_dot_tick_phase(self):
+        """After a reset_timer proc, the next natural Corrosive Dart tick lands one full tick interval later."""
+        from src.swtorsim.config_load import load_complete_loadout
+        from src.swtorsim.abilities import handle_reset_timer
+
+        loadout = load_complete_loadout(["abl.agent.corrosive_dart"])
+        stats_config = {"class_name": "sniper", "level": 80, "stats": {}}
+        sim, player, target = prepare_simulation([], stats_config, loadout, 1000000, {}, verbose=False)
+        player.stats["Ranged Accuracy"] = 1.10
+        player.stats["Main Accuracy"] = 1.10
+        player.stats["Tech Accuracy"] = 1.10
+
+        cd = player.ability_db["abl.agent.corrosive_dart"]
+        cd.cast(player, target, sim)
+        sim.run_timed(duration=4.0, target=target)  # natural ticks at ~3.0s; now at 4.0s
+
+        eff_key = next(k for k, e in target.effects.items() if getattr(e, "total_ticks", 0) > 0)
+        eff = target.effects[eff_key]
+        interval = eff.tick_interval
+        reset_time = sim.current_time  # time of the last resolved event (run_timed durations are absolute)
+        handle_reset_timer(
+            sim, player, target, {}, context={"owner_entity": target, "owner_effect_key": eff_key}
+        )
+        self.assertEqual(eff.ticks_remaining, eff.total_ticks)
+
+        before = sim.tracker.breakdown["Corrosive Dart"]["hit_count"]
+        sim.run_timed(duration=reset_time + interval - 0.2, target=target)
+        self.assertEqual(
+            sim.tracker.breakdown["Corrosive Dart"]["hit_count"], before,
+            "No natural tick may occur before one full tick interval after the reset",
+        )
+        sim.run_timed(duration=reset_time + interval + 0.2, target=target)
+        self.assertEqual(
+            sim.tracker.breakdown["Corrosive Dart"]["hit_count"], before + 1,
+            "Exactly one natural tick must land one tick interval after the reset",
+        )
+
     def test_24_energy_tanks_max_energy_scaling(self):
         """Verifies tal.agent.energy_tanks increases Sniper max energy from 100 to 110."""
         from src.swtorsim.config_load import load_complete_loadout
