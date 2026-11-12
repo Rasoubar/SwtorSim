@@ -148,7 +148,8 @@ class DamageHit(Event):
             "enemy_target": self.target,
             "tags": self.tags,
             "is_crit": is_crit,
-            "damage_type": self.action_data.get("damage_type", 1),
+            # Resolved type: weapon attacks carry no raw damage_type and resolve to the weapon's.
+            "damage_type": resolved_dt,
             "attack_type": attack_type,
             "spell_type": spell_type,
             "is_weapon_attack": is_weapon_attack,

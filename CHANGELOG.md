@@ -2878,3 +2878,15 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - Full suite: 172 pass.
 
 - Follow-up: an outlined box (a "Mudkip" label above it like the other fields, the text "Is the best pokemon", border and text colored by a new `--mudkip` variable: orange in the light theme, light blue `#58abdf` in the dark theme; no fill, same 26px height as the inputs) now fills the empty cell next to Accuracy Rating in the Character Stats grid, so MH Min / MH Max and OH Min / OH Max sit on the same row again after the Armor Pen input was removed.
+
+## Effects: Stack-Loss Branches Now Run
+- An effect's own `on_stack_charge_decreased` branches never ran: `TriggerManager.subscribe` skips lifecycle triggers, and the stack-loss path in `handle_modify_stack_charge` (`src/swtorsim/abilities.py`) only dispatched to the trigger manager. It now runs the effect's branches first, mirroring the stack-gain path.
+- The trigger's `proc_chance_percent` is honored for this trigger only (e.g. Deathmark's 50% stack refund). `Branch.execute` takes an optional `proc_chance`, rolled after the branch conditions pass, so a branch whose conditions fail draws nothing from the RNG.
+- A stack-loss branch that refunds the last stack keeps the effect alive; a stack-loss branch that removes a stack does not re-enter (`from_stack_event`).
+- Same-seed output identical on `hatred_14gcd`, `carnage_14gcd`, `sniper_marksmanship_config_test`, `annitest` (seeds 42/43/44): those builds take none of the talents that gate these branches. Hatred seed 42 stays at 31000.17 DPS.
+- Tests: `tests/test_stack_decrease_branches.py` (7). Full suite: 181 pass.
+
+## Triggers: Damage-Type Filter Uses the Resolved Damage Type
+- `DamageHit.resolve` (`src/swtorsim/events.py`) passed the raw action `damage_type` (default 1, kinetic) to the trigger context. Weapon attacks carry no raw type and resolve to the weapon's type, so triggers saw saber and blaster hits as kinetic. The context now carries the resolved type, the same value the damage log gets. No formula touched.
+- Same-seed output identical on the four configs above (seeds 42/43/44): the only live trigger filtering on damage type is a Deathmark branch wanting internal damage.
+- Tests: `tests/test_trigger_damage_type.py` (2). Full suite: 181 pass.

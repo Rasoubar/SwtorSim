@@ -77,8 +77,11 @@ class Branch:
             ),
         )
 
-    def execute(self, sim, caster, target, context=None, ability=None) -> tuple[bool, bool]:
+    def execute(self, sim, caster, target, context=None, ability=None, proc_chance=None) -> tuple[bool, bool]:
         """Evaluates branch conditions and sequentially executes its actions.
+
+        ``proc_chance`` (0-100) is rolled only after the conditions pass, so a branch whose
+        conditions fail never draws from the RNG.
 
         Returns ``(branch_ran, branch_succeeded)``.
         """
@@ -87,6 +90,9 @@ class Branch:
         if self.conditions:
             if not validate_all(self.conditions, caster, actual_target, sim=sim, context=context):
                 return False, True
+
+        if proc_chance is not None and proc_chance < 100.0 and random.random() * 100.0 > proc_chance:
+            return False, True
 
         source_name = ability.name if ability else "Unknown"
         combat_outcomes: list[bool] = []
@@ -203,6 +209,7 @@ class Effect:
         executed_branches = set()
         for branch in self.branches:
             triggers = getattr(branch, "triggers", [])
+            proc_chance = None
             if not triggers:
                 if not include_untriggered:
                     continue
@@ -227,6 +234,9 @@ class Effect:
                         if "is_successful" in bools and "is_successful" in branch_context:
                             if bools["is_successful"] != branch_context["is_successful"]:
                                 continue
+                    if trigger_name == "on_stack_charge_decreased":
+                        # e.g. Deathmark's 50% chance to refund the consumed stack
+                        proc_chance = (t.get("floats") or {}).get("proc_chance_percent")
                     matched = True
                     break
                 if not matched:
@@ -235,7 +245,9 @@ class Effect:
             if branch.run_if_none_ran and any(b in executed_branches for b in branch.run_if_none_ran):
                 continue
 
-            ran, success = branch.execute(sim, caster, target, context=branch_context, ability=ability)
+            ran, success = branch.execute(
+                sim, caster, target, context=branch_context, ability=ability, proc_chance=proc_chance
+            )
             if ran:
                 executed_branches.add(branch.index)
 
@@ -1028,6 +1040,19 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
     else:
         if owner_key:
             eff = getattr(owner_entity, "effects", {}).get(owner_key)
+        # A stack-loss branch refunding the stack it just lost: the effect sits at 0 stacks
+        # (flagged expired, not yet cleaned up), so the refund keeps it alive.
+        lost = (context or {}).get("active_effect")
+        if (
+            eff is None
+            and delta > 0
+            and lost is not None
+            and (context or {}).get("from_stack_event")
+            and getattr(lost, "stacks", 1) <= 0
+            and dict.get(getattr(owner_entity, "effects", {}), owner_key) is lost
+        ):
+            lost.is_expired = False
+            eff = lost
 
     if eff is None or getattr(eff, "is_expired", False):
         return
@@ -1074,17 +1099,40 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
                     "stack_multiplier": cur_stacks,
                 },
             )
-    elif delta < 0 and sim is not None and hasattr(sim, "triggers") and not (context or {}).get("from_stack_event"):
-        sim.triggers.dispatch(
-            "on_stack_charge_decreased",
-            sim,
-            {
+    elif delta < 0 and cur_stacks < old_stacks and not (context or {}).get("from_stack_event"):
+        # The effect's own on_stack_charge_decreased branches (never subscribed on the event bus).
+        # from_stack_event stops a branch that itself removes a stack from re-entering here.
+        blueprint = getattr(eff, "effect_blueprint", None)
+        if blueprint and hasattr(blueprint, "execute_triggered_branches"):
+            ctx = {
                 **(context or {}),
-                "caster": caster,
-                "target": owner_entity,
+                "stack_multiplier": cur_stacks,
+                "current_stacks": cur_stacks,
+                "owner_effect_key": owner_key,
+                "owner_entity": owner_entity,
+                "active_effect": eff,
                 "from_stack_event": True,
-            },
-        )
+            }
+            blueprint.execute_triggered_branches(
+                "on_stack_charge_decreased",
+                sim,
+                getattr(eff, "caster_ref", None) or caster,
+                owner_entity,
+                context=ctx,
+                ability=getattr(eff, "ability_ref", None),
+                include_untriggered=False,
+            )
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch(
+                "on_stack_charge_decreased",
+                sim,
+                {
+                    **(context or {}),
+                    "caster": caster,
+                    "target": owner_entity,
+                    "from_stack_event": True,
+                },
+            )
     if getattr(eff, "stacks", 1) <= 0:
         owner_entity.cleanup_expired_effects([owner_key])
 
