@@ -412,7 +412,7 @@
       rejectWorkerReady(err);
     };
 
-    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1794449312" });
+    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1794450423" });
     return wState;
   }
 
@@ -726,14 +726,16 @@
         const preCombat = Array.isArray(payload.pre_combat) ? payload.pre_combat : [];
         const pullConds = (payload.pull_conditions && typeof payload.pull_conditions === "object") ? payload.pull_conditions : {};
         const hasPull = Object.keys(pullConds).length > 0;
+        const weaveEntries = Array.isArray(payload.weave) ? payload.weave.filter(w => w && w.ability_id) : [];
         let fileData = payload.steps || [];
-        if (preCombat.length || hasPull) {
+        if (preCombat.length || hasPull || weaveEntries.length) {
           fileData = {};
           if (preCombat.length) fileData.pre_combat = preCombat;
           if (hasPull) {
             fileData.pull_conditions = pullConds;
             if (payload.pull_max_wait !== undefined && payload.pull_max_wait !== null) fileData.pull_max_wait = Number(payload.pull_max_wait);
           }
+          if (weaveEntries.length) fileData.weave = weaveEntries;
           fileData.sequence = payload.steps || [];
         }
         const contentStr = JSON.stringify(fileData, null, 4);
