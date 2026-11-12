@@ -2897,3 +2897,8 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - `DamageHit.resolve` (`src/swtorsim/events.py`) passed the raw action `damage_type` (default 1, kinetic) to the trigger context. Weapon attacks carry no raw type and resolve to the weapon's type, so triggers saw saber and blaster hits as kinetic. The context now carries the resolved type, the same value the damage log gets. No formula touched.
 - Same-seed output identical on the four configs above (seeds 42/43/44): the only live trigger filtering on damage type is a Deathmark branch wanting internal damage.
 - Tests: `tests/test_trigger_damage_type.py` (2). Full suite: 181 pass.
+
+## Conditions: is_casting Matches a Named Ability During a Timed Cast
+- `is_casting` with an `ability_spec` (`src/swtorsim/requirements.py`) read `.ability` from the active cast, but a timed cast stores the `Ability` itself in `active_cast` (only `ActiveChannel` wraps one), so the named check was always false mid-cast. It now falls back to the active cast itself.
+- Used 8 times in the extracted data, all in Take Cover / Take Portable Cover (Calculated Pursuit / Hot Pursuit). Same-seed output identical to commit 83ad888 on `hatred_14gcd`, `carnage_14gcd`, `sniper_marksmanship_config_test`, `annitest` (seeds 42/43/44).
+- Tests: `tests/test_is_casting_condition.py` (4). Full suite: 186 pass.

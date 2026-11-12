@@ -473,7 +473,8 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         
         spec = item.get("ability_spec")
         if spec and is_busy:
-            active_bp = getattr(active_channel, "ability", None) or getattr(active_cast, "ability", None)
+            # A channel wraps its ability (ActiveChannel.ability); a timed cast is the Ability itself.
+            active_bp = getattr(active_channel, "ability", None) or getattr(active_cast, "ability", None) or active_cast
             active_fqn = getattr(active_bp, "fqn", "")
             res = (spec == active_fqn)
         else:
