@@ -2902,3 +2902,8 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 - `is_casting` with an `ability_spec` (`src/swtorsim/requirements.py`) read `.ability` from the active cast, but a timed cast stores the `Ability` itself in `active_cast` (only `ActiveChannel` wraps one), so the named check was always false mid-cast. It now falls back to the active cast itself.
 - Used 8 times in the extracted data, all in Take Cover / Take Portable Cover (Calculated Pursuit / Hot Pursuit). Same-seed output identical to commit 83ad888 on `hatred_14gcd`, `carnage_14gcd`, `sniper_marksmanship_config_test`, `annitest` (seeds 42/43/44).
 - Tests: `tests/test_is_casting_condition.py` (4). Full suite: 186 pass.
+
+## Abilities: No Free Charge When Max Charges Drops
+- `Ability.apply_charge_modifiers` (`src/swtorsim/abilities.py`) shifted current charges by the change in max charges and floored the result at 1, so an ability at 0 charges got one back when a bonus charge was lost (only reachable through a pre-combat tactical swap away from a utility tactical that grants a charge). When the max drops, current charges are now capped at the new max (2 -> 1, 1 -> 1, 0 -> 0) instead of shifted and floored at 1; a rising max still adds the difference. The cap rule is the user's call; the in-game behaviour is untested.
+- Same-seed output identical on `hatred_14gcd`, `carnage_14gcd`, `sniper_marksmanship_config_test`, `annitest` (seeds 42/43/44).
+- Tests: `tests/test_charge_max_change.py` (4). Full suite: 190 pass.

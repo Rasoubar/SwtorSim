@@ -1395,7 +1395,13 @@ class Ability:
             if new_max is not None and new_max != self.max_charges:
                 diff = new_max - (self.max_charges or 1)
                 self.max_charges = new_max
-                self.charges = new_max if self.charges is None else max(1, self.charges + diff)
+                if self.charges is None:
+                    self.charges = new_max
+                elif diff > 0:
+                    self.charges += diff
+                else:
+                    # Losing a bonus charge caps what is held; it never hands back a spent one.
+                    self.charges = min(self.charges, new_max)
 
     def schedule_recharge(self, caster, sim):
         """Snapshots CDR, creates a new event reference, and schedules it."""
