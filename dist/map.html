@@ -70,8 +70,29 @@
   }
   [data-theme="dark"] header { color: var(--text-main); border-bottom: 1px solid var(--border); }
   header h1 { font-size: 15px; margin: 0; }
-  #info { font-size: 12px; opacity: .9; }
-  main { flex: 1; min-height: 0; overflow: auto; padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+  #info { font-size: 12px; opacity: .9; flex: 1; }
+  .hbtn { font: inherit; font-size: 12px; font-weight: 600; color: inherit; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .45); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+  .hbtn:hover:not(:disabled) { background: rgba(255, 255, 255, .3); }
+  .hbtn:disabled { opacity: .45; cursor: default; }
+  .hbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  [data-theme="dark"] .hbtn { background: var(--bg-card); border-color: var(--border); }
+  [data-theme="dark"] .hbtn.on { background: var(--accent); border-color: var(--accent); }
+  #shell { flex: 1; min-height: 0; display: flex; }
+  main { flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Ability palette: drag an ability onto an arrow, a step or the Use on cooldown strip. */
+  #palette { flex: none; width: 216px; min-height: 0; display: flex; flex-direction: column; background: var(--bg-card); border-right: 1px solid var(--border); }
+  #palette.hidden { display: none; }
+  #palSearch { margin: 8px; padding: 5px 8px; font: inherit; font-size: 12px; color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 6px; }
+  #palList { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
+  .pgroup { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); padding: 6px 4px 3px; }
+  .pitem { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; cursor: grab; }
+  .pitem:hover { background: var(--accent-bg); }
+  .pitem img, .pitem .noicon { width: 26px; height: 26px; border-radius: 4px; display: block; }
+  .pitem .noicon { border: 1px dashed var(--border); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+  .pitem .pn { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pitem .pcd { font-size: 10px; color: var(--text-muted); }
+  .pempty { font-size: 12px; color: var(--text-muted); padding: 14px 8px; text-align: center; }
   .note { font-size: 12px; color: var(--text-muted); }
   .empty { background: var(--bg-card); border: 1px dashed var(--border); border-radius: 8px; padding: 40px 20px; text-align: center; color: var(--text-muted); }
   .empty strong { color: var(--text-main); }
@@ -84,12 +105,26 @@
      smaller cards, linked to it by a dashed amber line. */
   .track { display: grid; grid-template-rows: auto; grid-auto-columns: auto; align-items: start; overflow-x: auto; padding: 12px 12px 14px; }
   .cell { grid-row: 1; }
-  .slot-top { position: relative; align-self: stretch; min-width: 28px; }
+  .slot-top { position: relative; align-self: stretch; min-width: 28px; border-radius: 6px; }
+  .slot-top.edge { min-width: 18px; }
+  .slot-top.empty-lane { min-width: 230px; min-height: 64px; border: 1.5px dashed var(--border); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; }
+  /* Drop targets while something is dragged */
+  body.dragging .slot-top { outline: 1.5px dashed var(--border); outline-offset: -3px; }
+  .slot-top.drop-on, .slot-bottom.drop-on { background: var(--accent-bg); outline: 2px solid var(--accent) !important; outline-offset: -3px; }
+  .weave-strip.drop-on { background: var(--accent-bg); }
+  .step.drop-before { box-shadow: -4px 0 0 var(--accent); }
+  .step.drop-after { box-shadow: 4px 0 0 var(--accent); }
+  .step.mini.drop-before { box-shadow: 0 -4px 0 var(--accent); }
+  .step.mini.drop-after { box-shadow: 0 4px 0 var(--accent); }
+  .step.drop-into { box-shadow: 0 0 0 2px var(--accent); }
+  .entry.drop-row-before { box-shadow: 0 -2px 0 var(--accent); }
+  .entry.drop-row-after { box-shadow: 0 2px 0 var(--accent); }
+  .step.is-dragging, .entry.is-dragging { opacity: .45; }
   .slot-top .hline { position: absolute; left: 4px; right: 6px; top: 14px; border-top: 1.5px solid var(--text-muted); }
   .slot-top .hline::after { content: ""; position: absolute; right: -6px; top: -5px; border: 4.5px solid transparent; border-left: 6px solid var(--text-muted); }
   .slot-top.has-off::after { content: ""; position: absolute; left: 50%; top: 14px; height: 24px; border-left: 1.5px dashed var(--amber); }
   .slot-top .branch { position: absolute; left: calc(50% - 4px); top: 10px; width: 9px; height: 9px; border-radius: 50%; background: var(--amber); z-index: 1; }
-  .slot-bottom { grid-row: 1; position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 38px 8px 0; }
+  .slot-bottom { grid-row: 1; position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 38px 8px 0; border-radius: 6px; }
   .slot-bottom .step + .step { position: relative; }
   .slot-bottom .step + .step::before { content: ""; position: absolute; left: 50%; top: -9px; height: 8px; border-left: 1.5px dashed var(--amber); }
 
@@ -109,13 +144,16 @@
   .step.mini .badge { font-size: 8.5px; }
   .step-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 6px; padding: 6px 8px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-input); border-radius: 7px 7px 0 0; cursor: pointer; text-align: left; font: inherit; color: inherit; border-top: 0; border-left: 0; border-right: 0; width: 100%; }
   .step-head:hover { background: var(--accent-bg); }
-  .num { font-family: monospace; font-size: 11px; font-weight: 700; color: #fff; border-radius: 4px; padding: 1px 5px; }
+  .num { font-family: monospace; font-size: 11px; font-weight: 700; color: #fff; border-radius: 4px; padding: 1px 5px; cursor: pointer; white-space: nowrap; }
+  .num:hover { outline: 2px solid var(--text-main); }
+  .step { cursor: grab; }
+  .empty-pool { font-size: 11px; color: var(--text-muted); padding: 4px 6px; }
   .num.priority_block { background: var(--accent); }
   .num.optional { background: var(--amber); }
   .num.fixed { background: var(--cyan); }
   .name { font-weight: 600; font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .entries { display: flex; flex-direction: column; padding: 4px; gap: 2px; }
-  .entry { display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; cursor: pointer; background: none; border: 0; font: inherit; color: inherit; text-align: left; width: 100%; }
+  .entry { position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr); align-items: center; gap: 6px; padding: 3px 4px; border-radius: 5px; cursor: pointer; background: none; border: 0; font: inherit; color: inherit; text-align: left; width: 100%; }
   .entry:hover { background: var(--accent-bg); }
   .entry:focus-visible, .step-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .entry img, .entry .noicon { width: 30px; height: 30px; border-radius: 4px; display: block; }
@@ -128,12 +166,60 @@
   .badge.res { background: var(--cyan-bg); color: var(--cyan); }
   .badge.buff { background: var(--green-bg); color: var(--green); }
   .badge.cd { background: var(--amber-bg); color: var(--amber); }
+  .badge[data-rule] { cursor: pointer; }
+  .badge[data-rule]:hover { outline: 1px solid currentColor; }
+  .bx { margin-left: 3px; font-weight: 700; opacity: .7; }
+  .bx:hover { opacity: 1; }
+  /* Row tools (add rule / remove row): shown on hover or keyboard focus */
+  .etools { position: absolute; top: 2px; right: 2px; display: none; gap: 2px; }
+  .entry:hover .etools, .entry:focus-within .etools, .wchip:hover .etools { display: flex; }
+  .wchip .etools { position: static; }
+  .ebtn { width: 16px; height: 16px; line-height: 14px; text-align: center; font-size: 12px; font-weight: 700; border-radius: 4px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text-main); cursor: pointer; }
+  .ebtn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ebtn.del:hover { background: var(--red); border-color: var(--red); }
+  /* End of Opener: drag the handle onto a gap to move the loop anchor */
+  .anchor-row { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--green); }
+  .anchor-handle { flex: none; cursor: grab; font-weight: 700; border: 1px dashed var(--green); border-radius: 6px; padding: 3px 8px; background: var(--green-bg); }
+  .anchor-line { flex: 1; border-top: 1.5px dashed var(--green); }
+  /* Trash: drop a step, a priority row, a Use on cooldown entry or the End of opener handle to remove it */
+  #trash { position: fixed; right: 20px; bottom: 20px; z-index: 10; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 1.5px dashed var(--border); background: var(--bg-card); color: var(--text-muted); opacity: .6; transition: transform .1s; }
+  #trash svg { width: 22px; height: 22px; pointer-events: none; }
+  body.dragging #trash { opacity: 1; border-color: var(--red); color: var(--red); }
+  #trash.drop-on { background: var(--red); border-style: solid; color: #fff; transform: scale(1.15); }
+  /* Loop shown as several rows: a new row starts at each step that leads with the chosen ability */
+  .track + .track { border-top: 1px dashed var(--border-subtle); }
+  /* Rows start at the left edge with same-width cards, so repeats of a cycle sit under each other */
+  .track.rowed { justify-content: start; }
+  .track.rowed .step:not(.mini) { width: 176px; }
+  .rowbreak { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); }
+  .rowbreak select { font: inherit; font-size: 11.5px; color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 5px; padding: 2px 4px; max-width: 190px; }
+  .wchip { cursor: grab; }
+  /* Floating step menu and rule form */
+  .pop { position: fixed; z-index: 20; display: none; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); }
+  .pop.open { display: block; }
+  #menu { min-width: 170px; padding: 4px 0; }
+  .mitem { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 12px; font: inherit; font-size: 12px; color: inherit; background: none; border: 0; text-align: left; cursor: pointer; }
+  .mitem:hover { background: var(--accent-bg); }
+  .mitem.cur { font-weight: 700; }
+  .mitem.danger { color: var(--red); }
+  .msep { border-top: 1px solid var(--border-subtle); margin: 4px 0; }
+  #rulePop { width: 380px; max-width: calc(100vw - 16px); padding: 10px 12px; }
+  .pop-title { font-weight: 700; font-size: 12.5px; margin-bottom: 8px; }
+  .form-group { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; flex: 1; min-width: 0; }
+  .form-group label { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
+  .form-row { display: flex; gap: 8px; }
+  #rulePop select, #rulePop input { font: inherit; font-size: 12px; color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-subtle); border-radius: 5px; padding: 4px 6px; min-width: 0; }
+  #rpDesc { font-size: 11px; color: var(--text-muted); }
+  #rpErr { font-size: 11.5px; color: var(--red); min-height: 14px; }
+  .pop-foot { display: flex; justify-content: flex-end; gap: 6px; margin-top: 4px; }
+  .pbtn { font: inherit; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-input); color: var(--text-main); cursor: pointer; }
+  .pbtn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .loopback { flex: none; margin-top: 2px; border: 1px dashed var(--green); color: var(--green); border-radius: 7px; padding: 10px 12px; font-size: 12px; font-weight: 700; text-align: center; width: 110px; }
   .lane-body { min-width: 0; display: flex; flex-direction: column; }
   .weave-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 8px 12px; border-bottom: 1px dashed var(--amber); font-size: 11.5px; }
   .weave-title { font-weight: 700; color: var(--amber); text-transform: uppercase; letter-spacing: .08em; font-size: 10.5px; }
   .weave-hint { color: var(--text-muted); }
-  .wchip { display: inline-flex; align-items: center; gap: 5px; border: 1px dashed var(--amber); border-radius: 6px; padding: 2px 6px 2px 2px; background: var(--bg-card); }
+  .wchip { display: inline-flex; align-items: center; gap: 5px; border: 1px dashed var(--amber); border-radius: 6px; padding: 2px 6px 2px 2px; background: var(--bg-card); min-height: 28px; }
   .wchip img, .wchip .noicon { width: 22px; height: 22px; border-radius: 4px; display: block; }
   .wchip .noicon { border: 1px dashed var(--border); font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 11.5px; color: var(--text-muted); }
@@ -144,11 +230,26 @@
 <header>
   <h1>Rotation Map</h1>
   <span id="info"></span>
+  <button type="button" class="hbtn" id="btnPalette" title="Show or hide the ability list">Abilities</button>
+  <button type="button" class="hbtn" id="btnUndo" title="Undo the last rotation change (Ctrl+Z)" disabled>Undo</button>
+  <button type="button" class="hbtn" id="btnRedo" title="Redo (Ctrl+Y)" disabled>Redo</button>
 </header>
-<main id="main">
-  <div class="empty"><strong>Waiting for the Rotation Builder.</strong><br>Keep the builder open; the map follows its rotation as you edit.</div>
-</main>
+<div id="shell">
+  <aside id="palette" aria-label="Abilities">
+    <input type="search" id="palSearch" placeholder="Search abilities" aria-label="Search abilities">
+    <div id="palList"></div>
+  </aside>
+  <main id="main">
+    <div class="empty"><strong>Waiting for the Rotation Builder.</strong><br>Keep the builder open; the map follows its rotation as you edit.</div>
+  </main>
+</div>
+<div id="trash" role="img" aria-label="Trash" title="Drag a step, a priority row, a Use on cooldown entry or the End of opener handle here to remove it">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>
+</div>
+<div class="pop" id="menu" role="menu"></div>
+<div class="pop" id="rulePop" role="dialog" aria-label="Rule"></div>
 
+<script src="rule_form.js"></script>
 <script>
 (function initTheme() {
   const apply = (t) => {
@@ -167,6 +268,9 @@ try { channel = new BroadcastChannel(MAP_CHANNEL_NAME); } catch (e) { channel = 
 
 let STATE = null;
 let selected = null;
+let drag = null;          // what is being dragged: {kind: "ability", slug} | {kind: "step", idx} | {kind: "row", step, row} | {kind: "anchor"} | {kind: "weave", idx}
+let paletteJson = "";     // last rendered ability catalog (the palette is redrawn only when it changes)
+let ruleCtx = null;       // open rule popover: {scope, step, row, editKey}
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 const iconUrl = (name) => {
@@ -174,93 +278,176 @@ const iconUrl = (name) => {
   const clean = name.toLowerCase().endsWith(".png") ? name : `${name}.png`;
   return `icons/${encodeURIComponent(clean)}`;
 };
+const iconHtml = (icon) => (icon ? `<img src="${iconUrl(icon)}" alt="" loading="lazy" draggable="false">` : `<span class="noicon">?</span>`);
+const stepByIdx = (idx) => ((STATE && STATE.steps) || []).find((s) => s.editorIdx === idx) || null;
+
+// Edits are done by the builder: the map sends a command and redraws from the state that comes back.
+// rev ties the command to the rotation it was built from; the builder drops commands with an older one.
+function send(cmd) {
+  if (channel && STATE) channel.postMessage({ type: "cmd", rev: STATE.rev, ...cmd });
+}
+
+function badgesHtml(rules) {
+  return (rules || []).map((r) => `<span class="badge ${esc(r.cls)}" data-rule="${esc(r.key)}" title="${esc(r.full)} (click to edit)">${esc(r.txt)}<span class="bx" data-delrule="${esc(r.key)}" title="Remove this rule">&times;</span></span>`).join("");
+}
 
 // The map shows the rotation's structure only; dry-run results live in the Cast Timeline window.
 function stepHtml(st, mini = false) {
   const label = st.type === "priority_block" ? "Priority" : st.type === "optional" ? "Optional" : st.type === "fixed" ? "Fixed" : st.type;
+  const isPool = st.type === "priority_block";
   const entries = st.entries.map((e, j) => {
-    const icon = e.icon ? `<img src="${iconUrl(e.icon)}" alt="" loading="lazy">` : `<span class="noicon">?</span>`;
-    const badges = (e.rules || []).map((r) => `<span class="badge ${esc(r.cls)}" title="${esc(r.full)}">${esc(r.txt)}</span>`).join("");
-    return `<button type="button" class="entry" data-step="${st.seq}" data-entry="${j}" title="${esc(e.name)} (click to open this row in the editor)">
-      ${icon}
+    const badges = badgesHtml(e.rules);
+    const tools = `<span class="etools">${st.canRules ? '<span class="ebtn" data-addrule title="Add a rule">+</span>' : ""}${isPool ? '<span class="ebtn del" data-delrow title="Remove this ability from the block">&times;</span>' : ""}</span>`;
+    return `<div class="entry" role="button" tabindex="0" data-step="${st.seq}" data-entry="${j}"${isPool ? ' draggable="true"' : ""} title="${esc(e.name)} (click to open this row in the editor${isPool ? "; drag to reorder" : ""})">
+      ${iconHtml(e.icon)}
       <span class="meta"><span class="an">${esc(e.name)}</span>${badges ? `<span class="badges">${badges}</span>` : ""}</span>
-    </button>`;
+      ${tools}
+    </div>`;
   }).join("");
-  return `<div class="step ${esc(st.type)}${mini ? " mini" : ""}${selected === st.seq ? " sel" : ""}" id="step-${st.seq}">
-    <button type="button" class="step-head" data-step="${st.seq}" title="${esc(label)}: ${esc(st.name)} (click to open in the editor)">
-      <span class="num ${esc(st.type)}">${st.seq}</span>
+  return `<div class="step ${esc(st.type)}${mini ? " mini" : ""}${selected === st.seq ? " sel" : ""}" id="step-${st.seq}" data-idx="${st.editorIdx}" data-type="${esc(st.type)}" draggable="true">
+    <div class="step-head" role="button" tabindex="0" data-step="${st.seq}" title="${esc(label)}: ${esc(st.name)} (click to open in the editor; drag to move)">
+      <span class="num ${esc(st.type)}" data-menu title="Change type, duplicate or delete">${st.seq} &#9662;</span>
       <span class="name">${esc(st.name)}</span>
-    </button>
-    <div class="entries">${entries}</div>
+    </div>
+    <div class="entries">${entries || '<div class="empty-pool">Empty block</div>'}</div>
   </div>`;
 }
 
 // Off-GCD steps leave the main line: each run of them hangs below the arrow between the GCD steps
-// around it (where they fire), in smaller cards.
-function laneHtml(kind, steps, tail) {
-  const label = kind === "opener" ? "Opener" : "Loop";
+// around it (where they fire), in smaller cards. Every arrow / lane end is a drop target; data-at is
+// the rotationSteps index a drop there inserts before (endAt for the end of the lane).
+function trackHtml(key, steps, endAt, tail, rowed = false) {
   const cols = [];
   let pending = [];
   steps.forEach((st) => {
     if (st.offGcd) { pending.push(st); return; }
-    cols.push({ slot: pending });
+    cols.push({ slot: pending, at: st.editorIdx });
     cols.push({ card: st });
     pending = [];
   });
-  cols.push({ slot: pending, last: true });
+  cols.push({ slot: pending, at: endAt, last: true });
   let html = "";
   let col = 1;
-  cols.forEach((c) => {
+  cols.forEach((c, i) => {
     if (c.card) {
       html += `<div class="cell" style="grid-column:${col}">${stepHtml(c.card)}</div>`;
       col += 1;
       return;
     }
     const off = c.slot;
-    if (!off.length && (col === 1 || (c.last && !tail))) return; // no bare arrow at either end
-    html += `<div class="cell slot-top${off.length ? " has-off" : ""}" style="grid-column:${col}" aria-hidden="true">
-      <div class="hline"></div>${off.length ? '<span class="branch"></span>' : ""}</div>`;
+    const edge = !off.length && (i === 0 || (c.last && !tail)); // no arrow at either end, only a drop gap
+    const emptyLane = edge && cols.length === 1;
+    const inner = edge
+      ? (emptyLane ? "Drop an ability here" : "")
+      : `<div class="hline"></div>${off.length ? '<span class="branch"></span>' : ""}`;
+    html += `<div class="cell slot-top${off.length ? " has-off" : ""}${edge ? " edge" : ""}${emptyLane ? " empty-lane" : ""}" style="grid-column:${col}" data-at="${c.at}">${inner}</div>`;
     if (off.length) {
-      html += `<div class="slot-bottom" style="grid-column:${col}" title="Off-GCD: fires between the steps around this arrow">${off.map((st) => stepHtml(st, true)).join("")}</div>`;
+      html += `<div class="slot-bottom" style="grid-column:${col}" data-at="${c.at}" title="Off-GCD: fires between the steps around this arrow">${off.map((st) => stepHtml(st, true)).join("")}</div>`;
     }
     col += 1;
   });
   if (tail) html += `<div class="cell" style="grid-column:${col}">${tail}</div>`;
+  return `<div class="track${rowed ? " rowed" : ""}" data-lane="${key}">${html}</div>`;
+}
+
+function laneHtml(kind, tracksHtml) {
+  const label = kind === "opener" ? "Opener" : "Loop";
   return `<section class="lane ${kind}" aria-label="${label}">
     <div class="lane-label">${label}</div>
-    <div class="lane-body">${kind === "loop" ? weaveHtml() : ""}<div class="track">${html}</div></div>
+    <div class="lane-body">${kind === "loop" ? weaveHtml() : ""}${tracksHtml}</div>
   </section>`;
+}
+
+// Loop row breaks (view only, remembered per class / discipline in this browser): with an ability
+// chosen, a new row starts at every loop step that leads with it (its only ability, or the first row
+// of a priority block), so repeats of the same cycle line up under each other.
+const loopSteps = () => ((STATE && STATE.steps) || []).filter((s) => s.seq > STATE.loopStart);
+const leadName = (st) => (st.entries[0] ? st.entries[0].name : "");
+const rowBreakKey = () => `swtorsim_map_rowbreak:${(STATE && STATE.loadoutLabel) || ""}`;
+
+function rowBreakName() {
+  let name = "";
+  try { name = localStorage.getItem(rowBreakKey()) || ""; } catch (e) {}
+  return name && loopSteps().some((st) => leadName(st) === name) ? name : "";
+}
+
+function loopRows(loop, name) {
+  const rows = [[]];
+  loop.forEach((st) => {
+    if (name && leadName(st) === name && rows[rows.length - 1].length) rows.push([]);
+    rows[rows.length - 1].push(st);
+  });
+  return rows;
+}
+
+function rowBreakHtml() {
+  const names = [...new Set(loopSteps().map(leadName).filter(Boolean))];
+  if (!names.length) return "";
+  const cur = rowBreakName();
+  const opts = names.map((n) => `<option value="${esc(n)}"${n === cur ? " selected" : ""}>${esc(n)}</option>`).join("");
+  return `<label class="rowbreak" title="Show the loop as several rows: a new row starts at each step that leads with this ability. View only; the rotation is not changed.">New row at<select data-rowbreak><option value="">(single row)</option>${opts}</select></label>`;
 }
 
 // Loop-only "always weave" abilities: listed once above the loop instead of in every gap.
 function weaveHtml() {
   const weave = (STATE && STATE.weave) || [];
-  if (!weave.length) return "";
-  const chips = weave.map((w) => {
-    const icon = w.icon ? `<img src="${iconUrl(w.icon)}" alt="" loading="lazy">` : `<span class="noicon">?</span>`;
-    const badges = (w.rules || []).map((r) => `<span class="badge ${esc(r.cls)}" title="${esc(r.full)}">${esc(r.txt)}</span>`).join("");
-    return `<span class="wchip" title="${esc(w.name)}: tried before every loop step">${icon}<span class="an">${esc(w.name)}</span>${badges}</span>`;
-  }).join("");
-  return `<div class="weave-strip"><span class="weave-title">Use on cooldown</span>${chips}<span class="weave-hint">tried in every gap of the loop</span></div>`;
+  const chips = weave.map((w, i) => `<span class="wchip" data-w="${i}" draggable="true" title="${esc(w.name)}: tried before every loop step">${iconHtml(w.icon)}<span class="an">${esc(w.name)}</span>${badgesHtml(w.rules)}<span class="etools"><span class="ebtn" data-addrule title="Add a rule">+</span><span class="ebtn del" data-delweave title="Remove from Use on cooldown">&times;</span></span></span>`).join("");
+  return `<div class="weave-strip"><span class="weave-title">Use on cooldown</span>${chips}<span class="weave-hint">${weave.length ? "tried in every gap of the loop; " : ""}drop an ability here to add one</span>${rowBreakHtml()}</div>`;
+}
+
+function anchorHtml() {
+  const handle = `<span class="anchor-handle" draggable="true" title="Drag onto an arrow or a step to set where the opener ends">&#8942;&#8942; End of opener</span>`;
+  if (STATE.anchorIdx < 0) {
+    return `<div class="anchor-row">${handle}<span class="note">No End of Opener anchor: the whole rotation loops. Drag this onto an arrow to split off an opener.</span></div>`;
+  }
+  return `<div class="anchor-row">${handle}<span class="anchor-line"></span><span class="ebtn del" data-delanchor title="Remove the End of Opener anchor (the whole rotation loops)">&times;</span></div>`;
+}
+
+function renderPalette() {
+  const list = document.getElementById("palList");
+  const abilities = (STATE && STATE.catalog && STATE.catalog.abilities) || [];
+  const q = document.getElementById("palSearch").value.trim().toLowerCase();
+  const shown = abilities.filter((a) => !q || a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q));
+  if (!shown.length) {
+    list.innerHTML = `<div class="pempty">${abilities.length ? "No matching abilities." : "Pick a class and discipline in the builder to list its abilities."}</div>`;
+    return;
+  }
+  const item = (a) => `<div class="pitem" draggable="true" data-slug="${esc(a.slug)}" title="${esc(a.name)}: drag onto an arrow, a step or Use on cooldown">${iconHtml(a.icon)}<span class="pn">${esc(a.name)}</span><span class="pcd">${a.cooldown > 0 ? `${esc(a.cooldown)}s` : ""}</span></div>`;
+  const group = (title, items) => (items.length ? `<div class="pgroup">${title}</div>${items.map(item).join("")}` : "");
+  list.innerHTML = group("On GCD", shown.filter((a) => a.gcd)) + group("Off GCD", shown.filter((a) => !a.gcd));
 }
 
 function render() {
   const main = document.getElementById("main");
   if (!STATE) return;
   document.getElementById("info").textContent = STATE.loadoutLabel || "";
+  document.getElementById("btnUndo").disabled = !STATE.canUndo;
+  document.getElementById("btnRedo").disabled = !STATE.canRedo;
+  const catJson = JSON.stringify((STATE.catalog && STATE.catalog.abilities) || []);
+  if (catJson !== paletteJson) { paletteJson = catJson; renderPalette(); }
+
+  // Keep the scroll position across redraws: every edit comes back as a full new state.
+  const scroll = { top: main.scrollTop, left: main.scrollLeft, tracks: {} };
+  main.querySelectorAll(".track").forEach((el) => { scroll.tracks[el.dataset.lane] = el.scrollLeft; });
+
   const steps = STATE.steps || [];
-  if (!steps.length) {
-    main.innerHTML = `<div class="empty"><strong>The rotation has no steps yet.</strong><br>Add steps in the builder and they will appear here.</div>`;
-    return;
-  }
+  const hasAnchor = STATE.anchorIdx >= 0;
   const opener = steps.filter((s) => s.seq <= STATE.loopStart);
   const loop = steps.filter((s) => s.seq > STATE.loopStart);
-  const note = `<div class="note">Click a step or an ability to open it in the editor.</div>`;
-  const loopTail = `<div class="loopback">&#8634; back to step ${STATE.loopStart + 1}</div>`;
+  const note = `<div class="note">Drag abilities onto an arrow or a step, and drag steps to reorder them. Click a step number to change its type, duplicate or delete it. Click a step or an ability to open it in the editor.</div>`;
+  const loopTail = loop.length ? `<div class="loopback">&#8634; back to step ${STATE.loopStart + 1}</div>` : "";
+  // A row's end gap inserts before the next row's first step; the last row ends the rotation.
+  const rows = loopRows(loop, rowBreakName());
+  const loopTracks = rows.map((row, i) => trackHtml(
+    i ? `loop-${i}` : "loop", row,
+    i + 1 < rows.length ? rows[i + 1][0].editorIdx : STATE.total,
+    i + 1 === rows.length ? loopTail : "",
+    rows.length > 1)).join("");
   main.innerHTML = `
     ${note}
-    ${opener.length ? laneHtml("opener", opener, "") : `<div class="note">No End of Opener anchor: the whole rotation loops.</div>`}
-    ${loop.length ? laneHtml("loop", loop, loopTail) : `<div class="note">Nothing after the End of Opener anchor: the loop is empty.</div>`}
+    ${hasAnchor ? laneHtml("opener", trackHtml("opener", opener, STATE.anchorIdx, "")) : ""}
+    ${anchorHtml()}
+    ${laneHtml("loop", loopTracks)}
     <div class="legend">
       <span><i style="background:var(--accent)"></i>Priority block</span>
       <span><i style="background:var(--amber)"></i>Optional</span>
@@ -271,6 +458,10 @@ function render() {
       <span><i style="background:var(--green-bg);border:1px solid var(--green)"></i>Buff / debuff rule</span>
       <span><i style="background:var(--amber-bg);border:1px solid var(--amber)"></i>Cooldown rule</span>
     </div>`;
+
+  main.scrollTop = scroll.top;
+  main.scrollLeft = scroll.left;
+  main.querySelectorAll(".track").forEach((el) => { if (scroll.tracks[el.dataset.lane]) el.scrollLeft = scroll.tracks[el.dataset.lane]; });
 }
 
 function applySelection(seq, scroll) {
@@ -283,9 +474,152 @@ function applySelection(seq, scroll) {
   if (scroll) el.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
 }
 
+// ---------------------------------------------------------------------------
+// Floating step menu and rule form
+// ---------------------------------------------------------------------------
+function closePops() {
+  document.getElementById("menu").classList.remove("open");
+  document.getElementById("rulePop").classList.remove("open");
+  ruleCtx = null;
+}
+
+function placePop(pop, anchorEl) {
+  pop.classList.add("open");
+  const r = anchorEl.getBoundingClientRect();
+  const w = pop.offsetWidth, h = pop.offsetHeight;
+  let top = r.bottom + 4;
+  if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 4);
+  const left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8));
+  pop.style.top = `${top}px`;
+  pop.style.left = `${left}px`;
+}
+
+function openStepMenu(card, anchorEl) {
+  closePops();
+  const idx = +card.dataset.idx;
+  const type = card.dataset.type;
+  const menu = document.getElementById("menu");
+  const typeItem = (t, label) => `<button type="button" class="mitem${t === type ? " cur" : ""}" role="menuitem" data-op="type" data-type="${t}"><span class="num ${t}">&nbsp;</span>${label}${t === type ? " (current)" : ""}</button>`;
+  menu.dataset.idx = idx;
+  menu.innerHTML = `
+    ${typeItem("priority_block", "Priority block")}
+    ${typeItem("fixed", "Fixed")}
+    ${typeItem("optional", "Optional")}
+    <div class="msep"></div>
+    <button type="button" class="mitem" role="menuitem" data-op="dup">Duplicate</button>
+    <button type="button" class="mitem danger" role="menuitem" data-op="del">Delete step</button>`;
+  placePop(menu, anchorEl);
+}
+
+document.getElementById("menu").addEventListener("click", (e) => {
+  const item = e.target.closest(".mitem");
+  if (!item) return;
+  const step = +document.getElementById("menu").dataset.idx;
+  const op = item.dataset.op;
+  if (op === "type") send({ op: "type", step, newType: item.dataset.type });
+  else send({ op, step });
+  closePops();
+});
+
+// Which rule host an element belongs to: a "Use on cooldown" chip, a priority row, or an optional step.
+function ruleTargetOf(el) {
+  const chip = el.closest(".wchip");
+  if (chip) {
+    const i = +chip.dataset.w;
+    const w = STATE.weave[i];
+    return w ? { scope: "weave", step: i, row: null, name: w.name, raw: w.rulesRaw || {} } : null;
+  }
+  const entry = el.closest(".entry");
+  const card = el.closest(".step");
+  if (!entry || !card) return null;
+  const st = stepByIdx(+card.dataset.idx);
+  const j = +entry.dataset.entry;
+  if (!st || !st.entries[j]) return null;
+  return { scope: "rotation", step: st.editorIdx, row: st.type === "priority_block" ? j : null, name: st.entries[j].name, raw: st.entries[j].rulesRaw || {} };
+}
+
+function renderRuleFields(existingVal = null) {
+  const key = document.getElementById("rpKey").value;
+  const cat = STATE.catalog || {};
+  const meta = (cat.conditions || []).find((c) => c.key === key) || {};
+  document.getElementById("rpDesc").textContent = meta.description || "";
+  document.getElementById("rpErr").textContent = "";
+  const html = RuleForm.fieldsHtml(key, existingVal, cat.lists || {});
+  document.getElementById("rpFields").innerHTML = html === null ? "" : html;
+  document.getElementById("rpSave").disabled = html === null;
+  if (html === null) document.getElementById("rpErr").textContent = "This condition has no guided form here. Edit it in the builder's Raw JSON tab.";
+}
+
+function openRulePop(target, editKey, anchorEl) {
+  closePops();
+  const conditions = (STATE.catalog && STATE.catalog.conditions) || [];
+  const pop = document.getElementById("rulePop");
+  const options = conditions.map((c) => `<option value="${esc(c.key)}">${esc(c.category)}: ${esc(c.label)} (${esc(c.key)})</option>`).join("");
+  pop.innerHTML = `
+    <div class="pop-title">${editKey ? "Edit rule" : "Add rule"}: ${esc(target.name)}</div>
+    <div class="form-group">
+      <label for="rpKey">Condition Type</label>
+      <select id="rpKey">${options}</select>
+      <div id="rpDesc"></div>
+    </div>
+    <div id="rpFields"></div>
+    <div id="rpErr" role="alert"></div>
+    <div class="pop-foot">
+      <button type="button" class="pbtn" id="rpCancel">Cancel</button>
+      <button type="button" class="pbtn primary" id="rpSave">Save rule</button>
+    </div>`;
+  ruleCtx = { scope: target.scope, step: target.step, row: target.row, editKey: editKey || null };
+  const sel = document.getElementById("rpKey");
+  let initial = null;
+  if (editKey && editKey in target.raw) {
+    // Same fallback as the builder's modal for alias keys that are not in the condition catalog.
+    sel.value = conditions.some((c) => c.key === editKey) ? editKey : "caster_buff_stacks";
+    initial = target.raw[editKey];
+  } else {
+    sel.value = "caster_has_buff";
+  }
+  renderRuleFields(initial);
+  sel.addEventListener("change", () => renderRuleFields());
+  document.getElementById("rpCancel").addEventListener("click", closePops);
+  document.getElementById("rpSave").addEventListener("click", () => {
+    if (!ruleCtx) return;
+    const key = sel.value;
+    const read = RuleForm.readValue(key);
+    if (read.error) { document.getElementById("rpErr").textContent = read.error; return; }
+    send({ op: "setRule", scope: ruleCtx.scope, step: ruleCtx.step, row: ruleCtx.row, key, value: read.value, editKey: ruleCtx.editKey });
+    closePops();
+  });
+  placePop(pop, anchorEl);
+  sel.focus();
+}
+
+// ---------------------------------------------------------------------------
+// Clicks: edit controls first, otherwise open the step / row in the editor.
+// ---------------------------------------------------------------------------
 document.getElementById("main").addEventListener("click", (e) => {
-  const entry = e.target.closest(".entry");
-  const head = e.target.closest(".step-head");
+  if (!STATE) return;
+  const t = e.target;
+  const card = t.closest(".step");
+
+  if (t.closest("[data-menu]") && card) { openStepMenu(card, t.closest("[data-menu]")); return; }
+  if (t.closest("[data-delanchor]")) { send({ op: "del", step: STATE.anchorIdx }); return; }
+  if (t.closest("[data-delweave]")) { send({ op: "weaveDel", idx: +t.closest(".wchip").dataset.w }); return; }
+  if (t.closest("[data-delrow]") && card) { send({ op: "delRow", step: +card.dataset.idx, row: +t.closest(".entry").dataset.entry }); return; }
+
+  const delRule = t.closest("[data-delrule]");
+  const badge = t.closest("[data-rule]");
+  const addRule = t.closest("[data-addrule]");
+  if (delRule || badge || addRule) {
+    const target = ruleTargetOf(t);
+    if (!target) return;
+    if (delRule) send({ op: "delRule", scope: target.scope, step: target.step, row: target.row, key: delRule.dataset.delrule });
+    else if (badge) openRulePop(target, badge.dataset.rule, badge);
+    else openRulePop(target, null, addRule.closest(".entry, .wchip") || addRule); // the "+" itself is hidden unless hovered
+    return;
+  }
+
+  const entry = t.closest(".entry");
+  const head = t.closest(".step-head");
   const target = entry || head;
   if (!target) return;
   const step = +target.dataset.step;
@@ -293,10 +627,202 @@ document.getElementById("main").addEventListener("click", (e) => {
   if (channel) channel.postMessage({ type: "goto", step, entry: entry ? +entry.dataset.entry : null });
 });
 
+document.getElementById("main").addEventListener("change", (e) => {
+  const sel = e.target.closest("[data-rowbreak]");
+  if (!sel) return;
+  try { localStorage.setItem(rowBreakKey(), sel.value); } catch (err) {}
+  render();
+});
+
+// Step heads and rows are div[role=button]: Enter / Space act like a click.
+document.getElementById("main").addEventListener("keydown", (e) => {
+  if ((e.key !== "Enter" && e.key !== " ") || !e.target.matches(".entry, .step-head")) return;
+  e.preventDefault();
+  e.target.click();
+});
+
+document.addEventListener("mousedown", (e) => {
+  if (!e.target.closest(".pop") && !e.target.closest("[data-menu], [data-rule], [data-addrule]")) closePops();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { closePops(); return; }
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || !channel) return;
+  // Text fields keep the browser's own undo.
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""))) return;
+  const k = e.key.toLowerCase();
+  if (k === "z" && !e.shiftKey) { e.preventDefault(); channel.postMessage({ type: "cmd", op: "undo" }); }
+  else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); channel.postMessage({ type: "cmd", op: "redo" }); }
+});
+
+document.getElementById("btnUndo").addEventListener("click", () => channel && channel.postMessage({ type: "cmd", op: "undo" }));
+document.getElementById("btnRedo").addEventListener("click", () => channel && channel.postMessage({ type: "cmd", op: "redo" }));
+document.getElementById("palSearch").addEventListener("input", renderPalette);
+
+(function initPalette() {
+  const pal = document.getElementById("palette");
+  const btn = document.getElementById("btnPalette");
+  let open = true;
+  try { open = localStorage.getItem("swtorsim_map_palette") !== "0"; } catch (e) {}
+  const apply = () => { pal.classList.toggle("hidden", !open); btn.classList.toggle("on", open); btn.setAttribute("aria-pressed", String(open)); };
+  apply();
+  btn.addEventListener("click", () => {
+    open = !open;
+    try { localStorage.setItem("swtorsim_map_palette", open ? "1" : "0"); } catch (e) {}
+    apply();
+  });
+})();
+
+// ---------------------------------------------------------------------------
+// Drag and drop. dropPlan() says what a drop at the pointer would do: the element to highlight, the
+// highlight class and the command to send (null = not a valid drop).
+// ---------------------------------------------------------------------------
+function gapCommand(d, at) {
+  if (d.kind === "ability") return { op: "insert", slug: d.slug, at };
+  if (d.kind === "step") return at === d.idx || at === d.idx + 1 ? null : { op: "move", from: d.idx, to: at };
+  if (d.kind === "anchor") return STATE.anchorIdx >= 0 && (at === STATE.anchorIdx || at === STATE.anchorIdx + 1) ? null : { op: "anchor", at };
+  if (d.kind === "row") return { op: "rowToStep", fromStep: d.step, fromRow: d.row, at };
+  return null;
+}
+
+function dropPlan(e) {
+  const d = drag;
+  if (!d || !STATE) return null;
+  const t = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+  if (!t) return null;
+
+  const weave = t.closest(".weave-strip");
+  if (weave) return d.kind === "ability" ? { el: weave, cls: "drop-on", cmd: { op: "weaveAdd", slug: d.slug } } : null;
+
+  const card = t.closest(".step");
+  if (card) {
+    const idx = +card.dataset.idx;
+    const type = card.dataset.type;
+    const mini = card.classList.contains("mini");
+    const isPool = type === "priority_block";
+
+    // Into the step: an ability joins (or starts) its priority pool; a priority row moves between pools.
+    if ((d.kind === "ability" && !mini) || (d.kind === "row" && isPool)) {
+      if (!isPool) return { el: card, cls: "drop-into", cmd: { op: "addRow", step: idx, slug: d.slug } };
+      const entry = t.closest(".entry");
+      let row = null, el = card, cls = "drop-into";
+      if (entry) {
+        const r = entry.getBoundingClientRect();
+        const before = e.clientY < r.top + r.height / 2;
+        row = +entry.dataset.entry + (before ? 0 : 1);
+        el = entry;
+        cls = before ? "drop-row-before" : "drop-row-after";
+      }
+      if (d.kind === "ability") return { el, cls, cmd: { op: "addRow", step: idx, row, slug: d.slug } };
+      if (d.step === idx && (row === null || row === d.row || row === d.row + 1)) return null;
+      return { el, cls, cmd: { op: "moveRow", fromStep: d.step, fromRow: d.row, toStep: idx, toRow: row } };
+    }
+
+    // Next to the step: main-line cards sit side by side, off-GCD cards are stacked.
+    const r = card.getBoundingClientRect();
+    const before = mini ? e.clientY < r.top + r.height / 2 : e.clientX < r.left + r.width / 2;
+    const cmd = gapCommand(d, before ? idx : idx + 1);
+    return cmd ? { el: card, cls: before ? "drop-before" : "drop-after", cmd } : null;
+  }
+
+  const gap = t.closest("[data-at]");
+  if (gap) {
+    const cmd = gapCommand(d, +gap.dataset.at);
+    return cmd ? { el: gap, cls: "drop-on", cmd } : null;
+  }
+  return null;
+}
+
+const DROP_CLASSES = ["drop-on", "drop-before", "drop-after", "drop-into", "drop-row-before", "drop-row-after"];
+function clearDropMarks() {
+  document.querySelectorAll(DROP_CLASSES.map((c) => `.${c}`).join(",")).forEach((el) => el.classList.remove(...DROP_CLASSES));
+}
+
+document.addEventListener("dragstart", (e) => {
+  const t = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+  if (!t || !STATE) return;
+  const pal = t.closest(".pitem");
+  const anchor = t.closest(".anchor-handle");
+  const chip = t.closest(".wchip");
+  const entry = t.closest('.entry[draggable="true"]');
+  const card = t.closest(".step");
+  if (pal) drag = { kind: "ability", slug: pal.dataset.slug };
+  else if (anchor) drag = { kind: "anchor" };
+  else if (chip) drag = { kind: "weave", idx: +chip.dataset.w };
+  else if (entry && card) drag = { kind: "row", step: +card.dataset.idx, row: +entry.dataset.entry };
+  else if (card) drag = { kind: "step", idx: +card.dataset.idx };
+  else return;
+  e.dataTransfer.setData("text/plain", drag.kind);
+  e.dataTransfer.effectAllowed = "copyMove";
+  closePops();
+  const src = entry || card;
+  if (src && !pal && !anchor) src.classList.add("is-dragging");
+  document.body.classList.add("dragging");
+});
+
+document.addEventListener("dragend", () => {
+  drag = null;
+  document.body.classList.remove("dragging");
+  document.querySelectorAll(".is-dragging").forEach((el) => el.classList.remove("is-dragging"));
+  clearDropMarks();
+});
+
+document.getElementById("main").addEventListener("dragover", (e) => {
+  const plan = dropPlan(e);
+  clearDropMarks();
+  if (!plan) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = drag.kind === "ability" ? "copy" : "move";
+  plan.el.classList.add(plan.cls);
+});
+
+document.getElementById("main").addEventListener("dragleave", (e) => {
+  if (!e.relatedTarget || !document.getElementById("main").contains(e.relatedTarget)) clearDropMarks();
+});
+
+document.getElementById("main").addEventListener("drop", (e) => {
+  const plan = dropPlan(e);
+  clearDropMarks();
+  if (!plan) return;
+  e.preventDefault();
+  send(plan.cmd);
+});
+
+// Trash: what dropping the dragged thing there removes (palette abilities are not in the rotation).
+function trashCommand(d) {
+  if (!d || !STATE) return null;
+  if (d.kind === "step") return { op: "del", step: d.idx };
+  if (d.kind === "row") return { op: "delRow", step: d.step, row: d.row };
+  if (d.kind === "weave") return { op: "weaveDel", idx: d.idx };
+  if (d.kind === "anchor") return STATE.anchorIdx >= 0 ? { op: "del", step: STATE.anchorIdx } : null;
+  return null;
+}
+
+(function initTrash() {
+  const trash = document.getElementById("trash");
+  trash.addEventListener("dragover", (e) => {
+    if (!trashCommand(drag)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    trash.classList.add("drop-on");
+  });
+  trash.addEventListener("dragleave", () => trash.classList.remove("drop-on"));
+  trash.addEventListener("drop", (e) => {
+    const cmd = trashCommand(drag);
+    trash.classList.remove("drop-on");
+    if (!cmd) return;
+    e.preventDefault();
+    send(cmd);
+  });
+})();
+
 if (channel) {
   channel.onmessage = (ev) => {
     const msg = ev.data || {};
     if (msg.type === "state") {
+      // An open menu or rule form points at the rotation as it was; a changed rotation closes it.
+      if (STATE && STATE.rev !== msg.rev) closePops();
       STATE = msg;
       selected = msg.selected || null;
       render();

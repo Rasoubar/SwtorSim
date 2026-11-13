@@ -1249,7 +1249,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794573217"></script>
+  <script src="pyodide_client.js?v=1794580616"></script>
 </head>
 <body>
 
@@ -1464,6 +1464,7 @@
 
 <div class="toast" id="toastBanner"></div>
 
+<script src="rule_form.js"></script>
 <script>
   function applyTheme(theme) {
     const isDark = theme === "dark";
@@ -1539,6 +1540,7 @@ let dryRunResult = null;
 let dryRunRotationJson = null;     // JSON of rotationSteps at the time of the last dry-run (stale detection)
 let dryRunRotationSnapshot = null; // rotationSteps as they were dry-run; the cast step_index values refer to this
 let vizSelectedStep = null;        // 1-based executable step index shared by Visual Map, editor and Cast Timeline
+let vizMapRev = 0;                 // bumped on every rotation change; Rotation Map edit commands must carry the current value
 let ruleModalContext = null; // { stepIndex, poolIndex (optional), editKey (optional) }
 
 // ---------------------------------------------------------------------------
@@ -2074,6 +2076,7 @@ async function onSelectExistingRotation(rotPath) {
   pullConditions = (data.pull_conditions && typeof data.pull_conditions === "object") ? data.pull_conditions : {};
   pullMaxWait = data.pull_max_wait !== undefined && data.pull_max_wait !== null ? Number(data.pull_max_wait) : 60;
   lastImportWarnings = data.warnings || [];
+  undoResetHistory();
   collapsedSteps.clear();
   activeBlockIndex = rotationSteps.findIndex(s => s.type === "priority_block");
   if (activeBlockIndex === -1) activeBlockIndex = null;
@@ -2098,6 +2101,7 @@ function handleLocalFileImport(ev) {
     try {
       const parsed = JSON.parse(e.target.result);
       applyRotationFileData(parsed);
+      undoResetHistory();
       collapsedSteps.clear();
       document.getElementById("saveFilename").value = file.name;
       renderTimeline();
@@ -4125,217 +4129,25 @@ function closeRuleModal() {
   ruleModalContext = null;
 }
 
-function buildDatalistOrSelect(id, items, currentVal, placeholder) {
-  const listId = `${id}_datalist`;
-  const opts = items.map(it => `<option value="${escapeAttr(it.name)}">${escapeHtml(it.label || it.name)}</option>`).join("");
-  return `
-    <div style="display:flex;gap:6px;">
-      <select onchange="document.getElementById('${id}').value = this.value" style="flex:1;">
-        <option value="">-- Pick Discovered ${escapeHtml(placeholder)} --</option>
-        ${opts}
-      </select>
-      <input type="text" id="${id}" list="${listId}" value="${escapeAttr(currentVal || "")}" placeholder="Or type exact name..." style="flex:1;">
-    </div>
-  `;
-}
-
+// The value fields and their read-back live in tools/rotation_rule_form.js (RuleForm), shared with the
+// Rotation Map's rule popover.
 function renderRuleValueForm(existingVal = null) {
   const key = document.getElementById("ruleKeySelect").value;
   const conditions = (workspaceCatalog && workspaceCatalog.conditions) || [];
   const meta = conditions.find(c => c.key === key) || {};
   document.getElementById("ruleTypeDesc").textContent = meta.description || "";
 
-  const container = document.getElementById("ruleDynamicFields");
-  const buffItems = (currentLoadout.caster_buffs || []).map(b => ({
-    name: b.name,
-    label: `${b.name} (${b.source_name}${b.max_stacks > 1 ? `, max ${b.max_stacks} stacks` : ""})`
-  }));
-  const debuffItems = (currentLoadout.target_debuffs || []).map(d => ({
-    name: d.name,
-    label: `${d.name} (${d.source_name}${d.is_dot ? ", DoT" : ""})`
-  }));
-  const procItems = (currentLoadout.procs || []).map(p => ({
-    name: p.name,
-    label: `${p.name} (${p.icd}s ICD)`
-  }));
-  const abilityItems = (currentLoadout.abilities || []).map(a => ({
-    name: a.name,
-    label: `${a.name} (CD: ${a.cooldown}s)`
-  }));
-
-  if (key === "caster_has_buff" || key === "caster_does_not_have_buff") {
-    const cur = typeof existingVal === "string" ? existingVal : (buffItems[0]?.name || "");
-    container.innerHTML = `
-      <div class="form-group">
-        <label>Caster Buff Name</label>
-        ${buildDatalistOrSelect("ruleBuffInput", buffItems, cur, "Caster Buff")}
-      </div>
-    `;
-    return;
-  }
-
-  if (key === "target_has_debuff" || key === "target_doesnt_have_debuff") {
-    const cur = typeof existingVal === "string" ? existingVal : (debuffItems[0]?.name || "");
-    container.innerHTML = `
-      <div class="form-group">
-        <label>Target Debuff / DoT Name</label>
-        ${buildDatalistOrSelect("ruleDebuffInput", debuffItems, cur, "Target Debuff")}
-      </div>
-    `;
-    return;
-  }
-
-  if (key === "caster_buff_stacks" || key === "target_debuff_stacks") {
-    const isTarget = key === "target_debuff_stacks";
-    const items = isTarget ? debuffItems : buffItems;
-    let curName = items[0]?.name || "";
-    let curStacks = 3;
-    let curOp = "gte";
-    if (Array.isArray(existingVal)) {
-      curName = existingVal[0] || curName;
-      curStacks = existingVal[1] ?? 3;
-      curOp = existingVal[2] || "gte";
-    } else if (existingVal && typeof existingVal === "object") {
-      curName = existingVal.name || existingVal.buff || existingVal.debuff || curName;
-      curStacks = existingVal.stacks ?? existingVal.count ?? existingVal.value ?? 3;
-      curOp = existingVal.comparison || existingVal.operator || "gte";
-    }
-    container.innerHTML = `
-      <div class="form-group">
-        <label>${isTarget ? "Target Debuff / DoT Name" : "Caster Buff Name"}</label>
-        ${buildDatalistOrSelect("ruleStackBuffInput", items, curName, isTarget ? "Debuff" : "Buff")}
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>Comparison Operator</label>
-          <select id="ruleStackOpInput" style="width:100%;">
-            <option value="gte" ${curOp === "gte" || curOp === ">=" ? "selected" : ""}>&ge; (At least)</option>
-            <option value="eq" ${curOp === "eq" || curOp === "==" ? "selected" : ""}>== (Exactly)</option>
-            <option value="lte" ${curOp === "lte" || curOp === "<=" ? "selected" : ""}>&le; (At most)</option>
-            <option value="gt" ${curOp === "gt" || curOp === ">" ? "selected" : ""}>&gt; (Greater than)</option>
-            <option value="lt" ${curOp === "lt" || curOp === "<" ? "selected" : ""}>&lt; (Less than)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Required Stacks</label>
-          <input type="number" id="ruleStackCountInput" min="1" max="99" step="1" value="${curStacks}" style="width:100%;">
-        </div>
-      </div>
-    `;
-    return;
-  }
-
-  if (key === "target_hp_below_pct" || key === "target_hp_above_pct") {
-    let curDec = 0.4;
-    let curBypass = "";
-    if (typeof existingVal === "number") {
-      curDec = existingVal;
-    } else if (existingVal && typeof existingVal === "object") {
-      curDec = existingVal.pct ?? 0.4;
-      curBypass = existingVal.bypass_if_buff_active || "";
-    }
-    container.innerHTML = `
-      <div class="form-row">
-        <div class="form-group">
-          <label>Decimal Fraction (0.0 - 1.0)</label>
-          <input type="number" id="ruleHpDecInput" min="0.01" max="1.0" step="0.05" value="${curDec}" style="width:100%;" oninput="document.getElementById('ruleHpPctPreview').textContent = Math.round(this.value * 100) + '%'">
-        </div>
-        <div class="form-group">
-          <label>Target Health %</label>
-          <div id="ruleHpPctPreview" style="padding:6px 10px;font-weight:700;color:var(--accent);font-size:14px;">${Math.round(curDec * 100)}%</div>
-        </div>
-      </div>
-      ${key === "target_hp_below_pct" ? `
-      <div class="form-group">
-        <label>Optional: Bypass HP Check if Caster Buff Active</label>
-        ${buildDatalistOrSelect("ruleHpBypassInput", buffItems, curBypass, "Bypass Buff")}
-      </div>` : ""}
-    `;
-    return;
-  }
-
-  if (key === "caster_energy_below" || key === "caster_energy_above") {
-    const cur = typeof existingVal === "number" ? existingVal : 35;
-    container.innerHTML = `
-      <div class="form-group">
-        <label>Resource Threshold (Force / Energy / Heat)</label>
-        <input type="number" id="ruleResourceInput" min="0" max="600" step="5" value="${cur}" style="width:100%;">
-      </div>
-    `;
-    return;
-  }
-
-  if (key === "proc_cooldown_above") {
-    const curName = (existingVal && existingVal.name) ? existingVal.name : (procItems[0]?.name || "Bloodletting");
-    const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 1.5;
-    container.innerHTML = `
-      <div class="form-group">
-        <label>Proc / Lockout Name</label>
-        ${buildDatalistOrSelect("ruleProcNameInput", procItems, curName, "Proc")}
-      </div>
-      <div class="form-group">
-        <label>Remaining Lockout / ICD Above (seconds)</label>
-        <input type="number" id="ruleProcSecInput" min="0" max="120" step="0.1" value="${curVal}" style="width:100%;">
-      </div>
-    `;
-    return;
-  }
-
-  if (key === "ability_cooldown_under" || key === "ability_cooldown_above") {
-    const isAbove = key === "ability_cooldown_above";
-    const curName = (existingVal && existingVal.name) ? existingVal.name : (abilityItems[0]?.name || "");
-    const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 1.5;
-    container.innerHTML = `
-      <div class="form-group">
-        <label>Ability Name</label>
-        ${buildDatalistOrSelect("ruleAblCdNameInput", abilityItems, curName, "Ability")}
-      </div>
-      <div class="form-group">
-        <label>Remaining Cooldown ${isAbove ? "Above" : "Under"} (seconds)</label>
-        <input type="number" id="ruleAblCdSecInput" min="0" max="180" step="0.1" value="${curVal}" style="width:100%;">
-      </div>
-    `;
-  }
+  const html = RuleForm.fieldsHtml(key, existingVal, RuleForm.listsFromLoadout(currentLoadout));
+  if (html !== null) document.getElementById("ruleDynamicFields").innerHTML = html;
 }
 
 function commitRuleFromModal() {
   if (!ruleModalContext) return;
   const { stepIndex, poolIndex, editKey } = ruleModalContext;
   const key = document.getElementById("ruleKeySelect").value;
-  let value = null;
-
-  if (key === "caster_has_buff" || key === "caster_does_not_have_buff") {
-    value = document.getElementById("ruleBuffInput").value.trim();
-    if (!value) return showToast("Please select or enter a buff name.", true);
-  } else if (key === "target_has_debuff" || key === "target_doesnt_have_debuff") {
-    value = document.getElementById("ruleDebuffInput").value.trim();
-    if (!value) return showToast("Please select or enter a debuff name.", true);
-  } else if (key === "caster_buff_stacks" || key === "target_debuff_stacks") {
-    const name = document.getElementById("ruleStackBuffInput").value.trim();
-    const op = document.getElementById("ruleStackOpInput").value;
-    const count = parseInt(document.getElementById("ruleStackCountInput").value, 10) || 1;
-    if (!name) return showToast("Please select or enter an effect name.", true);
-    value = op === "gte" ? [name, count] : [name, count, op];
-  } else if (key === "target_hp_below_pct" || key === "target_hp_above_pct") {
-    let dec = parseFloat(document.getElementById("ruleHpDecInput").value);
-    if (isNaN(dec) || dec <= 0) dec = 0.4;
-    if (dec > 1.0) dec = Number((dec / 100.0).toFixed(4));
-    const bypassEl = document.getElementById("ruleHpBypassInput");
-    const bypass = bypassEl ? bypassEl.value.trim() : "";
-    value = bypass ? { pct: dec, bypass_if_buff_active: bypass } : dec;
-  } else if (key === "caster_energy_below" || key === "caster_energy_above") {
-    value = parseFloat(document.getElementById("ruleResourceInput").value) || 0;
-  } else if (key === "proc_cooldown_above") {
-    const name = document.getElementById("ruleProcNameInput").value.trim();
-    const sec = parseFloat(document.getElementById("ruleProcSecInput").value) || 0.5;
-    if (!name) return showToast("Please select or enter a proc name.", true);
-    value = { name, value: sec };
-  } else if (key === "ability_cooldown_under" || key === "ability_cooldown_above") {
-    const name = document.getElementById("ruleAblCdNameInput").value.trim();
-    const sec = parseFloat(document.getElementById("ruleAblCdSecInput").value) || 1.5;
-    if (!name) return showToast("Please select or enter an ability name.", true);
-    value = { name, value: sec };
-  }
+  const read = RuleForm.readValue(key);
+  if (read.error) return showToast(read.error, true);
+  const value = read.value;
 
   const host = ruleHostFor(ruleModalContext, true);
   if (editKey && editKey !== key) {
@@ -4589,7 +4401,7 @@ function vizRuleList(rules) {
     else if (k === "ability_cooldown_under" && obj) { txt = `${obj.name} CD < ${obj.value}s`; }
     else if (k === "ability_cooldown_above" && obj) { txt = `${obj.name} CD > ${obj.value}s`; }
     else if (k.includes("stacks") || k.includes("charges")) { cls = "buff"; txt = k.replace(/_/g, " "); }
-    out.push({ cls, txt, full: formatRulePillText(k, v).replace(/<[^>]+>/g, "") });
+    out.push({ key: k, cls, txt, full: formatRulePillText(k, v).replace(/<[^>]+>/g, "") });
   }
   return out;
 }
@@ -4616,19 +4428,280 @@ function vizMapPayload() {
             name: m ? m.name : String(p.ability_id || "?"),
             icon: m && m.icon ? m.icon : "",
             rules: vizRuleList(p.rules),
+            rulesRaw: p.rules || {},
           };
         }),
+        // Editing from the map: index into rotationSteps, and whether the builder offers rules here
+        // (fixed steps carry none).
+        editorIdx: e.editorIdx,
+        canRules: s.type !== "fixed",
       };
     }),
     loopStart,
     // Loop-only "always weave" entries: the map lists them once above the Loop lane.
     weave: weaveSteps.map(w => {
       const m = resolveAbilityDisplay(w.ability_id);
-      return { name: m ? m.name : String(w.ability_id || "?"), icon: m && m.icon ? m.icon : "", rules: vizRuleList(w.rules) };
+      return { name: m ? m.name : String(w.ability_id || "?"), icon: m && m.icon ? m.icon : "", rules: vizRuleList(w.rules), rulesRaw: w.rules || {} };
     }),
     selected: vizSelectedStep,
     loadoutLabel: [currentLoadout.class_name, currentLoadout.spec_name].filter(Boolean).join(" // "),
+    // Map editing: rev guards against commands built on an older rotation; anchorIdx / total place drops.
+    rev: vizMapRev,
+    anchorIdx: rotationSteps.findIndex(s => s.type === "loop_anchor"),
+    total: rotationSteps.length,
+    canUndo: undoStack.length > 0,
+    canRedo: redoStack.length > 0,
+    catalog: {
+      abilities: (currentLoadout.abilities || []).map(a => ({
+        slug: a.slug, name: a.name, icon: a.icon || "", gcd: a.triggers_gcd !== false, cooldown: a.cooldown || 0,
+      })),
+      conditions: ((workspaceCatalog && workspaceCatalog.conditions) || []).map(c => ({
+        key: c.key, label: c.label, category: c.category, description: c.description || "",
+      })),
+      lists: RuleForm.listsFromLoadout(currentLoadout),
+    },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Undo / redo for the rotation (steps, weave, pre-combat, pull gate). Every edit ends in
+// renderTimeline, which queues vizOnRotationChanged -> undoTrack: a changed snapshot pushes the
+// previous one. Shared by the builder (Ctrl+Z / Ctrl+Y) and the Rotation Map (undo / redo commands).
+// ---------------------------------------------------------------------------
+const UNDO_LIMIT = 100;
+let undoStack = [];
+let redoStack = [];
+let undoLastJson = null; // snapshot the stacks are relative to; null = adopt the next one silently
+
+function undoSnapshotJson() {
+  return JSON.stringify({ r: rotationSteps, w: weaveSteps, p: preCombatSteps, pc: pullConditions, pm: pullMaxWait });
+}
+
+// A rotation was loaded or imported: its history starts fresh.
+function undoResetHistory() {
+  undoStack = [];
+  redoStack = [];
+  undoLastJson = null;
+}
+
+function undoTrack() {
+  const now = undoSnapshotJson();
+  if (undoLastJson !== null && now !== undoLastJson) {
+    undoStack.push(undoLastJson);
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+    redoStack = [];
+  }
+  undoLastJson = now;
+}
+
+function undoApply(json) {
+  const s = JSON.parse(json);
+  rotationSteps = s.r;
+  weaveSteps = s.w;
+  preCombatSteps = s.p;
+  pullConditions = s.pc;
+  pullMaxWait = s.pm;
+  const active = activeBlockIndex === null ? null : rotationSteps[activeBlockIndex];
+  if (!active || active.type !== "priority_block") activeBlockIndex = null;
+  undoLastJson = json;
+  renderTimeline();
+  renderRightPanel();
+}
+
+function undoRotation() {
+  undoTrack();
+  if (!undoStack.length) return showToast("Nothing to undo.");
+  redoStack.push(undoLastJson);
+  undoApply(undoStack.pop());
+}
+
+function redoRotation() {
+  undoTrack();
+  if (!redoStack.length) return showToast("Nothing to redo.");
+  undoStack.push(undoLastJson);
+  undoApply(redoStack.pop());
+}
+
+document.addEventListener("keydown", (e) => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+  // Text fields keep the browser's own undo.
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ""))) return;
+  const k = e.key.toLowerCase();
+  if (k === "z" && !e.shiftKey) { e.preventDefault(); undoRotation(); }
+  else if (k === "y" || (k === "z" && e.shiftKey)) { e.preventDefault(); redoRotation(); }
+});
+
+// ---------------------------------------------------------------------------
+// Rotation Map edit commands ({type: "cmd", op, rev, ...}). Step positions are rotationSteps
+// indexes taken from the state the map was drawn from; a command with an older rev is dropped and
+// the map is sent the current state instead.
+// ---------------------------------------------------------------------------
+function vizMapAbilityBySlug(slug) {
+  return (currentLoadout.abilities || []).find(a => a.slug === slug) || null;
+}
+
+function vizMapShiftActiveBlock(at, delta) {
+  if (activeBlockIndex !== null && activeBlockIndex >= at) activeBlockIndex += delta;
+}
+
+function vizMapMoveStep(from, to) {
+  // "to" is the insert-before position in the list as it is now.
+  let target = to;
+  if (from < target) target--;
+  if (target === from) return false;
+  const [moved] = rotationSteps.splice(from, 1);
+  rotationSteps.splice(target, 0, moved);
+  if (activeBlockIndex === from) activeBlockIndex = target;
+  else if (activeBlockIndex !== null) {
+    if (from < activeBlockIndex && target >= activeBlockIndex) activeBlockIndex--;
+    else if (from > activeBlockIndex && target <= activeBlockIndex) activeBlockIndex++;
+  }
+  return true;
+}
+
+// Returns true when the rotation changed and needs a re-render.
+function vizMapApplyCommand(msg) {
+  const n = rotationSteps.length;
+  const isStep = (i) => Number.isInteger(i) && i >= 0 && i < n;
+  const isSlot = (i) => Number.isInteger(i) && i >= 0 && i <= n;
+  const poolOf = (i) => (isStep(i) && rotationSteps[i].type === "priority_block" ? rotationSteps[i].pool : null);
+
+  switch (msg.op) {
+    case "insert": {
+      const a = vizMapAbilityBySlug(msg.slug);
+      if (!a || !isSlot(msg.at)) return false;
+      const id = preferredAbilityId(a);
+      const step = a.triggers_gcd === false ? { type: "optional", ability_id: id, rules: {} } : { type: "fixed", ability_id: id };
+      rotationSteps.splice(msg.at, 0, step);
+      vizMapShiftActiveBlock(msg.at, 1);
+      return true;
+    }
+    case "move":
+      if (!isStep(msg.from) || !isSlot(msg.to)) return false;
+      return vizMapMoveStep(msg.from, msg.to);
+    case "anchor": {
+      if (!isSlot(msg.at)) return false;
+      const cur = rotationSteps.findIndex(s => s.type === "loop_anchor");
+      if (cur !== -1) return vizMapMoveStep(cur, msg.at);
+      rotationSteps.splice(msg.at, 0, { type: "loop_anchor" });
+      vizMapShiftActiveBlock(msg.at, 1);
+      return true;
+    }
+    case "addRow": {
+      const a = vizMapAbilityBySlug(msg.slug);
+      if (!a || !isStep(msg.step)) return false;
+      const row = { ability_id: preferredAbilityId(a), rules: {} };
+      const step = rotationSteps[msg.step];
+      if (step.type === "priority_block") {
+        const at = Number.isInteger(msg.row) ? Math.max(0, Math.min(msg.row, step.pool.length)) : step.pool.length;
+        step.pool.splice(at, 0, row);
+      } else if (step.type === "fixed" || step.type === "optional") {
+        // Same upgrade as dropping an ability on the middle of a step card in the editor.
+        const first = { ability_id: step.ability_id, rules: step.rules ? JSON.parse(JSON.stringify(step.rules)) : {} };
+        if (step.lead_time !== undefined) first.lead_time = step.lead_time;
+        rotationSteps[msg.step] = { type: "priority_block", name: `Priority Window ${msg.step + 1}`, pool: [first, row] };
+      } else {
+        return false;
+      }
+      collapsedSteps.delete(msg.step);
+      activeBlockIndex = msg.step;
+      return true;
+    }
+    case "moveRow": {
+      const src = poolOf(msg.fromStep), dst = poolOf(msg.toStep);
+      if (!src || !dst || !Number.isInteger(msg.fromRow) || msg.fromRow < 0 || msg.fromRow >= src.length) return false;
+      let at = Number.isInteger(msg.toRow) ? Math.max(0, Math.min(msg.toRow, dst.length)) : dst.length;
+      if (src === dst) {
+        if (msg.fromRow < at) at--;
+        if (at === msg.fromRow) return false;
+      }
+      const [moved] = src.splice(msg.fromRow, 1);
+      dst.splice(at, 0, moved);
+      if (!src.length) deleteStep(msg.fromStep);
+      return true;
+    }
+    case "rowToStep": {
+      const src = poolOf(msg.fromStep);
+      if (!src || !isSlot(msg.at) || !Number.isInteger(msg.fromRow) || msg.fromRow < 0 || msg.fromRow >= src.length) return false;
+      const [row] = src.splice(msg.fromRow, 1);
+      const meta = resolveAbilityDisplay(row.ability_id);
+      const hasRules = row.rules && Object.keys(row.rules).length > 0;
+      // A fixed step carries no rules: a row with rules, or an off-GCD ability, becomes an optional step.
+      const step = hasRules || (meta && meta.triggers_gcd === false)
+        ? { type: "optional", ability_id: row.ability_id, rules: row.rules || {} }
+        : { type: "fixed", ability_id: row.ability_id };
+      if (row.lead_time !== undefined) step.lead_time = row.lead_time;
+      rotationSteps.splice(msg.at, 0, step);
+      vizMapShiftActiveBlock(msg.at, 1);
+      const srcIdx = msg.fromStep + (msg.at <= msg.fromStep ? 1 : 0);
+      if (!src.length) deleteStep(srcIdx);
+      return true;
+    }
+    case "delRow": {
+      const src = poolOf(msg.step);
+      if (!src || !Number.isInteger(msg.row) || msg.row < 0 || msg.row >= src.length) return false;
+      src.splice(msg.row, 1);
+      if (!src.length) deleteStep(msg.step);
+      return true;
+    }
+    case "type":
+      if (!isStep(msg.step) || !["priority_block", "fixed", "optional"].includes(msg.newType)) return false;
+      if (rotationSteps[msg.step].type === msg.newType) return false;
+      changeStepType(msg.step, msg.newType);
+      return true;
+    case "dup":
+      if (!isStep(msg.step) || rotationSteps[msg.step].type === "loop_anchor") return false;
+      duplicateStep(msg.step);
+      return true;
+    case "del":
+      if (!isStep(msg.step)) return false;
+      deleteStep(msg.step);
+      return true;
+    case "setRule":
+    case "delRule": {
+      const ctx = { scope: msg.scope === "weave" ? "weave" : "rotation", stepIndex: msg.step, poolIndex: Number.isInteger(msg.row) ? msg.row : null };
+      if (typeof msg.key !== "string" || !msg.key) return false;
+      if (ctx.scope === "weave") {
+        if (!weaveSteps[ctx.stepIndex]) return false;
+      } else {
+        if (!isStep(ctx.stepIndex)) return false;
+        const step = rotationSteps[ctx.stepIndex];
+        if (ctx.poolIndex === null ? step.type !== "optional" : !(step.pool && step.pool[ctx.poolIndex])) return false;
+      }
+      const host = ruleHostFor(ctx, true);
+      if (msg.op === "delRule") {
+        if (!(msg.key in host)) return false;
+        delete host[msg.key];
+        return true;
+      }
+      if (msg.editKey && msg.editKey !== msg.key) delete host[msg.editKey];
+      host[msg.key] = msg.value;
+      return true;
+    }
+    case "weaveAdd": {
+      const a = vizMapAbilityBySlug(msg.slug);
+      if (!a) return false;
+      weaveSteps.push({ ability_id: preferredAbilityId(a), rules: {} });
+      return true;
+    }
+    case "weaveDel":
+      if (!weaveSteps[msg.idx]) return false;
+      weaveSteps.splice(msg.idx, 1);
+      return true;
+    default:
+      return false;
+  }
+}
+
+function vizMapCommand(msg) {
+  if (msg.op === "undo") return undoRotation();
+  if (msg.op === "redo") return redoRotation();
+  if (msg.rev !== vizMapRev) return vizBroadcastMap();
+  if (vizMapApplyCommand(msg)) {
+    renderTimeline();
+    renderRightPanel();
+  }
 }
 
 // Select a step (1-based executable index) and open it in the editor.
@@ -4698,6 +4771,8 @@ function vizBroadcastState() {
 
 let vizLastStale = null;
 function vizOnRotationChanged() {
+  undoTrack();
+  vizMapRev += 1;
   vizBroadcastMap();
   const stale = vizIsStale();
   if (vizChannel && dryRunResult && stale !== vizLastStale) vizChannel.postMessage({ type: "stale", stale });
@@ -4712,8 +4787,8 @@ if (vizChannel) {
   };
 }
 
-// Rotation Map window (tools/rotation_map_ui.html): own channel; it asks for state with "hello" and
-// sends "goto" {step, entry} when a step or ability is clicked.
+// Rotation Map window (tools/rotation_map_ui.html): own channel; it asks for state with "hello",
+// sends "goto" {step, entry} when a step or ability is clicked and "cmd" {op, rev, ...} for edits.
 const MAP_CHANNEL_NAME = "swtorsim-rotation-map";
 let vizMapChannel = null;
 try { vizMapChannel = new BroadcastChannel(MAP_CHANNEL_NAME); } catch (e) { vizMapChannel = null; }
@@ -4727,6 +4802,7 @@ if (vizMapChannel) {
     const msg = ev.data || {};
     if (msg.type === "hello") vizBroadcastMap();
     else if (msg.type === "goto") vizSelectStep(msg.step, true, msg.entry ?? null);
+    else if (msg.type === "cmd") vizMapCommand(msg);
   };
 }
 
