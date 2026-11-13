@@ -192,6 +192,8 @@ class ActiveEffect:
     effect_blueprint: Any = field(default=None, repr=False, compare=False)
     ability_ref: Any = field(default=None, repr=False, compare=False)
     caster_ref: Any = field(default=None, repr=False, compare=False)
+    # on_pre_remove runs once per instance, whichever path removes the effect (expiry, remove_effect, dispel, 0 stacks)
+    pre_remove_fired: bool = field(default=False, repr=False, compare=False)
 
     def time_remaining(self, current_time: float) -> float:
         """Returns remaining duration in seconds, or ``inf`` if permanent."""

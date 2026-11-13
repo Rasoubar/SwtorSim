@@ -8,7 +8,7 @@
 | `swtorsim/setup.py` | Loadout wiring, passive init, proc registry & tactical swaps | `prepare_simulation, build_proc_registry, schedule_periodic, swap_tactical, prepare_tactical_swaps, validate_tactical_for_class, validate_pre_combat_rules` |
 | `swtorsim/entities.py` | Actors, stats, timers, immunities | `Entity :: apply_effect, cleanup_expired_effects, has_immunity`; `Player :: recalculate_stats, calculate_gcd, calculate_cast_time, calculate_channel_duration, calculate_cooldown, calculate_resource_cost, calculate_resource_regen, calculate_effect_duration, calculate_effect_tick, break_stealth, proc_registry`; `Dummy :: recalculate_stats, hp_ratio` |
 | `swtorsim/class_buffs.py` | Universal class buffs & hidden permanent bonus (+1% acc/crit chance/crit mult) | `apply_class_buffs, load_class_buff_effects, HIDDEN_BONUSES` |
-| `swtorsim/abilities.py` | Cast lifecycle, targeting, actions | `Ability :: can_cast, cast, _start_channel, apply_cooldown_locks, schedule_recharge`; `Effect :: execute, execute_triggered_branches`; `Branch :: execute`; `execute_single_action, handle_*` |
+| `swtorsim/abilities.py` | Cast lifecycle, targeting, actions | `Ability :: can_cast, cast, _start_channel, apply_cooldown_locks, schedule_recharge`; `Effect :: execute, execute_triggered_branches`; `Branch :: execute`; `execute_single_action, handle_*, remove_effect_firing_pre_remove` |
 | `swtorsim/effects.py` | Buff, DoT, and channel state | `ActiveEffect :: from_effect, from_effect_node, _resolve_branch_modifiers, get_effective_modifiers, modify_stacks, set_stacks`; `ActiveChannel, ActiveDot` |
 | `swtorsim/events.py` | Queued event resolution & pre-combat sequencing | `AbilityCast, CastFinishEvent, ChannelTickEvent, ProjectileImpactEvent, DamageHit, ApplyDamageLand, DotTick, EffectExpire, ResourceTick, PlayerReady, PreCombatEvent :: resolve`; `PreCombatRunner :: run, request, finish, _pull_gate_open`; `schedule_next_decision, is_pre_combat_active, PullConditionsNotMetError` |
 | `swtorsim/combat_math.py` | Hit math, DR curves, buckets, crits (formulas FROZEN, see `AGENTS.md` §1) | `calculate_hit, calculate_base_damage, handle_modifiers, handle_caster_buffs, handle_target_debuffs, handle_mitigation, calculate_crit, accuracy_roll, calc_dr` |
@@ -78,6 +78,7 @@
 | Debugging cooldown / GCD / Alacrity scaling | `entities.py :: Player.calculate_cooldown, calculate_gcd, calculate_cast_time, calculate_channel_duration` |
 | Debugging DoT duration / tick / charge scaling | `entities.py :: Player.calculate_effect_duration, calculate_effect_tick, calculate_ability_max_charges` |
 | Adding / fixing an action handler | `abilities.py :: execute_single_action, handle_<action>` |
+| Removing an effect before expiry (runs `on_pre_remove` once) | `abilities.py :: remove_effect_firing_pre_remove`; natural expiry in `events.py :: EffectExpire.resolve, DotTick.resolve` (`ActiveEffect.pre_remove_fired`) |
 | Fixing a condition check | `requirements.py :: evaluate_single_extracted_condition, evaluate_logic` |
 | Debugging proc triggers / ICDs | `triggers.py :: TriggerManager.dispatch` & `events.py :: DamageHit.resolve` |
 | Updating blueprint extraction | `extractor/abilities.py :: _decode_action, _decode_branch, _is_redundant_self_aoe_branch` |

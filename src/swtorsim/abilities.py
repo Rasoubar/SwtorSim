@@ -964,6 +964,41 @@ def handle_restore_charge(sim, caster, action):
                 ability.consume_charge(caster, sim)
 
 
+def remove_effect_firing_pre_remove(sim, entity, effect_key, fallback_caster=None):
+    """Runs an effect's on_pre_remove branches (once per instance), then removes it from the entity.
+
+    Used by every action that removes an effect before its natural expiry (remove_effect, dispel,
+    buff_remove, stacks reaching 0), so early removal behaves like EffectExpire / DotTick expiry.
+    """
+    eff = dict.get(entity.effects, effect_key)  # raw lookup: a 0-stack effect is flagged expired but still stored
+    if eff is None:
+        eff = entity.effects.get(effect_key)  # legacy name / FQN keys
+    bp = getattr(eff, "effect_blueprint", None)
+    if (
+        eff is not None
+        and not getattr(eff, "pre_remove_fired", False)
+        and hasattr(bp, "execute_triggered_branches")
+    ):
+        eff.pre_remove_fired = True
+        stacks = getattr(eff, "stacks", 1)
+        bp.execute_triggered_branches(
+            "on_pre_remove",
+            sim,
+            getattr(eff, "caster_ref", None) or fallback_caster,
+            entity,
+            context={
+                "stack_multiplier": stacks,
+                "current_stacks": stacks,
+                "active_effect": eff,
+                "owner_effect_key": effect_key,
+                "owner_entity": entity,
+                "effect": bp,
+            },
+            ability=getattr(eff, "ability_ref", None),
+        )
+    entity.cleanup_expired_effects([effect_key])
+
+
 def handle_modify_stack_charge(sim, caster, target, action, context=None):
     """Modifies stacks on an active effect (e.g. Deathmark consuming a stack, Deadly Saber charges)."""
     floats = action.get("floats") or {}
@@ -1134,7 +1169,7 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
                 },
             )
     if getattr(eff, "stacks", 1) <= 0:
-        owner_entity.cleanup_expired_effects([owner_key])
+        remove_effect_firing_pre_remove(sim, owner_entity, owner_key, fallback_caster=caster)
 
 
 def handle_set_effect_stack_charge(sim, caster, target, action, ability=None, context=None):
@@ -1240,7 +1275,7 @@ def handle_set_effect_stack_charge(sim, caster, target, action, ability=None, co
             owner_entity.recalculate_stats()
 
     if getattr(eff, "stacks", 1) <= 0:
-        owner_entity.cleanup_expired_effects([owner_key])
+        remove_effect_firing_pre_remove(sim, owner_entity, owner_key, fallback_caster=caster)
 
 
 def handle_buff_remove_action(sim, caster, target, action, ability=None, context=None):
@@ -1248,7 +1283,7 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
     action_type = action.get("action_type")
     effect_name = action.get("effect_name")
     if effect_name and caster.has_effect(effect_name):
-        caster.cleanup_expired_effects([effect_name])
+        remove_effect_firing_pre_remove(sim, caster, effect_name, fallback_caster=caster)
         if getattr(sim, "verbose", True):
             sim_log(sim, f"{caster.name} consumed/removed buff: {effect_name}")
         return
@@ -1257,7 +1292,7 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
         owner_key = (context or {}).get("owner_effect_key")
         owner_entity = (context or {}).get("owner_entity")
         if owner_key and owner_entity is not None and owner_key in getattr(owner_entity, "effects", {}):
-            owner_entity.cleanup_expired_effects([owner_key])
+            remove_effect_firing_pre_remove(sim, owner_entity, owner_key, fallback_caster=caster)
             return
         if owner_key:
             # The owning effect is already gone: nothing left to remove. Never fall through to the
@@ -1272,8 +1307,8 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
                     and not any("lockout" in t for t in getattr(eff, "tags", ()))
                     and (getattr(eff, "fqn", None) == ability.fqn or k == ability.name)
                 ]
-                if to_remove:
-                    actor.cleanup_expired_effects(to_remove)
+                for k in to_remove:
+                    remove_effect_firing_pre_remove(sim, actor, k, fallback_caster=caster)
         return
 
     if action_type == "dispel":
@@ -1309,7 +1344,8 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
                                     "ability_spec": getattr(eff_inst, "ability_fqn", None),
                                 },
                             )
-                actor.cleanup_expired_effects(to_remove)
+                for k in to_remove:
+                    remove_effect_firing_pre_remove(sim, actor, k, fallback_caster=caster)
 
 
 def handle_execute_ability(sim, caster, target, action):
@@ -1843,18 +1879,22 @@ def handle_reset_timer(sim, caster, target, action, ability=None, context=None):
         eff_bp = getattr(active_effect, "effect_blueprint", None)
         duration = float(getattr(eff_bp, "duration", 0.0) if eff_bp else 0.0)
 
+    total_ticks = getattr(active_effect, "total_ticks", 0)
+    tick_interval = getattr(active_effect, "tick_interval", None)
+    ticking = total_ticks > 0 and bool(tick_interval) and tick_interval > 0.0
+
     if duration > 0.0:
         new_expires_at = current_time + duration
         active_effect.expires_at = new_expires_at
-        if sim is not None:
+        # A ticking effect expires through its own final DotTick, exactly like a fresh application.
+        # An EffectExpire at the same timestamp would be resolved first and swallow that last tick.
+        if sim is not None and not ticking:
             from src.swtorsim.events import EffectExpire
             sim.schedule_absolute(new_expires_at, EffectExpire(owner_entity, effect_key, active_effect))
 
-    total_ticks = getattr(active_effect, "total_ticks", 0)
     if total_ticks > 0:
         active_effect.ticks_remaining = total_ticks
-        tick_interval = getattr(active_effect, "tick_interval", None)
-        if sim is not None and tick_interval and tick_interval > 0.0:
+        if sim is not None and ticking:
             # Parsed logs show the next natural tick lands one full tick interval after a reset, so
             # restart the tick phase: invalidate the pending DotTick and schedule a fresh one.
             from src.swtorsim.events import DotTick
@@ -1994,7 +2034,8 @@ def cleanup_channel_effects(channel, sim):
             bp = getattr(eff_inst, "effect_blueprint", None)
             ability = getattr(eff_inst, "ability_ref", None) or getattr(channel, "ability", None)
             caster = getattr(eff_inst, "caster_ref", None) or getattr(channel, "caster", None)
-            if bp and hasattr(bp, "execute_triggered_branches"):
+            if bp and hasattr(bp, "execute_triggered_branches") and not getattr(eff_inst, "pre_remove_fired", False):
+                eff_inst.pre_remove_fired = True
                 expire_ctx = {
                     "stack_multiplier": getattr(eff_inst, "stacks", 1),
                     "current_stacks": getattr(eff_inst, "stacks", 1),
@@ -2119,7 +2160,10 @@ def handle_custom_action(sim, caster, target, action, context=None):
         if target_abl is None:
             return
 
+        # The triggered ability runs against the branch's own target: the caster for the stealth
+        # abilities (non-aggressive, so their branch target is the caster), the enemy for Shoulder Cannon.
+        hook_target = target if target is not None else caster
         entry_effect_ids = getattr(target_abl, "entry_effect_ids", ()) or ()
         for entry_id in entry_effect_ids:
             if hasattr(target_abl, "execute_effect"):
-                target_abl.execute_effect(entry_id, caster, caster, sim, context=context)
+                target_abl.execute_effect(entry_id, caster, hook_target, sim, context=context)

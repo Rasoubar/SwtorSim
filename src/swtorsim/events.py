@@ -551,7 +551,12 @@ class EffectExpire(Event):
         blueprint = getattr(self.instance_ref, "effect_blueprint", None)
         ability = getattr(self.instance_ref, "ability_ref", None)
         caster = getattr(self.instance_ref, "caster_ref", self.entity)
-        if blueprint and hasattr(blueprint, "execute_triggered_branches"):
+        if (
+            blueprint
+            and hasattr(blueprint, "execute_triggered_branches")
+            and not getattr(self.instance_ref, "pre_remove_fired", False)
+        ):
+            self.instance_ref.pre_remove_fired = True  # once per instance (see remove_effect_firing_pre_remove)
             expire_ctx = {
                 "stack_multiplier": getattr(self.instance_ref, "stacks", 1),
                 "current_stacks": getattr(self.instance_ref, "stacks", 1),
@@ -638,7 +643,12 @@ class DotTick(Event):
                 next_tick_time = sim.current_time + self.instance_ref.tick_interval
                 sim.schedule_absolute(next_tick_time, self)
             else:
-                if effect_blueprint and hasattr(effect_blueprint, "execute_triggered_branches"):
+                if (
+                    effect_blueprint
+                    and hasattr(effect_blueprint, "execute_triggered_branches")
+                    and not getattr(self.instance_ref, "pre_remove_fired", False)
+                ):
+                    self.instance_ref.pre_remove_fired = True  # once per instance
                     expire_ctx = {
                         "stack_multiplier": getattr(self.instance_ref, "stacks", 1),
                         "current_stacks": getattr(self.instance_ref, "stacks", 1),
