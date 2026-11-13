@@ -68,7 +68,7 @@
 
 - **Effects**: `entities.py :: Entity.apply_effect` builds `effects.py :: ActiveEffect.from_effect`, scales stacks (`60`/`61`), duration (`44`), and tick rate (`45`), subscribes triggers (`TriggerManager.subscribe`), runs `on_apply`/`on_refresh`, and schedules `events.py :: DotTick` & `EffectExpire`.
 - **Stacks & Immunities**: `ActiveEffect.modify_stacks` (dispatches `on_stack_charge_increased/decreased`) vs `ActiveEffect.set_stacks` (silent cap); `Entity.immunities` unions `_base_immunities` and effect `immunities`.
-- **Conditions & Triggers**: `requirements.py :: evaluate_single_extracted_condition` & `evaluate_logic` evaluate 36 conditions; `check_proc_cooldown_above` queries `Player.proc_registry` (built by `setup.py :: build_proc_registry`) for authoritative `lockout_effect` and `trigger_icd` mappings; `triggers.py :: TriggerManager.dispatch` filters `spell_type, attack_type, weapon_mode`, tags, ICD (`229`), and proc chance (`228`).
+- **Conditions & Triggers**: `requirements.py :: evaluate_single_extracted_condition` & `evaluate_logic` evaluate 36 conditions; `check_proc_cooldown_above` queries `Player.proc_registry` (built by `setup.py :: build_proc_registry`) for authoritative `lockout_effect` and `trigger_icd` mappings; `triggers.py :: TriggerManager.dispatch` filters `spell_type, attack_type, weapon_mode`, tags, ICD (`interval_61` + `229`, then divided by the caster's Alacrity via `scale_time_modifier`, unrounded), and proc chance (`228`).
 
 ## 5. "Where to Look" Quick-Reference Routing Table
 

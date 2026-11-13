@@ -218,6 +218,11 @@ class TriggerManager:
                     rate_limit_mod += float(mod.value)
 
             effective_interval = max(0.0, base_min_interval + rate_limit_mod)
+            # Rate limits shrink with the caster's Alacrity (confirmed in game), unrounded, after the flat 229 mod.
+            if effective_interval > 0.0:
+                scale_time = getattr(caster, "scale_time_modifier", None)
+                if scale_time is not None:
+                    effective_interval = scale_time(effective_interval)
             if effective_interval > 0.0 and sim.current_time < sub["next_allowed_time"]:
                 continue
 
