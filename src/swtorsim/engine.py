@@ -36,6 +36,9 @@ class Simulation:
         self.event_counter = 0
         self.seed = seed
         self.tracer = tracer
+        # True while prepare_simulation applies the character's load-time passives and buffs: effects applied then
+        # scale with the Alacrity stat only, anything applied later uses total Alacrity.
+        self.loading = False
         self.tracker = Metrics()
         self.tracker.seed = seed
         self.triggers = TriggerManager()

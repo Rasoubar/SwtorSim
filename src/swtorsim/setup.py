@@ -102,7 +102,7 @@ def schedule_periodic(player, target, sim):
     for proc in player.procs.values():
         if getattr(proc, 'trigger', None) == "periodic":
             is_affected = getattr(proc, 'affected_by_cdr', False)
-            interval = player.scale_time_modifier(proc.icd) if is_affected else proc.icd
+            interval = player.scale_time_total(proc.icd) if is_affected else proc.icd
             first_tick = random.uniform(0.0, interval)
             sim.schedule_absolute(first_tick, PeriodicProcTick(player, target, proc))
 
@@ -343,6 +343,8 @@ def prepare_simulation(
             is_passive=getattr(eff, "is_passive", False),
         )
 
+    sim.loading = True
+
     # Pass 1: Register all passive blueprints in `player.passive_db` and apply flat `stat_changes`
     # before executing any `entry_effect_ids` so cross-passive `has_ability` checks (e.g. Blood Tracker)
     # are independent of dictionary iteration order. After Pass 1 completes, Pass 2 runs `entry_effect_ids`.
@@ -357,6 +359,7 @@ def prepare_simulation(
     # Every player gets all class buffs plus the hidden permanent bonus
     apply_class_buffs(player, sim)
     player.recalculate_stats()
+    sim.loading = False
 
     # Apply charge modifiers to active abilities
     for abl in player.ability_db.values():

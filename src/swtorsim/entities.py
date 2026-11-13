@@ -106,9 +106,14 @@ class Entity:
         else:
             base_duration = raw_duration
         ignore_alacrity = bool(getattr(effect, "eff_ignore_alacrity", True))
+        # Effects applied while the character loads (sim.loading) scale with the Alacrity stat only; anything applied
+        # later (including passive ticks applied by a trigger) uses total Alacrity.
+        scale_time = None
+        if caster is not None:
+            scale_time = caster.scale_time_modifier if getattr(sim, "loading", False) else caster.scale_time_total
 
         if base_duration > 0.0 and not ignore_alacrity and caster is not None:
-            duration = caster.scale_time_modifier(base_duration)
+            duration = scale_time(base_duration)
         else:
             duration = base_duration
 
@@ -150,6 +155,13 @@ class Entity:
         if base_tick > 0.0 and base_duration > 0.0:
             total_ticks = max(1, int(round(base_duration / base_tick)))
             scaled_tick = duration / total_ticks
+        elif is_passive and getattr(ability, "type", None) == "passive" and base_tick > 0.0:
+            # Effects of passive abilities (e.g. Terminal Velocity) have no duration, so they tick indefinitely.
+            # Active abilities (channels) flag effects passive too, but their ticks are driven by the channel.
+            # DotTick reads passive_tick_base to reschedule itself at this fixed interval and never expires the effect.
+            total_ticks = 0
+            scaled_tick = scale_time(base_tick) if (not ignore_alacrity and caster is not None) else base_tick
+            effect_instance.passive_tick_base = base_tick
         else:
             total_ticks = 0
             scaled_tick = None
@@ -265,7 +277,7 @@ class Entity:
                 sim.triggers.dispatch("on_effect_applied", sim, eff_ctx)
                 sim.triggers.dispatch("on_effect_received", sim, eff_ctx)
 
-            if total_ticks > 0 and scaled_tick is not None:
+            if (total_ticks > 0 or getattr(effect_instance, "passive_tick_base", None) is not None) and scaled_tick is not None:
                 from src.swtorsim.events import DotTick
                 sim.schedule_absolute(
                     current_time + scaled_tick,
@@ -298,6 +310,10 @@ class Entity:
 
     def scale_time_modifier(self, base_time: float) -> float:
         """Scales time durations (override in Player for Alacrity)."""
+        return base_time
+
+    def scale_time_total(self, base_time: float) -> float:
+        """Scales effect durations and proc cooldowns by total Alacrity (override in Player)."""
         return base_time
 
     def consider_recalculation(self, effect_instance):
@@ -726,6 +742,29 @@ class Player(Entity):
         cdr = self.stats.get("Alacrity",0.0)
         return base_time / (1.0 + cdr)
 
+    def instant_reduction_bonus(self) -> float:
+        """Sum of the unconditional instant-reduction bonuses (stat 274) of active effects.
+
+        This is the extra Alacrity-like term the GCD adds to the Alacrity stat (passives such as High Velocity Gas
+        Cylinder, stacking buffs such as Supercharged Velocity, Improved Vents).
+        """
+        total = 0.0
+        for effect in self.effects.values():
+            if getattr(effect, "is_expired", False):
+                continue
+            for mod in _effect_modifiers(effect):
+                if str(mod.stat) in _INSTANT_REDUCTION_STATS and mod.applies_to():
+                    total += float(mod.value)
+        return total
+
+    def scale_time_total(self, base_time: float) -> float:
+        """Scales effect durations (and so their ticks) and proc cooldowns by total Alacrity.
+
+        Total Alacrity is the Alacrity stat plus the instant-reduction bonuses, the same total the GCD uses.
+        Effects applied while the character loads use scale_time_modifier (stat only); see apply_effect.
+        """
+        return base_time / (1.0 + self.stats.get("Alacrity", 0.0) + self.instant_reduction_bonus())
+
     def recalculate_stats(self):  # because relics hate me
         """Recalculates a character's stats using its effects."""
         temp_stats = self.base_stats.copy()
@@ -1040,6 +1079,7 @@ def _effect_modifiers(effect):
     return getter()
 
 
+_INSTANT_REDUCTION_STATS = frozenset({"274", "stat_cbt_instant_reduction_percentage", "STAT_cbt_instant_reduction_percentage"})
 _MAX_CHARGES_STATS = frozenset({"422", "stat_abl_charges_max", "STAT_abl_charges_max"})
 _RESOURCE_COST_STATS = frozenset({
     "68", "69", "70",
