@@ -394,7 +394,12 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         floats = item.get("floats", {})
         threshold = floats.get("resource_amount", 0.0)
         comparison = item.get("comparison", "gte")
-        actual = getattr(getattr(actor, "resource", None), "current_value", 0.0)
+        resource = getattr(actor, "resource", None)
+        actual = getattr(resource, "current_value", 0.0)
+        # Game data states resource thresholds as resource AVAILABLE; HeatPool stores heat BUILT UP,
+        # so convert to remaining capacity (gte 6 -> heat <= 94, lte 60 -> heat >= 40).
+        if str(getattr(resource, "pool_type", "")).lower() == "heat":
+            actual = getattr(resource, "max_value", 100.0) - actual
         res = compare_values(actual, comparison, threshold)
 
     elif cond_type == "has_ability_stack_charge":

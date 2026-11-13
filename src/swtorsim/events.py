@@ -197,7 +197,7 @@ class PeriodicProcTick(Event):
                 sim_log(sim, f'Temporary Proc test')
             execute_single_action(sim, self.player, self.target, action, self.proc.name)
         is_affected = getattr(self.proc, 'affected_by_cdr', False)
-        interval = self.player.scale_time_modifier(self.proc.icd) if is_affected else self.proc.icd
+        interval = self.player.scale_time_total(self.proc.icd) if is_affected else self.proc.icd
         sim.schedule_relative(interval, PeriodicProcTick(self.player, self.target, self.proc))
 
 MAX_PRE_COMBAT_SECONDS: float = 300.0
@@ -628,6 +628,11 @@ class DotTick(Event):
                 tick_number=current_tick,
                 context=context,
             )
+            if getattr(self.instance_ref, "passive_tick_base", None) is not None:
+                # Passive ticking effect: no duration, never expires; the tick length was fixed when it was applied.
+                sim.schedule_absolute(sim.current_time + self.instance_ref.tick_interval, self)
+                return
+
             self.instance_ref.ticks_remaining -= 1
             if self.instance_ref.ticks_remaining > 0 and self.instance_ref.tick_interval:
                 next_tick_time = sim.current_time + self.instance_ref.tick_interval
