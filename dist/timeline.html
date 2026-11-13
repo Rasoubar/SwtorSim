@@ -582,7 +582,7 @@ function bindTimeline() {
     const stepLine = c.phase === "pre_combat"
       ? `Pre-combat step ${c.step_index}`
       : c.phase === "weave"
-      ? `Always weave (fired before step ${c.step_index}${st ? `: ${esc(st.name)}` : ""})`
+      ? `Use on cooldown (fired before step ${c.step_index}${st ? `: ${esc(st.name)}` : ""})`
       : `Step ${c.step_index}: ${esc(st ? st.name : c.step_label)}${st && st.type === "priority_block" && c.entry >= 0 ? ` (entry ${c.entry + 1} of ${st.pool.length})` : ""}`;
     let actLine = "";
     if (c.activation === "cast") {

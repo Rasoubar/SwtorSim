@@ -200,8 +200,8 @@ def prepare_tactical_swaps(player, steps: list[dict], class_name: str | None) ->
             player.gear_library[fqn] = _load_tactical_blueprint(fqn)
 
 
-def _unequip_passive(player, fqn: str, sim, keep_timed_effects: bool = True) -> None:
-    """Removes a passive's registration, permanent effects (and timed ones unless kept) and procs."""
+def _unequip_passive(player, fqn: str, sim) -> None:
+    """Removes a passive's registration, permanent effects and procs; timed effects it already produced are kept."""
     old_abl = player.passive_db.pop(fqn, None)
     if old_abl is not None and getattr(old_abl, "name", None):
         alias = old_abl.name.lower().replace(" ", "_")
@@ -223,7 +223,7 @@ def _unequip_passive(player, fqn: str, sim, keep_timed_effects: bool = True) -> 
             if not from_source:
                 continue
             is_timed = getattr(eff, "expires_at", None) is not None
-            if is_timed and keep_timed_effects:
+            if is_timed:
                 continue
             doomed.append(key)
         entity.cleanup_expired_effects(doomed)
@@ -241,12 +241,12 @@ def _equip_passive(player, bp, sim) -> None:
     player.proc_registry.update(build_proc_registry({bp.fqn: bp}))
 
 
-def swap_tactical(player, new_fqn: str, sim, keep_timed_effects: bool = True) -> bool:
+def swap_tactical(player, new_fqn: str, sim) -> bool:
     """Instant, off-GCD, zero-cost tactical swap. Returns False when ``new_fqn`` is already equipped.
 
     Unequips the current tactical (registration, permanent effects, triggers, proc registry;
-    timed effects it already produced are kept unless ``keep_timed_effects`` is False), equips
-    the new one exactly like loadout setup does, and recalculates stats.
+    timed effects it already produced are always kept), equips the new one exactly like loadout
+    setup does, and recalculates stats.
     """
     new_fqn = str(new_fqn or "").strip()
     old_fqn = getattr(player, "tactical_fqn", "") or ""
@@ -259,7 +259,7 @@ def swap_tactical(player, new_fqn: str, sim, keep_timed_effects: bool = True) ->
 
     player._sim_ref = sim
     if old_fqn:
-        _unequip_passive(player, old_fqn, sim, keep_timed_effects=keep_timed_effects)
+        _unequip_passive(player, old_fqn, sim)
     _equip_passive(player, bp, sim)
     player.tactical_fqn = new_fqn
     player.recalculate_stats()

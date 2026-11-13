@@ -354,7 +354,7 @@ class PreCombatRunner:
                     continue
                 from src.swtorsim.setup import swap_tactical
                 old_fqn = getattr(player, "tactical_fqn", "")
-                if swap_tactical(player, new_fqn, sim, keep_timed_effects=step.get("keep_timed_effects", True)):
+                if swap_tactical(player, new_fqn, sim):
                     self.swaps.append({"t": round(now, 4), "from": old_fqn, "to": new_fqn})
                 self.index += 1
                 continue

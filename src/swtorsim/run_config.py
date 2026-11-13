@@ -134,7 +134,7 @@ def normalize_pre_combat(
     """Normalizes precast ability and pre-combat sequences into a list of step dicts.
 
     Step kinds: ``{"ability": id}`` (optional ``target``, ``wait_for_cooldown``),
-    ``{"swap_tactical": fqn}`` (optional ``keep_timed_effects``), ``{"wait": seconds}``, and
+    ``{"swap_tactical": fqn}``, ``{"wait": seconds}``, and
     ``{"wait_until": rules}`` (optional ``max_wait``).
 
     Raises ValueError for any step it cannot interpret (unknown kind, empty ability, bad wait

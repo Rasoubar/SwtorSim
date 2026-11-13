@@ -1182,6 +1182,18 @@
     margin-bottom: 6px;
   }
   .pre-combat-title { font-weight: 700; font-size: 12.5px; color: var(--text-main); }
+  .pre-combat-panel.collapsed { max-height: none; overflow-y: visible; }
+  .pre-combat-panel.collapsed .pre-combat-head { margin-bottom: 0; }
+  .pc-toggle { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+  .pc-toggle:hover .pre-combat-title { color: var(--cyan); }
+  .pc-collapsed-note { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  .pc-icon { width: 22px; height: 22px; }
+  .pc-strip { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+  .pc-strip-item { display: inline-flex; align-items: center; }
+  .pc-chip { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 10px; white-space: nowrap; }
+  .pc-chip-swap { background: var(--amber-bg); color: var(--amber); }
+  .pc-chip-wait { background: var(--border-subtle); color: var(--text-muted); }
+  .pc-chip-until { background: var(--green-bg); color: var(--green); }
   .pre-combat-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
   .pre-combat-row {
     display: flex;
@@ -1237,7 +1249,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794528785"></script>
+  <script src="pyodide_client.js?v=1794573217"></script>
 </head>
 <body>
 
@@ -1503,11 +1515,16 @@ let currentLoadout = {
 };
 
 let rotationSteps = [];
-let preCombatSteps = []; // [{ability, target?, wait_for_cooldown?} | {swap_tactical, keep_timed_effects?} | {wait} | {wait_until, max_wait?}]
+let preCombatSteps = []; // [{ability, target?, wait_for_cooldown?} | {swap_tactical} | {wait} | {wait_until, max_wait?}]
 let weaveSteps = []; // loop-only "always weave": [{ability_id, rules, lead_time?}] tried before every loop step
 let dryRunWeaveJson = "[]"; // JSON of weaveSteps at the time of the last dry-run (stale detection)
 let pullConditions = {}; // fight-start gate: rotation-style rules that must hold before the rotation starts
 let pullMaxWait = 60;    // seconds; the run fails if the pull conditions are still false after this
+// UI only: which editor panels are minimized to their header row (remembered per browser).
+const panelCollapsed = { precombat: false, weave: false };
+for (const k of Object.keys(panelCollapsed)) {
+  try { panelCollapsed[k] = localStorage.getItem(`swtorsim_${k}_collapsed`) === "1"; } catch (e) {}
+}
 let TIMELINE_VIEW_MODE = "rotation"; // "rotation" or "sub30"
 let SUB30_THRESHOLD = 0.30;
 let SUB30_DEFAULT_ABILITY = "";
@@ -2551,8 +2568,6 @@ function updatePreCombatStep(idx, field, value) {
   } else if (field === "max_wait") {
     const v = parseFloat(value);
     if (isFinite(v) && v > 0) step.max_wait = v; else delete step.max_wait;
-  } else if (field === "keep_timed_effects") {
-    if (value) delete step.keep_timed_effects; else step.keep_timed_effects = false;
   } else if (field === "wait_for_cooldown") {
     if (value) step.wait_for_cooldown = true; else delete step.wait_for_cooldown;
   } else if (field === "target") {
@@ -2578,9 +2593,72 @@ function removePreCombatStep(idx) {
   renderRightPanel();
 }
 
+function togglePanelCollapse(key) {
+  panelCollapsed[key] = !panelCollapsed[key];
+  try { localStorage.setItem(`swtorsim_${key}_collapsed`, panelCollapsed[key] ? "1" : "0"); } catch (e) {}
+  if (key === "weave") renderWeave(); else renderPreCombat();
+}
+
+// Clickable header (chevron + title + optional note) shared by the Pre-Combat and Use on Cooldown panels.
+function panelToggleHtml(key, titleHtml, noteHtml = "") {
+  const collapsed = panelCollapsed[key];
+  return `
+    <span class="pc-toggle" role="button" tabindex="0" title="${collapsed ? "Expand this editor" : "Minimize this editor"}" onclick="togglePanelCollapse('${key}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); togglePanelCollapse('${key}'); }">
+      <span class="btn-sm" style="pointer-events:none;">${collapsed ? "&#9656;" : "&#9662;"}</span>
+      <span class="pre-combat-title">${titleHtml}</span>
+      ${noteHtml}
+    </span>`;
+}
+
+// Ability icon for an editor row / minimized strip ("" when the ability has no icon or is not in the loadout).
+function panelAbilityIconHtml(abilityId) {
+  const found = resolveAbilityDisplay(abilityId);
+  return found && found.icon ? getAbilityIconHtml(found.icon, "pc-icon") : "";
+}
+
+// One compact item per ability: its icon (name chip when it has none), hover shows the details.
+function panelAbilityStripItemHtml(abilityId, tip) {
+  const found = resolveAbilityDisplay(abilityId);
+  const name = found ? found.name : String(abilityId);
+  const icon = panelAbilityIconHtml(abilityId);
+  return `<span class="pc-strip-item" title="${escapeAttr(tip(name))}">${icon || `<span class="pc-chip pc-chip-wait">${escapeHtml(name)}</span>`}</span>`;
+}
+
+// Minimized Pre-Combat summary: one item per step, in order.
+function preCombatStripHtml() {
+  if (!preCombatSteps.length) return "";
+  const items = preCombatSteps.map((step, idx) => {
+    const n = idx + 1;
+    if (step.swap_tactical) {
+      return `<span class="pc-chip pc-chip-swap" title="${escapeAttr(`${n}. Swap Tactical: ${tacticalDisplayName(step.swap_tactical)}`)}">Swap</span>`;
+    }
+    if (step.wait_until !== undefined) {
+      return `<span class="pc-chip pc-chip-until" title="${n}. Wait Until">Until</span>`;
+    }
+    if (step.wait !== undefined) {
+      return `<span class="pc-chip pc-chip-wait" title="${n}. Wait ${Number(step.wait)}s">${Number(step.wait)}s</span>`;
+    }
+    return panelAbilityStripItemHtml(step.ability, name =>
+      `${n}. ${name}${step.target === "self" ? " (self)" : step.target === "target" ? " (enemy)" : ""}${step.wait_for_cooldown ? " - waits if not ready" : ""}`);
+  });
+  return `<span class="pc-strip">${items.join("")}</span>`;
+}
+
 function renderPreCombat() {
   const el = document.getElementById("preCombatPanel");
   if (!el) return;
+  el.classList.toggle("collapsed", panelCollapsed.precombat);
+  if (panelCollapsed.precombat) {
+    // Minimized: header only (toggle, title, step icons, pull-gate marker). Steps stay in preCombatSteps untouched.
+    const n = preCombatSteps.length;
+    el.innerHTML = `
+      <div class="pre-combat-head">
+        ${panelToggleHtml("precombat", `Pre-Combat (before pull) &mdash; ${n} step${n === 1 ? "" : "s"}`,
+          hasPullGate() ? '<span class="pc-collapsed-note">&middot; fight-start condition set</span>' : "")}
+        ${preCombatStripHtml()}
+      </div>`;
+    return;
+  }
   const abilities = currentLoadout.abilities || [];
   const tacticals = currentLoadout.tacticals || [];
 
@@ -2594,10 +2672,7 @@ function renderPreCombat() {
         + tacticals.map(t => `<option value="${escapeAttr(t.fqn)}" ${t.fqn === step.swap_tactical ? "selected" : ""}>${escapeHtml(t.name)}</option>`).join("");
       body = `
         <span style="color:var(--text-muted);font-size:11px;">${escapeHtml(tacticalDisplayName(preCombatTacticalBefore(idx)))} &rarr;</span>
-        <select style="max-width:260px;" onchange="updatePreCombatStep(${idx}, 'swap_tactical', this.value)">${opts}</select>
-        <label title="Keep timed buffs the old tactical already produced (e.g. Hidden Power)">
-          <input type="checkbox" ${step.keep_timed_effects === false ? "" : "checked"} onchange="updatePreCombatStep(${idx}, 'keep_timed_effects', this.checked)"> keep timed buffs
-        </label>`;
+        <select style="max-width:260px;" onchange="updatePreCombatStep(${idx}, 'swap_tactical', this.value)">${opts}</select>`;
     } else if (step.wait_until !== undefined) {
       kindHtml = '<span class="pc-kind pc-kind-until">Wait Until</span>';
       body = `
@@ -2614,6 +2689,7 @@ function renderPreCombat() {
       const opts = (found ? "" : `<option value="${escapeAttr(step.ability)}" selected>${escapeHtml(step.ability)} (not in loadout)</option>`)
         + abilities.map(a => `<option value="${escapeAttr(a.slug)}" ${found && found.fqn === a.fqn ? "selected" : ""}>${escapeHtml(a.name)}${a.activation_type === "channel" ? " [channel]" : a.activation_type === "cast" ? " [cast]" : ""}${a.triggers_gcd ? "" : " [off-GCD]"}</option>`).join("");
       body = `
+        ${panelAbilityIconHtml(step.ability)}
         <select style="max-width:230px;" onchange="updatePreCombatStep(${idx}, 'ability', this.value)">${opts}</select>
         <select title="Target" onchange="updatePreCombatStep(${idx}, 'target', this.value)">
           <option value="" ${!step.target ? "selected" : ""}>auto target</option>
@@ -2639,7 +2715,7 @@ function renderPreCombat() {
   const pullTac = preCombatTacticalBefore(preCombatSteps.length);
   el.innerHTML = `
     <div class="pre-combat-head">
-      <span class="pre-combat-title">Pre-Combat (before pull) &mdash; ${preCombatSteps.length} step${preCombatSteps.length === 1 ? "" : "s"}</span>
+      ${panelToggleHtml("precombat", `Pre-Combat (before pull) &mdash; ${preCombatSteps.length} step${preCombatSteps.length === 1 ? "" : "s"}`)}
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="btn-sm btn-primary" onclick="addPreCombatStep('ability')">+ Ability</button>
         <button class="btn-sm btn-amber" onclick="addPreCombatStep('swap')">+ Tactical Swap</button>
@@ -2661,7 +2737,7 @@ function renderPreCombat() {
 }
 
 // ---------------------------------------------------------------------------
-// Always Weave (loop only): abilities tried before every loop step, like an optional step in every gap
+// Use on Cooldown (loop only; stored as `weave`): abilities tried before every loop step, like an optional step in every gap
 // ---------------------------------------------------------------------------
 function addWeaveStep() {
   weaveSteps.push({ ability_id: getDefaultAbilityId(true), rules: {} });
@@ -2699,6 +2775,19 @@ function removeWeaveStep(idx) {
 function renderWeave() {
   const el = document.getElementById("weavePanel");
   if (!el) return;
+  el.classList.toggle("collapsed", panelCollapsed.weave);
+  const title = `Use on Cooldown (loop only) &mdash; ${weaveSteps.length} abilit${weaveSteps.length === 1 ? "y" : "ies"}`;
+  if (panelCollapsed.weave) {
+    // Minimized: header only (toggle, title, ability icons). Entries stay in weaveSteps untouched.
+    const strip = weaveSteps.map((entry, idx) =>
+      panelAbilityStripItemHtml(entry.ability_id, name => `${idx + 1}. ${name}`)).join("");
+    el.innerHTML = `
+      <div class="pre-combat-head">
+        ${panelToggleHtml("weave", title)}
+        ${strip ? `<span class="pc-strip">${strip}</span>` : ""}
+      </div>`;
+    return;
+  }
   const abilities = currentLoadout.abilities || [];
   const rows = weaveSteps.map((entry, idx) => {
     const found = resolveAbilityDisplay(entry.ability_id);
@@ -2709,6 +2798,7 @@ function renderWeave() {
       <div class="pre-combat-row">
         <span class="pc-idx">${idx + 1}.</span>
         <span class="pc-kind pc-kind-ability">Weave</span>
+        ${panelAbilityIconHtml(entry.ability_id)}
         <select style="max-width:230px;" onchange="updateWeaveStep(${idx}, 'ability_id', this.value)">${opts}</select>
         ${renderScopedRulesHtml(entry.rules || {}, "weave", idx)}
         <label title="How long before the GCD ends an off-GCD ability may fire (default 0.4s)">lead
@@ -2723,7 +2813,7 @@ function renderWeave() {
   }).join("");
   el.innerHTML = `
     <div class="pre-combat-head">
-      <span class="pre-combat-title">Always Weave (loop only) &mdash; ${weaveSteps.length} abilit${weaveSteps.length === 1 ? "y" : "ies"}</span>
+      ${panelToggleHtml("weave", title)}
       <button class="btn-sm btn-primary" onclick="addWeaveStep()">+ Ability</button>
     </div>
     ${weaveSteps.length ? "" : '<div class="pre-combat-hint">Optional. For off-GCD abilities you want used on cooldown: each one is tried before every step after the End of Opener anchor, so you do not have to place it between the steps by hand. The opener is not affected.</div>'}

@@ -800,8 +800,9 @@ def normalize_rotation_steps(raw_steps: Any) -> tuple[list[dict[str, Any]], list
 def normalize_pre_combat_steps(raw: Any) -> list[dict[str, Any]]:
     """Extracts the canonical pre-combat step list from a rotation file (``[]`` for bare arrays).
 
-    Keeps only known keys per step kind and drops defaults (``keep_timed_effects: true``,
-    ``wait_for_cooldown: false``) so saved files stay minimal.
+    Keeps only known keys per step kind and drops defaults (``wait_for_cooldown: false``) so saved
+    files stay minimal. A legacy ``keep_timed_effects`` key on a swap step is dropped (timed buffs
+    from the old tactical are always kept).
     """
     if not isinstance(raw, dict):
         return []
@@ -809,8 +810,6 @@ def normalize_pre_combat_steps(raw: Any) -> list[dict[str, Any]]:
     for step in normalize_pre_combat(raw.get("precast"), raw.get("pre_combat")):
         if step.get("swap_tactical"):
             out: dict[str, Any] = {"swap_tactical": str(step["swap_tactical"])}
-            if step.get("keep_timed_effects", True) is False:
-                out["keep_timed_effects"] = False
         elif "wait_until" in step:
             out = {"wait_until": dict(step.get("wait_until") or {})}
             if step.get("max_wait") is not None:
