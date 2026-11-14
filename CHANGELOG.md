@@ -4,6 +4,11 @@
 
 ## Completed Fixes
 
+### 89. Diminishing Returns Specs Point at a Run Config (`src/diminishing_returns/config.py`, `data/diminishing_returns/dr_config.json`) - [DONE]
+- A spec is now a display name plus `run_config`, a path such as `data/run_config/hatred_14gcd_pts.json`. Discipline, build, rotation, choices, weapons, tactical, legendaries, and the equipped relic pair come from that file. Duration, dummy HP, level, seed, stem matching, and the training-dummy armor debuff stay on the DR config and override the run config, so every spec in one sweep shares one fight.
+- A discipline path under `data/extractor/pts/` loads PTS data when the run config has no `environment` field. `hatred_14gcd_pts.json` therefore stays on the PTS Hatred tree and `L85_14gcd_red`. Its relics are Mastery and Power, so that pair is the one drawn on the derivative plot. Dummy HP stays 10,000,000 from the DR config (the run config's 6,000,000 is not used).
+- Verification: full suite 34 run, 34 OK (`tests/test_diminishing_returns.py`). `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10. The saved 10000-sample sweep was not run. No combat-math change.
+
 ### 88. Monte Carlo Spread on Mean DPS, and a t-test on Pinned Batch Comparisons (`tools/simulator_ui.html`) - [DONE]
 - The primary KPI no longer puts `± SD | Med:` on the comparison line. A Monte Carlo run shows its standard deviation after the mean (`53,852.9 ±824.9 SD`). The median stays on the Monte Carlo tab.
 - The line under the mean is the pinned delta. If either run is a single fight, or a batch has fewer than 2 iterations, that delta is unchanged.
