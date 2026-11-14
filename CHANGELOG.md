@@ -4,6 +4,14 @@
 
 ## Completed Fixes
 
+### 88. Monte Carlo Spread on Mean DPS, and a t-test on Pinned Batch Comparisons (`tools/simulator_ui.html`) - [DONE]
+- The primary KPI no longer puts `± SD | Med:` on the comparison line. A Monte Carlo run shows its standard deviation after the mean (`53,852.9 ±824.9 SD`). The median stays on the Monte Carlo tab.
+- The line under the mean is the pinned delta. If either run is a single fight, or a batch has fewer than 2 iterations, that delta is unchanged.
+- When both the pinned run and the active run are Monte Carlo with at least 2 fights, a two-sided 5% Welch t-test uses each run's mean, standard deviation, and fight count. A green check means the gap is larger than run-to-run noise (`p < 0.05`). A red cross means it is not. A `?` tooltip explains the test and shows `p`.
+- The engine's `std_dev` is the population spread (divisor `n`). The test converts it to the sample spread before the t statistic. No combat-math change.
+- Verification: local dashboard at `http://127.0.0.1:8787/`. Means 50.5 apart, both SD 824.9, both n 1000: red cross, `p = 0.171`. A 1,000 DPS gap on that same spread: green check. A single run against a pinned batch: delta only, no mark, no median on the comparison line.
+- Not done: `dist/` was not regenerated.
+
 ### 87. Diminishing Returns Tool Runs from `main.py` (`src/diminishing_returns/main.py`, `data/diminishing_returns/`) - [DONE]
 - `dr_config.json` moved out of `data/run_config/`, which the simulator, web GUI, and rotation builder scan as preset run configs. It now lives at `data/diminishing_returns/dr_config.json`.
 - The CLI is `src/diminishing_returns/main.py`, matching the extractor. It puts the repo root on `sys.path` before importing `src`, so `python src/diminishing_returns/runner.py` is no longer the entry (that file has no `main` and could not import `src`). `__main__.py` is removed.

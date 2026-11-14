@@ -628,6 +628,42 @@
     font-size: 25px;
   }
 
+  .kpi-card.primary .kpi-value .kpi-sd {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-left: 6px;
+  }
+
+  .sig-mark {
+    font-size: 14px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .sig-mark.sig-yes {
+    color: var(--green);
+  }
+
+  .sig-mark.sig-no {
+    color: var(--red);
+  }
+
+  .sig-help {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--text-muted);
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 700;
+    cursor: help;
+    line-height: 1;
+  }
+
   .kpi-sub {
     font-size: 11px;
     color: var(--text-muted);
@@ -2438,20 +2474,154 @@
     return `<span class="delta-badge ${cls}">${sign}${diff.toFixed(1)}${suffix} (${sign}${pct.toFixed(2)}%)</span>`;
   }
 
+  // Lanczos log-gamma. Used only for the comparison t-test below.
+  function logGamma(z) {
+    const p = [
+      0.99999999999980993,
+      676.5203681218851,
+      -1259.1392167224028,
+      771.32342877765313,
+      -176.61502916214059,
+      12.507343278686905,
+      -0.13857109526572012,
+      9.984369654078499e-6,
+      1.5056327351493116e-7
+    ];
+    if (z < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * z)) - logGamma(1 - z);
+    z -= 1;
+    let x = p[0];
+    for (let i = 1; i < p.length; i++) x += p[i] / (z + i);
+    const t = z + 7.5;
+    return 0.5 * Math.log(2 * Math.PI) + (z + 0.5) * Math.log(t) - t + Math.log(x);
+  }
+
+  // Continued fraction for the incomplete beta (Numerical Recipes betacf).
+  function betacf(a, b, x) {
+    const MAXIT = 200;
+    const EPS = 3e-14;
+    const FPMIN = 1e-300;
+    const qab = a + b;
+    const qap = a + 1;
+    const qam = a - 1;
+    let c = 1;
+    let d = 1 - (qab * x) / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      const m2 = 2 * m;
+      let aa = (m * (b - m) * x) / ((qam + m2) * (a + m2));
+      d = 1 + aa * d;
+      if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c;
+      if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      h *= d * c;
+      aa = (-(a + m) * (qab + m) * x) / ((a + m2) * (qap + m2));
+      d = 1 + aa * d;
+      if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c;
+      if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      const del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < EPS) return h;
+    }
+    return h;
+  }
+
+  function regularizedIncompleteBeta(a, b, x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    const bt = Math.exp(
+      logGamma(a + b) - logGamma(a) - logGamma(b) + a * Math.log(x) + b * Math.log(1 - x)
+    );
+    if (x < (a + 1) / (a + b + 2)) return (bt * betacf(a, b, x)) / a;
+    return 1 - (bt * betacf(b, a, 1 - x)) / b;
+  }
+
+  function studentTTwoTailP(tAbs, df) {
+    if (!(tAbs > 0) || !(df > 0)) return 1;
+    const x = df / (df + tAbs * tAbs);
+    return regularizedIncompleteBeta(df / 2, 0.5, x);
+  }
+
+  // Population std_dev from the engine uses divisor n. The t-test wants the sample spread.
+  function welchTTest(meanA, sdA, nA, meanB, sdB, nB) {
+    const sA = sdA * Math.sqrt(nA / (nA - 1));
+    const sB = sdB * Math.sqrt(nB / (nB - 1));
+    const vA = (sA * sA) / nA;
+    const vB = (sB * sB) / nB;
+    const se2 = vA + vB;
+    if (se2 === 0) {
+      const same = meanA === meanB;
+      return { significant: !same, p: same ? 1 : 0 };
+    }
+    const t = Math.abs(meanA - meanB) / Math.sqrt(se2);
+    const df = (se2 * se2) / ((vA * vA) / (nA - 1) + (vB * vB) / (nB - 1));
+    const p = studentTTwoTailP(t, df);
+    return { significant: p < 0.05, p };
+  }
+
+  function monteCarloSample(run) {
+    if (!run || run.mode !== "BATCH") return null;
+    const n = Number(run.iterations);
+    const sd = Number(run.std_dev);
+    const mean = Number(run.dps);
+    if (!Number.isFinite(n) || n < 2) return null;
+    if (!Number.isFinite(sd) || sd < 0 || !Number.isFinite(mean)) return null;
+    return { mean, sd, n };
+  }
+
+  function escapeHtmlAttr(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  }
+
+  function formatPValue(p) {
+    if (!Number.isFinite(p)) return "n/a";
+    if (p === 0) return "0";
+    if (p < 0.001) return p.toExponential(2);
+    return p.toFixed(3);
+  }
+
+  function formatSignificanceMark(current, baseline) {
+    const a = monteCarloSample(current);
+    const b = monteCarloSample(baseline);
+    if (!a || !b) return "";
+    const test = welchTTest(a.mean, a.sd, a.n, b.mean, b.sd, b.n);
+    const cls = test.significant ? "sig-yes" : "sig-no";
+    const glyph = test.significant ? "\u2713" : "\u2717";
+    const label = test.significant ? "Significant" : "Not significant";
+    const tip =
+      "Two-sided 5% Welch t-test of the two Monte Carlo means, using each run's DPS standard deviation and fight count. " +
+      "A check means the difference is larger than run-to-run noise. A cross means it is not. " +
+      "This comparison: p = " + formatPValue(test.p) + ".";
+    return (
+      `<span class="sig-mark ${cls}" aria-label="${label}">${glyph}</span>` +
+      `<span class="sig-help" title="${escapeHtmlAttr(tip)}">?</span>`
+    );
+  }
+
   function renderAllResultPanels(res) {
     // 1. Update KPI Strip
     const isBatch = res.mode === "BATCH";
     document.getElementById("kpiModeBadge").textContent = isBatch ? `BATCH (${res.iterations})` : "TEST (1x)";
     document.getElementById("kpiDpsLabel").textContent = isBatch ? "Mean DPS" : "Total DPS";
-    document.getElementById("kpiDpsValue").textContent = res.dps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const dpsText = res.dps.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const dpsValueEl = document.getElementById("kpiDpsValue");
+    if (isBatch && Number.isFinite(Number(res.std_dev))) {
+      const sdText = Number(res.std_dev).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+      dpsValueEl.innerHTML = `${dpsText}<span class="kpi-sd"> \u00b1${sdText} SD</span>`;
+    } else {
+      dpsValueEl.textContent = dpsText;
+    }
 
     let dpsSubHtml = "";
     if (PINNED_BASELINE) {
-      dpsSubHtml += formatDeltaBadge(res.dps, PINNED_BASELINE.dps, " DPS") + " ";
+      dpsSubHtml += formatDeltaBadge(res.dps, PINNED_BASELINE.dps, " DPS");
+      dpsSubHtml += formatSignificanceMark(res, PINNED_BASELINE);
     }
-    if (isBatch) {
-      dpsSubHtml += `±${res.std_dev.toLocaleString()} SD | Med: ${res.median_dps.toLocaleString()}`;
-    } else {
+    if (!isBatch) {
       dpsSubHtml += `${res.class_name} - ${res.spec} (Seed ${res.seed})`;
     }
     document.getElementById("kpiDpsSub").innerHTML = dpsSubHtml;
