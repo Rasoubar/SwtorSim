@@ -1057,6 +1057,37 @@ def _init_batch_worker(sim_context: dict[str, Any]) -> None:
     _WORKER_SIM_CONTEXT = sim_context
 
 
+def _is_pycharm_plot_helper_dir(path_entry: str) -> bool:
+    """True for PyCharm's `pycharm_<lib>_backend` helper directories (each ships a `sitecustomize.py`)."""
+    name = os.path.basename(os.path.normpath(path_entry)).lower()
+    return name.startswith("pycharm_") and name.endswith("_backend")
+
+
+def _prepare_worker_environment() -> None:
+    """Keeps pool workers from loading matplotlib / numpy (OpenBLAS) at interpreter start-up.
+
+    A PyCharm run configuration puts its plot-helper directories on PYTHONPATH. Their
+    `sitecustomize.py` imports matplotlib in every Python child, so each pool worker commits
+    one OpenBLAS buffer per core (about 780 MB on 24 cores) before it runs any of our code.
+    When Windows cannot grant that memory OpenBLAS exits the worker, and `Pool()` then blocks
+    forever writing start-up data to a pipe nobody reads (BATCH stuck at 0%).
+
+    Workers inherit `os.environ` whenever they are spawned, including later respawns by the
+    pool, so the change is made in place and stays for the life of the server.
+    """
+    python_path = os.environ.get("PYTHONPATH")
+    if python_path:
+        entries = [entry for entry in python_path.split(os.pathsep) if entry]
+        kept = [entry for entry in entries if not _is_pycharm_plot_helper_dir(entry)]
+        if len(kept) != len(entries):
+            if kept:
+                os.environ["PYTHONPATH"] = os.pathsep.join(kept)
+            else:
+                del os.environ["PYTHONPATH"]
+    # Safety net if a worker ever imports numpy anyway; an explicit user value wins.
+    os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+
+
 def get_or_create_simulation_pool(cores: int, sim_context: dict[str, Any], pool_key: Any) -> Any:
     """Returns a warm, persistent worker pool pre-loaded with static simulation context."""
     global _GLOBAL_SIMULATION_POOL, _GLOBAL_SIMULATION_POOL_KEY
@@ -1069,6 +1100,7 @@ def get_or_create_simulation_pool(cores: int, sim_context: dict[str, Any], pool_
                     _GLOBAL_SIMULATION_POOL.join()
                 except Exception:
                     pass
+            _prepare_worker_environment()
             _GLOBAL_SIMULATION_POOL = Pool(
                 processes=cores,
                 initializer=_init_batch_worker,
