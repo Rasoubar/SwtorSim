@@ -1249,7 +1249,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794631488"></script>
+  <script src="pyodide_client.js?v=1794658260"></script>
 </head>
 <body>
 
@@ -1752,47 +1752,24 @@ function populateExistingRotationsSelect(preferredPath = null) {
     return;
   }
 
-  // Filter strictly to the chosen class (and discipline if chosen)
-  const specCustom = allRots.filter(r => (r.is_custom || (r.path && r.path.includes("/custom/"))) && (
+  const specRotations = allRots.filter(r => (
     (!r.class && !r.spec) ||
     (r.class === classSlug && (!r.spec || !specSlug || r.spec === specSlug))
-  ));
+  )).sort((a, b) => String(a.name || a.label).localeCompare(String(b.name || b.label)));
 
-  const specPresets = allRots.filter(r => !r.is_custom && (!r.path || !r.path.includes("/custom/")) && (
-    (!r.class && !r.spec) ||
-    (r.class === classSlug && (!r.spec || !specSlug || r.spec === specSlug))
-  ));
-
-  if (specCustom.length > 0) {
-    const cGroup = document.createElement("optgroup");
-    cGroup.label = "★ My Custom Files";
-    for (const rot of specCustom) {
-      const opt = document.createElement("option");
-      opt.value = rot.path;
-      opt.textContent = `★ ${rot.name || rot.label}`;
-      cGroup.appendChild(opt);
-    }
-    rotSel.appendChild(cGroup);
-  }
-
-  if (specPresets.length > 0) {
-    const pGroup = document.createElement("optgroup");
-    pGroup.label = "Built-In Rotations";
-    for (const rot of specPresets) {
-      const opt = document.createElement("option");
-      opt.value = rot.path;
-      opt.textContent = rot.name ? rot.name.replace(/\.json$/i, "") : rot.label;
-      pGroup.appendChild(opt);
-    }
-    rotSel.appendChild(pGroup);
-  }
-
-  if (specCustom.length === 0 && specPresets.length === 0) {
+  if (specRotations.length === 0) {
     const emptyOpt = document.createElement("option");
     emptyOpt.value = "";
     emptyOpt.disabled = true;
     emptyOpt.textContent = `(No rotations found for ${specSlug || classSlug})`;
     rotSel.appendChild(emptyOpt);
+  } else {
+    for (const rot of specRotations) {
+      const opt = document.createElement("option");
+      opt.value = rot.path;
+      opt.textContent = rot.name ? rot.name.replace(/\.json$/i, "") : rot.label;
+      rotSel.appendChild(opt);
+    }
   }
 
   if (cur && Array.from(rotSel.options).some(o => o.value === cur)) {
@@ -4937,7 +4914,7 @@ async function saveRotationToDisk() {
 
   const isWebMode = window.PYODIDE_BRIDGE || window.location.port === "8080" || !window.location.port;
   if (isWebMode) {
-    showToast(`[OK] Saved ${filename} to My Custom Files`);
+    showToast(`[OK] Saved ${filename}`);
   } else {
     showToast(`[OK] Saved to workspace disk: ${data.path}`);
   }
