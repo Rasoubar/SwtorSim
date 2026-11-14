@@ -12,9 +12,11 @@ from extractor.config import (
     ALWAYS_EXTRACTED_ABILITY_FQNS,
     DATA_DIR,
     DEFAULT_ITEM_RATING,
+    default_item_rating,
     ExtractorConfig,
     ITEM_ABILITY_FQN_PREFIXES,
     ORIGIN_STORIES,
+    PTS_ITEM_RATING,
     RELIC_ABILITY_FQN_PREFIX,
     RELIC_SCALES_WITH_ITEM_RATING_SEGMENT,
 )
@@ -81,10 +83,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--item-rating",
         type=int,
-        default=DEFAULT_ITEM_RATING,
+        default=None,
         help=(
             "Item rating used to resolve relic standard-rating scaled amounts "
-            f"(default: {DEFAULT_ITEM_RATING})"
+            f"(default: {DEFAULT_ITEM_RATING}, or {PTS_ITEM_RATING} with --pts)"
         ),
     )
     parser.add_argument(
@@ -272,7 +274,11 @@ def main(argv: list[str] | None = None) -> int:
         force_hash_update=args.force_hash_update,
         pts=args.pts,
         keep_work_files=args.keep_work,
-        item_rating=args.item_rating,
+        item_rating=(
+            args.item_rating
+            if args.item_rating is not None
+            else default_item_rating(args.pts)
+        ),
         extract_icons=args.extract_icons,
         parsed_only=args.parsed_only,
     )

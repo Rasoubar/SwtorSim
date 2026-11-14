@@ -59,8 +59,8 @@ flowchart LR
 | Flag | Default | Description |
 | :--- | :--- | :--- |
 | `assets_path` | *(Positional)* | Path to SWTOR's `Assets` folder containing `.tor` files (optional if `--skip-extract` is used). |
-| `--pts` | `False` | Reads `swtor_test_*.tor` archives, outputs to `data/extractor/pts/`, and defaults `--item-rating` to `362` (Level 85). |
-| `--item-rating` | `344` (`362` on PTS) | Item rating used to resolve `cbtStandardRatingInfo` stat budgets for relics and adrenals. |
+| `--pts` | `False` | Reads `swtor_test_*.tor` archives, outputs to `data/extractor/pts/`, and defaults `--item-rating` to `380`. |
+| `--item-rating` | `344` (`380` on PTS) | Item rating used to resolve `cbtStandardRatingInfo` stat budgets for relics and adrenals. |
 | `--skip-extract` | `False` | Reuses previously unpacked files in `extract_work/` without reading `.tor` archives. |
 | `--skip-icons` | `False` | Skips `.dds` -> `.png` icon extraction. |
 | `--keep-work` | `False` | Retains `extract_work/` after the pipeline finishes. |

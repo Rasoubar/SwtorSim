@@ -35,6 +35,12 @@ STANDARD_DAMAGE_FQN = "cbtStandardDamageInfo"
 STANDARD_HEALING_FQN = "cbtStandardHealingInfo"
 
 DEFAULT_ITEM_RATING = 344
+PTS_ITEM_RATING = 380
+
+
+def default_item_rating(pts: bool) -> int:
+    """Item rating used for relic/adrenal stat amounts when --item-rating is not given."""
+    return PTS_ITEM_RATING if pts else DEFAULT_ITEM_RATING
 
 ORIGIN_STORIES = (
     "agent",
