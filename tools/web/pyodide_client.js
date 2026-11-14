@@ -65,19 +65,21 @@
       const sanitized = {};
       let changed = false;
       for (const [k, content] of Object.entries(files)) {
-        if (!k.includes("/custom/")) {
+        if (k.startsWith("data/rotations/custom/")) {
           changed = true;
+          const newKey = k.replace("data/rotations/custom/", "data/rotations/");
+          if (!sanitized[newKey]) sanitized[newKey] = content;
+        } else if (!k.includes("/custom/")) {
           let newKey = k;
-          if (k.startsWith("data/rotations/")) {
-            newKey = k.replace("data/rotations/", "data/rotations/custom/");
-          } else if (k.startsWith("data/Choices/") || k.startsWith("data/choices/")) {
+          if (k.startsWith("data/Choices/") || k.startsWith("data/choices/")) {
             newKey = k.replace(/^data\/[Cc]hoices\//, "data/Choices/custom/");
           } else if (k.startsWith("data/builds/")) {
             newKey = k.replace("data/builds/", "data/builds/custom/");
           } else if (k.startsWith("data/run_config/")) {
             newKey = k.replace("data/run_config/", "data/run_config/custom/");
           }
-          if (!files[newKey]) {
+          if (newKey !== k) changed = true;
+          if (newKey === k || !files[newKey]) {
             sanitized[newKey] = content;
           }
         } else {
@@ -740,7 +742,7 @@
         }
         const contentStr = JSON.stringify(fileData, null, 4);
 
-        const customPath = `data/rotations/custom/${classFolder}/${specFolder}/${filename}`;
+        const customPath = `data/rotations/${classFolder}/${specFolder}/${filename}`;
 
         state.customFiles[customPath] = contentStr;
         saveCustomFilesToStorage(state.customFiles);
@@ -830,7 +832,7 @@
         const classFolder = String(payload.class_folder || "").trim().toLowerCase();
         const specFolder = String(payload.spec_folder || "").trim().toLowerCase();
 
-        let relFolder = "data/rotations/custom";
+        let relFolder = "data/rotations";
         if (category === "choices") relFolder = "data/Choices/custom";
         else if (category === "builds") relFolder = "data/builds/custom";
         else if (category === "run_config") relFolder = "data/run_config/custom";

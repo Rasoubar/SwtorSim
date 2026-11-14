@@ -1,0 +1,25 @@
+{
+  "game_version": "8.0",
+  "author": "Sinrai",
+  "gear_label": "380 Artifact + 318 Gold Augs",
+  "level": 85,
+  "duration": 1000,
+  "dummy_hp": 10000000,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": true,
+  "seed": 42,
+  "sweep": {"stat": "Crit Rating", "min": 0, "max": 9000},
+  "jitter": {"Mastery": 2000, "Power": 2000},
+  "samples_per_variant": 10000,
+  "relics": {
+    "Mastery": "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "Power": "abl.itm.relic.onhit.dps_power.scales_with_item_rating",
+    "Crit": "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
+  },
+  "specs": [
+    {
+      "name": "Hatred/Serenity",
+      "run_config": "data/run_config/hatred_14gcd_pts.json"
+    }
+  ]
+}

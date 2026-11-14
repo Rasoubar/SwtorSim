@@ -46,9 +46,9 @@
         "name": "Reck+DF+MPRIO1 Window 1",
         "pool": [
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -89,13 +89,13 @@
             {
                 "ability_id": "leeching_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -111,7 +111,7 @@
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {}
             },
             {
@@ -121,7 +121,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -166,7 +166,7 @@
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {}
             },
             {
@@ -176,7 +176,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -211,9 +211,9 @@
         "name": "MPRIO 2 Window",
         "pool": [
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -227,13 +227,13 @@
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {}
             },
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -273,13 +273,13 @@
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {}
             },
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -311,7 +311,7 @@
             {
                 "ability_id": "leeching_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -321,13 +321,13 @@
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {}
             },
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -363,7 +363,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -373,7 +373,7 @@
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {}
             },
             {
@@ -395,9 +395,9 @@
         "name": "MPRIO 3 Window",
         "pool": [
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {
@@ -407,7 +407,7 @@
                 }
             },
             {
-                "ability_id": "assassinate",
+                "ability_id": "execution",
                 "rules": {}
             },
             {
@@ -417,7 +417,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.3
+                    "target_hp_below_pct": 0.4
                 }
             },
             {

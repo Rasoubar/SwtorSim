@@ -1,7 +1,7 @@
 {
   "spec_path": "data/extractor/pts/disciplines/assassin/hatred.json",
   "stats_path": "data/builds/L85_14gcd_red.json",
-  "rotation_path": "data/rotations/assassin/hatred/BasicMaliPS.json",
+  "rotation_path": "data/rotations/assassin/hatred/BasicMaliPS_pts.json",
   "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
   "legendary_fqns": [
     "abl.itm.legendary.generic.dps.berserkers",
@@ -26,5 +26,7 @@
     "64": 1,
     "68": 3,
     "73": 1
-  }
+  },
+  "main_hand": {"min": 3161, "max": 4741},
+  "off_hand": null
 }

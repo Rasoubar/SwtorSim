@@ -48,7 +48,7 @@
             {
                 "ability_id": "assassinate",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -89,13 +89,13 @@
             {
                 "ability_id": "leeching_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
                 "ability_id": "assassinate",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -121,7 +121,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -176,7 +176,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -213,7 +213,7 @@
             {
                 "ability_id": "assassinate",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -233,7 +233,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -279,7 +279,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -311,7 +311,7 @@
             {
                 "ability_id": "leeching_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -327,7 +327,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -363,7 +363,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -397,7 +397,7 @@
             {
                 "ability_id": "assassinate",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {
@@ -417,7 +417,7 @@
             {
                 "ability_id": "saber_strike",
                 "rules": {
-                    "target_hp_below_pct": 0.4
+                    "target_hp_below_pct": 0.3
                 }
             },
             {

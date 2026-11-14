@@ -97,10 +97,10 @@ Because all disciplines, abilities, talents, tacticals, and legendary implants a
 
 1. **Verify Class Resource Pool Mapping** ([`src/swtorsim/resources.py`](../src/swtorsim/resources.py#L154-L172)):
    - Check `CLASS_RESOURCE_MAP` in `resources.py` and `prepare_simulation` in `setup.py` to ensure the class maps to the right pool (`Force`, `Energy`, `Heat`, or `Rage`/`Focus`) and max resource (`500`/`600` Force for Sorcerer/Sage, `100` Force for Assassin/Shadow, `100` Energy/Heat, `12` Rage/Focus).
-2. **Create a Character Stats Profile (`data/builds/<spec>_stats.json`)**:
-   - Add sheet ratings (`Mastery`, `Power`, `Critical Rating`, `Alacrity Rating`, `Accuracy Rating`, `Weapon Damage Min`, `Weapon Damage Max`, `Force/Tech Bonus`, and `Offhand Damage Min`/`Max` for dual-wield specs).
-3. **Create a Skill Tree Choices File (`data/choices/<spec>_choices.json`)**:
-   - Specify `"option_1"`, `"option_2"`, or `"option_3"` for each tier (`level_23` through `level_73`).
+2. **Create a Character Stats Profile (`data/builds/<name>.json`)**:
+   - Add shared sheet ratings (`Mastery`, `Power`, `Critical Rating`, `Alacrity Rating`, `Accuracy Rating`, `Force Power`, `Tech Power`). Weapon damage is not part of the build.
+3. **Write a run config** (`data/run_config/<spec>.json`):
+   - Inline `choices` (`"23"` through `"73"`, each `1`, `2`, or `3`), plus `main_hand` (`{"min", "max"}`) and `off_hand` (`null`, or a range when the spec dual-wields).
 4. **Build a Rotation (`data/rotations/<spec>_rotation.json`)**:
    - Launch `.\.venv\Scripts\python.exe data/rotation_builder.py --ui`, select the new discipline and choices, and construct the opener and priority list.
 5. **Validate Against a Live Combat Log**:

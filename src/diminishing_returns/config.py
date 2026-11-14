@@ -1,9 +1,15 @@
-"""Load and validate the diminishing-returns run config."""
+"""Load and validate the diminishing-returns run config.
+
+Each spec names a simulator run config. The loadout (discipline, build, rotation,
+choices, weapons, tactical, legendaries, and the equipped relic pair) comes from
+that file. Fight length, dummy HP, level, seed, stem matching, and the armor
+debuff stay on the DR config and apply to every spec.
+"""
 
 from dataclasses import dataclass, replace
 
 from src.swtorsim.config_load import load_json_file
-from src.swtorsim.run_config import RunConfig, discipline_names, validate_run_config
+from src.swtorsim.run_config import RunConfig, load_run_config, validate_run_config
 
 RELIC_STATS = ("Mastery", "Power", "Crit")
 JITTER_STATS = ("Mastery", "Power")
@@ -37,17 +43,6 @@ def build_stat_name(name: str) -> str:
 def relic_line(pair_key: str) -> str:
     """The equipped pair, as a plot subtitle such as 'Mastery + Power Relics'."""
     return " + ".join(VARIANT_STATS[pair_key]) + " Relics"
-
-_SPEC_KEYS = (
-    "name",
-    "spec_path",
-    "stats_path",
-    "rotation_path",
-    "choices_path",
-    "tactical_fqn",
-    "legendary_fqns",
-    "relic_fqns",
-)
 
 
 @dataclass
@@ -87,7 +82,7 @@ class DrConfig:
 
 
 def load_dr_config(path: str) -> DrConfig:
-    """Loads a dr_config.json and validates every spec against the sim's run config rules."""
+    """Loads a dr_config.json. Each spec's ``run_config`` is a simulator run config path."""
     raw = load_json_file(path)
     if not isinstance(raw, dict):
         raise ValueError(f"DR config '{path}' must be a JSON object.")
@@ -170,22 +165,43 @@ def _load_spec(
         raise ValueError(f"Invalid DR config '{path}':\n- {label} must be an object.")
 
     errors: list[str] = []
-    missing = [key for key in _SPEC_KEYS if key not in row]
-    if missing:
-        errors.append(f"{label} is missing: {', '.join(missing)}.")
-        _raise(path, errors)
-
     name = _require_str(row, "name", errors, label)
-    spec_path = _require_str(row, "spec_path", errors, label)
-    stats_path = _require_str(row, "stats_path", errors, label)
-    rotation_path = _require_str(row, "rotation_path", errors, label)
-    choices_path = _require_str(row, "choices_path", errors, label)
-    tactical = _require_str(row, "tactical_fqn", errors, label)
-    legendaries = _require_str_list(row, "legendary_fqns", errors, label)
-    relic_fqns = _require_str_list(row, "relic_fqns", errors, label)
+    run_config_path = _require_str(row, "run_config", errors, label)
     if errors:
         _raise(path, errors)
 
+    try:
+        raw_run = load_json_file(run_config_path)
+    except FileNotFoundError as exc:
+        raise ValueError(
+            f"Invalid DR config '{path}':\n"
+            f"- {label} '{name}' run config '{run_config_path}' was not found."
+        ) from exc
+    if not isinstance(raw_run, dict):
+        raise ValueError(
+            f"Invalid DR config '{path}':\n"
+            f"- {label} '{name}' run config '{run_config_path}' must be a JSON object."
+        )
+
+    try:
+        loaded = load_run_config(run_config_path, environment=_run_config_environment(raw_run))
+    except (ValueError, FileNotFoundError) as exc:
+        raise ValueError(
+            f"Invalid DR config '{path}':\n- {label} '{name}': {exc}"
+        ) from exc
+
+    run_config = replace(
+        loaded,
+        mode="BATCH",
+        iterations=1,
+        duration=duration,
+        dummy_hp=dummy_hp,
+        training_dummy_armor_debuff=training_dummy,
+        enable_stem_matching=stem_matching,
+        level=level,
+        seed=seed,
+    )
+    relic_fqns = list(run_config.relic_fqns)
     known = set(relics.values())
     if len(relic_fqns) != 2 or len(set(relic_fqns)) != 2 or any(fqn not in known for fqn in relic_fqns):
         names = ", ".join(RELIC_STATS)
@@ -194,6 +210,7 @@ def _load_spec(
             f"- {label} '{name}' relic_fqns must be two of the relics listed under 'relics' ({names})."
         )
 
+    stats_path = run_config.stats_path
     stats = load_json_file(stats_path)
     if not isinstance(stats, dict):
         raise ValueError(f"Invalid DR config '{path}':\n- {label} build '{stats_path}' must be a JSON object.")
@@ -206,33 +223,27 @@ def _load_spec(
                 f"- {label} build '{stats_path}' must contain a numeric '{build_stat}' to overwrite."
             )
 
-    spec_data = load_json_file(spec_path)
-    class_name, spec = discipline_names(spec_data, spec_path)
-    run_config = RunConfig(
-        spec_path=spec_path,
-        class_name=class_name,
-        spec=spec,
-        stats_path=stats_path,
-        rotation_path=rotation_path,
-        choices_path=choices_path,
-        tactical_fqn=tactical,
-        legendary_fqns=legendaries,
-        relic_fqns=relic_fqns,
-        mode="BATCH",
-        iterations=1,
-        duration=duration,
-        dummy_hp=dummy_hp,
-        training_dummy_armor_debuff=training_dummy,
-        enable_stem_matching=stem_matching,
-        level=level,
-        seed=seed,
-    )
     validate_run_config(run_config)
     for fqns in _variant_lists(relics):
         validate_run_config(with_relics(run_config, fqns))
 
     pair_key = _pair_key(relic_fqns, relics)
     return SpecEntry(name=name, run_config=run_config, pair_key=pair_key)
+
+
+def _run_config_environment(raw: dict) -> str:
+    """The data set for a run config.
+
+    An ``environment`` field wins. Otherwise a discipline path under
+    ``data/extractor/pts/`` loads PTS data, and every other path loads live.
+    """
+    explicit = raw.get("environment")
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip().lower()
+    spec_path = str(raw.get("spec_path") or "").replace("\\", "/").lower()
+    if "/extractor/pts/" in spec_path:
+        return "pts"
+    return "live"
 
 
 def _variant_lists(relics: dict[str, str]) -> list[list[str]]:
@@ -314,14 +325,6 @@ def _require_str(raw: dict, key: str, errors: list[str], label: str | None = Non
         errors.append(f"'{prefix}{key}' must be a non-empty string.")
         return ""
     return value
-
-
-def _require_str_list(raw: dict, key: str, errors: list[str], label: str) -> list[str]:
-    value = raw.get(key)
-    if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
-        errors.append(f"'{label}.{key}' must be a list of non-empty strings.")
-        return []
-    return list(value)
 
 
 def _require_bool(raw: dict, key: str, errors: list[str]) -> bool:

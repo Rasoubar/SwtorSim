@@ -33,6 +33,7 @@ if str(SWTORSIM_ROOT) not in sys.path:
 from src.swtorsim.cast_timeline import CastTimelineRecorder, rotation_steps_of
 from src.swtorsim.cli import index_disciplines
 from src.swtorsim.config_load import (
+    expand_force_tech_power,
     fqn_to_relative_path,
     load_character_stats_from_json,
     load_complete_loadout,
@@ -48,7 +49,6 @@ from src.swtorsim.metrics import (
 )
 from src.swtorsim.run_config import (
     BUILDS_DIR,
-    CHOICES_DIR,
     DISCIPLINES_DIR,
     GEAR_PATH,
     LEGENDARY_PREFIX,
@@ -57,11 +57,13 @@ from src.swtorsim.run_config import (
     TACTICAL_PREFIX,
     TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
     RunConfig,
+    apply_weapon_ranges,
     discipline_names,
     filter_gear_for_class,
     get_disciplines_dir,
     get_gear_path,
     get_relics_path,
+    parse_hand_range,
     relic_menu_label,
     resolve_env_extractor_path,
     resolve_skill_tree_fqns,
@@ -92,8 +94,7 @@ COMMON_HP_PRESETS = [
 DEFAULT_STAT_KEYS = (
     "Mastery",
     "Power",
-    "Force Power",
-    "Tech Power",
+    "Force-Tech Power",
     "Critical Rating",
     "Alacrity Rating",
     "Accuracy Rating",
@@ -252,24 +253,16 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
                 continue
             rel = path.relative_to(base)
             parts = rel.parts
-            is_custom = len(parts) > 0 and parts[0].lower() == "custom"
-            if is_custom:
-                cls = parts[1].lower() if len(parts) >= 3 else ""
-                sp = parts[2].lower() if len(parts) >= 4 else ""
-                clean_label = "/".join(parts[1:]).removesuffix(".json") if len(parts) >= 2 else rel.with_suffix("").as_posix()
-            else:
-                cls = parts[0].lower() if len(parts) >= 2 else ""
-                sp = parts[1].lower() if len(parts) >= 3 else ""
-                clean_label = rel.with_suffix("").as_posix()
-
+            cls = parts[0].lower() if len(parts) >= 2 else ""
+            sp = parts[1].lower() if len(parts) >= 3 else ""
             items.append(
                 {
-                    "label": clean_label,
+                    "label": rel.with_suffix("").as_posix(),
                     "name": path.name,
                     "path": _to_workspace_rel(path),
                     "class": cls,
                     "spec": sp,
-                    "is_custom": is_custom,
+                    "is_custom": False,
                 }
             )
         return items
@@ -285,9 +278,10 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
                 stats_dict = load_json_file(str(b_file))
             except Exception:
                 stats_dict = {}
+            if isinstance(stats_dict, dict):
+                expand_force_tech_power(stats_dict)
         builds.append({**b, "stats": stats_dict})
 
-    choices_files = _scan_dir(CHOICES_DIR)
     rotations_files = _scan_rotations(ROTATIONS_DIR)
 
     relics_path = _resolve_workspace_path(get_relics_path(active_env))
@@ -324,7 +318,7 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
         "run_configs": run_configs,
         "disciplines": disciplines,
         "builds": builds,
-        "choices_files": choices_files,
+        "choices_files": [],
         "rotations": rotations_files,
         "relics": relics_list,
         "hp_presets": COMMON_HP_PRESETS,
@@ -446,6 +440,8 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
     if isinstance(stats_override, dict) and stats_override:
         if isinstance(stats_data, dict):
             stats_data.update(stats_override)
+    if isinstance(stats_data, dict):
+        expand_force_tech_power(stats_data)
 
     choices_data = {}
     if raw_rc.get("choices_path"):
@@ -537,6 +533,8 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
 
     raw_seed = payload.get("seed")
     seed = int(raw_seed) if (raw_seed is not None and str(raw_seed).strip() != "") else 42
+    main_hand_min, main_hand_max = parse_hand_range(payload.get("main_hand"), "main_hand")
+    off_hand_min, off_hand_max = parse_hand_range(payload.get("off_hand"), "off_hand")
 
     training_dummy_armor_debuff = bool(payload.get("training_dummy_armor_debuff", True))
     enable_stem_matching = bool(payload.get("enable_stem_matching", True))
@@ -561,6 +559,10 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         rotation_path=_to_workspace_rel(rotation_path),
         choices=choices_data,
         choices_path=_to_workspace_rel(choices_path) if choices_path else "",
+        main_hand_min=main_hand_min,
+        main_hand_max=main_hand_max,
+        off_hand_min=off_hand_min,
+        off_hand_max=off_hand_max,
         tactical_fqn=tactical_fqn,
         legendary_fqns=legendary_fqns,
         relic_fqns=relic_fqns,
@@ -617,12 +619,16 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     stats_override = payload.get("stats_override")
     if isinstance(stats_override, dict):
         for k, v in stats_override.items():
+            if k in ("Main_hand_min", "Main_hand_max", "Off_hand_min", "Off_hand_max"):
+                continue
             if v is None or str(v).strip() == "":
                 continue
             try:
                 stats_config["stats"][str(k)] = float(v)
             except (ValueError, TypeError):
                 pass
+    expand_force_tech_power(stats_config["stats"])
+    apply_weapon_ranges(stats_config["stats"], config)
 
     rotation_config = load_rotation_from_json(rotation_path)
     debuff_module: dict[str, Any] = {}
@@ -1858,6 +1864,8 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     return
                 clean_stats = {}
                 for k, v in stats_obj.items():
+                    if k in ("Main_hand_min", "Main_hand_max", "Off_hand_min", "Off_hand_max"):
+                        continue
                     if v is None or str(v).strip() == "":
                         continue
                     try:
@@ -1885,7 +1893,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 spec_folder = str(payload.get("spec_folder") or "").strip().lower()
 
                 if category == "rotations":
-                    folder = SWTORSIM_ROOT / "data" / "rotations" / "custom"
+                    folder = SWTORSIM_ROOT / "data" / "rotations"
                     if class_folder and spec_folder:
                         folder = folder / class_folder / spec_folder
                 elif category == "choices":
@@ -1931,8 +1939,14 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     self._send_json({"error": "Invalid file path."}, status=400)
                     return
-                if "/custom/" not in f"/{rel_to_root}":
-                    self._send_json({"error": "Only custom files can be deleted."}, status=400)
+                rotations_root = (SWTORSIM_ROOT / "data" / "rotations").resolve()
+                try:
+                    target_file.resolve().relative_to(rotations_root)
+                    in_rotations = True
+                except ValueError:
+                    in_rotations = False
+                if not in_rotations and "/custom/" not in f"/{rel_to_root}":
+                    self._send_json({"error": "Only rotation files, or files under a custom folder, can be deleted."}, status=400)
                     return
                 if target_file.is_file():
                     try:

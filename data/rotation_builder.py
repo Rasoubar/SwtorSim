@@ -19,16 +19,15 @@ if str(SWTORSIM_ROOT) not in sys.path:
 
 from src.swtorsim.cli import (
     index_disciplines,
-    select_choices_path,
     select_discipline_path,
     select_legendaries,
     select_relics,
+    select_skill_tree_choices,
     select_tactical,
 )
 from src.swtorsim.config_load import fqn_to_relative_path, load_json_file
 from src.swtorsim.run_config import (
     BUILDS_DIR,
-    CHOICES_DIR,
     DISCIPLINES_DIR,
     GEAR_PATH,
     LEGENDARY_PREFIX,
@@ -939,15 +938,9 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
                 continue
             rel = path.relative_to(base)
             parts = rel.parts
-            is_custom = len(parts) > 0 and parts[0].lower() == "custom"
-            if is_custom:
-                cls = parts[1].lower() if len(parts) >= 3 else ""
-                sp = parts[2].lower() if len(parts) >= 4 else ""
-                clean_label = "/".join(parts[1:]).removesuffix(".json") if len(parts) >= 2 else rel.with_suffix("").as_posix()
-            else:
-                cls = parts[0].lower() if len(parts) >= 2 else ""
-                sp = parts[1].lower() if len(parts) >= 3 else ""
-                clean_label = rel.with_suffix("").as_posix()
+            cls = parts[0].lower() if len(parts) >= 2 else ""
+            sp = parts[1].lower() if len(parts) >= 3 else ""
+            clean_label = rel.with_suffix("").as_posix()
             try:
                 rel_path = path.resolve().relative_to(SWTORSIM_ROOT).as_posix()
             except ValueError:
@@ -958,22 +951,10 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
                 "path": rel_path,
                 "class": cls,
                 "spec": sp,
-                "is_custom": is_custom,
+                "is_custom": False,
             })
         return items
 
-    choices_files_raw = _scan_json_dir(CHOICES_DIR)
-    choices_files = []
-    for cf in choices_files_raw:
-        target = _resolve_workspace_path(cf["path"])
-        if target.is_file():
-            try:
-                doc = load_json_file(str(target))
-                # Must be a skill-tree choices dictionary (not a rotation list or stat build)
-                if isinstance(doc, dict) and not doc.get("stats") and not doc.get("gear") and not isinstance(doc.get("steps"), list):
-                    choices_files.append(cf)
-            except Exception:
-                pass
     rotations_files = _scan_rotations(ROTATIONS_DIR)
     run_configs = _scan_json_dir("data/run_config")
     builds_files = _scan_json_dir(BUILDS_DIR)
@@ -1009,7 +990,7 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
     return {
         "environment": active_env,
         "disciplines": rel_disciplines,
-        "choices_files": choices_files,
+        "choices_files": [],
         "rotations": rotations_files,
         "run_configs": run_configs,
         "builds": builds_files,
@@ -1270,6 +1251,9 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                     c_file = _resolve_workspace_path(rc_data["choices_path"])
                     if c_file.is_file():
                         choices_data = load_json_file(str(c_file))
+                inline_choices = rc_data.get("choices")
+                if isinstance(inline_choices, dict) and inline_choices:
+                    choices_data.update({str(k): v for k, v in inline_choices.items()})
                 self._send_json(
                     {
                         "run_config": rc_data,
@@ -1322,9 +1306,9 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                     filename += ".json"
                 # Sanitize filename
                 filename = Path(filename).name
-                custom_dir = SWTORSIM_ROOT / "data" / "rotations" / "custom" / class_folder / spec_folder
-                custom_dir.mkdir(parents=True, exist_ok=True)
-                full_path = custom_dir / filename
+                rotation_dir = SWTORSIM_ROOT / "data" / "rotations" / class_folder / spec_folder
+                rotation_dir.mkdir(parents=True, exist_ok=True)
+                full_path = rotation_dir / filename
 
                 file_data = build_rotation_file_data(
                     steps, payload.get("pre_combat"), payload.get("pull_conditions"), payload.get("pull_max_wait"),
@@ -1499,13 +1483,13 @@ def cli_main():
     print("=========================================")
 
     class_name, _spec, spec_path = select_discipline_path()
-    choices_path = select_choices_path()
+    choices = select_skill_tree_choices(spec_path)
     tactical_fqn = select_tactical(class_name)
     legendary_fqns = select_legendaries(class_name)
     relic_fqns = select_relics()
     catalog = build_castable_catalog(
         spec_path,
-        choices_path,
+        choices,
         tactical_fqn=tactical_fqn,
         legendary_fqns=legendary_fqns,
         relic_fqns=relic_fqns,

@@ -10,6 +10,7 @@ from src.swtorsim.run_config import (
     TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
     RunConfig,
     get_training_dummy_armor_debuff_path,
+    apply_weapon_ranges,
     resolve_skill_tree_fqns,
     validate_run_config,
 )
@@ -43,11 +44,13 @@ def load_from_run_config(config: RunConfig) -> SimulationInputs:
     if config.training_dummy_armor_debuff:
         debuff_path = get_training_dummy_armor_debuff_path(env)
         debuff_module.update(load_training_dummy_armor_debuffs(debuff_path=debuff_path))
+    stats_config = load_character_stats_from_json(
+        config.class_name, config.stats_path, config.level
+    )
+    apply_weapon_ranges(stats_config["stats"], config)
     return SimulationInputs(
         rotation_config=load_rotation_from_json(config.rotation_path),
-        stats_config=load_character_stats_from_json(
-            config.class_name, config.stats_path, config.level
-        ),
+        stats_config=stats_config,
         loadout_blueprints=loadout_blueprints,
         debuff_module=debuff_module,
     )
@@ -250,9 +253,28 @@ def load_json_file(filepath: str) -> Any:
     return raw_data
 
 
+FORCE_TECH_POWER_KEY = "Force-Tech Power"
+
+
+def expand_force_tech_power(stats: dict) -> dict:
+    """Copy the shared build key onto Force Power and Tech Power.
+
+    One attack reads only one of those stats: force hits use Force Power,
+    tech hits use Tech Power. The same number on both does not add twice.
+    """
+    if not isinstance(stats, dict) or FORCE_TECH_POWER_KEY not in stats:
+        return stats
+    value = stats.pop(FORCE_TECH_POWER_KEY)
+    stats["Force Power"] = value
+    stats["Tech Power"] = value
+    return stats
+
+
 def load_character_stats_from_json(class_name: str, filepath: str, level: int) -> dict:
     """Loads character stat profile JSON and formats it for the player."""
     stats_data = load_json_file(filepath)
+    if isinstance(stats_data, dict):
+        expand_force_tech_power(stats_data)
     return {
         "class_name": class_name,
         "level": level,
