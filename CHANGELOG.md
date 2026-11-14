@@ -4,6 +4,26 @@
 
 ## Completed Fixes
 
+### 81. Extractor Launcher Always Refreshes Hashes (`run_extractor.py`) - [DONE]
+- Every run started from `run_extractor.py` passes `--force-hash-update`, so the Jedipedia hash list, `gom.js`, and `fnv1a64.js` are re-downloaded even when cached copies exist. Direct `src/extractor/main.py` runs are unchanged.
+- Verification: no test covers `run_extractor.py`. No DPS change.
+
+### 80. Extractor Launcher Uses `match` (`run_extractor.py`) - [DONE]
+- The source prompt, extraction menu, and `--source` preset now use `match`/`case`. The `--live` / `--pts` / `--both` dispatch stays an `if`/`elif` chain. Behavior is unchanged.
+- Verification: `py_compile` of `run_extractor.py`. No test covers this file. No DPS change.
+
+### 79. Extractor Launcher Item Ratings (`run_extractor.py`) - [DONE]
+- The launcher now passes `--item-rating 340` for Live and `--item-rating 380` for PTS. Both are printed on the menu and in the extraction banner. Direct `src/extractor/main.py` runs are unchanged (still default 344).
+- Verification: no test covers `run_extractor.py`. No DPS change until data is re-extracted.
+
+### 78. Extractor Menu Exits After a Run (`run_extractor.py`) - [DONE]
+- The extraction menu is shown once. Options 1-5 run and the process exits. Option 6 exits. An invalid choice exits after a warning. There is no "change asset source" option on this menu; the source is chosen in the prompt before it. A failed run exits with code 1.
+- Verification: no test covers `run_extractor.py`. No DPS change.
+
+### 77. Linux Steam Defaults in the Extractor Launcher (`run_extractor.py`) - [DONE]
+- Steam Live/PTS asset defaults now follow the OS. Windows stays `C:\Program Files (x86)\Steam\steamapps\common\...`. On other platforms the root is `~/.steam/steam/steamapps/common/` (on this machine, `/home/sinrai/.steam/steam/...`), for both `Star Wars - The Old Republic/Assets` and `Star Wars - The Old Republic - PTS/Assets`. The EA launcher presets are unchanged.
+- Verification: both Linux directories exist. No test covers `run_extractor.py`. No DPS change.
+
 ### 76. Removed the "keep timed buffs" Option from Tactical Swaps (`tools/rotation_builder_ui.html`, `src/swtorsim/setup.py`, `events.py`, `run_config.py`, `data/rotation_builder.py`, tests) - [DONE]
 - A tactical swap now always keeps the timed buffs the old tactical already produced (previously the default, with an opt-out `keep_timed_effects: false`). The old tactical's registration, permanent effects, triggers and proc entries are still removed on the swap; behavior for every existing file/default is unchanged.
 - Removed: the "keep timed buffs" checkbox in the Pre-Combat swap row, the `keep_timed_effects` parameter of `swap_tactical` / `_unequip_passive`, and its pass-through in `PreCombatRunner` (`events.py`). `normalize_pre_combat_steps` now drops a legacy `keep_timed_effects` key (true or false) from saved files; the engine ignores it. No file in `data/` used the key.

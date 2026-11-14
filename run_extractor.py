@@ -16,12 +16,17 @@ from pathlib import Path
 import subprocess
 import sys
 
-STEAM_LIVE_ASSETS = Path(
-    r"C:\Program Files (x86)\Steam\steamapps\common\Star Wars - The Old Republic\Assets"
-)
-STEAM_PTS_ASSETS = Path(
-    r"C:\Program Files (x86)\Steam\steamapps\common\Star Wars - The Old Republic - PTS\Assets"
-)
+
+def _steam_common() -> Path:
+    """Default Steam library root for this OS."""
+    if sys.platform == "win32":
+        return Path(r"C:\Program Files (x86)\Steam\steamapps\common")
+    return Path.home() / ".steam" / "steam" / "steamapps" / "common"
+
+
+_STEAM_COMMON = _steam_common()
+STEAM_LIVE_ASSETS = _STEAM_COMMON / "Star Wars - The Old Republic" / "Assets"
+STEAM_PTS_ASSETS = _STEAM_COMMON / "Star Wars - The Old Republic - PTS" / "Assets"
 
 LAUNCHER_LIVE_ASSETS = Path(
     r"C:\Program Files (x86)\Electronic Arts\BioWare\Star Wars - The Old Republic\Assets"
@@ -32,6 +37,9 @@ LAUNCHER_PTS_ASSETS = Path(
 
 DEFAULT_LIVE_ASSETS = STEAM_LIVE_ASSETS
 DEFAULT_PTS_ASSETS = STEAM_PTS_ASSETS
+
+LIVE_ITEM_RATING = 340
+PTS_ITEM_RATING = 380
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 EXTRACTOR_MAIN = PROJECT_ROOT / "src" / "extractor" / "main.py"
@@ -94,30 +102,33 @@ def select_asset_source(
         print("=" * 64)
 
         choice = input("Select source (1-3) [default: 1]: ").strip()
-        if choice in ("1", ""):
-            return "Steam", STEAM_LIVE_ASSETS, STEAM_PTS_ASSETS
-        elif choice == "2":
-            return "Launcher", LAUNCHER_LIVE_ASSETS, LAUNCHER_PTS_ASSETS
-        elif choice == "3":
-            print("\n--- Custom Asset Paths (leave blank to keep current path) ---")
-            live_path = prompt_custom_path("LIVE", current_live)
-            pts_path = prompt_custom_path("PTS", current_pts)
-            return "Custom", live_path, pts_path
-        else:
-            print(f"[WARN] Invalid selection '{choice}'. Please enter 1, 2, or 3.")
+        match choice:
+            case "1" | "":
+                return "Steam", STEAM_LIVE_ASSETS, STEAM_PTS_ASSETS
+            case "2":
+                return "Launcher", LAUNCHER_LIVE_ASSETS, LAUNCHER_PTS_ASSETS
+            case "3":
+                print("\n--- Custom Asset Paths (leave blank to keep current path) ---")
+                live_path = prompt_custom_path("LIVE", current_live)
+                pts_path = prompt_custom_path("PTS", current_pts)
+                return "Custom", live_path, pts_path
+            case _:
+                print(f"[WARN] Invalid selection '{choice}'. Please enter 1, 2, or 3.")
 
 
 def run_extractor(assets_path: Path, is_pts: bool = False, parsed_only: bool = True) -> bool:
     """Executes the extractor subprocess for the given assets."""
     assets_path = normalize_assets_path(assets_path)
     label = "PTS" if is_pts else "LIVE"
+    item_rating = PTS_ITEM_RATING if is_pts else LIVE_ITEM_RATING
     mode_str = " (Parsed Only - Fast)" if parsed_only else " (Full with Raw Dumps)"
     target_dir = "data/extractor/pts" if is_pts else "data/extractor/live"
 
     print("\n" + "=" * 64)
     print(f" [INFO] Starting {label} Data Extraction{mode_str}")
-    print(f" [INFO] Assets:     {assets_path}")
-    print(f" [INFO] Output Dir: {target_dir}")
+    print(f" [INFO] Assets:      {assets_path}")
+    print(f" [INFO] Item Rating: {item_rating}")
+    print(f" [INFO] Output Dir:  {target_dir}")
     print("=" * 64 + "\n")
 
     if not assets_path.exists():
@@ -125,7 +136,14 @@ def run_extractor(assets_path: Path, is_pts: bool = False, parsed_only: bool = T
         print("       Please check your game installation path or change the asset source.")
         return False
 
-    cmd = get_runner() + [str(EXTRACTOR_MAIN), "--assets", str(assets_path)]
+    cmd = get_runner() + [
+        str(EXTRACTOR_MAIN),
+        "--assets",
+        str(assets_path),
+        "--item-rating",
+        str(item_rating),
+        "--force-hash-update",
+    ]
     if is_pts:
         cmd.append("--pts")
     if parsed_only:
@@ -144,57 +162,54 @@ def run_extractor(assets_path: Path, is_pts: bool = False, parsed_only: bool = T
         return False
 
 
-def interactive_menu() -> None:
-    """Displays the interactive source selection and extraction menu."""
+def interactive_menu() -> bool | None:
+    """Shows the extraction menu once, then runs that choice or exits.
+
+    Returns True/False after an extraction finishes, or None when the user
+    exits without running one. The asset source is chosen in the prompt above
+    this menu.
+    """
     source_name, live_assets, pts_assets = select_asset_source()
 
-    while True:
-        print("\n" + "=" * 64)
-        print("            SwtorSim Game Data Extractor Menu")
-        print("=" * 64)
-        print(f"  Active Source: [{source_name}]")
-        print(f"  LIVE Assets:   {live_assets}")
-        print(f"  PTS Assets:    {pts_assets}")
-        print("-" * 64)
-        print("  [1] Extract LIVE Data (Parsed Only - Fast & ~12MB)")
-        print("  [2] Extract PTS Data  (Parsed Only - Fast & ~12MB)")
-        print("  [3] Extract BOTH      (Live & PTS - Parsed Only)")
-        print()
-        print("  [4] Extract LIVE (Full Raw Dump - includes extracted/)")
-        print("  [5] Extract PTS  (Full Raw Dump - includes extracted/)")
-        print()
-        print("  [6] Change Asset Source (Steam / Launcher / Custom)")
-        print("  [7] Exit")
-        print("=" * 64)
+    print("\n" + "=" * 64)
+    print("            SwtorSim Game Data Extractor Menu")
+    print("=" * 64)
+    print(f"  Active Source: [{source_name}]")
+    print(f"  LIVE Assets:   {live_assets}  (IR {LIVE_ITEM_RATING})")
+    print(f"  PTS Assets:    {pts_assets}  (IR {PTS_ITEM_RATING})")
+    print("-" * 64)
+    print("  [1] Extract LIVE Data (Parsed Only - Fast & ~12MB)")
+    print("  [2] Extract PTS Data  (Parsed Only - Fast & ~12MB)")
+    print("  [3] Extract BOTH      (Live & PTS - Parsed Only)")
+    print()
+    print("  [4] Extract LIVE (Full Raw Dump - includes extracted/)")
+    print("  [5] Extract PTS  (Full Raw Dump - includes extracted/)")
+    print()
+    print("  [6] Exit")
+    print("=" * 64)
 
-        choice = input("Select an option (1-7): ").strip()
+    choice = input("Select an option (1-6): ").strip()
 
-        if choice == "1":
-            run_extractor(live_assets, is_pts=False, parsed_only=True)
-            input("\nPress Enter to return to menu...")
-        elif choice == "2":
-            run_extractor(pts_assets, is_pts=True, parsed_only=True)
-            input("\nPress Enter to return to menu...")
-        elif choice == "3":
+    match choice:
+        case "1":
+            return run_extractor(live_assets, is_pts=False, parsed_only=True)
+        case "2":
+            return run_extractor(pts_assets, is_pts=True, parsed_only=True)
+        case "3":
             ok_live = run_extractor(live_assets, is_pts=False, parsed_only=True)
-            if ok_live:
-                run_extractor(pts_assets, is_pts=True, parsed_only=True)
-            input("\nPress Enter to return to menu...")
-        elif choice == "4":
-            run_extractor(live_assets, is_pts=False, parsed_only=False)
-            input("\nPress Enter to return to menu...")
-        elif choice == "5":
-            run_extractor(pts_assets, is_pts=True, parsed_only=False)
-            input("\nPress Enter to return to menu...")
-        elif choice == "6":
-            source_name, live_assets, pts_assets = select_asset_source(
-                source_name, live_assets, pts_assets
-            )
-        elif choice in ("7", "q", "exit", ""):
+            if not ok_live:
+                return False
+            return run_extractor(pts_assets, is_pts=True, parsed_only=True)
+        case "4":
+            return run_extractor(live_assets, is_pts=False, parsed_only=False)
+        case "5":
+            return run_extractor(pts_assets, is_pts=True, parsed_only=False)
+        case "6" | "q" | "exit" | "":
             print("Exiting.")
-            break
-        else:
-            print(f"[WARN] Invalid option '{choice}'. Please enter 1 to 7.")
+            return None
+        case _:
+            print(f"[WARN] Invalid option '{choice}'.")
+            return None
 
 
 def main() -> int:
@@ -232,12 +247,13 @@ def main() -> int:
     args = parser.parse_args()
     parsed_only = not args.full
 
-    if args.source == "launcher":
-        default_live = LAUNCHER_LIVE_ASSETS
-        default_pts = LAUNCHER_PTS_ASSETS
-    else:
-        default_live = STEAM_LIVE_ASSETS
-        default_pts = STEAM_PTS_ASSETS
+    match args.source:
+        case "launcher":
+            default_live = LAUNCHER_LIVE_ASSETS
+            default_pts = LAUNCHER_PTS_ASSETS
+        case _:
+            default_live = STEAM_LIVE_ASSETS
+            default_pts = STEAM_PTS_ASSETS
 
     live_assets = normalize_assets_path(args.live_assets) if args.live_assets else default_live
     pts_assets = normalize_assets_path(args.pts_assets) if args.pts_assets else default_pts
@@ -260,8 +276,8 @@ def main() -> int:
         pts_ok = run_extractor(pts_assets, is_pts=True, parsed_only=parsed_only) if live_ok else False
         return 0 if (live_ok and pts_ok) else 1
     else:
-        interactive_menu()
-        return 0
+        result = interactive_menu()
+        return 0 if result is not False else 1
 
 
 if __name__ == "__main__":
