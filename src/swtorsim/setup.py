@@ -10,6 +10,7 @@ from src.swtorsim.abilities import Ability
 from src.swtorsim.entities import Player, Dummy
 from src.swtorsim.events import ResourceTick, PlayerReady, PeriodicProcTick, PreCombatRunner, DEFAULT_PRE_COMBAT_MAX_WAIT
 from src.swtorsim.combat_curves import player_standard_health
+from src.swtorsim.config_load import expand_force_tech_power
 from src.swtorsim.rotation import Rotation
 from src.swtorsim.class_buffs import apply_class_buffs
 from src.swtorsim.resources import resource_type_for_class
@@ -316,7 +317,12 @@ def prepare_simulation(
 
     # Set up player base stats. Standard health comes from the level curve.
     player.level = stats_config.get("level", player.level)
-    for stat_key, stat_value in stats_config.get("stats", {}).items():
+    raw_stats = stats_config.get("stats", {})
+    if not isinstance(raw_stats, dict):
+        raw_stats = {}
+    # Copy so a shared "Force-Tech Power" key fills both stats without mutating the caller's dict.
+    raw_stats = expand_force_tech_power(dict(raw_stats))
+    for stat_key, stat_value in raw_stats.items():
         if stat_key == "Standard_health":
             continue
         player.base_stats[stat_key] = stat_value

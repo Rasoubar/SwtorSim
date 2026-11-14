@@ -92,7 +92,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Extract referenced ability/effect icons from gfx TOR archives "
-            "and write PNGs to data/icons/"
+            "and write PNGs to data/extractor/<live|pts>/icons/ "
+            "(served by the web GUI)"
         ),
     )
     parser.add_argument(

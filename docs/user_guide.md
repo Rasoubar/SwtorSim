@@ -64,7 +64,9 @@ At the end of the prompts, you can optionally save your selections back to `run_
   "spec": "Hatred",
   "stats_path": "data/builds/hatred_stats.json",
   "rotation_path": "data/rotations/hatred_Priority_Test.json",
-  "choices_path": "data/choices/hatred_choices.json",
+  "choices": {"23": 1, "27": 1, "39": 1, "43": 1, "51": 1, "64": 1, "68": 1, "73": 1},
+  "main_hand": {"min": 3161, "max": 4741},
+  "off_hand": null,
   "tactical_fqn": "abl.itm.tactical.sith_inquisitor.assassin.hatred.two_time_trouble",
   "legendary_fqns": [
     "abl.itm.legendary.sith_inquisitor.assassin.force_training",
@@ -97,7 +99,9 @@ At the end of the prompts, you can optionally save your selections back to `run_
 | `spec` | `string` | *(Auto-inferred)* | Discipline display name (e.g. `"Hatred"`, `"Annihilation"`). Inferred from `spec_path` if omitted. |
 | `stats_path` | `string` | *(Required)* | Path to the character stats JSON file in `data/builds/`. |
 | `rotation_path` | `string` | *(Required)* | Path to the rotation JSON file in `data/rotations/`. |
-| `choices_path` | `string` | *(Required)* | Path to the skill-tree choices JSON file in `data/choices/`. |
+| `choices` | `object` | *(Required)* | Skill-tree picks for this spec. Keys are level strings (`"23"` … `"73"`), values are `1`, `2`, or `3`. |
+| `main_hand` | `object` | `{"min": 0, "max": 0}` | Main-hand weapon damage range for this spec: `{"min": 3161, "max": 4741}`. |
+| `off_hand` | `object` or `null` | `null` | Off-hand weapon damage range. `null` means no off-hand weapon (shield, focus, or generator). |
 | `tactical_fqn` | `string` | *(Required)* | FQN (`abl.itm.tactical.*`) of the equipped Tactical item. |
 | `legendary_fqns` | `list[str]` | *(Required)* | List of exactly **2** distinct Legendary Implant FQNs (`abl.itm.legendary.*`). |
 | `relic_fqns` | `list[str]` | `[]` | List of up to **2** distinct Relic FQNs (`abl.itm.relic.*`). |
@@ -117,7 +121,7 @@ At the end of the prompts, you can optionally save your selections back to `run_
 
 ### 2.2 Character Stats (`data/builds/*.json`)
 
-Character stat files store unbuffed gear/character ratings and weapon damage ranges.
+Character stat files store unbuffed gear ratings shared across specs. Main-hand and off-hand damage live on the run config, because they depend on the spec's weapons.
 
 ```json
 {
@@ -126,35 +130,32 @@ Character stat files store unbuffed gear/character ratings and weapon damage ran
   "Critical Rating": 4214,
   "Alacrity Rating": 2250,
   "Accuracy Rating": 2694,
-  "Weapon Damage Min": 2368,
-  "Weapon Damage Max": 3552,
-  "Force/Tech Bonus": 10035,
-  "Offhand Damage Min": 0,
-  "Offhand Damage Max": 0
+  "Force Power": 9332,
+  "Tech Power": 0
 }
 ```
 
 - **How Stats Are Hydrated**:
   - During `prepare_simulation()`, `Player.recalculate_stats()` automatically applies all 4 raid Class Buffs (*Mark of Power*, *Force Valor*, *Coordination*, *Unnatural Might*), the 5 hidden +1% Companion bonuses (+1% Accuracy, +1% Crit Chance, +1% Surge, +1% Alacrity, +1% Endurance), and any passive stat modifiers from your discipline tree and legendary implants.
   - Ratings (`Critical Rating`, `Alacrity Rating`, `Accuracy Rating`) are converted into percentages using the level-indexed diminishing returns formulas in `combat_curves.json`.
-  - Dual-wield specs (e.g., Marauder, Sentinel, Mercenary, Gunslinger) should populate `Offhand Damage Min` and `Offhand Damage Max` (or `Offhand Force/Tech Bonus` if applicable).
+  - A dual-wield spec sets `off_hand` to a `{"min", "max"}` range on the run config. `off_hand: null` means that spec has no off-hand weapon.
 
 ---
 
-### 2.3 Skill Tree Choices (`data/choices/*.json`)
+### 2.3 Skill Tree Choices
 
-Skill tree choice files map each talent tier (e.g., `"level_23"`, `"level_27"`, ..., `"level_73"`) to the chosen option (`"option_1"`, `"option_2"`, or `"option_3"`):
+Skill-tree picks are stored on the run config. Each talent tier (`"23"`, `"27"`, ..., `"73"`) maps to option `1`, `2`, or `3`:
 
 ```json
 {
-  "level_23": "option_1",
-  "level_27": "option_2",
-  "level_39": "option_1",
-  "level_43": "option_1",
-  "level_51": "option_1",
-  "level_64": "option_1",
-  "level_68": "option_3",
-  "level_73": "option_1"
+  "23": 1,
+  "27": 2,
+  "39": 1,
+  "43": 1,
+  "51": 1,
+  "64": 1,
+  "68": 3,
+  "73": 1
 }
 ```
 

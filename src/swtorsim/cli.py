@@ -5,7 +5,6 @@ from pathlib import Path
 from src.swtorsim.config_load import load_json_file
 from src.swtorsim.run_config import (
     BUILDS_DIR,
-    CHOICES_DIR,
     DISCIPLINES_DIR,
     GEAR_PATH,
     LEGENDARY_PREFIX,
@@ -44,7 +43,7 @@ def collect_run_config_interactive() -> RunConfig:
     class_name, spec, spec_path = select_discipline_path()
     stats_path = select_stats_path()
     rotation_path = select_rotation_path()
-    choices_path = select_choices_path()
+    choices = select_skill_tree_choices(spec_path)
     tactical_fqn = select_tactical(class_name)
     legendary_fqns = select_legendaries(class_name)
     relic_fqns = select_relics()
@@ -56,7 +55,7 @@ def collect_run_config_interactive() -> RunConfig:
         spec=spec,
         stats_path=stats_path,
         rotation_path=rotation_path,
-        choices_path=choices_path,
+        choices=choices,
         tactical_fqn=tactical_fqn,
         legendary_fqns=legendary_fqns,
         relic_fqns=relic_fqns,
@@ -122,12 +121,30 @@ def select_rotation_path(rotations_dir: str = ROTATIONS_DIR) -> str:
     return options[choice]
 
 
-def select_choices_path(choices_dir: str = CHOICES_DIR) -> str:
-    """Prompts for a skill-tree choice JSON, including files in subdirectories."""
-    options = catalog_json_files(choices_dir, recursive=True)
-    print(f"\n📂 Available Skill Tree Choices in '{choices_dir}':")
-    choice = prompt_menu_choice(sorted(options), "Select Choices Number: ")
-    return options[choice]
+def select_skill_tree_choices(spec_path: str) -> dict[str, int]:
+    """Prompts for each skill-tree level. Enter selects option 1."""
+    spec_data = load_json_file(spec_path)
+    skill_tree = spec_data.get("skill_tree", {}) if isinstance(spec_data, dict) else {}
+    if not isinstance(skill_tree, dict) or not skill_tree:
+        raise ValueError(f"Discipline file '{spec_path}' has no skill tree.")
+
+    print("\nSkill tree choices (press Enter for option 1):")
+    choices: dict[str, int] = {}
+    levels = sorted(
+        skill_tree,
+        key=lambda level: (0, int(level)) if str(level).isdigit() else (1, str(level)),
+    )
+    for level in levels:
+        while True:
+            raw = input(f"  Level {level} option [1/2/3] (default 1): ").strip()
+            if raw == "":
+                choices[str(level)] = 1
+                break
+            if raw in {"1", "2", "3"}:
+                choices[str(level)] = int(raw)
+                break
+            print("  [WARN] Enter 1, 2, or 3.")
+    return choices
 
 
 def catalog_json_files(directory: str, recursive: bool) -> dict[str, str]:

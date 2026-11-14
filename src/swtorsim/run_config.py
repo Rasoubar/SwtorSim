@@ -17,7 +17,6 @@ from src.swtorsim.settings import (
 DISCIPLINES_DIR = "data/extractor/live/disciplines"
 BUILDS_DIR = "data/builds"
 ROTATIONS_DIR = "data/rotations"
-CHOICES_DIR = "data/choices"
 GEAR_PATH = "data/extractor/live/gear_abilities_talents.json"
 RELICS_PATH = "data/extractor/live/relics.json"
 TRAINING_DUMMY_ARMOR_DEBUFF_LABEL = "Training Dummy Armor Debuff"
@@ -110,6 +109,10 @@ class RunConfig:
     legendary_fqns: list[str]
     choices: dict[str, int] = field(default_factory=dict)
     choices_path: str = ""
+    main_hand_min: float = 0.0
+    main_hand_max: float = 0.0
+    off_hand_min: float = 0.0
+    off_hand_max: float = 0.0
     relic_fqns: list[str] = field(default_factory=list)
     mode: str = "TEST"
     iterations: int = 1000
@@ -205,6 +208,35 @@ def normalize_pre_combat(
     return steps
 
 
+def parse_hand_range(value: Any, label: str) -> tuple[float, float]:
+    """Parses ``{"min", "max"}``. None means that hand deals no weapon damage."""
+    if value is None:
+        return (0.0, 0.0)
+    if not isinstance(value, dict):
+        raise ValueError(f"'{label}' must be an object with 'min' and 'max', or null.")
+    bounds: list[float] = []
+    for bound in ("min", "max"):
+        if bound not in value:
+            raise ValueError(f"'{label}' is missing '{bound}'.")
+        number = value[bound]
+        if isinstance(number, bool) or not isinstance(number, (int, float)):
+            raise ValueError(f"'{label}.{bound}' must be a number.")
+        if number < 0:
+            raise ValueError(f"'{label}.{bound}' must be zero or greater.")
+        bounds.append(float(number))
+    return (bounds[0], bounds[1])
+
+
+def apply_weapon_ranges(stats: dict, config: RunConfig) -> None:
+    """Writes the run config's weapon ranges onto the stat keys the sim already reads."""
+    if not isinstance(stats, dict):
+        raise ValueError("Character stats must be a JSON object.")
+    stats["Main_hand_min"] = float(config.main_hand_min)
+    stats["Main_hand_max"] = float(config.main_hand_max)
+    stats["Off_hand_min"] = float(config.off_hand_min)
+    stats["Off_hand_max"] = float(config.off_hand_max)
+
+
 def load_run_config(path: str, environment: str | None = None) -> RunConfig:
     """Loads a run config JSON, fills class and spec from the discipline file, and validates it."""
     raw = _load_json(path)
@@ -224,6 +256,8 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
             f"Run config '{path}' must specify either 'choices' (dict) or 'choices_path' (str)."
         )
     parsed_choices = {str(k): int(v) for k, v in raw_choices.items()} if isinstance(raw_choices, dict) else {}
+    main_hand_min, main_hand_max = parse_hand_range(raw.get("main_hand"), "main_hand")
+    off_hand_min, off_hand_max = parse_hand_range(raw.get("off_hand"), "off_hand")
 
     active_env = (environment or raw.get("environment") or "live").lower().strip()
     spec_path = _require_config_str(raw, "spec_path")
@@ -241,6 +275,10 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
         rotation_path=_require_config_str(raw, "rotation_path"),
         choices=parsed_choices,
         choices_path=choices_path,
+        main_hand_min=main_hand_min,
+        main_hand_max=main_hand_max,
+        off_hand_min=off_hand_min,
+        off_hand_max=off_hand_max,
         tactical_fqn=_require_config_str(raw, "tactical_fqn"),
         legendary_fqns=_require_config_str_list(raw, "legendary_fqns"),
         relic_fqns=_optional_config_str_list(raw, "relic_fqns"),

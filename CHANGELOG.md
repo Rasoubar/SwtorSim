@@ -4,6 +4,37 @@
 
 ## Completed Fixes
 
+### 86. Rotations Share One Folder (`data/rotations/`, simulator and rotation builder) - [DONE]
+- Rotations are no longer split into built-in and custom. Files live at `data/rotations/<class>/<spec>/<name>.json`. The simulator and Rotation Builder dropdowns list that folder for the selected discipline, with no custom/preset groups. New saves and imports go to that same folder. Delete applies to any rotation there. Builds and run configs still use their `custom/` folders.
+- Moved `DirtyFighting.json` to `data/rotations/gunslinger/dirty_fighting/` and pointed `dirty_fighting_13gcd.json` at it. Removed `data/rotations/custom/`. Both Hatred rotations are kept: `BasicMaliPS.json` is the Live file (execute checks at `0.3`) and `BasicMaliPS_pts.json` is the PTS file (those checks at `0.4`). `hatred_14gcd_pts.json` uses the PTS file. The Live configs stay on `BasicMaliPS.json`.
+- Verification: full suite 38 run, 38 OK. Local dashboard: Hatred lists only `BasicMaliPS`, Dirty Fighting lists only `DirtyFighting`, and neither dropdown has a custom or preset group.
+- Not done: `dist/` was not regenerated, so the static web build still groups custom rotations.
+
+### 85. Extractor Launcher Also Extracts Web GUI Icons (`run_extractor.py`) - [DONE]
+- Every run started from `run_extractor.py` (menu or `--live` / `--pts` / `--both`, parsed-only or full) now passes `--extract-icons`. Ability and talent icons are written to `data/extractor/live/icons` or `data/extractor/pts/icons`, which the simulator and rotation builder already serve at `/icons/`. Direct `src/extractor/main.py` runs stay opt-in via the same flag.
+- The launch banner prints the icon directory. The flag help text now names `data/extractor/<live|pts>/icons/` instead of the old `data/icons/` path.
+- Verification: full suite 38 run, 38 OK (`tests/test_run_extractor.py` covers live/PTS and parsed/full command lines). No DPS change. Icons are produced on the next extraction; this change does not run the game archives.
+
+### 84. One Force/Tech Power Field, Weapon Damage Back with the Loadout (`tools/simulator_ui.html`) - [DONE]
+- Section 3 now has a single Force/Tech Power input. It reads `"Force-Tech Power"`, or `Force Power`, or `Tech Power`, and saving a build writes `"Force-Tech Power"`. That value is still applied to both stats, and a hit still uses only one of them. The two-column grid is Mastery / Power, Force/Tech Power / Critical Rating, Alacrity Rating / Accuracy Rating.
+- Main-hand and off-hand min/max moved to section 2 (Loadout, Gear & Rotation), next to the rest of the run config. They still save as `main_hand` / `off_hand` on the run config, and a build save still skips them.
+- I am very sorry to remove the Mudkip filler. The outlined "Is the best pokemon" cell sat beside Accuracy Rating so the weapon row would line up, and the `--mudkip` color existed only for that box. The stats grid no longer has a hole for it to fill.
+- Verification: local dashboard at `http://127.0.0.1:8799/`. Section 2 shows MH/OH min and max under the relics. Section 3 shows one Force/Tech Power field and no Mudkip cell. Loading a build that only has `Force Power` fills that field, and the value sent with a run is `Force-Tech Power`. No DPS change for a run that does not go through the form. A run started from the form now sends the one field as both powers.
+- Not done: `dist/` was not regenerated.
+
+### 83. Build Files Can Set Force and Tech Power from One Key - [DONE]
+- A build JSON may set `"Force-Tech Power"`. On load that value is written to both `Force Power` and `Tech Power`, and the shared key is not kept as its own stat. Separate `Force Power` and `Tech Power` keys still work when the shared key is absent. If the shared key is present it overwrites both.
+- A hit still uses one pool. Force attacks (`attack_type` 3) read `F_Bonus_Damage` (Force Power only). Tech attacks (`attack_type` 4) read `T_Bonus_Damage` (Tech Power only). Setting both powers to the same number does not add them on one hit.
+- The simulator form first filled both Force Power and Tech Power inputs from the shared key. Entry 84 replaces those two inputs with one Force/Tech Power field.
+- Verification: full suite 37 run, 37 OK (`tests/test_build_stats.py`: shared key, separate keys, JSON load, prepare, no double hit). No DPS change: existing builds in `data/builds/` still use `Force Power` only, so they load as before.
+- Not done: `dist/` was not regenerated, so the static web build does not map the shared key in the form until the next `tools/build_web_release.py`. The local web GUI (`tools/simulator_ui.html`) does.
+
+### 82. Choices and Weapon Ranges Live on the Run Config - [DONE]
+- Skill-tree choices are inline on every run config. `dirty_fighting_13gcd.json` and the Hatred spec in `dr_config.json` no longer point at `choices_path`. `data/choices/` is removed, including the stale rotation copy under `data/choices/Specs/`. The catalog, Pyodide bundle, and interactive CLI no longer scan that folder. The CLI asks for each skill-tree level instead (Enter = option 1). A `choices_path` still loads if a file is named, for a config kept outside this repo.
+- `Main_hand_min` / `Main_hand_max` / `Off_hand_min` / `Off_hand_max` are no longer stored on builds. Each run config has `main_hand` (`{"min", "max"}`) and `off_hand` (`null`, or a range). Those values are written onto the same stat keys the sim already reads. The web GUI Offhand Option dropdown is gone; off-hand presence is whether `off_hand` is `null` or a range. Saving a build does not write weapon damage, and changing the build preset does not change the weapon inputs.
+- Verification: full suite 32 run, 32 OK. `dirty_fighting_13gcd` and `dr_config.json` load. Same-seed DPS (`hatred_13gcd`, seed 42, 300s cap, 6,000,000 dummy HP) before -> after: 42104.6 -> 42104.6, total damage 6,004,113 -> 6,004,113.
+- Not done: `dist/` was not regenerated (`tools/build_web_release.py`), so the static web build still has the Offhand Option dropdown and still bundles `data/choices/`.
+
 ### 81. Extractor Launcher Always Refreshes Hashes (`run_extractor.py`) - [DONE]
 - Every run started from `run_extractor.py` passes `--force-hash-update`, so the Jedipedia hash list, `gom.js`, and `fnv1a64.js` are re-downloaded even when cached copies exist. Direct `src/extractor/main.py` runs are unchanged.
 - Verification: no test covers `run_extractor.py`. No DPS change.

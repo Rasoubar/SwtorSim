@@ -96,7 +96,6 @@ Raw GOM node dumps (`data/extractor/extracted/`, ~400 MB) and Jedipedia hash bin
 | Engine Code | `src/swtorsim/` | Simulation engine, modifiers, curves, and bridge |
 | Live Blueprints | `data/extractor/parsed/` | Parsed abilities, talents, and passives |
 | PTS Blueprints | `data/extractor/pts/` | PTS 8.0 parsed blueprints and disciplines |
-| Choices & Gear | `data/Choices/` & `data/choices/` | Implants, tacticals, legendary items, and relics |
 | Preset Rotations | `data/rotations/` | Default class priority lists |
 | Base Builds | `data/builds/` | Baseline class stat allocations |
 | Run Configs | `data/run_config/` | Preset simulation configurations |

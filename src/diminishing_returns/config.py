@@ -3,7 +3,7 @@
 from dataclasses import dataclass, replace
 
 from src.swtorsim.config_load import load_json_file
-from src.swtorsim.run_config import RunConfig, discipline_names, validate_run_config
+from src.swtorsim.run_config import RunConfig, discipline_names, parse_hand_range, validate_run_config
 
 RELIC_STATS = ("Mastery", "Power", "Crit")
 JITTER_STATS = ("Mastery", "Power")
@@ -43,7 +43,7 @@ _SPEC_KEYS = (
     "spec_path",
     "stats_path",
     "rotation_path",
-    "choices_path",
+    "choices",
     "tactical_fqn",
     "legendary_fqns",
     "relic_fqns",
@@ -179,10 +179,24 @@ def _load_spec(
     spec_path = _require_str(row, "spec_path", errors, label)
     stats_path = _require_str(row, "stats_path", errors, label)
     rotation_path = _require_str(row, "rotation_path", errors, label)
-    choices_path = _require_str(row, "choices_path", errors, label)
+    raw_choices = row.get("choices")
     tactical = _require_str(row, "tactical_fqn", errors, label)
     legendaries = _require_str_list(row, "legendary_fqns", errors, label)
     relic_fqns = _require_str_list(row, "relic_fqns", errors, label)
+    parsed_choices: dict[str, int] = {}
+    if not isinstance(raw_choices, dict):
+        errors.append(f"{label} 'choices' must be an object mapping skill-tree levels to 1, 2, or 3.")
+    else:
+        try:
+            parsed_choices = {str(k): int(v) for k, v in raw_choices.items()}
+        except (TypeError, ValueError):
+            errors.append(f"{label} 'choices' values must be 1, 2, or 3.")
+    try:
+        main_hand_min, main_hand_max = parse_hand_range(row.get("main_hand"), f"{label} main_hand")
+        off_hand_min, off_hand_max = parse_hand_range(row.get("off_hand"), f"{label} off_hand")
+    except ValueError as exc:
+        errors.append(str(exc))
+        main_hand_min = main_hand_max = off_hand_min = off_hand_max = 0.0
     if errors:
         _raise(path, errors)
 
@@ -214,7 +228,11 @@ def _load_spec(
         spec=spec,
         stats_path=stats_path,
         rotation_path=rotation_path,
-        choices_path=choices_path,
+        choices=parsed_choices,
+        main_hand_min=main_hand_min,
+        main_hand_max=main_hand_max,
+        off_hand_min=off_hand_min,
+        off_hand_max=off_hand_max,
         tactical_fqn=tactical,
         legendary_fqns=legendaries,
         relic_fqns=relic_fqns,

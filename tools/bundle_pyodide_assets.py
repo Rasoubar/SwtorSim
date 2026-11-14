@@ -30,8 +30,6 @@ EXCLUDE_PATTERNS = {
 
 INCLUDE_DIRS = [
     ("src/swtorsim", "src/swtorsim"),
-    ("data/Choices", "data/Choices"),
-    ("data/Choices", "data/choices"),
     ("data/builds", "data/builds"),
     ("data/rotations", "data/rotations"),
     ("data/run_config", "data/run_config"),

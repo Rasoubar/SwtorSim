@@ -7,6 +7,9 @@ Launch by double-clicking, or run from terminal:
     py run_extractor.py --both
     py run_extractor.py --source launcher --live
     py run_extractor.py --live-assets "D:\\Games\\SWTOR\\Assets" --live
+
+Every run also extracts the ability and talent icons the web GUI serves
+from data/extractor/live/icons and data/extractor/pts/icons.
 """
 
 from __future__ import annotations
@@ -116,6 +119,25 @@ def select_asset_source(
                 print(f"[WARN] Invalid selection '{choice}'. Please enter 1, 2, or 3.")
 
 
+def extractor_command(assets_path: Path, is_pts: bool = False, parsed_only: bool = True) -> list[str]:
+    """Build the extractor argv, including web-GUI icon extraction."""
+    item_rating = PTS_ITEM_RATING if is_pts else LIVE_ITEM_RATING
+    cmd = get_runner() + [
+        str(EXTRACTOR_MAIN),
+        "--assets",
+        str(assets_path),
+        "--item-rating",
+        str(item_rating),
+        "--force-hash-update",
+        "--extract-icons",
+    ]
+    if is_pts:
+        cmd.append("--pts")
+    if parsed_only:
+        cmd.append("--parsed-only")
+    return cmd
+
+
 def run_extractor(assets_path: Path, is_pts: bool = False, parsed_only: bool = True) -> bool:
     """Executes the extractor subprocess for the given assets."""
     assets_path = normalize_assets_path(assets_path)
@@ -129,6 +151,7 @@ def run_extractor(assets_path: Path, is_pts: bool = False, parsed_only: bool = T
     print(f" [INFO] Assets:      {assets_path}")
     print(f" [INFO] Item Rating: {item_rating}")
     print(f" [INFO] Output Dir:  {target_dir}")
+    print(f" [INFO] Icons:       {target_dir}/icons")
     print("=" * 64 + "\n")
 
     if not assets_path.exists():
@@ -136,18 +159,7 @@ def run_extractor(assets_path: Path, is_pts: bool = False, parsed_only: bool = T
         print("       Please check your game installation path or change the asset source.")
         return False
 
-    cmd = get_runner() + [
-        str(EXTRACTOR_MAIN),
-        "--assets",
-        str(assets_path),
-        "--item-rating",
-        str(item_rating),
-        "--force-hash-update",
-    ]
-    if is_pts:
-        cmd.append("--pts")
-    if parsed_only:
-        cmd.append("--parsed-only")
+    cmd = extractor_command(assets_path, is_pts=is_pts, parsed_only=parsed_only)
 
     try:
         res = subprocess.run(cmd, cwd=str(PROJECT_ROOT))

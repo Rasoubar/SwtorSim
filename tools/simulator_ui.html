@@ -28,7 +28,6 @@
     --red-bg: #fee2e2;
     --cyan: #1d72a8;
     --cyan-bg: #d7eefa;
-    --mudkip: #ff7818;
   }
 
   [data-theme="dark"] {
@@ -54,7 +53,6 @@
     --red-bg: rgba(239, 68, 68, 0.14);
     --cyan: #58abdf;
     --cyan-bg: rgba(88, 171, 223, 0.14);
-    --mudkip: #58abdf;
   }
 
   [data-theme="dark"] .brand-badge {
@@ -1138,7 +1136,7 @@
             <span>Rotation File</span>
             <div style="display:flex; gap:4px;">
               <button class="btn btn-sm" id="importRotationBtn" type="button" style="padding:1px 6px; font-size:10px;" title="Import custom rotation JSON">📁 Import</button>
-              <button class="btn btn-sm" id="deleteRotationBtn" type="button" style="padding:1px 6px; font-size:10px; display:none; color:var(--red);" title="Delete selected custom rotation">🗑️</button>
+              <button class="btn btn-sm" id="deleteRotationBtn" type="button" style="padding:1px 6px; font-size:10px; display:none; color:var(--red);" title="Delete selected rotation">🗑️</button>
               <input type="file" id="importRotationFile" accept=".json" style="display:none;">
             </div>
           </div>
@@ -1189,17 +1187,25 @@
           </div>
         </div>
 
-        <div class="form-row">
-          <div class="form-label">
-            <span>Offhand Option</span>
-            <span id="offhandPreviewBadge" style="color:var(--cyan);font-size:10px;">None (0 Dmg)</span>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label class="form-label">MH Min Dmg</label>
+            <input type="number" class="stat-input" data-stat="Main_hand_min" value="2513">
           </div>
-          <select id="offhandSelect">
-            <option value="none">None / Shield / Focus / Generator (0 OH Dmg)</option>
-            <option value="weapon">Dual Wield Weapon (Match Main Hand: 3161 - 4741)</option>
-            <option value="custom">Custom Offhand Weapon Dmg</option>
-          </select>
+          <div class="form-row">
+            <label class="form-label">MH Max Dmg</label>
+            <input type="number" class="stat-input" data-stat="Main_hand_max" value="3769">
+          </div>
+          <div class="form-row">
+            <label class="form-label">OH Min Dmg</label>
+            <input type="number" class="stat-input" data-stat="Off_hand_min" value="0">
+          </div>
+          <div class="form-row">
+            <label class="form-label">OH Max Dmg</label>
+            <input type="number" class="stat-input" data-stat="Off_hand_max" value="0">
+          </div>
         </div>
+
       </div>
     </div>
 
@@ -1234,12 +1240,8 @@
             <input type="number" class="stat-input" data-stat="Power" value="14394">
           </div>
           <div class="form-row">
-            <label class="form-label">Force Power</label>
-            <input type="number" class="stat-input" data-stat="Force Power" value="9332">
-          </div>
-          <div class="form-row">
-            <label class="form-label">Tech Power</label>
-            <input type="number" class="stat-input" data-stat="Tech Power" value="0">
+            <label class="form-label">Force/Tech Power</label>
+            <input type="number" class="stat-input" data-stat="Force-Tech Power" value="9332">
           </div>
           <div class="form-row">
             <label class="form-label">Critical Rating</label>
@@ -1252,26 +1254,6 @@
           <div class="form-row">
             <label class="form-label">Accuracy Rating</label>
             <input type="number" class="stat-input" data-stat="Accuracy Rating" value="2824">
-          </div>
-          <div class="form-row">
-            <label class="form-label">Mudkip</label>
-            <div id="mudkipBox" style="display:flex; align-items:center; justify-content:center; gap:6px; height:26px; box-sizing:border-box; padding:0 8px; border:1px solid var(--mudkip); border-radius:5px; font-size:11px; font-weight:700; letter-spacing:0.3px; color:var(--mudkip); white-space:nowrap;">Is the best pokemon</div>
-          </div>
-          <div class="form-row">
-            <label class="form-label">MH Min Dmg</label>
-            <input type="number" class="stat-input" data-stat="Main_hand_min" value="2513">
-          </div>
-          <div class="form-row">
-            <label class="form-label">MH Max Dmg</label>
-            <input type="number" class="stat-input" data-stat="Main_hand_max" value="3769">
-          </div>
-          <div class="form-row">
-            <label class="form-label">OH Min Dmg</label>
-            <input type="number" class="stat-input" data-stat="Off_hand_min" value="0">
-          </div>
-          <div class="form-row">
-            <label class="form-label">OH Max Dmg</label>
-            <input type="number" class="stat-input" data-stat="Off_hand_max" value="0">
           </div>
         </div>
 
@@ -1835,56 +1817,30 @@
       return;
     }
 
-    // Presets strictly for this active class and discipline
-    const specPresets = allRots.filter(r => !r.is_custom && (
+    const specRotations = allRots.filter(r => (
       (!r.class && !r.spec) ||
       (r.class === classSlug && (!r.spec || !specSlug || r.spec === specSlug))
-    ));
+    )).sort((a, b) => String(a.name || a.label).localeCompare(String(b.name || b.label)));
 
-    // Custom rotations strictly for this active class and discipline
-    const specCustom = allRots.filter(r => r.is_custom && (
-      (!r.class && !r.spec) ||
-      (r.class === classSlug && (!r.spec || !specSlug || r.spec === specSlug))
-    ));
-
-    if (specCustom.length > 0) {
-      const cGroup = document.createElement("optgroup");
-      cGroup.label = "★ My Custom Files";
-      specCustom.forEach(it => {
-        const opt = document.createElement("option");
-        opt.value = it.path;
-        opt.textContent = `★ ${it.name || it.label}`;
-        cGroup.appendChild(opt);
-      });
-      rotSel.appendChild(cGroup);
-    }
-
-    if (specPresets.length > 0) {
-      const pGroup = document.createElement("optgroup");
-      pGroup.label = "Preset Rotations";
-      specPresets.forEach(it => {
-        const opt = document.createElement("option");
-        opt.value = it.path;
-        opt.textContent = it.name ? it.name.replace(/\.json$/i, "") : it.label;
-        pGroup.appendChild(opt);
-      });
-      rotSel.appendChild(pGroup);
-    }
-
-    if (specCustom.length === 0 && specPresets.length === 0) {
+    if (specRotations.length === 0) {
       const emptyOpt = document.createElement("option");
       emptyOpt.value = "";
       emptyOpt.disabled = true;
       emptyOpt.textContent = `(No rotations found for ${specSlug || classSlug})`;
       rotSel.appendChild(emptyOpt);
+    } else {
+      specRotations.forEach(it => {
+        const opt = document.createElement("option");
+        opt.value = it.path;
+        opt.textContent = it.name ? it.name.replace(/\.json$/i, "") : it.label;
+        rotSel.appendChild(opt);
+      });
     }
 
     if (prevVal && Array.from(rotSel.options).some(o => o.value === prevVal)) {
       rotSel.value = prevVal;
-    } else if (specPresets.length > 0) {
-      rotSel.value = specPresets[0].path;
-    } else if (specCustom.length > 0) {
-      rotSel.value = specCustom[0].path;
+    } else if (specRotations.length > 0) {
+      rotSel.value = specRotations[0].path;
     } else if (rotSel.options.length > 0) {
       rotSel.selectedIndex = 0;
     }
@@ -2110,45 +2066,71 @@
     });
   }
 
-  function syncOffhandOptionFromStats() {
-    const mhMinInp = document.querySelector('.stat-input[data-stat="Main_hand_min"]');
-    const mhMaxInp = document.querySelector('.stat-input[data-stat="Main_hand_max"]');
-    const ohMinInp = document.querySelector('.stat-input[data-stat="Off_hand_min"]');
-    const ohMaxInp = document.querySelector('.stat-input[data-stat="Off_hand_max"]');
-    const offSelect = document.getElementById("offhandSelect");
-    const badge = document.getElementById("offhandPreviewBadge");
-    if (!offSelect) return;
+  const WEAPON_STAT_KEYS = ["Main_hand_min", "Main_hand_max", "Off_hand_min", "Off_hand_max"];
 
-    const mhMin = parseFloat(mhMinInp?.value) || 0;
-    const mhMax = parseFloat(mhMaxInp?.value) || 0;
-    const ohMin = parseFloat(ohMinInp?.value) || 0;
-    const ohMax = parseFloat(ohMaxInp?.value) || 0;
-
-    if (ohMin <= 0 && ohMax <= 0) {
-      offSelect.value = "none";
-      if (badge) badge.textContent = "None (0 Dmg)";
-    } else if (ohMin === mhMin && ohMax === mhMax && ohMax > 0) {
-      offSelect.value = "weapon";
-      if (badge) badge.textContent = `Weapon (${ohMin} - ${ohMax})`;
-    } else {
-      offSelect.value = "custom";
-      if (badge) badge.textContent = `Custom (${ohMin} - ${ohMax})`;
-    }
+  function forceTechFromStats(statsObj) {
+    if (!statsObj) return 0;
+    const shared = statsObj["Force-Tech Power"];
+    if (shared !== undefined && shared !== null && shared !== "") return shared;
+    if (statsObj["Force Power"] !== undefined && statsObj["Force Power"] !== null && statsObj["Force Power"] !== "") return statsObj["Force Power"];
+    if (statsObj["Tech Power"] !== undefined && statsObj["Tech Power"] !== null && statsObj["Tech Power"] !== "") return statsObj["Tech Power"];
+    return 0;
   }
 
   function applyStatsToInputs(statsObj) {
     document.querySelectorAll(".stat-input").forEach(inp => {
       const k = inp.dataset.stat;
+      if (WEAPON_STAT_KEYS.includes(k)) return;
+      if (k === "Force-Tech Power") {
+        inp.value = forceTechFromStats(statsObj);
+        return;
+      }
       const val = statsObj && statsObj[k] !== undefined ? statsObj[k] : 0;
       inp.value = val;
     });
-    syncOffhandOptionFromStats();
+  }
+
+  function applyWeaponRanges(rc) {
+    const set = (stat, value) => {
+      const inp = document.querySelector(`.stat-input[data-stat="${stat}"]`);
+      if (inp) inp.value = value;
+    };
+    const mh = rc && rc.main_hand;
+    const oh = rc && rc.off_hand;
+    if (mh && typeof mh === "object") {
+      set("Main_hand_min", mh.min ?? 0);
+      set("Main_hand_max", mh.max ?? 0);
+    } else {
+      set("Main_hand_min", 0);
+      set("Main_hand_max", 0);
+    }
+    if (oh && typeof oh === "object") {
+      set("Off_hand_min", oh.min ?? 0);
+      set("Off_hand_max", oh.max ?? 0);
+    } else {
+      set("Off_hand_min", 0);
+      set("Off_hand_max", 0);
+    }
+  }
+
+  function readWeaponRanges() {
+    const num = (stat) => {
+      const raw = parseFloat(document.querySelector(`.stat-input[data-stat="${stat}"]`)?.value);
+      return Number.isFinite(raw) ? raw : 0;
+    };
+    const ohMin = num("Off_hand_min");
+    const ohMax = num("Off_hand_max");
+    return {
+      main_hand: { min: num("Main_hand_min"), max: num("Main_hand_max") },
+      off_hand: (ohMin <= 0 && ohMax <= 0) ? null : { min: ohMin, max: ohMax },
+    };
   }
 
   function getStatsOverrideFromInputs() {
     const out = {};
     document.querySelectorAll(".stat-input").forEach(inp => {
       const k = inp.dataset.stat;
+      if (WEAPON_STAT_KEYS.includes(k)) return;
       const v = parseFloat(inp.value);
       if (!isNaN(v)) out[k] = v;
     });
@@ -2193,6 +2175,7 @@
       if (rawStatsOverride && typeof rawStatsOverride === "object" && Object.keys(rawStatsOverride).length > 0) {
         applyStatsToInputs(rawStatsOverride);
       }
+      applyWeaponRanges(rc);
 
       if (bundle.choices && typeof bundle.choices === "object") {
         Object.entries(bundle.choices).forEach(([k, v]) => {
@@ -2263,6 +2246,7 @@
       spec_path: document.getElementById("specSelect").value,
       stats_path: document.getElementById("buildSelect").value,
       stats_override: getStatsOverrideFromInputs(),
+      ...readWeaponRanges(),
       rotation_path: document.getElementById("rotationSelect").value,
       choices: CURRENT_CHOICES,
       choices_override: CURRENT_CHOICES,
@@ -3182,6 +3166,8 @@
       spec_path: p.spec_path,
       stats_path: p.stats_path,
       stats_override: p.stats_override || getStatsOverrideFromInputs(),
+      main_hand: p.main_hand,
+      off_hand: p.off_hand,
       rotation_path: p.rotation_path,
       choices: CURRENT_CHOICES,
       tactical_fqn: p.tactical_fqn,
@@ -3313,57 +3299,7 @@
     }
   });
 
-  document.getElementById("offhandSelect").addEventListener("change", e => {
-    const mode = e.target.value;
-    const mhMinInp = document.querySelector('.stat-input[data-stat="Main_hand_min"]');
-    const mhMaxInp = document.querySelector('.stat-input[data-stat="Main_hand_max"]');
-    const ohMinInp = document.querySelector('.stat-input[data-stat="Off_hand_min"]');
-    const ohMaxInp = document.querySelector('.stat-input[data-stat="Off_hand_max"]');
-    const badge = document.getElementById("offhandPreviewBadge");
-
-    const mhMin = parseFloat(mhMinInp?.value) || 3161;
-    const mhMax = parseFloat(mhMaxInp?.value) || 4741;
-
-    if (mode === "none") {
-      if (ohMinInp) ohMinInp.value = 0;
-      if (ohMaxInp) ohMaxInp.value = 0;
-      if (badge) badge.textContent = "None (0 Dmg)";
-    } else if (mode === "weapon") {
-      if (ohMinInp) ohMinInp.value = mhMin;
-      if (ohMaxInp) ohMaxInp.value = mhMax;
-      if (badge) badge.textContent = `Weapon (${mhMin} - ${mhMax})`;
-    } else if (mode === "custom") {
-      const curMax = parseFloat(ohMaxInp?.value) || 0;
-      if (curMax <= 0) {
-        if (ohMinInp) ohMinInp.value = mhMin;
-        if (ohMaxInp) ohMaxInp.value = mhMax;
-      }
-      const curMin = parseFloat(ohMinInp?.value) || 0;
-      const finalMax = parseFloat(ohMaxInp?.value) || 0;
-      if (badge) badge.textContent = `Custom (${curMin} - ${finalMax})`;
-    }
-    refreshComputedStats();
-  });
-
   document.querySelectorAll(".stat-input").forEach(inp => {
-    inp.addEventListener("input", () => {
-      const stat = inp.dataset.stat;
-      if (stat === "Main_hand_min" || stat === "Main_hand_max") {
-        const offSelect = document.getElementById("offhandSelect");
-        if (offSelect && offSelect.value === "weapon") {
-          const mhMin = parseFloat(document.querySelector('.stat-input[data-stat="Main_hand_min"]')?.value) || 0;
-          const mhMax = parseFloat(document.querySelector('.stat-input[data-stat="Main_hand_max"]')?.value) || 0;
-          const ohMinInp = document.querySelector('.stat-input[data-stat="Off_hand_min"]');
-          const ohMaxInp = document.querySelector('.stat-input[data-stat="Off_hand_max"]');
-          if (ohMinInp) ohMinInp.value = mhMin;
-          if (ohMaxInp) ohMaxInp.value = mhMax;
-          const badge = document.getElementById("offhandPreviewBadge");
-          if (badge) badge.textContent = `Weapon (${mhMin} - ${mhMax})`;
-        }
-      } else if (stat === "Off_hand_min" || stat === "Off_hand_max") {
-        syncOffhandOptionFromStats();
-      }
-    });
     inp.addEventListener("change", () => refreshComputedStats());
   });
 
@@ -3413,12 +3349,19 @@
     }
   });
 
+  function canDeleteSelected(selId, path) {
+    if (!path) return false;
+    const norm = path.replace(/\\/g, "/");
+    if (selId === "rotationSelect") return norm.startsWith("data/rotations/");
+    return norm.includes("/custom/");
+  }
+
   function syncDeleteButtons() {
     const check = (selId, btnId) => {
       const sel = document.getElementById(selId);
       const btn = document.getElementById(btnId);
       if (sel && btn) {
-        btn.style.display = (sel.value && sel.value.includes("/custom/")) ? "inline-block" : "none";
+        btn.style.display = canDeleteSelected(selId, sel.value) ? "inline-block" : "none";
       }
     };
     check("presetConfigSelect", "deleteRunConfigBtn");
@@ -3434,9 +3377,10 @@
   async function deleteCustomFile(selectElemId) {
     const sel = document.getElementById(selectElemId);
     const path = sel ? sel.value : "";
-    if (!path || !path.includes("/custom/")) return;
+    if (!canDeleteSelected(selectElemId, path)) return;
     const filename = path.split("/").pop();
-    if (!confirm(`Are you sure you want to delete custom file "${filename}"?`)) return;
+    const kind = selectElemId === "rotationSelect" ? "rotation" : "custom file";
+    if (!confirm(`Are you sure you want to delete ${kind} "${filename}"?`)) return;
 
     try {
       const res = await fetch("/api/custom_file/delete", {
