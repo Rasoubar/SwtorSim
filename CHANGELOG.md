@@ -4,6 +4,11 @@
 
 ## Completed Fixes
 
+### 87. Diminishing Returns Tool Runs from `main.py` (`src/diminishing_returns/main.py`, `data/diminishing_returns/`) - [DONE]
+- `dr_config.json` moved out of `data/run_config/`, which the simulator, web GUI, and rotation builder scan as preset run configs. It now lives at `data/diminishing_returns/dr_config.json`.
+- The CLI is `src/diminishing_returns/main.py`, matching the extractor. It puts the repo root on `sys.path` before importing `src`, so `python src/diminishing_returns/runner.py` is no longer the entry (that file has no `main` and could not import `src`). `__main__.py` is removed.
+- Verification: full suite 40 run, 40 OK (`tests/test_diminishing_returns.py`). `python src/diminishing_returns/main.py --help` exits 0 and names `data/diminishing_returns/dr_config.json`. That file loads Hatred/Serenity. One 5-second worker-pool fight (seed 42, no relics) returned 24537.6 DPS. The saved 10000-sample sweep was not run. No simulator DPS change.
+
 ### 86. Rotations Share One Folder (`data/rotations/`, simulator and rotation builder) - [DONE]
 - Rotations are no longer split into built-in and custom. Files live at `data/rotations/<class>/<spec>/<name>.json`. The simulator and Rotation Builder dropdowns list that folder for the selected discipline, with no custom/preset groups. New saves and imports go to that same folder. Delete applies to any rotation there. Builds and run configs still use their `custom/` folders.
 - Moved `DirtyFighting.json` to `data/rotations/gunslinger/dirty_fighting/` and pointed `dirty_fighting_13gcd.json` at it. Removed `data/rotations/custom/`. Both Hatred rotations are kept: `BasicMaliPS.json` is the Live file (execute checks at `0.3`) and `BasicMaliPS_pts.json` is the PTS file (those checks at `0.4`). `hatred_14gcd_pts.json` uses the PTS file. The Live configs stay on `BasicMaliPS.json`.

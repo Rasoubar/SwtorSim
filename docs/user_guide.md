@@ -267,12 +267,12 @@ All conditions inside a `"rules"` dictionary must evaluate to `True` (logical `A
 
 ## 4. Auxiliary Tools & Utilities
 
-### 4.1 Diminishing Returns Curve Fitter (`src/diminishing_returns/runner.py`)
+### 4.1 Diminishing Returns Curve Fitter (`src/diminishing_returns/main.py`)
 
-Fits theoretical SWTOR diminishing returns parameters (`Cap` and `Divisor`) against empirical `(rating, percentage)` pairs observed on the in-game character sheet:
+Sweeps a stat through the simulator and plots diminishing returns. The default config is `data/diminishing_returns/dr_config.json`.
 
 ```powershell
-.\.venv\Scripts\python.exe src/diminishing_returns/runner.py
+.\tools\pyclean.exe src/diminishing_returns/main.py
 ```
 
 ### 4.2 Combat Log Parser (`tools/parse_combat_log.py`)

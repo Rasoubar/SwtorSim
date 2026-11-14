@@ -1,10 +1,16 @@
 """Command line entry for the diminishing-returns run."""
 
 import argparse
+import sys
+from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 from src.diminishing_returns.config import load_dr_config
 
-DEFAULT_CONFIG = "data/run_config/dr_config.json"
+DEFAULT_CONFIG = "data/diminishing_returns/dr_config.json"
 
 
 def main(argv=None) -> None:
