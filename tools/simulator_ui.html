@@ -2685,8 +2685,8 @@
     }
 
     const rows = [...rowsRaw].sort((a, b) => {
-      const va = a[BREAKDOWN_SORT.col];
-      const vb = b[BREAKDOWN_SORT.col];
+      const va = a[BREAKDOWN_SORT.col] ?? -1;
+      const vb = b[BREAKDOWN_SORT.col] ?? -1;
       if (typeof va === "string") {
         return BREAKDOWN_SORT.asc ? va.localeCompare(vb) : vb.localeCompare(va);
       }
@@ -2703,9 +2703,10 @@
             <th class="num-col" onclick="sortBreakdownBy('dps')">DPS</th>
             <th onclick="sortBreakdownBy('share_pct')">Damage Share</th>
             <th class="num-col" onclick="sortBreakdownBy('total_damage')">${isTest ? 'Total Damage' : 'Avg Damage'}</th>
+            <th class="num-col" onclick="sortBreakdownBy('casts')">${isTest ? 'Casts' : 'Avg Casts'}</th>
+            <th class="num-col" onclick="sortBreakdownBy('dmg_per_cast')">Dmg / Cast</th>
             <th class="num-col" onclick="sortBreakdownBy('hits')">${isTest ? 'Hits' : 'Avg Hits'}</th>
             <th class="num-col" onclick="sortBreakdownBy('crit_pct')">Crit %</th>
-            <th class="num-col" onclick="sortBreakdownBy('avg_hit')">Avg Hit</th>
             ${isTest ? '<th class="num-col">Min / Max Hit</th>' : ''}
           </tr>
         </thead>
@@ -2730,9 +2731,10 @@
             </div>
           </td>
           <td class="num-col">${Math.round(r.total_damage).toLocaleString()}</td>
-          <td class="num-col">${r.hits.toLocaleString()}</td>
+          <td class="num-col">${r.casts == null ? "&mdash;" : r.casts.toLocaleString()}</td>
+          <td class="num-col" style="font-weight:600;">${r.dmg_per_cast == null ? "&mdash;" : Math.round(r.dmg_per_cast).toLocaleString()}</td>
+          <td class="num-col" style="cursor:help;" title="Avg hit: ${Math.round(r.avg_hit).toLocaleString()}">${r.hits.toLocaleString()}</td>
           <td class="num-col" style="color:var(--amber);font-weight:600;">${r.crit_pct.toFixed(1)}%</td>
-          <td class="num-col">${Math.round(r.avg_hit).toLocaleString()}</td>
           ${minMaxCell}
         </tr>
       `;

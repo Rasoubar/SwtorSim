@@ -1732,6 +1732,10 @@ class Ability:
                 },
             )
 
+        tracker = getattr(sim, "tracker", None)
+        if tracker is not None:
+            tracker.log_cast(self.name or self.fqn, target)
+
         return True
 
     def _start_channel(self, caster, ability_target, sim, channel_duration: float):

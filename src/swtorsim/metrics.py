@@ -49,6 +49,8 @@ class Metrics:
         self.breakdown = {}
         self.total_execute_damage = 0.0
         self.execute_breakdown = {}
+        self.cast_counts = {}
+        self.execute_cast_counts = {}
         self.execute_start_time = None
         self.combat_start_time = None
         self.combat_end_time = None
@@ -137,6 +139,12 @@ class Metrics:
 
             self.total_execute_damage += dmg_value
             self._record_hit(self.execute_breakdown, ability_name, dmg_value, is_crit, attack_type, damage_type)
+
+    def log_cast(self, ability_name: str, target=None):
+        """Counts one successful ability cast (the execute split uses the target's HP at cast time)."""
+        self.cast_counts[ability_name] = self.cast_counts.get(ability_name, 0) + 1
+        if target and getattr(target, 'hp_ratio', 1.0) <= 0.30:
+            self.execute_cast_counts[ability_name] = self.execute_cast_counts.get(ability_name, 0) + 1
 
     @staticmethod
     def _record_hit(

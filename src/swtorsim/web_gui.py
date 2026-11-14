@@ -663,8 +663,13 @@ def _format_ability_breakdown_rows(
     phase_total_damage: float,
     extra_stats: dict[str, dict[str, Any]] | None = None,
     iterations: int = 1,
+    cast_counts: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
-    """Formats ability damage breakdown into sorted JSON-serializable rows."""
+    """Formats ability damage breakdown into sorted JSON-serializable rows.
+
+    ``cast_counts`` holds summed cast counts per ability name. Damage rows with no matching cast
+    (DoT ticks, procs) get ``casts``/``dmg_per_cast`` of None.
+    """
     rows: list[dict[str, Any]] = []
     sorted_items = sorted(
         breakdown_dict.items(),
@@ -697,11 +702,13 @@ def _format_ability_breakdown_rows(
             "crit_pct": round(crit_pct, 1),
             "avg_hit": round(avg_hit, 0),
         }
+        casts = int((cast_counts or {}).get(name, 0))
+        row["casts"] = (round(casts / iterations, 1) if iterations > 1 else casts) if casts > 0 else None
+        row["dmg_per_cast"] = round(total_dmg / casts, 0) if casts > 0 else None
         if extra_stats and name in extra_stats:
             ex = extra_stats[name]
             row["min_hit"] = round(float(ex.get("min_hit", 0.0)), 0)
             row["max_hit"] = round(float(ex.get("max_hit", 0.0)), 0)
-            row["casts"] = int(ex.get("casts", 0))
         rows.append(row)
     return rows
 
@@ -747,11 +754,6 @@ def _run_single_test_detailed(
                     ok = fn(caster, tgt, s)
                     if ok:
                         a_name = ability_obj.name or ability_obj.fqn
-                        ex = ability_extra.setdefault(
-                            a_name,
-                            {"min_hit": float("inf"), "max_hit": 0.0, "casts": 0},
-                        )
-                        ex["casts"] += 1
                         res_val = round(float(getattr(caster.resource, "current_value", 0.0)), 1)
                         hp_pct = round(float(tgt.hp_ratio) * 100.0, 1)
                         combat_events.insert(
@@ -801,7 +803,7 @@ def _run_single_test_detailed(
             )
             ex = ability_extra.setdefault(
                 ability_name,
-                {"min_hit": float("inf"), "max_hit": 0.0, "casts": 0},
+                {"min_hit": float("inf"), "max_hit": 0.0},
             )
             if dmg_value < ex["min_hit"]:
                 ex["min_hit"] = dmg_value
@@ -903,6 +905,7 @@ def _run_single_test_detailed(
         total_damage,
         extra_stats=ability_extra,
         iterations=1,
+        cast_counts=sim.tracker.cast_counts,
     )
 
     exec_start_raw = getattr(sim.tracker, "execute_start_time", None)
@@ -916,6 +919,7 @@ def _run_single_test_detailed(
             exec_dur,
             exec_total_dmg,
             iterations=1,
+            cast_counts=sim.tracker.execute_cast_counts,
         )
         execute_phase = {
             "active": True,
@@ -1182,6 +1186,8 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
     execute_dur = max(0.0, float(sim.current_time) - execute_start) if execute_start is not None else 0.0
 
     return {
+        "cast_counts": dict(sim.tracker.cast_counts),
+        "execute_cast_counts": dict(sim.tracker.execute_cast_counts),
         "run_id": run_id + 1,
         "dps": calculated_dps,
         "total_damage": float(sim.tracker.total_damage),
@@ -1354,12 +1360,18 @@ def _aggregate_batch_results(
 
     macro_breakdown: dict[str, dict[str, Any]] = {}
     macro_exec_breakdown: dict[str, dict[str, Any]] = {}
+    macro_cast_counts: dict[str, int] = {}
+    macro_exec_cast_counts: dict[str, int] = {}
     total_exec_damage = 0.0
     total_exec_duration = 0.0
 
     for result in harvested:
         total_exec_damage += result.get("total_execute_damage", 0.0)
         total_exec_duration += result.get("execute_duration", 0.0)
+        for name, n in result.get("cast_counts", {}).items():
+            macro_cast_counts[name] = macro_cast_counts.get(name, 0) + n
+        for name, n in result.get("execute_cast_counts", {}).items():
+            macro_exec_cast_counts[name] = macro_exec_cast_counts.get(name, 0) + n
 
         for name, data in result["abilities"].items():
             entry = macro_breakdown.setdefault(
@@ -1417,6 +1429,7 @@ def _aggregate_batch_results(
         total_time,
         total_damage_all,
         iterations=iterations,
+        cast_counts=macro_cast_counts,
     )
 
     if total_exec_duration > 0 and total_exec_damage > 0:
@@ -1427,6 +1440,7 @@ def _aggregate_batch_results(
             total_exec_duration,
             total_exec_damage,
             iterations=iterations,
+            cast_counts=macro_exec_cast_counts,
         )
         execute_phase = {
             "active": True,
