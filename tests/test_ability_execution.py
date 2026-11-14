@@ -278,5 +278,50 @@ class AbilityExecutionTests(unittest.TestCase):
         self.sim.triggers.dispatch("on_damage_dealt", self.sim, ranged_ctx)
         self.assertEqual(proc_count, 1, "Ranged weapon hit (weapon_mode=3) must proc weapon_mode=3 trigger!")
 
+    def test_calculate_recharge_time_does_not_double_count_64_and_423(self):
+        """Effects carrying both stat 64 (cooldown) and stat 423 (recharge) must apply -15s once, not -30s."""
+        from src.swtorsim.effects import ActiveEffect
+        from src.swtorsim.modifiers import Modifier
+
+        charge_abl = self._find_ability(lambda a: a.has_charges and a.recharge_time > 0)
+        self.player.stats["Alacrity"] = 0.0
+        base = charge_abl.recharge_time
+
+        both_eff = ActiveEffect(
+            fqn="abl.test.both_cd_and_recharge",
+            name="Both CD and Recharge",
+            number=1,
+            modifiers=[
+                Modifier(stat="STAT_abl_time_cooldown", value=-5.0, targets=frozenset({charge_abl.fqn})),
+                Modifier(stat="stat_abl_charges_recharge_time", value=-5.0, targets=frozenset({charge_abl.fqn})),
+            ],
+            is_passive=True,
+        )
+        self.player.effects["test_both:1"] = both_eff
+        self.assertAlmostEqual(
+            self.player.calculate_recharge_time(base, ability=charge_abl),
+            max(0.0, base - 5.0),
+            places=2,
+        )
+
+        # Fallback to stat 64 when an effect does not carry stat 423 for the ability
+        del self.player.effects["test_both:1"]
+        cd_only_eff = ActiveEffect(
+            fqn="abl.test.cd_only",
+            name="CD Only",
+            number=1,
+            modifiers=[
+                Modifier(stat="STAT_abl_time_cooldown", value=-5.0, targets=frozenset({charge_abl.fqn})),
+            ],
+            is_passive=True,
+        )
+        self.player.effects["test_cd_only:1"] = cd_only_eff
+        self.assertAlmostEqual(
+            self.player.calculate_recharge_time(base, ability=charge_abl),
+            max(0.0, base - 5.0),
+            places=2,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

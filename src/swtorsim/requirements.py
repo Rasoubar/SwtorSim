@@ -421,8 +421,12 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         res = True
 
     elif cond_type == "random_chance":
-        chance = item.get("floats", {}).get("chance", 1.0)
-        res = random.random() <= chance
+        floats = item.get("floats", {})
+        if "percent_chance" in floats:
+            chance = floats["percent_chance"] / 100.0  # extractor field is a percent (10.0 = 10%)
+        else:
+            chance = floats.get("chance", 1.0)
+        res = random.random() < chance
 
     elif cond_type == "immune_by_resolve":
         # Target dummies/bosses have resolve immunity

@@ -715,19 +715,24 @@ class Player(Entity):
                 abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
                 ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
 
+            _RECHARGE_STATS = ("423", "stat_abl_charges_recharge_time", "STAT_abl_charges_recharge_time")
+            _COOLDOWN_STATS = ("64", "STAT_abl_time_cooldown")
             for effect in self.effects.values():
                 if getattr(effect, "is_expired", False):
                     continue
-                for mod in _effect_modifiers(effect):
-                    if str(mod.stat) in (
-                        "423", "stat_abl_charges_recharge_time", "STAT_abl_charges_recharge_time",
-                        "64", "STAT_abl_time_cooldown",
-                    ):
-                        if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
-                            if mod.is_percent:
-                                pct_mod += mod.value
-                            else:
-                                flat_mod += mod.value
+                mods = _effect_modifiers(effect)
+                has_423 = any(
+                    str(m.stat) in _RECHARGE_STATS
+                    and m.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags)
+                    for m in mods
+                )
+                target_stats = _RECHARGE_STATS if has_423 else _COOLDOWN_STATS
+                for mod in mods:
+                    if str(mod.stat) in target_stats and mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
+                        if mod.is_percent:
+                            pct_mod += mod.value
+                        else:
+                            flat_mod += mod.value
 
         adjusted_base = max(0.0, (base_recharge * pct_mod) + flat_mod)
         if ignore_alacrity:
