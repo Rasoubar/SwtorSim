@@ -1,0 +1,232 @@
+[
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.vital_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.shrap_bomb"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.hemorrhaging_blast"
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {},
+        "lead_time": 0.25
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "loop_anchor"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "vital_shot"
+    },
+    {
+        "type": "priority_block",
+        "name": "Hemo",
+        "pool": [
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.hemorrhaging_blast",
+                "rules": {}
+            },
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {}
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "shrap_bomb"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "priority_block",
+        "name": "Hemo",
+        "pool": [
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.hemorrhaging_blast",
+                "rules": {}
+            },
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {}
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "priority_block",
+        "name": "Hemo",
+        "pool": [
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.hemorrhaging_blast",
+                "rules": {}
+            },
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {}
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "vital_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "shrap_bomb"
+    },
+    {
+        "type": "priority_block",
+        "name": "Hemo",
+        "pool": [
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.hemorrhaging_blast",
+                "rules": {}
+            },
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {}
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "priority_block",
+        "name": "Hemo",
+        "pool": [
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.hemorrhaging_blast",
+                "rules": {}
+            },
+            {
+                "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {}
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    }
+]

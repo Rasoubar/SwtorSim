@@ -1,0 +1,40 @@
+{
+  "class": "Gunslinger",
+  "class_name": "Gunslinger",
+  "spec": "Dirty Fighting",
+  "spec_name": "Dirty Fighting",
+  "spec_path": "data/extractor/disciplines/gunslinger/dirty_fighting.json",
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
+  "rotation_path": "data/rotations/gunslinger/dirty_fighting/DirtyFighting.json",
+  "choices": {
+    "23": 3,
+    "27": 2,
+    "39": 1,
+    "43": 3,
+    "51": 2,
+    "64": 1,
+    "68": 2,
+    "73": 1
+  },
+  "main_hand": {"min": 2305, "max": 4280},
+  "off_hand": {"min": 2305, "max": 4280},
+  "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
+  "legendary_fqns": [
+    "abl.itm.legendary.age_smu.locked_and_loaded",
+    "abl.itm.legendary.age_smu.sni_gun.improved_targeting"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
+  ],
+  "mode": "BATCH",
+  "iterations": 50,
+  "duration": 1000,
+  "level": 85,
+  "dummy_hp": 10000000,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false,
+  "enable_projectile_flight_time": false,
+  "in_flashpoint_operation": true,
+  "combat_distance": 30
+}
