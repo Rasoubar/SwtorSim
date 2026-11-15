@@ -38,6 +38,7 @@
   function buildDatalistOrSelect(id, items, currentVal, placeholder) {
     const listId = `${id}_datalist`;
     const opts = items.map(it => `<option value="${escapeAttr(it.name)}">${escapeHtml(it.label || it.name)}</option>`).join("");
+    const dlOpts = items.map(it => `<option value="${escapeAttr(it.name)}"></option>`).join("");
     return `
     <div style="display:flex;gap:6px;">
       <select onchange="document.getElementById('${id}').value = this.value" style="flex:1;">
@@ -45,6 +46,7 @@
         ${opts}
       </select>
       <input type="text" id="${id}" list="${listId}" value="${escapeAttr(currentVal || "")}" placeholder="Or type exact name..." style="flex:1;">
+      <datalist id="${listId}">${dlOpts}</datalist>
     </div>
   `;
   }
@@ -187,6 +189,12 @@
     return null;
   }
 
+  // A non-negative number from an input; the fallback is only for blank / invalid text (0 is a valid value).
+  function readNonNegative(inputEl, fallback) {
+    const n = parseFloat(inputEl.value);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+  }
+
   // Read the form back into a rule value: { value } on success, { error } when a field is missing.
   function readValue(key) {
     const el = (id) => document.getElementById(id);
@@ -215,12 +223,12 @@
       value = parseFloat(el("ruleResourceInput").value) || 0;
     } else if (key === "proc_cooldown_above") {
       const name = el("ruleProcNameInput").value.trim();
-      const sec = parseFloat(el("ruleProcSecInput").value) || 0.5;
+      const sec = readNonNegative(el("ruleProcSecInput"), 0.5);
       if (!name) return { error: "Please select or enter a proc name." };
       value = { name, value: sec };
     } else if (key === "ability_cooldown_under" || key === "ability_cooldown_above") {
       const name = el("ruleAblCdNameInput").value.trim();
-      const sec = parseFloat(el("ruleAblCdSecInput").value) || 1.5;
+      const sec = readNonNegative(el("ruleAblCdSecInput"), 1.5);
       if (!name) return { error: "Please select or enter an ability name." };
       value = { name, value: sec };
     }

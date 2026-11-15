@@ -1260,7 +1260,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794769963"></script>
+  <script src="pyodide_client.js?v=1794779862"></script>
 </head>
 <body>
 
@@ -4131,7 +4131,10 @@ function renderRuleValueForm(existingVal = null) {
     return;
   }
   const html = RuleForm.fieldsHtml(key, existingVal, RuleForm.listsFromLoadout(currentLoadout));
-  if (html !== null) document.getElementById("ruleDynamicFields").innerHTML = html;
+  // No guided form for this key: clear the fields so inputs of the previous rule type are not shown.
+  document.getElementById("ruleDynamicFields").innerHTML = html === null
+    ? '<div class="form-group"><label>No guided form for this rule. Edit it in the Raw JSON tab.</label></div>'
+    : html;
 }
 
 function commitRuleFromModal() {
@@ -4874,24 +4877,31 @@ async function runDryRunSimulation() {
   if (!rotationSteps.length) {
     return showToast("Add at least one rotation step before running preview.", true);
   }
-  const res = await fetch("/api/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      env: currentEnvironment,
-      spec_path: currentLoadout.spec_path,
-      choices: currentLoadout.choices,
-      tactical_fqn: document.getElementById("tacticalSelect").value || "",
-      legendary_fqns: getSelectedLegendaries(),
-      relic_fqns: getSelectedRelics(),
-      rotation: rotationSteps,
-      pre_combat: preCombatSteps,
-      weave: weaveSteps,
-      ...pullGatePayload(),
-      duration: 30.0
-    })
-  });
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch("/api/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        env: currentEnvironment,
+        spec_path: currentLoadout.spec_path,
+        choices: currentLoadout.choices,
+        tactical_fqn: document.getElementById("tacticalSelect").value || "",
+        legendary_fqns: getSelectedLegendaries(),
+        relic_fqns: getSelectedRelics(),
+        rotation: rotationSteps,
+        pre_combat: preCombatSteps,
+        weave: weaveSteps,
+        ...pullGatePayload(),
+        duration: 30.0
+      })
+    });
+    data = await res.json();
+    if (!res.ok && !data.error) data.error = `HTTP ${res.status}`;
+  } catch (err) {
+    showToast(`Preview failed: ${err.message || err}`, true);
+    return;
+  }
   if (data.error) {
     showToast(`Preview failed: ${data.error}`, true);
     return;
@@ -4938,20 +4948,27 @@ async function saveRotationToDisk() {
   const classFolder = (currentLoadout && currentLoadout.default_class_folder) || "assassin";
   const specFolder = (currentLoadout && currentLoadout.default_spec_folder) || "hatred";
 
-  const res = await fetch("/api/rotation/save", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      class_folder: classFolder,
-      spec_folder: specFolder,
-      filename: filename,
-      steps: rotationSteps,
-      pre_combat: preCombatSteps,
-      weave: weaveSteps,
-      ...pullGatePayload()
-    })
-  });
-  const data = await res.json();
+  let data;
+  try {
+    const res = await fetch("/api/rotation/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        class_folder: classFolder,
+        spec_folder: specFolder,
+        filename: filename,
+        steps: rotationSteps,
+        pre_combat: preCombatSteps,
+        weave: weaveSteps,
+        ...pullGatePayload()
+      })
+    });
+    data = await res.json();
+    if (!res.ok && !data.error) data.error = `HTTP ${res.status}`;
+  } catch (err) {
+    showToast(`Save failed: ${err.message || err}`, true);
+    return;
+  }
   if (data.error) {
     showToast(`Save failed: ${data.error}`, true);
     return;
