@@ -250,6 +250,16 @@ class TriggerManager:
                 "is_proc": True,
                 "trigger_name": event_name,
             }
+            # The branch belongs to the owner's effect, so its stacks (not whatever the event context inherited)
+            # drive stack scaling: scales_with_stack_charge damage multiplies by them, if_stack_charge reads them.
+            owner = sub["target"]
+            owner_effects = getattr(owner, "effects", None)
+            owner_effect = owner_effects.get(sub["effect_key"]) if owner_effects is not None and sub["effect_key"] else None
+            if owner_effect is not None and not getattr(owner_effect, "is_expired", False):
+                owner_stacks = getattr(owner_effect, "stacks", 1)
+                branch_ctx["active_effect"] = owner_effect
+                branch_ctx["current_stacks"] = owner_stacks
+                branch_ctx["stack_multiplier"] = owner_stacks if getattr(owner_effect, "scales_with_stacks", False) else 1
             if effective_interval > 0.0:
                 sub["next_allowed_time"] = sim.current_time + effective_interval
             ran = sub["ability"].execute_branch(
