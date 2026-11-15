@@ -108,7 +108,6 @@ class RunConfig:
     tactical_fqn: str
     legendary_fqns: list[str]
     choices: dict[str, int] = field(default_factory=dict)
-    choices_path: str = ""
     main_hand_min: float = 0.0
     main_hand_max: float = 0.0
     off_hand_min: float = 0.0
@@ -249,12 +248,9 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
         )
 
     raw_choices = raw.get("choices")
-    choices_path = _optional_config_str(raw, "choices_path", "")
-    if raw_choices is None and not choices_path:
-        raise ValueError(
-            f"Run config '{path}' must specify either 'choices' (dict) or 'choices_path' (str)."
-        )
-    parsed_choices = {str(k): int(v) for k, v in raw_choices.items()} if isinstance(raw_choices, dict) else {}
+    if not isinstance(raw_choices, dict):
+        raise ValueError(f"Run config '{path}' must specify 'choices' as an object of node id to option.")
+    parsed_choices = {str(k): int(v) for k, v in raw_choices.items()}
     main_hand_min, main_hand_max = parse_hand_range(raw.get("main_hand"), "main_hand")
     off_hand_min, off_hand_max = parse_hand_range(raw.get("off_hand"), "off_hand")
 
@@ -273,7 +269,6 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
         stats_path=_require_config_str(raw, "stats_path"),
         rotation_path=_require_config_str(raw, "rotation_path"),
         choices=parsed_choices,
-        choices_path=choices_path,
         main_hand_min=main_hand_min,
         main_hand_max=main_hand_max,
         off_hand_min=off_hand_min,
@@ -330,12 +325,9 @@ def validate_run_config(
         ("spec_path", config.spec_path),
         ("stats_path", config.stats_path),
         ("rotation_path", config.rotation_path),
-        ("choices_path", config.choices_path),
         ("gear catalog", actual_gear),
         ("relic catalog", actual_relics),
     ):
-        if label == "choices_path" and (config.choices or not path or not str(path).strip() or str(path).strip() == "."): 
-            continue
         if not isinstance(path, str) or not path.strip():
             errors.append(f"{label} must be a non-empty path.")
             continue
@@ -383,12 +375,7 @@ def validate_run_config(
         )
 
     try:
-        if config.choices:
-            choices = config.choices
-        elif config.choices_path and config.choices_path.strip() not in ("", "."):
-            choices = _load_json(config.choices_path)
-        else:
-            choices = {}
+        choices = config.choices or {}
         skill_tree = spec_data.get("skill_tree", {})
         resolve_skill_tree_fqns(skill_tree, choices)
     except ValueError as exc:

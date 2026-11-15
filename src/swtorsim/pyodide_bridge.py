@@ -97,10 +97,6 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
                 return json.dumps({"error": f"Run config not found: {rel_path}"}, ensure_ascii=False)
             rc_data = load_json_file(str(target_file))
             choices_data = {}
-            if rc_data.get("choices_path"):
-                c_file = _resolve_workspace_path(rc_data["choices_path"])
-                if c_file.is_file():
-                    choices_data = load_json_file(str(c_file))
             choices_override = rc_data.get("choices_override") or rc_data.get("choices")
             if isinstance(choices_override, dict) and choices_override:
                 choices_data.update({str(k): v for k, v in choices_override.items()})
@@ -130,7 +126,7 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
 
         elif action == "DISCOVER_LOADOUT":
             spec_path = data.get("spec_path", "")
-            choices = data.get("choices") or data.get("choices_path") or {}
+            choices = data.get("choices") or {}
             tactical_fqn = data.get("tactical_fqn", "")
             legendary_fqns = data.get("legendary_fqns", [])
             relic_fqns = data.get("relic_fqns", [])

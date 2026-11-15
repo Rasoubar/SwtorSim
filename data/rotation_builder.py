@@ -1247,10 +1247,6 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                     return
                 rc_data = load_json_file(str(target_file))
                 choices_data = {}
-                if rc_data.get("choices_path"):
-                    c_file = _resolve_workspace_path(rc_data["choices_path"])
-                    if c_file.is_file():
-                        choices_data = load_json_file(str(c_file))
                 inline_choices = rc_data.get("choices")
                 if isinstance(inline_choices, dict) and inline_choices:
                     choices_data.update({str(k): v for k, v in inline_choices.items()})
@@ -1275,7 +1271,7 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
 
             if route == "/api/loadout":
                 spec_path = payload.get("spec_path")
-                choices = payload.get("choices") or payload.get("choices_path") or {}
+                choices = payload.get("choices") or {}
                 tactical_fqn = payload.get("tactical_fqn") or ""
                 legendary_fqns = payload.get("legendary_fqns") or []
                 relic_fqns = payload.get("relic_fqns") or []

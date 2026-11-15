@@ -444,10 +444,6 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
         expand_force_tech_power(stats_data)
 
     choices_data = {}
-    if raw_rc.get("choices_path"):
-        c_file = _resolve_workspace_path(raw_rc["choices_path"])
-        if c_file.is_file():
-            choices_data = load_json_file(str(c_file))
 
     choices_override = raw_rc.get("choices_override") or raw_rc.get("choices")
     if isinstance(choices_override, dict) and choices_override:
@@ -508,8 +504,6 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     spec_path = str(_resolve_workspace_path(raw_spec))
     stats_path = str(_resolve_workspace_path(payload.get("stats_path") or ""))
     rotation_path = str(_resolve_workspace_path(payload.get("rotation_path") or ""))
-    raw_choices_path = str(payload.get("choices_path") or "").strip()
-    choices_path = str(_resolve_workspace_path(raw_choices_path)) if raw_choices_path else ""
 
     spec_data = load_json_file(spec_path)
     class_name, spec_name = discipline_names(spec_data, spec_path)
@@ -545,8 +539,6 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
 
     # Resolve choices
     choices_data = {}
-    if choices_path and Path(choices_path).is_file():
-        choices_data = load_json_file(choices_path)
     if isinstance(payload.get("choices_override"), dict) and payload["choices_override"]:
         choices_data = {str(k): int(v) for k, v in payload["choices_override"].items()}
     elif isinstance(payload.get("choices"), dict) and payload["choices"]:
@@ -559,7 +551,6 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         stats_path=_to_workspace_rel(stats_path),
         rotation_path=_to_workspace_rel(rotation_path),
         choices=choices_data,
-        choices_path=_to_workspace_rel(choices_path) if choices_path else "",
         main_hand_min=main_hand_min,
         main_hand_max=main_hand_max,
         off_hand_min=off_hand_min,
