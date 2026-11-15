@@ -4,6 +4,10 @@
 
 Unlike spreadsheet calculators or hardcoded rotation scripts, SwtorSim extracts ability, talent, discipline, gear, relic, and combat-curve blueprints directly from SWTOR's `.tor` (MYP) client archives and executes them inside a priority-queue discrete-event engine (`heapq`). It runs both natively on multi-core CPython 3.13+ and entirely in the browser via a zero-backend **Pyodide (WebAssembly)** Web Worker pool.
 
+> **Run in Your Browser (No Install):** [Launch SwtorSim Web App](https://swtorsim.pages.dev)
+>
+> <!-- Add 1-2 screenshots of the Simulator Dashboard and Rotation Builder here before publishing -->
+
 ---
 
 ## Key Features
@@ -17,7 +21,7 @@ Unlike spreadsheet calculators or hardcoded rotation scripts, SwtorSim extracts 
 - **Dual-Mode Execution**:
   - **Native Mode**: Fast CLI and local web dashboard powered by Python `multiprocessing.Pool`.
   - **Browser-Only WebAssembly Mode**: Standalone static build (`dist/`) running parallel Pyodide Web Workers in the user's browser—deployable to GitHub Pages, Cloudflare Pages, or Netlify with zero server cost.
-- **Visual Rotation Builder & Combat Log Validator**: Interactive browser-based rotation editor (`data/rotation_builder.py --ui`) and StarParse/live combat log comparison tools (`tools/parse_combat_log.py`, `tools/validate_modifiers_vs_log.py`).
+- **Visual Rotation Builder**: Interactive browser-based rotation editor (`data/rotation_builder.py --ui`) with a visual Rotation Map and Cast Timeline.
 
 ---
 
@@ -88,9 +92,9 @@ Or run the terminal-based rotation builder wizard:
 .\.venv\Scripts\python.exe data/rotation_builder.py
 ```
 
-### 4. Extract Game Data from a SWTOR Installation (Optional)
+### 4. Extract Game Data from a SWTOR Installation
 
-The repository already ships with pre-extracted and parsed blueprints in `data/extractor/`. If you want to re-extract from a local SWTOR client or PTS build:
+`data/extractor/` is excluded from git by default. To extract or refresh blueprints from a local SWTOR client or PTS build:
 
 ```powershell
 # Interactive extractor menu
@@ -99,7 +103,7 @@ The repository already ships with pre-extracted and parsed blueprints in `data/e
 # Direct CLI extraction from SWTOR Assets folder
 .\.venv\Scripts\python.exe src/extractor/main.py "C:\Program Files (x86)\Steam\steamapps\common\Star Wars - The Old Republic\Assets"
 
-# Extract PTS data to data/extractor/pts/ (Level 85 / Item Rating 362)
+# Extract PTS data to data/extractor/pts/ (Level 85)
 .\.venv\Scripts\python.exe src/extractor/main.py "C:\Path\To\PTS\Assets" --pts
 ```
 
@@ -164,8 +168,7 @@ SwtorSim/
 │   ├── extractor/               # Binary .tor (MYP) & GOM (.bkt / .stb) Game Data Extractor
 │   └── diminishing_returns/     # Empirical DR curve-fitting utility
 ├── tests/                       # Unit and full-fight integration test suite
-├── tools/                       # Web release bundler, catalog generator, and combat log parsers
-└── web/                         # Pyodide Web Worker pool and browser runtime glue
+└── tools/                       # Web UI pages, release bundler, and Pyodide worker runtime (`tools/web/`)
 ```
 
 ---
@@ -177,6 +180,13 @@ Execute the unit and integration test suite via `unittest`:
 ```powershell
 .\tools\pyclean.exe -m unittest discover -s tests -p "*test*.py"
 ```
+
+---
+
+## Contributing & Bug Reports
+
+- Read [ARCHITECTURE.md](ARCHITECTURE.md) and the [Developer & Contributor Guide](docs/developer_guide.md) before modifying engine or extractor code, and make sure the full `unittest` suite passes.
+- When reporting a simulation bug, please include your exported `run_config.json`, rotation JSON, and whether you are running on `live` or `pts`.
 
 ---
 

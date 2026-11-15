@@ -293,6 +293,7 @@ def prepare_simulation(
     pre_combat: list | None = None,
     pull_conditions: dict | None = None,
     pull_max_wait: float | None = None,
+    gcd_stall: float = 0.0,
 ):
     """Prepares simulation entities from unified loadout blueprints."""
     active_abilities = {}
@@ -314,6 +315,7 @@ def prepare_simulation(
         resource=resource_type_for_class(stats_config.get("class_name")),
     )
     player.proc_registry = build_proc_registry(loadout_blueprints)
+    player.gcd_stall = float(gcd_stall)
 
     # Set up player base stats. Standard health comes from the level curve.
     player.level = stats_config.get("level", player.level)
@@ -375,14 +377,12 @@ def prepare_simulation(
     # Assign rotation
     player.rotation = Rotation(name="Custom Profile Loop", steps_config=rotation_config, loop=True)
 
-    # Resolve pre-combat / pre-cast steps from config, rotation, or explicit arguments
-    cfg_precast = getattr(config, "precast", None) if config else None
-    cfg_pre_combat = getattr(config, "pre_combat", None) if config else None
+    # Resolve pre-combat / pre-cast steps from the explicit arguments or the rotation file
     rot_precast = rotation_config.get("precast") if isinstance(rotation_config, dict) else None
     rot_pre_combat = rotation_config.get("pre_combat") if isinstance(rotation_config, dict) else None
 
-    resolved_precast = precast or cfg_precast or rot_precast
-    resolved_pre_combat = pre_combat or cfg_pre_combat or rot_pre_combat
+    resolved_precast = precast or rot_precast
+    resolved_pre_combat = pre_combat or rot_pre_combat
     pre_combat_steps = normalize_pre_combat(resolved_precast, resolved_pre_combat)
 
     # Track the equipped tactical so pre-combat swaps can unequip it, and validate/preload swap targets

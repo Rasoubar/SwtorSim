@@ -1566,7 +1566,9 @@ class Ability:
         if not self.triggers_gcd:
             caster.next_gcd = max(getattr(caster, "next_gcd", 0.0), round(sim.current_time, 4))
         if self.triggers_gcd:
-            caster.next_gcd = round(sim.current_time + caster.calculate_gcd(self.base_gcd, ability=self), 4)
+            caster.next_gcd = round(
+                sim.current_time + caster.calculate_gcd(self.base_gcd, ability=self) + _gcd_stall_delay(caster), 4
+            )
 
         if self.has_charges:
             self.consume_charge(caster, sim)
@@ -2129,6 +2131,17 @@ def handle_cooldown_action(sim, caster, action, ability=None, context=None):
         current_cd = caster.cooldowns.get(abl_name, 0.0)
         new_cd = round(sim.current_time + final_cd, 4)
         caster.cooldowns[abl_name] = max(current_cd, new_cd)
+
+
+GCD_STALL_SECONDS = 0.1
+
+
+def _gcd_stall_delay(caster) -> float:
+    """Models client/server lag: with probability caster.gcd_stall the GCD is 0.1s longer (no RNG draw when 0)."""
+    chance = getattr(caster, "gcd_stall", 0.0)
+    if chance > 0.0 and random.random() < chance:
+        return GCD_STALL_SECONDS
+    return 0.0
 
 
 def handle_global_cooldown(sim, caster, action):

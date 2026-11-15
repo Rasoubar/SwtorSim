@@ -1274,6 +1274,7 @@
     <span class="brand-badge" id="activeSpecBadge">Loading...</span>
   </div>
   <div class="header-actions">
+    <button type="button" class="btn-simulator-link" id="openMapBtn" onclick="openVisualMapWindow()" title="Build the rotation visually: drag abilities, reorder steps, set rules (opens in its own window)">Open Visual Map &#8599;</button>
     <label style="font-size:11.5px;color:var(--text-muted);">Quick Preset (RunConfig):</label>
     <select id="runConfigSelect" onchange="onSelectRunConfig(this.value)">
       <option value="">-- Load from Run Config --</option>
@@ -1406,11 +1407,6 @@
         <button onclick="addLoopAnchor()">+ End Of Opener</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
-        <label style="font-size:11px;color:var(--text-muted);">ID Format:</label>
-        <select id="idFormatSelect" onchange="onChangeIdFormat(this.value)" style="padding:3px 6px;font-size:11px;">
-          <option value="slug">Short Slug (assassinate+)</option>
-          <option value="fqn">Full FQN (abl.sith_inquisitor...)</option>
-        </select>
         <button class="btn-sm" onclick="expandCollapseAll(false)">Expand All</button>
         <button class="btn-sm" onclick="expandCollapseAll(true)">Collapse All</button>
         <button class="btn-sm btn-danger" onclick="clearRotation()" title="Clear all steps">Clear</button>
@@ -2195,8 +2191,7 @@ function switchPaletteTab(tab) {
 }
 
 function preferredAbilityId(abilityObj) {
-  const fmt = document.getElementById("idFormatSelect").value;
-  return fmt === "fqn" ? abilityObj.fqn : abilityObj.slug;
+  return abilityObj.slug;
 }
 
 function resolveAbilityDisplay(abilityId) {
@@ -2231,8 +2226,7 @@ function renderPalette() {
       card.draggable = true;
       card.title = "Drag into timeline or priority block, or click +Block / +Opt";
       card.addEventListener("dragstart", (e) => {
-        const fmt = document.getElementById("idFormatSelect").value;
-        const abId = fmt === "fqn" ? abl.fqn : abl.slug;
+        const abId = abl.slug;
         currentDragData = {
           kind: "ability",
           slug: abl.slug,
@@ -2366,8 +2360,7 @@ function getDefaultAbilityId(preferOffGcd = false) {
 }
 
 function quickAddAbilityToBlock(slug, fqn) {
-  const fmt = document.getElementById("idFormatSelect").value;
-  const abId = fmt === "fqn" ? fqn : slug;
+  const abId = slug;
 
   // Always create a new priority block and make it active
   rotationSteps.push({
@@ -2381,8 +2374,7 @@ function quickAddAbilityToBlock(slug, fqn) {
 }
 
 function quickAddOptional(slug, fqn) {
-  const fmt = document.getElementById("idFormatSelect").value;
-  const abId = fmt === "fqn" ? fqn : slug;
+  const abId = slug;
   rotationSteps.push({
     type: "optional",
     ability_id: abId,
@@ -3032,8 +3024,7 @@ function onStepCardDrop(e, idx) {
   }
 
   if (data.kind === "ability") {
-    const fmt = document.getElementById("idFormatSelect").value;
-    const abId = fmt === "fqn" ? data.fqn : data.slug;
+    const abId = data.slug;
     const step = rotationSteps[idx];
 
     if (isUpgrade && (step.type === "fixed" || step.type === "optional")) {
@@ -3189,8 +3180,7 @@ function onPoolRowDrop(e, stepIdx, rowIdx) {
   }
 
   if (data.kind === "ability") {
-    const fmt = document.getElementById("idFormatSelect").value;
-    const abId = fmt === "fqn" ? data.fqn : data.slug;
+    const abId = data.slug;
     const dstPool = rotationSteps[stepIdx].pool;
     let targetRow = isTop ? rowIdx : rowIdx + 1;
     dstPool.splice(targetRow, 0, { ability_id: abId, rules: {} });
@@ -3308,31 +3298,13 @@ function addPoolRow(stepIdx) {
   renderRightPanel();
 }
 
-function onChangeIdFormat(fmt) {
-  // Convert existing ability_ids in rotationSteps to the chosen format when matched
-  for (const step of rotationSteps) {
-    if (step.type === "fixed" || step.type === "optional") {
-      const m = resolveAbilityDisplay(step.ability_id);
-      if (m) step.ability_id = fmt === "fqn" ? m.fqn : m.slug;
-    } else if (step.type === "priority_block") {
-      for (const row of step.pool || []) {
-        const m = resolveAbilityDisplay(row.ability_id);
-        if (m) row.ability_id = fmt === "fqn" ? m.fqn : m.slug;
-      }
-    }
-  }
-  renderTimeline();
-  renderRightPanel();
-}
-
 function buildAbilitySelectHtml(currentId, onChangeJs) {
-  const fmt = document.getElementById("idFormatSelect").value;
   const abilities = currentLoadout.abilities || [];
   let matched = false;
   let opts = "";
 
   for (const a of abilities) {
-    const val = fmt === "fqn" ? a.fqn : a.slug;
+    const val = a.slug;
     const isSel = (a.slug === String(currentId).toLowerCase().replace(/\s+/g, "_")) || (a.fqn === currentId) || (val === currentId);
     if (isSel) matched = true;
     const gcdTag = a.triggers_gcd ? "" : " [Off-GCD]";
@@ -3623,6 +3595,7 @@ function renderTimeline() {
         <div style="font-size:15px;font-weight:600;color:var(--text-main);margin-bottom:8px;">Rotation Timeline is Empty</div>
         <div style="margin-bottom:14px;">Drag an ability from the left palette, click <strong>+ Priority Block</strong>, or select an existing rotation from the top bar.</div>
         <button class="btn-purple" onclick="addPriorityBlock()">+ Create First Priority Block</button>
+        <button class="btn-simulator-link" style="margin-left:6px;" onclick="openVisualMapWindow()">Open Visual Map &#8599;</button>
       </div>
     `;
     const emptyDrop = document.getElementById("emptyTimelineDrop");
@@ -3642,8 +3615,7 @@ function renderTimeline() {
         const data = currentDragData;
         currentDragData = null;
         if (data.kind === "ability") {
-          const fmt = document.getElementById("idFormatSelect").value;
-          const abId = fmt === "fqn" ? data.fqn : data.slug;
+          const abId = data.slug;
           if (data.triggers_gcd) {
             rotationSteps.push({
               type: "priority_block",
@@ -4031,8 +4003,7 @@ function renderTimeline() {
     currentDragData = null;
 
     if (data.kind === "ability") {
-      const fmt = document.getElementById("idFormatSelect").value;
-      const abId = fmt === "fqn" ? data.fqn : data.slug;
+      const abId = data.slug;
       if (data.triggers_gcd) {
         rotationSteps.push({
           type: "priority_block",

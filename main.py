@@ -177,6 +177,7 @@ def run(config):
         dummy_hp=config.dummy_hp,
         debuff_module=inputs.debuff_module,
         enable_stem_matching=getattr(config, "enable_stem_matching", True),
+        gcd_stall=getattr(config, "gcd_stall", 0.0),
     )
 
     if config.mode == "TEST":

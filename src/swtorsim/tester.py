@@ -7,13 +7,14 @@ import time
 import statistics
 from multiprocessing import Pool, cpu_count
 from src.swtorsim.setup import prepare_simulation
+from src.swtorsim.settings import snapshot_engine_settings, apply_engine_settings
 from src.swtorsim.metrics import format_type_descriptor
 
 
 class Tester:
     """Orchestrates single-fight verbose runs and multi-core Monte Carlo batch simulations."""
 
-    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False, seed: int = 42):
+    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False, seed: int = 42, gcd_stall: float = 0.0):
         self.rotation_config = rotation_config
         self.stats_config = stats_config
         self.loadout_blueprints = loadout_blueprints
@@ -22,6 +23,11 @@ class Tester:
         self.debuff_module = debuff_module
         self.enable_stem_matching = enable_stem_matching
         self.seed = seed
+        # Snapshot of the parent's engine toggles (set by run-config load); spawned workers do not inherit globals.
+        self.engine_settings = snapshot_engine_settings()
+        self.engine_settings["enable_stem_matching"] = bool(enable_stem_matching)
+        self.gcd_stall = float(gcd_stall)
+        self.engine_settings["gcd_stall"] = self.gcd_stall
 
     def run_test(self, show_buffs: bool = True, tracer=None, config=None):
         """Orchestrates a single simulation."""
@@ -35,6 +41,7 @@ class Tester:
             seed=self.seed,
             tracer=tracer,
             config=config,
+            gcd_stall=self.gcd_stall,
         )
         sim.run_timed(duration=self.duration, target=target)
         sim.tracker.print_metrics(sim.current_time, show_buffs=show_buffs)
@@ -54,7 +61,8 @@ class Tester:
 
         task_payloads = [
             (i, self.duration, self.dummy_hp, self.rotation_config, self.stats_config,
-             self.loadout_blueprints, self.debuff_module, self.enable_stem_matching, self.seed + i)
+             self.loadout_blueprints, self.debuff_module, self.enable_stem_matching, self.seed + i,
+             self.engine_settings)
             for i in range(iterations)
         ]
 
@@ -69,20 +77,26 @@ class Tester:
     @staticmethod
     def execute_single_worker_task(args):
         """Single simulation worker for monte carlo."""
-        if len(args) == 9:
+        engine_settings = None
+        if len(args) == 10:
+            run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module, enable_stem_matching, worker_seed, engine_settings = args
+        elif len(args) == 9:
             run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module, enable_stem_matching, worker_seed = args
         else:
             run_id, duration, dummy_hp, rotation_config, stats_config, loadout_blueprints, debuff_module, enable_stem_matching = args
             worker_seed = 42 + run_id
         from src.swtorsim.settings import set_stem_matching
         set_stem_matching(enable_stem_matching)
+        if engine_settings is not None:
+            apply_engine_settings(engine_settings)
 
         old_stdout = sys.stdout
         sys.stdout = open(os.devnull, 'w')
 
         try:
             sim, player, target = prepare_simulation(
-                rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False, seed=worker_seed
+                rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False, seed=worker_seed,
+                gcd_stall=(engine_settings or {}).get("gcd_stall", 0.0),
             )
             sim.run_timed(duration, target)
 

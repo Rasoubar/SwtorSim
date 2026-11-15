@@ -75,3 +75,23 @@ def set_in_flashpoint_operation(enabled: bool) -> None:
 def is_in_flashpoint_operation() -> bool:
     """Returns True if the current simulation environment is an Operation/Flashpoint encounter."""
     return IN_FLASHPOINT_OPERATION
+
+
+def snapshot_engine_settings() -> dict:
+    """Returns a picklable copy of every engine toggle, for forwarding to spawned worker processes."""
+    return {
+        "enable_stem_matching": ENABLE_STEM_MATCHING,
+        "enable_projectile_flight_time": ENABLE_PROJECTILE_FLIGHT_TIME,
+        "combat_distance": DEFAULT_COMBAT_DISTANCE,
+        "in_flashpoint_operation": IN_FLASHPOINT_OPERATION,
+        "environment": DATA_ENVIRONMENT,
+    }
+
+
+def apply_engine_settings(snapshot: dict) -> None:
+    """Applies a snapshot from snapshot_engine_settings() in the current (worker) process."""
+    set_stem_matching(snapshot["enable_stem_matching"])
+    set_projectile_flight_time(snapshot["enable_projectile_flight_time"])
+    set_default_combat_distance(snapshot["combat_distance"])
+    set_in_flashpoint_operation(snapshot["in_flashpoint_operation"])
+    set_data_environment(snapshot["environment"])

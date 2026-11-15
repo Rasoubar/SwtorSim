@@ -12,3 +12,11 @@ figures/
 # Debug simulator output (tools/debug_sim.py default output path)
 /debug_*.html
 /debug_*.json
+
+# Local tooling, agent config, and scratch scripts
+tools/pyclean.exe
+CLAUDE.md
+testfile.py
+
+# User-created presets saved from the Web GUI / Builder
+data/*/custom/

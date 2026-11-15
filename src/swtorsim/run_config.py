@@ -123,11 +123,10 @@ class RunConfig:
     enable_projectile_flight_time: bool = False
     in_flashpoint_operation: bool = True
     combat_distance: float = 30.0
+    gcd_stall: float = 0.0
     level: int = 85
     seed: int = 42
     environment: str = "live"
-    precast: str = ""
-    pre_combat: list[Any] = field(default_factory=list)
 
 
 def normalize_pre_combat(
@@ -301,11 +300,10 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
         combat_distance=_optional_config_float(
             raw, "combat_distance", 30.0
         ),
+        gcd_stall=_optional_config_float(raw, "gcd_stall", 0.0),
         level=_optional_config_int(raw, "level", 85),
         seed=_optional_config_int(raw, "seed", 42),
         environment=active_env,
-        precast=_optional_config_str(raw, "precast", ""),
-        pre_combat=list(raw.get("pre_combat") or []) if isinstance(raw.get("pre_combat"), list) else [],
     )
     set_data_environment(config.environment)
     set_stem_matching(config.enable_stem_matching)
@@ -356,6 +354,12 @@ def validate_run_config(
             errors.append(f"{label} must be a positive integer.")
     if isinstance(config.seed, bool) or not isinstance(config.seed, int):
         errors.append("seed must be an integer.")
+    if (
+        isinstance(config.gcd_stall, bool)
+        or not isinstance(config.gcd_stall, (int, float))
+        or not 0.0 <= config.gcd_stall <= 1.0
+    ):
+        errors.append("gcd_stall must be a number from 0 to 1.")
     if not isinstance(config.training_dummy_armor_debuff, bool):
         errors.append("training_dummy_armor_debuff must be true or false.")
     elif config.training_dummy_armor_debuff and not _is_file(actual_debuff):

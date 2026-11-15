@@ -541,6 +541,7 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     enable_projectile_flight_time = bool(payload.get("enable_projectile_flight_time", False))
     in_flashpoint_operation = bool(payload.get("in_flashpoint_operation", True))
     combat_distance = max(0.0, float(payload.get("combat_distance", 30.0)))
+    gcd_stall = min(1.0, max(0.0, float(payload.get("gcd_stall") or 0.0)))
 
     # Resolve choices
     choices_data = {}
@@ -575,11 +576,10 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         enable_projectile_flight_time=enable_projectile_flight_time,
         in_flashpoint_operation=in_flashpoint_operation,
         combat_distance=combat_distance,
+        gcd_stall=gcd_stall,
         level=level,
         seed=seed,
         environment=env,
-        precast=str(payload.get("precast") or "").strip(),
-        pre_combat=list(payload.get("pre_combat") or []) if isinstance(payload.get("pre_combat"), list) else [],
     )
     from src.swtorsim.settings import set_data_environment
     set_data_environment(env)
@@ -740,6 +740,7 @@ def _run_single_test_detailed(
             sim_inputs["debuff_module"],
             seed=config.seed,
             config=config,
+            gcd_stall=config.gcd_stall,
         )
         player.combat_distance = config.combat_distance
         target.combat_distance = config.combat_distance
@@ -1173,8 +1174,6 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
     old_stdout = sys.stdout
     sys.stdout = open(os.devnull, "w")
     try:
-        precast = settings_dict.get("precast")
-        pre_combat = settings_dict.get("pre_combat")
         sim, player, target = prepare_simulation(
             rotation_config,
             stats_config,
@@ -1183,8 +1182,7 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
             debuff_module,
             verbose=False,
             seed=worker_seed,
-            precast=precast,
-            pre_combat=pre_combat,
+            gcd_stall=settings_dict.get("gcd_stall", 0.0),
         )
         player.combat_distance = settings_dict["combat_distance"]
         target.combat_distance = settings_dict["combat_distance"]
@@ -1293,8 +1291,7 @@ def _run_batch_monte_carlo_detailed(
         "enable_projectile_flight_time": config.enable_projectile_flight_time,
         "combat_distance": config.combat_distance,
         "in_flashpoint_operation": config.in_flashpoint_operation,
-        "precast": getattr(config, "precast", ""),
-        "pre_combat": getattr(config, "pre_combat", []),
+        "gcd_stall": getattr(config, "gcd_stall", 0.0),
     }
 
     sim_context = {
@@ -1311,6 +1308,7 @@ def _run_batch_monte_carlo_detailed(
         settings_dict["enable_projectile_flight_time"],
         settings_dict["combat_distance"],
         settings_dict["in_flashpoint_operation"],
+        settings_dict["gcd_stall"],
     )
     selected_fqns_tuple = tuple(sim_inputs.get("selected_fqns") or ())
     cores = max(1, min(cpu_count() or 2, iterations))
@@ -1569,8 +1567,7 @@ def execute_simulation_slice(payload: dict[str, Any]) -> dict[str, Any]:
         "enable_projectile_flight_time": config.enable_projectile_flight_time,
         "combat_distance": config.combat_distance,
         "in_flashpoint_operation": config.in_flashpoint_operation,
-        "precast": getattr(config, "precast", ""),
-        "pre_combat": getattr(config, "pre_combat", []),
+        "gcd_stall": getattr(config, "gcd_stall", 0.0),
     }
     sim_context = {
         "rotation_config": sim_inputs["rotation_config"],
