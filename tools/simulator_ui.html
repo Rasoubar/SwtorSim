@@ -3824,9 +3824,10 @@
             run: async () => {
               const sel = document.getElementById("presetConfigSelect");
               if (sel && sel.options.length > 1) {
-                const mmOpt = Array.from(sel.options).find(
-                  (o) => /sniper_marksmanship_14gcd|marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent)
-                );
+                const opts = Array.from(sel.options);
+                const mmOpt =
+                  opts.find((o) => /sniper_marksmanship_14gcd/i.test(o.value) || /sniper_marksmanship_14gcd/i.test(o.textContent)) ||
+                  opts.find((o) => /marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent));
                 if (mmOpt) sel.selectedIndex = mmOpt.index;
                 else if (!sel.value) sel.selectedIndex = 1;
                 sel.dispatchEvent(new Event("change", { bubbles: true }));
@@ -3875,9 +3876,10 @@
             run: async (tut) => {
               const sel = document.getElementById("presetConfigSelect");
               if (sel && !sel.value && sel.options.length > 1) {
-                const mmOpt = Array.from(sel.options).find(
-                  (o) => /sniper_marksmanship_14gcd|marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent)
-                );
+                const opts = Array.from(sel.options);
+                const mmOpt =
+                  opts.find((o) => /sniper_marksmanship_14gcd/i.test(o.value) || /sniper_marksmanship_14gcd/i.test(o.textContent)) ||
+                  opts.find((o) => /marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent));
                 sel.selectedIndex = mmOpt ? mmOpt.index : 1;
                 sel.dispatchEvent(new Event("change", { bubbles: true }));
                 await new Promise((r) => setTimeout(r, 350));

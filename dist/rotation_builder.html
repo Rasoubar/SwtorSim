@@ -1260,7 +1260,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794751902"></script>
+  <script src="pyodide_client.js?v=1794752544"></script>
 </head>
 <body>
 
@@ -4959,9 +4959,10 @@ if (window.SwtorTutorial) {
           run: async () => {
             const sel = document.getElementById("runConfigSelect");
             if (sel && sel.options.length > 1) {
-              const mmOpt = Array.from(sel.options).find(
-                (o) => /sniper_marksmanship_14gcd|marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent)
-              );
+              const opts = Array.from(sel.options);
+              const mmOpt =
+                opts.find((o) => /sniper_marksmanship_14gcd/i.test(o.value) || /sniper_marksmanship_14gcd/i.test(o.textContent)) ||
+                opts.find((o) => /marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent));
               sel.selectedIndex = mmOpt ? mmOpt.index : 1;
               sel.dispatchEvent(new Event("change", { bubbles: true }));
               await new Promise((r) => setTimeout(r, 400));
