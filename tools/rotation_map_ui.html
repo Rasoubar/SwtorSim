@@ -302,12 +302,20 @@ let paletteJson = "";     // last rendered ability catalog (the palette is redra
 let ruleCtx = null;       // open rule popover: {scope, step, row, editKey}
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
-const iconUrl = (name) => {
+const iconUrl = (name, lower = false) => {
   if (!name) return "";
   const clean = name.toLowerCase().endsWith(".png") ? name : `${name}.png`;
-  return `icons/${encodeURIComponent(clean)}`;
+  return `icons/${encodeURIComponent(lower ? clean.toLowerCase() : clean)}`;
 };
-const iconHtml = (icon) => (icon ? `<img src="${iconUrl(icon)}" alt="" loading="lazy" draggable="false">` : `<span class="noicon">?</span>`);
+const iconHtml = (icon) => {
+  if (!icon) return `<span class="noicon">?</span>`;
+  const url = iconUrl(icon);
+  const lower = iconUrl(icon, true);
+  const onerr = url !== lower
+    ? ` onerror="if(!this.dataset.r){this.dataset.r='1';this.src='${lower}';}else{this.style.display='none';}"`
+    : ` onerror="this.style.display='none'"`;
+  return `<img src="${url}"${onerr} alt="" loading="lazy" draggable="false">`;
+};
 const stepByIdx = (idx) => ((STATE && STATE.steps) || []).find((s) => s.editorIdx === idx) || null;
 
 // Edits are done by the builder: the map sends a command and redraws from the state that comes back.

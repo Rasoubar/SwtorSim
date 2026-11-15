@@ -154,12 +154,18 @@ def compare_values(actual: float, comparison: str, expected: float) -> bool:
 
 
 def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str | None = None, count: int = 1) -> bool:
-    """Checks whether an entity has an active effect or dot matching tags or an ability spec."""
+    """Checks whether an entity has an active effect or dot matching tags or an ability spec.
+
+    `count` is the combined stack total across all matching active effects and dots, so one
+    effect with 3 stacks and three separate effects sharing a tag (e.g. three DoTs tagged
+    sinister_succor_dot) both satisfy count=3.
+    """
     if not entity:
         return False
 
     effects = getattr(entity, "effects", {})
     tags_set = set(tags) if tags else set()
+    total = 0
 
     for eff in effects.values():
         if getattr(eff, "is_expired", False):
@@ -175,16 +181,22 @@ def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str |
         if ability_spec and ability_spec in (eff_fqn, eff_name):
             matches = True
 
-        if matches and stacks >= count:
-            return True
+        if matches:
+            total += stacks
+            if total >= count:
+                return True
 
     # Also check active dots on dummy targets
     dots = getattr(entity, "dots", {})
     for dot_name, dot in dots.items():
+        dot_stacks = getattr(dot, "stacks", None) or 1
         if ability_spec and ability_spec == dot_name:
-            return True
-        dot_tags = set(getattr(dot, "tags", []) or [])
-        if tags_set and (tags_set & dot_tags):
+            total += dot_stacks
+        else:
+            dot_tags = set(getattr(dot, "tags", []) or [])
+            if tags_set and (tags_set & dot_tags):
+                total += dot_stacks
+        if total >= count:
             return True
 
     return False

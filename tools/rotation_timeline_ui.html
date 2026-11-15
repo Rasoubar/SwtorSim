@@ -210,10 +210,19 @@ let MODEL = null;     // derived view model
 let selected = null;  // 1-based sequence step index (matches cast.step_index)
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
-const iconUrl = (name) => {
+const iconUrl = (name, lower = false) => {
   if (!name) return "";
   const clean = name.toLowerCase().endsWith(".png") ? name : `${name}.png`;
-  return `icons/${encodeURIComponent(clean)}`;
+  return `icons/${encodeURIComponent(lower ? clean.toLowerCase() : clean)}`;
+};
+const iconImgHtml = (name) => {
+  const url = iconUrl(name);
+  if (!url) return "";
+  const lower = iconUrl(name, true);
+  const onerr = url !== lower
+    ? ` onerror="if(!this.dataset.r){this.dataset.r='1';this.src='${lower}';}else{this.style.display='none';}"`
+    : ` onerror="this.style.display='none'"`;
+  return `<img src="${url}"${onerr} alt="">`;
 };
 
 function buildModel(state) {
@@ -496,10 +505,17 @@ function draw() {
   };
 
   const iconTile = (c, x, y, s) => {
-    const icon = iconUrl(STATE.icons[c.slug]);
+    const iconName = STATE.icons[c.slug];
+    const icon = iconUrl(iconName);
+    const iconLower = iconUrl(iconName, true);
     const stepTxt = c.phase === "pre_combat" ? `P${c.step_index}` : c.phase === "weave" ? "W" : String(c.step_index);
     let out = `<rect x="${x}" y="${y}" width="${s}" height="${s}" rx="${R}" fill="var(--bg-input)"/>`;
-    if (icon) out += `<image href="${icon}" x="${x}" y="${y}" width="${s}" height="${s}" style="clip-path: inset(0 round ${R}px)" preserveAspectRatio="xMidYMid slice"/>`;
+    if (icon) {
+      const onerr = icon !== iconLower
+        ? ` onerror="if(!this.dataset.r){this.dataset.r='1';this.setAttribute('href','${iconLower}');}"`
+        : "";
+      out += `<image href="${icon}"${onerr} x="${x}" y="${y}" width="${s}" height="${s}" style="clip-path: inset(0 round ${R}px)" preserveAspectRatio="xMidYMid slice"/>`;
+    }
     out += `<rect x="${x + 0.5}" y="${y + 0.5}" width="${s - 1}" height="${s - 1}" rx="${R}" fill="none" stroke="var(--border-subtle)"/>`;
     if (s >= 18) {
       const bw = Math.max(12, 5 + stepTxt.length * 5.5);
@@ -585,9 +601,9 @@ function renderDetail() {
     <div class="entries">${st.pool.map((p, j) => {
       const c = m.entryCount[`${st.idx}:${j}`] || 0;
       const slug = STATE.slugs[p.ability_id] || p.ability_id;
-      const icon = iconUrl(STATE.icons[slug] || STATE.icons[p.ability_id]);
+      const iconName = STATE.icons[slug] || STATE.icons[p.ability_id];
       return `<div class="entry${c ? "" : " unused"}" title="${esc(Object.keys(p.rules || {}).join(", ") || "no conditions")}">
-        ${icon ? `<img src="${icon}" alt="">` : ""}
+        ${iconImgHtml(iconName)}
         <span>${esc(STATE.names[p.ability_id] || p.ability_id)}</span>
         <span class="n${c ? "" : " zero"}">${c}x</span>
       </div>`;
