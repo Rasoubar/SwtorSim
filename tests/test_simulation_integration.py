@@ -297,6 +297,43 @@ class SimulationIntegrationTests(unittest.TestCase):
                 "ability_cooldown_under should be True when 5.0s < 6.0s",
             )
 
+        with self.subTest("ability_cooldown_reads_charge_recharge_timer"):
+            class _ChargeAbility:
+                def __init__(self, charges, recharge_target_time):
+                    self.name = "Snake Eyes"
+                    self.has_charges = True
+                    self.charges = charges
+                    self.recharge_target_time = recharge_target_time
+
+            now = self.sim.current_time
+            self.player.ability_db["snake_eyes"] = _ChargeAbility(1, now + 60.0)
+            self.assertFalse(
+                validate_all({"ability_cooldown_above": {"name": "Snake Eyes", "value": 20}}, self.player, self.target, sim=self.sim),
+                "a charge still in hand is not a remaining cooldown",
+            )
+            self.player.ability_db["snake_eyes"] = _ChargeAbility(0, now + 60.0)
+            self.assertTrue(
+                validate_all({"ability_cooldown_above": {"name": "Snake Eyes", "value": 20}}, self.player, self.target, sim=self.sim),
+                "60s of charge recharge is above 20s",
+            )
+            self.assertFalse(
+                validate_all({"ability_cooldown_above": {"name": "Snake Eyes", "value": 60}}, self.player, self.target, sim=self.sim),
+                "remaining recharge equal to the threshold is not strictly above",
+            )
+            self.assertFalse(
+                validate_all({"ability_cooldown_under": {"name": "Snake Eyes", "value": 20}}, self.player, self.target, sim=self.sim),
+                "60s of charge recharge is not under 20s",
+            )
+            self.player.ability_db["snake_eyes"] = _ChargeAbility(0, now + 15.0)
+            self.assertFalse(
+                validate_all({"ability_cooldown_above": {"name": "Snake Eyes", "value": 20}}, self.player, self.target, sim=self.sim),
+                "15s of charge recharge is not above 20s",
+            )
+            self.assertTrue(
+                validate_all({"ability_cooldown_under": {"name": "Snake Eyes", "value": 20}}, self.player, self.target, sim=self.sim),
+                "15s of charge recharge is under 20s",
+            )
+
     def test_07_full_hatred_rotation_simulation_run(self):
         """[End-to-End] Runs a 30-second Hatred Assassin simulation and validates rotational execution."""
         try:

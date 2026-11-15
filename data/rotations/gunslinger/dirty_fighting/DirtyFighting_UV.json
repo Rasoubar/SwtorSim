@@ -1,0 +1,116 @@
+[
+    {
+        "type": "loop_anchor"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.vital_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.shrap_bomb"
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.hemorrhaging_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.dirty_blast"
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.smuggler.skill.dirty_fighting.wounding_shot"
+    }
+]

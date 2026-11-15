@@ -93,19 +93,49 @@ def check_caster_does_not_have_buff(conditions: Any, caster: "Player", _target: 
     has_any_buff = any(caster.has_effect(b) for b in buff_list)
     return not has_any_buff
 
+def _ability_for_cooldown_rule(caster, name: str):
+    """Resolves a rotation cooldown name to an ability, using the same keys as ``Player.build_ability_db``."""
+    ability_db = getattr(caster, "ability_db", None) or {}
+    if not isinstance(name, str) or not ability_db:
+        return None
+    ability = ability_db.get(name)
+    if ability is None:
+        ability = ability_db.get(name.lower().replace(" ", "_"))
+    return ability
+
+
+def remaining_ability_cooldown(name: str, caster, sim) -> float:
+    """Seconds until ``name`` can be cast again.
+
+    A normal ability stores its ready time in ``caster.cooldowns`` under the display name.
+    A charge ability does not: spending the last charge records ``recharge_target_time`` on the
+    ability and leaves the cooldown map empty. A charge still in hand does not block the cast.
+    """
+    now = float(sim.current_time)
+    cooldowns = getattr(caster, "cooldowns", None) or {}
+    ready_at = float(cooldowns.get(name, 0) or 0)
+
+    ability = _ability_for_cooldown_rule(caster, name)
+    if ability is not None:
+        stored_name = getattr(ability, "name", None)
+        if stored_name and stored_name != name:
+            ready_at = max(ready_at, float(cooldowns.get(stored_name, 0) or 0))
+        if getattr(ability, "has_charges", False):
+            charges = getattr(ability, "charges", None)
+            if charges is not None and charges < 1:
+                recharge_at = getattr(ability, "recharge_target_time", None)
+                if recharge_at is not None:
+                    ready_at = max(ready_at, float(recharge_at))
+    return ready_at - now
+
+
 def check_ability_cooldown_under(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
     """Returns True if the remaining cooldown of ``data['name']`` is strictly below ``data['value']`` seconds."""
-    cooldown = caster.cooldowns.get(data["name"], 0)
-    remaining_cooldown = cooldown - sim.current_time
-
-    return remaining_cooldown < data["value"]
+    return remaining_ability_cooldown(data["name"], caster, sim) < data["value"]
 
 def check_ability_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
     """Returns True if the remaining cooldown of ``data['name']`` is strictly above ``data['value']`` seconds."""
-    cooldown = caster.cooldowns.get(data["name"], 0)
-    remaining_cooldown = cooldown - sim.current_time
-
-    return remaining_cooldown > data["value"]
+    return remaining_ability_cooldown(data["name"], caster, sim) > data["value"]
 
 
 def compare_values(actual: float, comparison: str, expected: float) -> bool:

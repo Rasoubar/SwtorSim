@@ -83,7 +83,19 @@
     {
         "type": "optional",
         "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
-        "rules": {}
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
     },
     {
         "type": "fixed",
@@ -118,7 +130,19 @@
     {
         "type": "optional",
         "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
-        "rules": {}
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
     },
     {
         "type": "fixed",
@@ -153,7 +177,19 @@
     {
         "type": "optional",
         "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
-        "rules": {}
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
     },
     {
         "type": "fixed",
@@ -188,7 +224,19 @@
     {
         "type": "optional",
         "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
-        "rules": {}
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
     },
     {
         "type": "fixed",
@@ -223,7 +271,19 @@
     {
         "type": "optional",
         "ability_id": "abl.smuggler.skill.dirty_fighting.blood_sights_plus",
-        "rules": {}
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "optional",
+        "ability_id": "illegal_mods",
+        "rules": {
+            "ability_cooldown_above": {
+                "name": "Snake Eyes",
+                "value": 30
+            }
+        },
+        "lead_time": 0.25
     },
     {
         "type": "fixed",

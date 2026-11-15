@@ -259,8 +259,8 @@ All conditions inside a `"rules"` dictionary must evaluate to `True` (logical `A
 | `target_hp_above` | `0.3` | True if target HP ratio `> threshold`. |
 | `caster_energy_above` | `60` | True if caster primary resource `>= threshold`. |
 | `caster_energy_below` | `40` | True if caster primary resource `< threshold`. |
-| `ability_cooldown_under` | `{"name": "eradicate", "value": 1.5}` | True if the remaining cooldown of `name` is `< value` seconds. |
-| `ability_cooldown_above` | `{"name": "eradicate", "value": 1.5}` | True if the remaining cooldown of `name` is `> value` seconds. |
+| `ability_cooldown_under` | `{"name": "eradicate", "value": 1.5}` | True if the remaining cooldown of `name` is `< value` seconds. A charge ability uses the time until its next charge when none are left. |
+| `ability_cooldown_above` | `{"name": "eradicate", "value": 1.5}` | True if the remaining cooldown of `name` is `> value` seconds. A charge ability uses the time until its next charge when none are left. |
 | `proc_cooldown_above` | `{"name": "Bloodletting", "value": 1.5}` | True if the named proc is not active and its remaining ICD/lockout (resolved via `player.proc_registry`) is `> value` seconds. |
 
 ---
