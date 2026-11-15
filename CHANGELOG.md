@@ -4,6 +4,11 @@
 
 ## Completed Fixes
 
+### 90. Charge Abilities Count for Rotation Cooldown Rules (`src/swtorsim/requirements.py`) - [DONE]
+- `ability_cooldown_above` and `ability_cooldown_under` read `caster.cooldowns`, which a charge ability never writes. Snake Eyes (`blood_sights_plus`, 1 charge, 60s recharge) therefore always looked ready, and Dirty Fighting's opener skipped Illegal Mods because "Snake Eyes remaining > 20s" was never true.
+- Both rules now use the later of the cooldown-map ready time and, when no charge is left, `recharge_target_time`. A charge still in hand does not count as cooldown. The name is resolved the same way as `Player.build_ability_db` (`"Snake Eyes"` -> `snake_eyes`).
+- Verification: `tests.test_simulation_integration.SimulationIntegrationTests.test_06_passive_registration_and_proc_icd_tracking` (Eradicate map entries unchanged; new charge-timer subtest). PTS Dirty Fighting loadout from `dirty_fighting_13gcd_uv.json` with `DirtyFighting.json`, seed 42, 120s: Illegal Mods casts 0 -> 1. That rotation is not the UV config's rotation, and live `dirty_fighting_13gcd.json` has no Snake Eyes ability, so those shipped fights do not change. No combat-math change. The ~100s second Illegal Mods cast is still absent: the step sits only in the opener.
+
 ### 89. Diminishing Returns Specs Point at a Run Config (`src/diminishing_returns/config.py`, `data/diminishing_returns/dr_config.json`) - [DONE]
 - A spec is now a display name plus `run_config`, a path such as `data/run_config/hatred_14gcd_pts.json`. Discipline, build, rotation, choices, weapons, tactical, legendaries, and the equipped relic pair come from that file. Duration, dummy HP, level, seed, stem matching, and the training-dummy armor debuff stay on the DR config and override the run config, so every spec in one sweep shares one fight.
 - A discipline path under `data/extractor/pts/` loads PTS data when the run config has no `environment` field. `hatred_14gcd_pts.json` therefore stays on the PTS Hatred tree and `L85_14gcd_red`. Its relics are Mastery and Power, so that pair is the one drawn on the derivative plot. Dummy HP stays 10,000,000 from the DR config (the run config's 6,000,000 is not used).

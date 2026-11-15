@@ -28,7 +28,7 @@
     "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
   ],
   "mode": "BATCH",
-  "iterations": 50,
+  "iterations": 100,
   "duration": 1000,
   "level": 85,
   "dummy_hp": 10000000,
