@@ -295,7 +295,10 @@ class PreCombatRunner:
         if not self.active or self.pending:
             return
         self.pending = True
-        sim.schedule_absolute(round(max(sim.current_time, at_time), 4), PreCombatEvent(self.player, self.target))
+        run_at = max(sim.current_time, round(at_time, 4))
+        if run_at < at_time:
+            run_at = at_time  # never wake before the requested moment (rounding down would re-queue at the same time)
+        sim.schedule_absolute(run_at, PreCombatEvent(self.player, self.target))
 
     def _skip(self, sim, label: str, reason: str) -> None:
         if getattr(sim, "verbose", True):
@@ -385,7 +388,7 @@ class PreCombatRunner:
                 self._skip(sim, abl_key or "<empty>", "ability not found in player abilities")
                 continue
 
-            if getattr(abl, "triggers_gcd", True) and now < getattr(player, "next_gcd", 0.0) - 1e-4:
+            if getattr(abl, "triggers_gcd", True) and now < getattr(player, "next_gcd", 0.0):
                 self.request(sim, player.next_gcd)
                 return
 

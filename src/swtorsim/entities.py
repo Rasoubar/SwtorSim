@@ -471,8 +471,9 @@ class Player(Entity):
         if rotation is not None and hasattr(rotation, "get_next_lead_time"):
             lead = rotation.get_next_lead_time(self, current_time, sim)
             if lead > 0.0:
-                return round(max(current_time, getattr(self, "next_gcd", current_time) - lead), 4)
-        return round(base_time, 4)
+                return max(current_time, round(getattr(self, "next_gcd", current_time) - lead, 4))
+        # Round first, then clamp: rounding a time with digits past the 4th decimal can land just below now.
+        return max(current_time, round(base_time, 4))
 
     def calculate_gcd(self, base_gcd: float = 1.5, ability: Any = None) -> float:
         """Calculates GCD duration scaled by Alacrity, rounded up to the nearest tenth of a second as ingame"""

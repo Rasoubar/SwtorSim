@@ -565,7 +565,7 @@
     // Gate: guarantee 100% of the worker pool is warm and ready before running
     await ensureAllWorkersReady();
 
-    const totalIterations = Math.max(1, parseInt(payload.iterations, 10) || 50);
+    const totalIterations = Math.max(1, Math.min(10000, parseInt(payload.iterations, 10) || 50));
 
     // Get active pool workers up to chosen targetPoolSize
     const activeWorkers = state.workers.slice(0, state.targetPoolSize).filter(w => w.isReady);
@@ -759,22 +759,21 @@
         if (!filename.endsWith(".json")) filename += ".json";
         filename = filename.replace(/^.*[\\/]/, "");
 
-        const preCombat = Array.isArray(payload.pre_combat) ? payload.pre_combat : [];
-        const pullConds = (payload.pull_conditions && typeof payload.pull_conditions === "object") ? payload.pull_conditions : {};
-        const hasPull = Object.keys(pullConds).length > 0;
-        const weaveEntries = Array.isArray(payload.weave) ? payload.weave.filter(w => w && w.ability_id) : [];
-        let fileData = payload.steps || [];
-        if (preCombat.length || hasPull || weaveEntries.length) {
-          fileData = {};
-          if (preCombat.length) fileData.pre_combat = preCombat;
-          if (hasPull) {
-            fileData.pull_conditions = pullConds;
-            if (payload.pull_max_wait !== undefined && payload.pull_max_wait !== null) fileData.pull_max_wait = Number(payload.pull_max_wait);
-          }
-          if (weaveEntries.length) fileData.weave = weaveEntries;
-          fileData.sequence = payload.steps || [];
+        // Same normalization as the native server (the bridge calls build_rotation_file_data).
+        const formatted = await callPrimaryWorker("FORMAT_ROTATION", {
+          steps: payload.steps,
+          pre_combat: payload.pre_combat,
+          pull_conditions: payload.pull_conditions,
+          pull_max_wait: payload.pull_max_wait,
+          weave: payload.weave
+        });
+        if (!formatted || formatted.error !== undefined || typeof formatted.content !== "string") {
+          return new Response(JSON.stringify({ error: (formatted && formatted.error) || "Could not format rotation." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
         }
-        const contentStr = JSON.stringify(fileData, null, 4);
+        const contentStr = formatted.content;
 
         const customPath = `data/rotations/${classFolder}/${specFolder}/${filename}`;
 
@@ -830,17 +829,18 @@
               pct: 0.0
             };
             result = await callPrimaryWorker("SIMULATE", payload);
-            state.latestProgress.running = false;
           }
         } catch (err) {
           if (state.cancelRequested) {
-            state.latestProgress.running = false;
             return new Response(JSON.stringify({ cancelled: true }), {
               status: 200,
               headers: { "Content-Type": "application/json" }
             });
           }
           throw err;
+        } finally {
+          // Any exit (success, cancel or a worker error) ends the "running" state the progress bar reads.
+          state.latestProgress.running = false;
         }
 
         const isError = result && (result.error !== undefined);

@@ -135,6 +135,18 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
         elif action == "RUN_ROTATION_PREVIEW":
             result = run_dry_run_preview(data)
 
+        elif action == "FORMAT_ROTATION":
+            # Rotation file contents exactly as SAVE_ROTATION / the native server would write them, without
+            # touching a filesystem (the browser build keeps custom files in localStorage).
+            steps = data.get("steps")
+            if not isinstance(steps, list):
+                return json.dumps({"error": "steps must be a list."}, ensure_ascii=False)
+            file_data = build_rotation_file_data(
+                steps, data.get("pre_combat"), data.get("pull_conditions"), data.get("pull_max_wait"),
+                weave=data.get("weave"),
+            )
+            result = {"ok": True, "content": json.dumps(file_data, indent=4, ensure_ascii=False)}
+
         elif action == "SAVE_ROTATION":
             class_folder = str(data.get("class_folder") or "assassin").strip().lower()
             spec_folder = str(data.get("spec_folder") or "hatred").strip().lower()

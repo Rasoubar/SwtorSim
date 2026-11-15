@@ -83,6 +83,8 @@ class Rotation:
                 if lead is not None:
                     return max(0.0, float(lead))
                 return DEFAULT_OFF_GCD_LEAD_TIME
+            if ability:
+                return 0.0  # on-GCD ability: it cannot be cast early, so there is nothing to lead
 
         # 2. PriorityBlockStep: check the top viable candidate in the pool
         if isinstance(step, PriorityBlockStep) and player is not None:
@@ -98,8 +100,9 @@ class Rotation:
                     if lead is None:
                         lead = getattr(step, "lead_time", None)
                     return max(0.0, float(lead)) if lead is not None else DEFAULT_OFF_GCD_LEAD_TIME
-                # First viable candidate in priority block is an on-GCD ability; do not lead early
-                break
+                # First viable candidate in priority block is an on-GCD ability; do not lead early (an early wake-up
+                # would only let a lower-priority off-GCD option jump ahead of it)
+                return 0.0
 
         # 3. Explicit lead_time defined on step regardless of ability detection
         lead = getattr(step, "lead_time", None)
@@ -147,7 +150,7 @@ class FixedAbilityStep:
             - If it casts successfully, resolves and advances (returns True).
             - If it cannot cast yet (e.g. cooldown/resource), returns False so it retries at next_gcd.
         """
-        is_early = (getattr(player, "next_gcd", 0.0) - sim.current_time) > 1e-4
+        is_early = getattr(player, "next_gcd", 0.0) > sim.current_time
         ability = player.ability_db.get(self.ability_id)
         if is_early and (not ability or getattr(ability, "triggers_gcd", True)):
             return False
@@ -168,7 +171,7 @@ class PriorityBlockStep:
 
     def evaluate(self, player, target, sim) -> bool:
         """Mandatory block step. Resolves if any valid priority option casts successfully."""
-        is_early = (getattr(player, "next_gcd", 0.0) - sim.current_time) > 1e-4
+        is_early = getattr(player, "next_gcd", 0.0) > sim.current_time
         tracer = getattr(sim, "tracer", None)
 
         # Fast path when no diagnostic tracer is attached
@@ -273,7 +276,7 @@ class OptionalAbilityStep:
         If evaluated when character is ready (at or after player.next_gcd and not channeling/casting):
             - Always resolves and advances (returns True) even if it did not cast.
         """
-        is_early = (getattr(player, "next_gcd", 0.0) - sim.current_time) > 1e-4
+        is_early = getattr(player, "next_gcd", 0.0) > sim.current_time
         is_channeling_or_casting = (
             getattr(player, "active_channel", None) is not None
             or getattr(player, "active_cast", None) is not None
