@@ -16,7 +16,7 @@ SWTORSIM_ROOT = Path(__file__).resolve().parents[2]
 if str(SWTORSIM_ROOT) not in sys.path:
     sys.path.insert(0, str(SWTORSIM_ROOT))
 
-from src.swtorsim.config_load import expand_force_tech_power, load_json_file
+from src.swtorsim.config_load import load_json_file
 from src.swtorsim.web_gui import (
     aggregate_batch_slices,
     execute_simulation_from_payload,
@@ -77,13 +77,10 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
             target_file = _resolve_workspace_path(rel_path)
             if not target_file.is_file():
                 return json.dumps({"error": f"Build file not found: {rel_path}"}, ensure_ascii=False)
-            stats_doc = load_json_file(str(target_file))
-            stats_data = stats_doc.get("stats") or stats_doc
-            if isinstance(stats_data, dict):
-                expand_force_tech_power(stats_data)
+            # Same shape as the native /api/build_stats route: the raw build JSON (Force-Tech Power kept).
             result = {
                 "path": rel_path,
-                "stats": stats_data,
+                "stats": load_json_file(str(target_file)),
             }
 
         elif action == "LOAD_RUN_CONFIG":

@@ -95,9 +95,14 @@
     }
   }
 
+  // Last value of the shared custom-files key this tab has seen or written (used by the focus check below).
+  let lastStorageSnapshot = "";
+
   function saveCustomFilesToStorage(filesMap) {
     try {
-      localStorage.setItem("swtor_custom_files", JSON.stringify(filesMap));
+      const raw = JSON.stringify(filesMap);
+      localStorage.setItem("swtor_custom_files", raw);
+      lastStorageSnapshot = raw;
     } catch (_e) {}
   }
 
@@ -346,7 +351,8 @@
       rejectReady: rejectWorkerReady,
       pendingRequests: new Map(),
       requestId: 0,
-      completedRuns: 0
+      completedRuns: 0,
+      syncedPaths: new Set()
     };
 
     wState.worker.onmessage = function (event) {
@@ -474,14 +480,42 @@
 
   async function syncCustomFilesToWorker(wState) {
     const customFiles = state.customFiles || {};
-    const entries = Object.entries(customFiles);
-    for (const [vPath, content] of entries) {
+    // Drop files this worker holds that are no longer stored (deleted in another tab).
+    for (const vPath of Array.from(wState.syncedPaths)) {
+      if (Object.prototype.hasOwnProperty.call(customFiles, vPath)) continue;
+      try {
+        await callSpecificWorker(wState, "DELETE_VIRTUAL_FILE", { path: vPath });
+        wState.syncedPaths.delete(vPath);
+      } catch (err) {
+        console.error(`Failed to remove custom file ${vPath} from worker #${wState.index}:`, err);
+      }
+    }
+    for (const [vPath, content] of Object.entries(customFiles)) {
       try {
         await callSpecificWorker(wState, "WRITE_VIRTUAL_FILE", { path: vPath, content });
+        wState.syncedPaths.add(vPath);
       } catch (err) {
         console.error(`Failed to sync custom file ${vPath} to worker #${wState.index}:`, err);
       }
     }
+  }
+
+  // Writes one file into every ready worker (unready workers sync from state.customFiles when they become ready).
+  async function pushFileToWorkers(vPath, content) {
+    const readyWorkers = state.workers.filter(w => w.isReady);
+    await Promise.all(readyWorkers.map(async w => {
+      await callSpecificWorker(w, "WRITE_VIRTUAL_FILE", { path: vPath, content });
+      w.syncedPaths.add(vPath);
+    }));
+  }
+
+  // Removes one file from every ready worker.
+  async function removeFileFromWorkers(vPath) {
+    const readyWorkers = state.workers.filter(w => w.isReady);
+    await Promise.all(readyWorkers.map(async w => {
+      await callSpecificWorker(w, "DELETE_VIRTUAL_FILE", { path: vPath });
+      w.syncedPaths.delete(vPath);
+    }));
   }
 
   function callSpecificWorker(wState, action, payload) {
@@ -746,13 +780,7 @@
 
         state.customFiles[customPath] = contentStr;
         saveCustomFilesToStorage(state.customFiles);
-
-        // Sync to all currently ready workers (unready workers auto-sync upon ready)
-        const readyWorkers = state.workers.filter(w => w.isReady);
-        const syncPromises = readyWorkers.map(w =>
-          callSpecificWorker(w, "WRITE_VIRTUAL_FILE", { path: customPath, content: contentStr })
-        );
-        await Promise.all(syncPromises);
+        await pushFileToWorkers(customPath, contentStr);
 
         return new Response(JSON.stringify({ ok: true, path: customPath, filename: filename }), {
           status: 200,
@@ -853,13 +881,7 @@
 
         state.customFiles[vPath] = contentStr;
         saveCustomFilesToStorage(state.customFiles);
-
-        // Sync to all currently ready workers (unready workers auto-sync upon ready)
-        const readyWorkers = state.workers.filter(w => w.isReady);
-        const syncPromises = readyWorkers.map(w =>
-          callSpecificWorker(w, "WRITE_VIRTUAL_FILE", { path: vPath, content: contentStr })
-        );
-        await Promise.all(syncPromises);
+        await pushFileToWorkers(vPath, contentStr);
 
         return new Response(JSON.stringify({ ok: true, path: vPath, filename: filename }), {
           status: 200,
@@ -870,21 +892,11 @@
       if (pathname === "/api/custom_file/delete") {
         const payload = JSON.parse(options.body || "{}");
         const vPath = String(payload.path || "").trim();
-        const filename = vPath.split("/").pop();
 
-        for (const k of Object.keys(state.customFiles)) {
-          if (k === vPath || k.endsWith("/" + filename)) {
-            delete state.customFiles[k];
-          }
-        }
+        // Only the exact path: other custom files may share this basename.
+        delete state.customFiles[vPath];
         saveCustomFilesToStorage(state.customFiles);
-
-        // Delete from all currently ready workers (unready workers will initialize without it)
-        const readyWorkers = state.workers.filter(w => w.isReady);
-        const delPromises = readyWorkers.map(w =>
-          callSpecificWorker(w, "DELETE_VIRTUAL_FILE", { path: vPath })
-        );
-        await Promise.all(delPromises);
+        await removeFileFromWorkers(vPath);
 
         return new Response(JSON.stringify({ ok: true, path: vPath }), {
           status: 200,
@@ -894,11 +906,40 @@
 
       if (pathname === "/api/run_config/save" || pathname === "/api/build_stats/save") {
         const payload = JSON.parse(options.body || "{}");
-        const filename = payload.filename || "custom_config.json";
-        const content = payload.run_config || payload.config || payload.stats || payload;
-        const blob = new Blob([JSON.stringify(content, null, 2)], {
-          type: "application/json"
-        });
+        const isBuild = pathname === "/api/build_stats/save";
+        let filename = String(payload.filename || (isBuild ? "custom_build.json" : "custom_config.json")).trim();
+        if (!filename.endsWith(".json")) filename += ".json";
+        filename = filename.replace(/^.*[\\\/]/, "");
+
+        let content = isBuild ? payload.stats : (payload.run_config || payload.config);
+        if (!content || typeof content !== "object" || Array.isArray(content)) {
+          return new Response(JSON.stringify({ error: (isBuild ? "stats" : "run_config") + " must be a JSON object." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        if (isBuild) {
+          // Same cleaning as the native route: drop weapon ranges and blanks, coerce numbers.
+          const weaponKeys = ["Main_hand_min", "Main_hand_max", "Off_hand_min", "Off_hand_max"];
+          const clean = {};
+          for (const [k, v] of Object.entries(content)) {
+            if (weaponKeys.includes(k)) continue;
+            if (v === null || v === undefined || String(v).trim() === "") continue;
+            const num = Number(v);
+            if (Number.isFinite(num)) clean[String(k)] = num;
+          }
+          content = clean;
+        }
+
+        // Stored as a custom file (same folders the catalog and the storage loader use), so it shows up in the lists.
+        const vPath = (isBuild ? "data/builds/custom/" : "data/run_config/custom/") + filename;
+        const contentStr = JSON.stringify(content, null, 2);
+        state.customFiles[vPath] = contentStr;
+        saveCustomFilesToStorage(state.customFiles);
+        await pushFileToWorkers(vPath, contentStr);
+
+        // Also offer a download copy as a backup.
+        const blob = new Blob([contentStr], { type: "application/json" });
         const downloadUrl = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = downloadUrl;
@@ -906,7 +947,7 @@
         a.click();
         URL.revokeObjectURL(downloadUrl);
 
-        return new Response(JSON.stringify({ ok: true, filename, downloaded: true }), {
+        return new Response(JSON.stringify({ ok: true, path: vPath, filename, downloaded: true }), {
           status: 200,
           headers: { "Content-Type": "application/json" }
         });
@@ -971,7 +1012,6 @@
     }
   });
 
-  let lastStorageSnapshot = "";
   try { lastStorageSnapshot = localStorage.getItem("swtor_custom_files") || "{}"; } catch (_e) {}
 
   window.addEventListener("focus", () => {
