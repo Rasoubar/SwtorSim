@@ -3155,3 +3155,7 @@ otation_path, stats_tuple, settings_tuple, 	raining_dummy_armor_debuff).
 
 ## Simulator UI: In-Game Mastery Toggle
 - New checkbox under the Mastery input (`masteryInGameToggle`, "In-game value (incl. 5%)"). On: the field is the Mastery shown on the in-game sheet and `getStatsOverrideFromInputs` divides it by 1.05 and rounds to a whole number before it is sent or saved; `applyStatsToInputs` multiplies loaded builds/presets by 1.05 for display (rounded). Toggling re-expresses the typed value so raw Mastery stays the same. Default off (unchanged behavior); builds and presets always store the raw value. Source `tools/simulator_ui.html`. UI only; no tests cover it, no combat math touched.
+
+## 2026-11-15 - Companion Window Move-to-Tab / Pop-Out Toggle
+- Added `btnDockMode` ("Move to Tab" / "Pop Out Window") to `tools/rotation_map_ui.html` and `tools/rotation_timeline_ui.html` so users can switch companion views between a pop-out window and a browser tab in-place without losing live `BroadcastChannel` sync.
+- Persisted per-view open-mode preferences in `localStorage` (`swtorsim_map_open_mode`, `swtorsim_timeline_open_mode`, `swtorsim_sim_timeline_open_mode`) and wired `tools/rotation_builder_ui.html` (`openCompanionWindow`) and `tools/simulator_ui.html` (`openCastTimeline`) to honor the saved mode (and `Shift+Click` to invert it).

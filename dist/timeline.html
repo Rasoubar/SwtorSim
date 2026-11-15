@@ -130,6 +130,7 @@
   <span id="runInfo" style="font-size:12px;opacity:.9;"></span>
   <span class="spacer"></span>
   <button type="button" id="clearSelBtn" hidden>Clear step filter</button>
+  <button type="button" id="btnDockMode"></button>
   <label for="zoom">Zoom <input id="zoom" type="range" min="12" max="80" value="32"></label>
 </header>
 <main id="main">
@@ -156,6 +157,34 @@
 const SOURCE = new URLSearchParams(location.search).get("source") === "sim" ? "sim" : "builder";
 const CHANNEL_BASE = "swtorsim-cast-timeline";
 const CHANNEL_NAME = SOURCE === "sim" ? `${CHANNEL_BASE}-sim` : CHANNEL_BASE;
+
+(function initDockMode() {
+  const btn = document.getElementById("btnDockMode");
+  if (!btn) return;
+  const params = new URLSearchParams(location.search);
+  const isPopup = params.get("mode") === "popup";
+  const prefKey = SOURCE === "sim" ? "swtorsim_sim_timeline_open_mode" : "swtorsim_timeline_open_mode";
+  const targetBase = SOURCE === "sim" ? "swtorsim_sim_cast_timeline" : "swtorsim_cast_timeline";
+  btn.textContent = isPopup ? "Move to Tab" : "Pop Out Window";
+  btn.title = isPopup
+    ? "Move this Cast Timeline into a browser tab and remember this preference"
+    : "Pop this Cast Timeline out into its own window and remember this preference";
+  btn.addEventListener("click", () => {
+    const nextMode = isPopup ? "tab" : "popup";
+    const nextUrl = new URL(location.href);
+    nextUrl.searchParams.set("mode", nextMode);
+    const w = nextMode === "tab"
+      ? window.open(nextUrl.toString(), `${targetBase}_tab`)
+      : window.open(nextUrl.toString(), targetBase, "width=1400,height=780");
+    if (!w) {
+      alert(`The browser blocked the Cast Timeline ${nextMode === "tab" ? "tab" : "window"}. Allow pop-ups for this page.`);
+      return;
+    }
+    try { localStorage.setItem(prefKey, nextMode); } catch (e) {}
+    w.focus();
+    window.close();
+  });
+})();
 const TEXT = SOURCE === "sim"
   ? {
       waitTitle: "Waiting for the Combat Simulator.",

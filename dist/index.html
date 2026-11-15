@@ -1059,7 +1059,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794752845"></script>
+  <script src="pyodide_client.js?v=1794755266"></script>
 </head>
 <body>
 
@@ -2767,14 +2767,25 @@
     };
   }
 
-  function openCastTimeline() {
+  function openCastTimeline(ev) {
     if (!castTimelineChannel) {
       alert("This browser can't link windows (BroadcastChannel unavailable).");
       return;
     }
-    const w = window.open("timeline.html?source=sim", "swtorsim_sim_cast_timeline", "width=1400,height=780");
+    let mode = "popup";
+    try {
+      if (localStorage.getItem("swtorsim_sim_timeline_open_mode") === "tab") mode = "tab";
+    } catch (e) {}
+    const shift = Boolean((ev && ev.shiftKey) || (window.event && window.event.shiftKey));
+    if (shift) mode = mode === "popup" ? "tab" : "popup";
+
+    const targetUrl = `timeline.html?source=sim&mode=${mode}`;
+    const targetName = mode === "tab" ? "swtorsim_sim_cast_timeline_tab" : "swtorsim_sim_cast_timeline";
+    const w = mode === "tab"
+      ? window.open(targetUrl, targetName)
+      : window.open(targetUrl, targetName, "width=1400,height=780");
     if (!w) {
-      alert("The browser blocked the Cast Timeline window. Allow pop-ups for this page.");
+      alert(`The browser blocked the Cast Timeline ${mode === "tab" ? "tab" : "window"}. Allow pop-ups for this page.`);
       return;
     }
     w.focus();

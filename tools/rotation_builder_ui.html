@@ -4775,36 +4775,65 @@ if (vizMapChannel) {
   };
 }
 
-function openVisualMapWindow() {
+function openCompanionWindow({ url, targetBase, features, prefKey, label, ev, afterOpen }) {
+  let mode = "popup";
+  try {
+    if (localStorage.getItem(prefKey) === "tab") mode = "tab";
+  } catch (e) {}
+  const shift = Boolean((ev && ev.shiftKey) || (window.event && window.event.shiftKey));
+  if (shift) mode = mode === "popup" ? "tab" : "popup";
+
+  const sep = url.includes("?") ? "&" : "?";
+  const targetUrl = `${url}${sep}mode=${mode}`;
+  const targetName = mode === "tab" ? `${targetBase}_tab` : targetBase;
+  const w = mode === "tab"
+    ? window.open(targetUrl, targetName)
+    : window.open(targetUrl, targetName, features);
+
+  if (!w) {
+    showToast(`The browser blocked the ${label} ${mode === "tab" ? "tab" : "window"}. Allow pop-ups for this page.`, true);
+    return;
+  }
+  w.focus();
+  if (afterOpen) afterOpen();
+}
+
+function openVisualMapWindow(ev) {
   if (!vizMapChannel) {
     showToast("This browser can't link windows (BroadcastChannel unavailable).", true);
     return;
   }
   // map.html: served by the local builder server and copied into dist/ by build_web_release.py
-  const w = window.open("map.html", "swtorsim_rotation_map", "width=1500,height=700");
-  if (!w) {
-    showToast("The browser blocked the Rotation Map window. Allow pop-ups for this page.", true);
-    return;
-  }
-  w.focus();
-  vizBroadcastMap();
+  openCompanionWindow({
+    url: "map.html",
+    targetBase: "swtorsim_rotation_map",
+    features: "width=1500,height=700",
+    prefKey: "swtorsim_map_open_mode",
+    label: "Rotation Map",
+    ev,
+    afterOpen: () => vizBroadcastMap(),
+  });
 }
 
-function openCastTimelineWindow() {
+function openCastTimelineWindow(ev) {
   if (!vizChannel) {
     showToast("This browser can't link windows (BroadcastChannel unavailable).", true);
     return;
   }
   // timeline.html: served by the local builder server and copied into dist/ by build_web_release.py
-  const w = window.open("timeline.html", "swtorsim_cast_timeline", "width=1400,height=780");
-  if (!w) {
-    showToast("The browser blocked the Cast Timeline window. Allow pop-ups for this page.", true);
-    return;
-  }
-  w.focus();
-  // A freshly opened window says hello on load; an already-open one gets the current state now.
-  vizBroadcastState();
-  if (!dryRunResult) showToast("Cast Timeline opened. Run a dry-run to fill it.");
+  openCompanionWindow({
+    url: "timeline.html",
+    targetBase: "swtorsim_cast_timeline",
+    features: "width=1400,height=780",
+    prefKey: "swtorsim_timeline_open_mode",
+    label: "Cast Timeline",
+    ev,
+    afterOpen: () => {
+      // A freshly opened window says hello on load; an already-open one gets the current state now.
+      vizBroadcastState();
+      if (!dryRunResult) showToast("Cast Timeline opened. Run a dry-run to fill it.");
+    },
+  });
 }
 
 function insertSavedStepTemplate(tIdx) {

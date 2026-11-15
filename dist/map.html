@@ -233,6 +233,7 @@
   <button type="button" class="hbtn" id="btnPalette" title="Show or hide the ability list">Abilities</button>
   <button type="button" class="hbtn" id="btnUndo" title="Undo the last rotation change (Ctrl+Z)" disabled>Undo</button>
   <button type="button" class="hbtn" id="btnRedo" title="Redo (Ctrl+Y)" disabled>Redo</button>
+  <button type="button" class="hbtn" id="btnDockMode"></button>
   <button type="button" class="hbtn" id="tutorialBtn" style="border-color:var(--accent);color:var(--accent);" title="Replay the Interactive Guided Tour">? Tutorial</button>
 </header>
 <div id="shell">
@@ -262,6 +263,32 @@
   try { saved = localStorage.getItem("swtorsim_theme") || "dark"; } catch (e) {}
   apply(saved);
   window.addEventListener("storage", (e) => { if (e.key === "swtorsim_theme") apply(e.newValue || "dark"); });
+})();
+
+(function initDockMode() {
+  const btn = document.getElementById("btnDockMode");
+  if (!btn) return;
+  const params = new URLSearchParams(location.search);
+  const isPopup = params.get("mode") === "popup";
+  btn.textContent = isPopup ? "Move to Tab" : "Pop Out Window";
+  btn.title = isPopup
+    ? "Move this Rotation Map into a browser tab and remember this preference"
+    : "Pop this Rotation Map out into its own window and remember this preference";
+  btn.addEventListener("click", () => {
+    const nextMode = isPopup ? "tab" : "popup";
+    const nextUrl = new URL(location.href);
+    nextUrl.searchParams.set("mode", nextMode);
+    const w = nextMode === "tab"
+      ? window.open(nextUrl.toString(), "swtorsim_rotation_map_tab")
+      : window.open(nextUrl.toString(), "swtorsim_rotation_map", "width=1500,height=700");
+    if (!w) {
+      alert(`The browser blocked the Rotation Map ${nextMode === "tab" ? "tab" : "window"}. Allow pop-ups for this page.`);
+      return;
+    }
+    try { localStorage.setItem("swtorsim_map_open_mode", nextMode); } catch (e) {}
+    w.focus();
+    window.close();
+  });
 })();
 
 const MAP_CHANNEL_NAME = "swtorsim-rotation-map";
