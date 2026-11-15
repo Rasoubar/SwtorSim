@@ -1059,7 +1059,7 @@
     color: var(--text-main);
   }
 </style>
-  <script src="pyodide_client.js?v=1794747072"></script>
+  <script src="pyodide_client.js?v=1794751902"></script>
 </head>
 <body>
 
@@ -1093,6 +1093,7 @@
     <button class="btn btn-sm" id="exportRunConfigBtn" type="button" title="Export current configuration to JSON file" onclick="exportRunConfigDirectly()">Export Config</button>
     <button class="btn btn-sm" id="reloadCatalogBtn" title="Reload files from workspace">Refresh</button>
     <button class="btn btn-purple btn-sm" id="openRotationBuilderBtn" title="Launch or switch to the Web Rotation Builder">Rotation Builder</button>
+    <button class="btn btn-sm" id="tutorialBtn" type="button" style="border-color:var(--accent);color:var(--accent);background:var(--accent-bg);" title="Replay the Interactive Guided Tour">? Tutorial</button>
     <button class="btn btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">🌙 Dark</button>
     <button class="btn btn-primary" id="runSimBtn" title="Run Simulation (Ctrl+Enter)">▶ Run Simulation</button>
   </div>
@@ -1283,6 +1284,9 @@
           <div class="form-row">
             <label class="form-label">Mastery</label>
             <input type="number" class="stat-input" data-stat="Mastery" value="16570">
+            <label style="display:flex; gap:5px; align-items:center; font-size:11px; color:var(--text-muted); margin-top:3px; cursor:pointer;" title="On: type Mastery as shown on the in-game character sheet (after the 5% class buff). The simulator divides it by 1.05 to get the raw value. Off: type the raw value (before the 5% buff).">
+              <input type="checkbox" id="masteryInGameToggle"> In-game value (incl. 5%)
+            </label>
           </div>
           <div class="form-row">
             <label class="form-label">Power</label>
@@ -1345,23 +1349,27 @@
         <label class="checkbox-row" title="Applies all 8 Operation Dummy debuffs: -20% Armor, +5% Melee/Ranged/Force/Tech Dmg, +7% Internal/Elemental Dmg, +10% AoE Dmg">
           <input type="checkbox" id="toggleArmorDebuff" checked>
           <span>Training Dummy Operation Debuffs (All Raid Debuffs)</span>
+          <span class="sig-help" title="Applies all 8 Operation Dummy debuffs: -20% Armor, +5% Melee/Ranged/Force/Tech Dmg, +7% Internal/Elemental Dmg, +10% AoE Dmg">?</span>
         </label>
         <label class="checkbox-row">
           <input type="checkbox" id="toggleStemMatching" checked>
           <span>Ability Stem Matching (e.g. assassinate_plus)</span>
+          <span class="sig-help" title="Only matters on PTS: treats upgraded or talent-replaced ability variants (e.g. assassinate_plus) as matching their base ability name in rotation steps and conditions.">?</span>
         </label>
         <label class="checkbox-row">
           <input type="checkbox" id="toggleFlightTime">
           <span>Projectile Travel Flight Time</span>
+          <span class="sig-help" title="Delays projectile damage and effects by travel time (Combat Distance / projectile speed) instead of landing instantaneously.">?</span>
         </label>
         <label class="checkbox-row">
           <input type="checkbox" id="toggleInOperation" checked>
           <span>In Flashpoint / Operation Instance</span>
+          <span class="sig-help" title="Marks the fight as inside a Flashpoint or Operation instance for effects and passives that check instance state.">?</span>
         </label>
 
         <div class="form-row" style="margin-top:4px;">
           <div class="form-label">
-            <span>Combat Distance (meters)</span>
+            <span>Combat Distance (meters) <span class="sig-help" title="Distance to the target dummy in meters. Used to compute projectile travel delay when Projectile Travel Flight Time is enabled.">?</span></span>
             <div class="chip-row">
               <span class="chip" onclick="setDistance(4)">4m</span>
               <span class="chip" onclick="setDistance(10)">10m</span>
@@ -1373,7 +1381,7 @@
 
         <div class="form-row" style="margin-top:4px;">
           <div class="form-label">
-            <span title="Simulates GCD lag by having a set % of gcds be delayed by 0.1s">GCD Stall (% of GCDs +0.1s)</span>
+            <span title="Simulates GCD lag by having a set % of gcds be delayed by 0.1s">GCD Stall (% of GCDs +0.1s) <span class="sig-help" title="Simulates human or network GCD lag by delaying this percentage of GCDs by +0.1s.">?</span></span>
             <div class="chip-row">
               <span class="chip" onclick="setGcdStall(0)">0%</span>
               <span class="chip" onclick="setGcdStall(30)">30%</span>
@@ -1575,6 +1583,7 @@
   </div>
 </div>
 
+<script src="tutorial_showcase.js"></script>
 <script>
   function applyTheme(theme) {
     const isDark = theme === "dark";
@@ -2144,6 +2153,11 @@
     return 0;
   }
 
+  const MASTERY_CLASS_BUFF = 1.05;
+  function masteryScale() {
+    return document.getElementById("masteryInGameToggle")?.checked ? MASTERY_CLASS_BUFF : 1;
+  }
+
   function applyStatsToInputs(statsObj) {
     document.querySelectorAll(".stat-input").forEach(inp => {
       const k = inp.dataset.stat;
@@ -2153,7 +2167,7 @@
         return;
       }
       const val = statsObj && statsObj[k] !== undefined ? statsObj[k] : 0;
-      inp.value = val;
+      inp.value = (k === "Mastery") ? Math.round(Number(val) * masteryScale()) : val;
     });
   }
 
@@ -2199,7 +2213,7 @@
       const k = inp.dataset.stat;
       if (WEAPON_STAT_KEYS.includes(k)) return;
       const v = parseFloat(inp.value);
-      if (!isNaN(v)) out[k] = v;
+      if (!isNaN(v)) out[k] = (k === "Mastery") ? Math.round(v / masteryScale()) : v;
     });
     return out;
   }
@@ -2374,6 +2388,16 @@
       // Ignore transient validation errors during partial selection
     }
   }
+
+  document.getElementById("masteryInGameToggle")?.addEventListener("change", (ev) => {
+    // Re-express the typed value in the new mode so the underlying raw Mastery stays the same.
+    const inp = document.querySelector('.stat-input[data-stat="Mastery"]');
+    const v = parseFloat(inp?.value);
+    if (inp && isFinite(v)) {
+      inp.value = Math.round(ev.target.checked ? v * MASTERY_CLASS_BUFF : v / MASTERY_CLASS_BUFF);
+    }
+    refreshComputedStats();
+  });
 
   function updateSimProgressUI(completed, total, visible = true) {
     const box = document.getElementById("simProgressBox");
@@ -3771,6 +3795,124 @@
 
   // Initialize
   loadCatalog(false);
+
+  if (window.SwtorTutorial) {
+    window.SwtorTutorial.init({
+      storageKey: "swtorsim_sim_tutorial_v1",
+      buttonId: "tutorialBtn",
+      showWelcomeToast: true,
+      welcomeTitle: "Welcome to SwtorSim",
+      welcomeBody: "New here? Take a 60-second interactive tour of presets, Monte Carlo runs, and combat telemetry.",
+      steps: [
+        {
+          target: null,
+          title: "Welcome to the Combat Simulator",
+          body: "<p>SwtorSim simulates SWTOR combat rotations, procs, buffs, and gear curves in single-run (<b>TEST</b>) or Monte Carlo (<b>BATCH</b>) mode.</p><p>Use <b>Next</b> / <b>Back</b> or your arrow keys (<code>&larr;</code> <code>&rarr;</code>) to step through the dashboard.</p>",
+        },
+        {
+          target: ["#envLiveBtn", "#envPtsBtn"],
+          placement: "bottom",
+          title: "Game Environment (Live vs PTS)",
+          body: "<p>Switch between <b>Live (7.9)</b> and <b>PTS (8.0)</b> game data, blueprints, and stat curves at any time.</p>",
+        },
+        {
+          target: "#presetConfigSelect",
+          placement: "bottom",
+          title: "Preset Run Configs",
+          body: "<p>Pick a ready-made <b>Preset Config</b> to populate your class, spec, gear, and rotation in one click.</p>",
+          action: {
+            label: "Load Sample Preset",
+            run: async () => {
+              const sel = document.getElementById("presetConfigSelect");
+              if (sel && sel.options.length > 1) {
+                const mmOpt = Array.from(sel.options).find(
+                  (o) => /sniper_marksmanship_14gcd|marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent)
+                );
+                if (mmOpt) sel.selectedIndex = mmOpt.index;
+                else if (!sel.value) sel.selectedIndex = 1;
+                sel.dispatchEvent(new Event("change", { bubbles: true }));
+                await new Promise((r) => setTimeout(r, 350));
+              }
+            },
+          },
+        },
+        {
+          target: ".sidebar .config-section:nth-child(1)",
+          placement: "right",
+          title: "Execution Mode & Target Dummy",
+          onEnter: () => {
+            const body = document.querySelector(".sidebar .config-section:nth-child(1) .section-body");
+            if (body) body.classList.remove("collapsed");
+          },
+          body: "<p><b>TEST (Single Run)</b> runs one deterministic fight using the RNG seed—great for inspecting exact casts and logs.</p><p><b>BATCH (Monte Carlo)</b> runs dozens or hundreds of fights to measure mean DPS, variance, and percentiles across Target Dummy HP presets.</p>",
+        },
+        {
+          target: ".sidebar .config-section:nth-child(2)",
+          placement: "right",
+          title: "Loadout, Rotation & Skill Tree",
+          onEnter: () => {
+            const body = document.querySelector(".sidebar .config-section:nth-child(2) .section-body");
+            if (body) body.classList.remove("collapsed");
+          },
+          body: "<p>Customize your <b>Class</b>, <b>Discipline</b>, <b>Rotation File</b>, Tactical, Implants, and Relics.</p><p>Click <b>Skill Tree</b> to toggle passives and ability choices interactively.</p>",
+        },
+        {
+          target: ".sidebar .config-section:nth-child(4)",
+          placement: "right",
+          title: "Engine Mechanics & Toggles",
+          onEnter: () => {
+            const body = document.querySelector(".sidebar .config-section:nth-child(4) .section-body");
+            if (body) body.classList.remove("collapsed");
+          },
+          body: "<p>Control combat realism: <b>Operation Raid Debuffs</b>, <b>Ability Stem Matching</b>, <b>Projectile Flight Time</b>, and <b>Flashpoint / Operation</b> mode.</p><p>You can also set <b>Combat Distance (m)</b> and <b>GCD Stall (%)</b> to model real-world latency.</p>",
+        },
+        {
+          target: "#runSimBtn",
+          placement: "bottom",
+          title: "Run Your First Simulation",
+          body: "<p>Click <b>&#9654; Run Simulation</b> (or press <code>Ctrl+Enter</code>) to execute the fight.</p><p>Want to see live results right now? Click below to run a quick single-fight demo.</p>",
+          action: {
+            label: "&#9654; Run Demo Sim (TEST)",
+            run: async (tut) => {
+              const sel = document.getElementById("presetConfigSelect");
+              if (sel && !sel.value && sel.options.length > 1) {
+                const mmOpt = Array.from(sel.options).find(
+                  (o) => /sniper_marksmanship_14gcd|marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent)
+                );
+                sel.selectedIndex = mmOpt ? mmOpt.index : 1;
+                sel.dispatchEvent(new Event("change", { bubbles: true }));
+                await new Promise((r) => setTimeout(r, 350));
+              }
+              if (typeof setSimMode === "function") setSimMode("TEST");
+              if (typeof runSimulation === "function") await runSimulation();
+              tut.next();
+            },
+          },
+        },
+        {
+          target: ".kpi-strip",
+          placement: "bottom",
+          title: "Results Summary & Baseline Pinning",
+          onEnter: () => {
+            if (typeof switchTab === "function") switchTab("tabBreakdown");
+          },
+          body: "<p>The top summary cards show <b>Total / Mean DPS</b>, <b>Fight Duration</b>, <b>Execute (&lt;30% HP) DPS</b>, and <b>Crit Rate</b>.</p><p>Click <b>Pin Run</b> to lock a baseline and compare DPS deltas after changing gear or rotation.</p>",
+        },
+        {
+          target: "#castTimelineBtn",
+          placement: "bottom",
+          title: "Cast Timeline Window",
+          body: "<p>After any <b>TEST (Single Run)</b>, click <b>Cast Timeline</b> to open a visual, second-by-second cast &amp; buff timeline in its own window.</p><p>Great for spotting GCD gaps, proc windows, and weave timing.</p>",
+        },
+        {
+          target: ".tabs-bar",
+          placement: "bottom",
+          title: "Deep Telemetry & Replay Anytime",
+          body: "<p>Explore <b>Ability Breakdown</b>, <b>Monte Carlo Distribution</b>, <b>Buffs &amp; Debuffs</b> uptimes, and the timestamped <b>Combat Event Log</b>.</p><p>Replay this tour anytime by clicking <b>? Tutorial</b> in the top bar.</p>",
+        },
+      ],
+    });
+  }
 </script>
 </body>
 </html>

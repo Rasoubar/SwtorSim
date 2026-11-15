@@ -22,6 +22,7 @@ ROT_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
 TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 MAP_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_map_ui.html"
 RULE_FORM_JS_PATH = SWTORSIM_ROOT / "tools" / "rotation_rule_form.js"
+TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
 
 # Import bundle builder
 sys.path.insert(0, str(SWTORSIM_ROOT))
@@ -118,6 +119,13 @@ def build_web_release() -> None:
         print("[OK] Copied dist/rule_form.js (rule form shared by the builder and the map)")
     else:
         print(f"[FAIL] rotation_rule_form.js not found at {RULE_FORM_JS_PATH}")
+
+    # 8. Copy the in-page tutorial showcase script
+    if TUTORIAL_JS_PATH.is_file():
+        shutil.copy2(TUTORIAL_JS_PATH, DIST_DIR / "tutorial_showcase.js")
+        print("[OK] Copied dist/tutorial_showcase.js (in-page tutorial showcase)")
+    else:
+        print(f"[FAIL] tutorial_showcase.js not found at {TUTORIAL_JS_PATH}")
 
     print("\n" + "=" * 65)
     print("  [OK] WEB RELEASE BUILD COMPLETE!")

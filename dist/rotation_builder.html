@@ -1260,7 +1260,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794747072"></script>
+  <script src="pyodide_client.js?v=1794751902"></script>
 </head>
 <body>
 
@@ -1286,6 +1286,7 @@
       <option value="">-- Open Existing Rotation JSON --</option>
     </select>
     <button onclick="triggerLocalFileImport()" title="Import any .json file from disk">Import File...</button>
+    <button class="btn-sm" id="tutorialBtn" type="button" style="border-color:var(--accent);color:var(--accent);background:var(--accent-bg);" title="Replay the Interactive Guided Tour">? Tutorial</button>
     <button class="btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">Dark</button>
     <input type="file" id="localFileInput" accept=".json" style="display:none" onchange="handleLocalFileImport(event)">
   </div>
@@ -1475,6 +1476,7 @@
 
 <div class="toast" id="toastBanner"></div>
 
+<script src="tutorial_showcase.js"></script>
 <script src="rule_form.js"></script>
 <script>
   function applyTheme(theme) {
@@ -2993,6 +2995,11 @@ function onStepCardDragLeave(e, idx) {
   }
 }
 
+// Rules for abilities dropped from the palette: in Sub 30 helper mode they inherit the HP threshold.
+function sub30DropRules() {
+  return TIMELINE_VIEW_MODE === "sub30" ? { target_hp_below_pct: SUB30_THRESHOLD } : {};
+}
+
 function onStepCardDrop(e, idx) {
   if (!currentDragData) return;
   e.preventDefault();
@@ -3033,7 +3040,7 @@ function onStepCardDrop(e, idx) {
       const oldRules = step.rules ? JSON.parse(JSON.stringify(step.rules)) : {};
       const pool = [
         { ability_id: oldAbId, rules: oldRules },
-        { ability_id: abId, rules: {} }
+        { ability_id: abId, rules: sub30DropRules() }
       ];
       rotationSteps[idx] = {
         type: "priority_block",
@@ -3048,7 +3055,7 @@ function onStepCardDrop(e, idx) {
     }
 
     if (isUpgrade && step.type === "priority_block") {
-      step.pool.push({ ability_id: abId, rules: {} });
+      step.pool.push({ ability_id: abId, rules: sub30DropRules() });
       collapsedSteps.delete(idx);
       activeBlockIndex = idx;
       renderTimeline();
@@ -3062,13 +3069,13 @@ function onStepCardDrop(e, idx) {
       newStep = {
         type: "priority_block",
         name: `Window ${rotationSteps.filter(s => s.type === "priority_block").length + 1}`,
-        pool: [{ ability_id: abId, rules: {} }]
+        pool: [{ ability_id: abId, rules: sub30DropRules() }]
       };
     } else {
       newStep = {
         type: "optional",
         ability_id: abId,
-        rules: {}
+        rules: sub30DropRules()
       };
     }
 
@@ -3184,7 +3191,7 @@ function onPoolRowDrop(e, stepIdx, rowIdx) {
     const abId = data.slug;
     const dstPool = rotationSteps[stepIdx].pool;
     let targetRow = isTop ? rowIdx : rowIdx + 1;
-    dstPool.splice(targetRow, 0, { ability_id: abId, rules: {} });
+    dstPool.splice(targetRow, 0, { ability_id: abId, rules: sub30DropRules() });
     renderTimeline();
     renderRightPanel();
     showToast(`Inserted ${data.slug} at priority #${targetRow + 1}.`);
@@ -3621,14 +3628,14 @@ function renderTimeline() {
             rotationSteps.push({
               type: "priority_block",
               name: "Window 1",
-              pool: [{ ability_id: abId, rules: {} }]
+              pool: [{ ability_id: abId, rules: sub30DropRules() }]
             });
             activeBlockIndex = 0;
           } else {
             rotationSteps.push({
               type: "optional",
               ability_id: abId,
-              rules: {}
+              rules: sub30DropRules()
             });
           }
           renderTimeline();
@@ -4009,14 +4016,14 @@ function renderTimeline() {
         rotationSteps.push({
           type: "priority_block",
           name: `Window ${rotationSteps.filter(s => s.type === "priority_block").length + 1}`,
-          pool: [{ ability_id: abId, rules: {} }]
+          pool: [{ ability_id: abId, rules: sub30DropRules() }]
         });
         activeBlockIndex = rotationSteps.length - 1;
       } else {
         rotationSteps.push({
           type: "optional",
           ability_id: abId,
-          rules: {}
+          rules: sub30DropRules()
         });
       }
       renderTimeline();
@@ -4933,6 +4940,79 @@ function escapeHtml(str) {
 
 function escapeAttr(str) {
   return escapeHtml(str).replace(/'/g, "&#39;");
+}
+
+if (window.SwtorTutorial) {
+  window.SwtorTutorial.init({
+    storageKey: "swtorsim_builder_tutorial_v1",
+    buttonId: "tutorialBtn",
+    showWelcomeToast: true,
+    welcomeTitle: "Rotation Builder Guide",
+    welcomeBody: "Take a quick interactive tour of the ability palette, timeline blocks, Sub 30 helper, and Visual Map.",
+    steps: [
+      {
+        target: null,
+        title: "Welcome to the Rotation Builder",
+        body: "<p>Build, lint, and dry-run SWTOR rotations visually—without hand-writing JSON.</p><p>Use <b>Next</b> / <b>Back</b> or arrow keys (<code>&larr;</code> <code>&rarr;</code>) to explore the workspace, or load the sample Marksmanship preset to follow along.</p>",
+        action: {
+          label: "Load Sample Preset",
+          run: async () => {
+            const sel = document.getElementById("runConfigSelect");
+            if (sel && sel.options.length > 1) {
+              const mmOpt = Array.from(sel.options).find(
+                (o) => /sniper_marksmanship_14gcd|marksmanship/i.test(o.value) || /marksmanship/i.test(o.textContent)
+              );
+              sel.selectedIndex = mmOpt ? mmOpt.index : 1;
+              sel.dispatchEvent(new Event("change", { bubbles: true }));
+              await new Promise((r) => setTimeout(r, 400));
+            }
+          },
+        },
+      },
+      {
+        target: "#openMapBtn",
+        placement: "bottom",
+        title: "Visual Map (Recommended Editor)",
+        body: "<p><b>Open Visual Map</b> is the fastest, most visual way to build rotations: drag and drop abilities across horizontal <b>Opener</b> &amp; <b>Loop</b> lanes, place off-GCD weaves, and edit rules in place.</p><p>Every change syncs live back to this builder.</p>",
+        action: {
+          label: "Open Visual Map &#8599;",
+          run: () => {
+            if (typeof openVisualMapWindow === "function") openVisualMapWindow();
+          },
+        },
+      },
+      {
+        target: ".workspace > .panel:first-child",
+        placement: "right",
+        title: "Spec, Gear & Auto-Discovery",
+        body: "<p>Select your <b>Class</b>, <b>Discipline</b>, <b>Tactical</b>, <b>Legendary Implants</b>, and <b>Relics</b>.</p><p>The palette below automatically discovers valid <b>Abilities</b>, <b>Buffs</b>, <b>Debuffs</b>, and <b>Procs</b> for your exact loadout.</p>",
+      },
+      {
+        target: ".timeline-toolbar",
+        placement: "bottom",
+        title: "Timeline & Step Types",
+        body: "<p>Add <b>Priority Blocks</b> (first matching rule wins), <b>Optional Casts</b>, <b>Fixed Casts</b>, and an <b>End Of Opener</b> loop anchor.</p><p>Drag steps to reorder them, or click <b>+ Rule</b> on any step to open the Guided Rule Builder.</p>",
+      },
+      {
+        target: ["#preCombatPanel", "#weavePanel"],
+        placement: "bottom",
+        title: "Pre-Combat & Use on Cooldown",
+        body: "<p>Configure pre-pull actions (e.g. stealth, tactical swaps, pre-casts) in <b>Pre-Combat</b>, and off-GCD abilities in <b>Use on Cooldown (Weave)</b>.</p>",
+      },
+      {
+        target: "#tabModeSub30",
+        placement: "bottom",
+        title: "Sub 30 Helper",
+        body: "<p>Switch to <b>Sub 30 helper</b> to inspect execute-phase coverage and quickly insert execute abilities where needed.</p>",
+      },
+      {
+        target: ".workspace > .panel:last-child",
+        placement: "left",
+        title: "Linter, Dry-Run Sim & Replay Anytime",
+        body: "<p>Validate your rotation in <b>Linter &amp; Clipboard</b>, test it with <b>Dry-Run Sim</b>, or open <b>Visual Map</b> from the tab bar too.</p><p>Replay this tour anytime by clicking <b>? Tutorial</b> in the top bar.</p>",
+      },
+    ],
+  });
 }
 </script>
 </body>

@@ -233,6 +233,7 @@
   <button type="button" class="hbtn" id="btnPalette" title="Show or hide the ability list">Abilities</button>
   <button type="button" class="hbtn" id="btnUndo" title="Undo the last rotation change (Ctrl+Z)" disabled>Undo</button>
   <button type="button" class="hbtn" id="btnRedo" title="Redo (Ctrl+Y)" disabled>Redo</button>
+  <button type="button" class="hbtn" id="tutorialBtn" style="border-color:var(--accent);color:var(--accent);" title="Replay the Interactive Guided Tour">? Tutorial</button>
 </header>
 <div id="shell">
   <aside id="palette" aria-label="Abilities">
@@ -249,6 +250,7 @@
 <div class="pop" id="menu" role="menu"></div>
 <div class="pop" id="rulePop" role="dialog" aria-label="Rule"></div>
 
+<script src="tutorial_showcase.js"></script>
 <script src="rule_form.js"></script>
 <script>
 (function initTheme() {
@@ -358,7 +360,7 @@ function laneHtml(kind, tracksHtml) {
   </section>`;
 }
 
-// Loop row breaks (view only, remembered per class / discipline in this browser): with an ability
+// Loop row breaks (view only, session-only per class / discipline): with an ability
 // chosen, a new row starts at every loop step that leads with it (its only ability, or the first row
 // of a priority block), so repeats of the same cycle line up under each other.
 const loopSteps = () => ((STATE && STATE.steps) || []).filter((s) => s.seq > STATE.loopStart);
@@ -367,7 +369,7 @@ const rowBreakKey = () => `swtorsim_map_rowbreak:${(STATE && STATE.loadoutLabel)
 
 function rowBreakName() {
   let name = "";
-  try { name = localStorage.getItem(rowBreakKey()) || ""; } catch (e) {}
+  try { name = sessionStorage.getItem(rowBreakKey()) || ""; } catch (e) {}
   return name && loopSteps().some((st) => leadName(st) === name) ? name : "";
 }
 
@@ -630,7 +632,7 @@ document.getElementById("main").addEventListener("click", (e) => {
 document.getElementById("main").addEventListener("change", (e) => {
   const sel = e.target.closest("[data-rowbreak]");
   if (!sel) return;
-  try { localStorage.setItem(rowBreakKey(), sel.value); } catch (err) {}
+  try { sessionStorage.setItem(rowBreakKey(), sel.value); } catch (err) {}
   render();
 });
 
@@ -833,6 +835,65 @@ if (channel) {
   channel.postMessage({ type: "hello" });
 } else {
   document.getElementById("main").innerHTML = `<div class="empty"><strong>This browser can't link windows (BroadcastChannel is unavailable).</strong></div>`;
+}
+
+if (window.SwtorTutorial) {
+  window.SwtorTutorial.init({
+    storageKey: "swtorsim_map_tutorial_v1",
+    buttonId: "tutorialBtn",
+    showWelcomeToast: true,
+    welcomeTitle: "Visual Map Guide",
+    welcomeBody: "Take a quick tour of Opener/Loop lanes, drag-and-drop editing, weaves, and rule popovers.",
+    steps: [
+      {
+        target: null,
+        title: "Welcome to the Visual Map",
+        body: "<p>This is the primary horizontal editor for your rotation. Every change you make here syncs live back to the <b>Rotation Builder</b>.</p><p>Use <b>Next</b> / <b>Back</b> or arrow keys (<code>&larr;</code> <code>&rarr;</code>) to step through.</p>",
+      },
+      {
+        target: "#btnPalette",
+        placement: "bottom",
+        title: "Ability Palette & Drag-and-Drop",
+        body: "<p>Toggle <b>Abilities</b> to open the searchable palette. Drag any ability onto an <b>arrow gap</b> to insert a new step, onto an <b>existing step</b> to add a priority row, or into <b>Use on cooldown</b>.</p>",
+      },
+      {
+        target: () => document.querySelector(".anchor-row") || document.querySelector("#main"),
+        placement: "bottom",
+        title: "Opener, Loop & End of Opener Anchor",
+        body: "<p><b>Opener</b> runs once at pull; <b>Loop</b> repeats indefinitely.</p><p>Drag the <code>&#8942;&#8942; End of opener</code> handle onto any arrow or step to split them, or click <b>&times;</b> to remove it so the entire rotation loops.</p>",
+      },
+      {
+        target: "#main",
+        placement: "top",
+        title: "Step Types, Off-GCDs & Step Menu",
+        body: "<p>Steps are color-coded: <b>Fixed</b> (must fire), <b>Optional</b> (skip if not ready/rules fail), and <b>Priority Block</b> (first matching row wins).</p><p><b>Off-GCD</b> steps hang below the arrow where they fire. Click a step's menu button to switch type, duplicate, or delete.</p>",
+      },
+      {
+        target: "#main",
+        placement: "top",
+        title: "Guided Rules & Conditions",
+        body: "<p>Hover over any <b>Optional step</b>, <b>Priority row</b>, or <b>Use on cooldown</b> chip and click the <b>+</b> button (or click an existing rule badge) to add or edit conditions using the guided rule popover—no hand-written JSON needed.</p>",
+      },
+      {
+        target: () => document.querySelector(".weave-strip") || document.querySelector("#main"),
+        placement: "bottom",
+        title: "Use on Cooldown (Weave Strip)",
+        body: "<p>This loop-only strip sits above the <b>Loop</b> lane. Abilities dropped here are tried before every loop step—ideal for off-GCD cooldowns and procs, with optional rules per chip.</p>",
+      },
+      {
+        target: () => document.querySelector(".rowbreak") || document.querySelector("#main"),
+        placement: "bottom",
+        title: "Wrap Long Loops (New row at)",
+        body: "<p>Choose an ability in <b>New row at</b> to wrap the <b>Loop</b> onto a new row each time that ability starts a step—great for lining up repeating cycles. View-only; resets when you close the window.</p>",
+      },
+      {
+        target: ["#btnUndo", "#btnRedo"],
+        placement: "bottom",
+        title: "Trash, Undo/Redo & Replay Anytime",
+        body: "<p>Drag any step, priority row, weave chip, or End of Opener handle onto the bottom-right <b>Trash</b> icon to remove it, and use <b>Undo</b> / <b>Redo</b> (<code>Ctrl+Z</code> / <code>Ctrl+Y</code>) anytime.</p><p>Replay this tour anytime from <b>? Tutorial</b> in the top bar.</p>",
+      },
+    ],
+  });
 }
 </script>
 </body>

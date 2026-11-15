@@ -52,6 +52,7 @@ UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
 TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 MAP_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_map_ui.html"
 RULE_FORM_JS_PATH = SWTORSIM_ROOT / "tools" / "rotation_rule_form.js"
+TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
 
 
 # ---------------------------------------------------------------------------
@@ -1168,6 +1169,19 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                     self._send_json({"error": f"Script not found at {RULE_FORM_JS_PATH}"}, status=500)
                     return
                 js_bytes = RULE_FORM_JS_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/javascript; charset=utf-8")
+                self.send_header("Content-Length", str(len(js_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(js_bytes)
+                return
+
+            if route == "/tutorial_showcase.js":
+                if not TUTORIAL_JS_PATH.is_file():
+                    self._send_json({"error": f"Script not found at {TUTORIAL_JS_PATH}"}, status=500)
+                    return
+                js_bytes = TUTORIAL_JS_PATH.read_bytes()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/javascript; charset=utf-8")
                 self.send_header("Content-Length", str(len(js_bytes)))

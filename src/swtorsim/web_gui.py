@@ -81,6 +81,7 @@ from src.swtorsim.setup import prepare_simulation
 PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "live" / "parsed"
 SIM_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
 TIMELINE_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
+TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
 RUN_CONFIG_DIR = SWTORSIM_ROOT / "data" / "run_config"
 
 COMMON_HP_PRESETS = [
@@ -1694,6 +1695,19 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(html_bytes)
+                return
+
+            if route == "/tutorial_showcase.js":
+                if not TUTORIAL_JS_PATH.is_file():
+                    self._send_json({"error": f"Script not found at {TUTORIAL_JS_PATH}"}, status=500)
+                    return
+                js_bytes = TUTORIAL_JS_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/javascript; charset=utf-8")
+                self.send_header("Content-Length", str(len(js_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(js_bytes)
                 return
 
             if route in ("/", "/index.html"):
