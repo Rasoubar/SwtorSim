@@ -1605,12 +1605,12 @@
   }
 
   (function initTheme() {
-    let saved = "light";
-    try { saved = localStorage.getItem("swtorsim_theme") || "light"; } catch (e) {}
+    let saved = "dark";
+    try { saved = localStorage.getItem("swtorsim_theme") || "dark"; } catch (e) {}
     applyTheme(saved);
     window.addEventListener("storage", (e) => {
       if (e.key === "swtorsim_theme") {
-        applyTheme(e.newValue || "light");
+        applyTheme(e.newValue || "dark");
       }
     });
   })();

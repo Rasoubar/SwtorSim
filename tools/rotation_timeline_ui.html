@@ -145,10 +145,10 @@
     if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
     else document.documentElement.removeAttribute("data-theme");
   };
-  let saved = "light";
-  try { saved = localStorage.getItem("swtorsim_theme") || "light"; } catch (e) {}
+  let saved = "dark";
+  try { saved = localStorage.getItem("swtorsim_theme") || "dark"; } catch (e) {}
   apply(saved);
-  window.addEventListener("storage", (e) => { if (e.key === "swtorsim_theme") apply(e.newValue || "light"); });
+  window.addEventListener("storage", (e) => { if (e.key === "swtorsim_theme") apply(e.newValue || "dark"); });
 })();
 
 // Who feeds this window: the Rotation Builder (default) or the Combat Simulator (?source=sim).

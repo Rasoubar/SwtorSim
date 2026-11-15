@@ -1260,7 +1260,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794752544"></script>
+  <script src="pyodide_client.js?v=1794752845"></script>
 </head>
 <body>
 
@@ -1500,12 +1500,12 @@
   }
 
   (function initTheme() {
-    let saved = "light";
-    try { saved = localStorage.getItem("swtorsim_theme") || "light"; } catch (e) {}
+    let saved = "dark";
+    try { saved = localStorage.getItem("swtorsim_theme") || "dark"; } catch (e) {}
     applyTheme(saved);
     window.addEventListener("storage", (e) => {
       if (e.key === "swtorsim_theme") {
-        applyTheme(e.newValue || "light");
+        applyTheme(e.newValue || "dark");
       }
     });
   })();
