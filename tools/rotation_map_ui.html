@@ -573,6 +573,13 @@ function renderRuleFields(existingVal = null) {
   const meta = (cat.conditions || []).find((c) => c.key === key) || {};
   document.getElementById("rpDesc").textContent = meta.description || "";
   document.getElementById("rpErr").textContent = "";
+  if (!key) {
+    // Unknown rule key being edited: nothing is selected until the user picks a type.
+    document.getElementById("rpFields").innerHTML = "";
+    document.getElementById("rpSave").disabled = true;
+    document.getElementById("rpErr").textContent = `Unknown rule "${ruleCtx ? ruleCtx.editKey : ""}". Pick a Condition Type to replace it.`;
+    return;
+  }
   const html = RuleForm.fieldsHtml(key, existingVal, cat.lists || {});
   document.getElementById("rpFields").innerHTML = html === null ? "" : html;
   document.getElementById("rpSave").disabled = html === null;
@@ -601,9 +608,18 @@ function openRulePop(target, editKey, anchorEl) {
   const sel = document.getElementById("rpKey");
   let initial = null;
   if (editKey && editKey in target.raw) {
-    // Same fallback as the builder's modal for alias keys that are not in the condition catalog.
-    sel.value = conditions.some((c) => c.key === editKey) ? editKey : "caster_buff_stacks";
-    initial = target.raw[editKey];
+    if (conditions.some((c) => c.key === editKey)) {
+      sel.value = editKey;
+      initial = target.raw[editKey];
+    } else {
+      // Unknown key (typo or removed rule): never guess a replacement; Save stays disabled until a type is picked.
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.disabled = true;
+      opt.textContent = `-- Unknown rule "${editKey}": pick a type --`;
+      sel.insertBefore(opt, sel.firstChild);
+      sel.value = "";
+    }
   } else {
     sel.value = "caster_has_buff";
   }

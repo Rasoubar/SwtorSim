@@ -82,6 +82,8 @@ PARSED_DIR = SWTORSIM_ROOT / "data" / "extractor" / "live" / "parsed"
 SIM_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
 TIMELINE_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
+CREDITS_JS_PATH = SWTORSIM_ROOT / "tools" / "credits_modal.js"
+CREDITS_MD_PATH = SWTORSIM_ROOT / "CREDITS.md"
 RUN_CONFIG_DIR = SWTORSIM_ROOT / "data" / "run_config"
 
 COMMON_HP_PRESETS = [
@@ -1708,6 +1710,33 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(js_bytes)
+                return
+
+            if route == "/credits_modal.js":
+                if not CREDITS_JS_PATH.is_file():
+                    self._send_json({"error": f"Script not found at {CREDITS_JS_PATH}"}, status=500)
+                    return
+                js_bytes = CREDITS_JS_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/javascript; charset=utf-8")
+                self.send_header("Content-Length", str(len(js_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(js_bytes)
+                return
+
+            if route == "/CREDITS.md":
+                if not CREDITS_MD_PATH.is_file():
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                md_bytes = CREDITS_MD_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/markdown; charset=utf-8")
+                self.send_header("Content-Length", str(len(md_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(md_bytes)
                 return
 
             if route in ("/", "/index.html"):

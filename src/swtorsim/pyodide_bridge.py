@@ -33,6 +33,7 @@ from data.rotation_builder import (
     build_rotation_file_data,
     discover_loadout_catalog,
     get_workspace_catalog,
+    load_builder_run_config,
     normalize_pre_combat_steps,
     normalize_pull_gate,
     normalize_weave_steps,
@@ -92,18 +93,10 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
 
         elif action == "LOAD_BUILDER_RUN_CONFIG":
             rel_path = data.get("path", "")
-            target_file = _resolve_workspace_path(rel_path)
-            if not target_file.is_file():
-                return json.dumps({"error": f"Run config not found: {rel_path}"}, ensure_ascii=False)
-            rc_data = load_json_file(str(target_file))
-            choices_data = {}
-            choices_override = rc_data.get("choices_override") or rc_data.get("choices")
-            if isinstance(choices_override, dict) and choices_override:
-                choices_data.update({str(k): v for k, v in choices_override.items()})
-            result = {
-                "run_config": rc_data,
-                "choices": choices_data,
-            }
+            try:
+                result = load_builder_run_config(rel_path)
+            except FileNotFoundError as exc:
+                return json.dumps({"error": str(exc)}, ensure_ascii=False)
 
         elif action == "LOAD_ROTATION":
             rel_path = data.get("path", "")

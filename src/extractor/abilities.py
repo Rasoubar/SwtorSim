@@ -482,6 +482,17 @@ def _cooldown(record: NodeRecord) -> float:
     return value
 
 
+def _target_rule(record: NodeRecord) -> str:
+    """Who the ability is aimed at, from ``ablTargetRule`` (``tgtRuleAttackable`` -> ``attackable``,
+    ``tgtRuleGroundSelf`` -> ``ground_self``). Abilities without the field are self-cast (Cloak of Pain, Enrage)."""
+    value = _field_value(record, "ablTargetRule")
+    if not isinstance(value, str) or not value:
+        return "self"
+    if value.startswith("tgtRule"):
+        value = value[len("tgtRule") :]
+    return re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", value).lower() or "self"
+
+
 def _effect_ids(record: NodeRecord) -> list[str]:
     effect_ids = _field_value(record, "ablEffectIDs")
     if isinstance(effect_ids, dict) and isinstance(effect_ids.get("list"), list):
@@ -2087,6 +2098,10 @@ def _build_ability_payload(
         payload["triggers_gcd"] = triggers_gcd
         payload["base_gcd"] = base_gcd
         payload["activation"] = _activation(record)
+        payload["target_rule"] = _target_rule(record)
+        max_range = _float_field(record, "ablMaxRange")
+        if max_range is not None:
+            payload["max_range"] = max_range
 
     zero_effect = _zero_effect_record(record, records_by_fqn)
     if zero_effect is not None:

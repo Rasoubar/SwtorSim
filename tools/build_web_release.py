@@ -23,6 +23,8 @@ TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 MAP_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_map_ui.html"
 RULE_FORM_JS_PATH = SWTORSIM_ROOT / "tools" / "rotation_rule_form.js"
 TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
+CREDITS_JS_PATH = SWTORSIM_ROOT / "tools" / "credits_modal.js"
+CREDITS_MD_PATH = SWTORSIM_ROOT / "CREDITS.md"
 
 # Import bundle builder
 sys.path.insert(0, str(SWTORSIM_ROOT))
@@ -126,6 +128,19 @@ def build_web_release() -> None:
         print("[OK] Copied dist/tutorial_showcase.js (in-page tutorial showcase)")
     else:
         print(f"[FAIL] tutorial_showcase.js not found at {TUTORIAL_JS_PATH}")
+
+    # 9. Copy the About & Credits modal script & CREDITS.md
+    if CREDITS_JS_PATH.is_file():
+        shutil.copy2(CREDITS_JS_PATH, DIST_DIR / "credits_modal.js")
+        print("[OK] Copied dist/credits_modal.js (About & Credits modal)")
+    else:
+        print(f"[FAIL] credits_modal.js not found at {CREDITS_JS_PATH}")
+
+    if CREDITS_MD_PATH.is_file():
+        shutil.copy2(CREDITS_MD_PATH, DIST_DIR / "CREDITS.md")
+        print("[OK] Copied dist/CREDITS.md (single source of truth for credits)")
+    else:
+        print(f"[FAIL] CREDITS.md not found at {CREDITS_MD_PATH}")
 
     print("\n" + "=" * 65)
     print("  [OK] WEB RELEASE BUILD COMPLETE!")

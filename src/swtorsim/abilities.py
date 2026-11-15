@@ -287,6 +287,12 @@ class Effect:
         if not self.target_overrides:
             has_caster_trigger = any(
                 t.get("trigger") in ("on_damage_dealt", "on_ability_activated")
+                # Retaliation buffs (Cloak of Pain, Rebuke): the owner takes the hit and the branch answers the
+                # attacker (trigger_caster), so the owner is the caster even if the ability is tagged aggressive.
+                or (
+                    t.get("trigger") == "on_damage_taken"
+                    and any(o.get("type") == "trigger_caster" for o in (getattr(b, "target_overrides", None) or []))
+                )
                 for b in self.branches
                 for t in getattr(b, "triggers", [])
             )
@@ -375,6 +381,12 @@ class Effect:
         self.schedule_timer_branches(sim, caster, effect_target, context=context, ability=ability)
 
 
+# ablTargetRule values (as emitted by the extractor) that never aim an ability at the enemy.
+_NON_HOSTILE_TARGET_RULES = frozenset(
+    {"self", "friendly", "friendly_dead", "companion", "grouped", "ground_self", "cover_object"}
+)
+
+
 @dataclass(slots=True)
 class AbilityBlueprint:
     """Immutable parsed representation of an active ability, passive ability, or talent JSON blueprint."""
@@ -396,6 +408,8 @@ class AbilityBlueprint:
     effects: Dict[int, Effect] = field(default_factory=dict)
     entry_effect_ids: List[int] = field(default_factory=list)
     file_path: Optional[Path] = None
+    target_rule: Optional[str] = None  # extracted ablTargetRule ("attackable", "friendly", "self", ...); None in older data
+    max_range: Optional[float] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], file_path: Optional[Path] = None) -> "AbilityBlueprint":
@@ -446,6 +460,8 @@ class AbilityBlueprint:
             effects=effects_map,
             entry_effect_ids=entry_ids,
             file_path=file_path,
+            target_rule=data.get("target_rule"),
+            max_range=float(data["max_range"]) if data.get("max_range") is not None else None,
         )
 
     @classmethod
@@ -1403,6 +1419,41 @@ class Ability:
         return self.max_charges is not None and self.max_charges > 0
 
     @property
+    def _looks_hostile(self) -> bool:
+        """Tag/damage heuristic: tagged aggressive/basic attack, or any branch deals damage (regardless of other
+        tags, e.g. Obliterate carries only class tags)."""
+        return (
+            "tag.abl.utility.aggressive_action" in self.tags
+            or "tag.abl.utility.is_basic_attack" in self.tags
+            or any(
+                getattr(b, "is_attack", False)
+                for eff in self.effects.values()
+                for b in getattr(eff, "branches", ())
+            )
+        )
+
+    @property
+    def targets_enemy(self) -> bool:
+        """True when the cast is aimed at the enemy (ability-level conditions and the cast target).
+
+        Uses the extracted ``target_rule`` (the game's ablTargetRule) when present: ``attackable`` aims at the enemy;
+        self/friendly/companion/grouped/cover rules aim at the caster (a self-centered AoE such as Sweeping Slash
+        still reaches enemies through its own aoe target overrides). ``ground``, ``any`` and data extracted before
+        ``target_rule`` existed fall back to the tag/damage heuristic."""
+        rule = getattr(self.blueprint, "target_rule", None)
+        if rule == "attackable":
+            return True
+        if rule in _NON_HOSTILE_TARGET_RULES:
+            return False
+        return self._looks_hostile
+
+    @property
+    def is_aggressive(self) -> bool:
+        """True for a hostile action: casting it enters combat and breaks stealth. Attackable abilities and anything
+        the tag/damage heuristic flags, including self-centered damaging AoEs whose rule is ``self``."""
+        return self.targets_enemy or self._looks_hostile
+
+    @property
     def is_channel(self) -> bool:
         act = self.activation or getattr(self.blueprint, "activation", None) or {}
         return isinstance(act, dict) and act.get("type") == "channel"
@@ -1500,19 +1551,7 @@ class Ability:
         if not caster.resource.can_afford(modified_cost):
             return False
 
-        is_aggressive = (
-            "tag.abl.utility.aggressive_action" in self.tags
-            or "tag.abl.utility.is_basic_attack" in self.tags
-            or (
-                not self.tags
-                and any(
-                    getattr(b, "is_attack", False)
-                    for eff in self.effects.values()
-                    for b in getattr(eff, "branches", ())
-                )
-            )
-        )
-        ability_target = target if is_aggressive else caster
+        ability_target = target if self.targets_enemy else caster
         conds = self.conditions or getattr(self.blueprint, "conditions", None) or {}
         return validate_all(conds, caster, ability_target, sim=sim)
 
@@ -1541,19 +1580,7 @@ class Ability:
         if not caster.resource.can_afford(modified_cost):
             return False, f"Insufficient resource (needs {modified_cost:.1f}, has {caster.resource.current:.1f})"
 
-        is_aggressive = (
-            "tag.abl.utility.aggressive_action" in self.tags
-            or "tag.abl.utility.is_basic_attack" in self.tags
-            or (
-                not self.tags
-                and any(
-                    getattr(b, "is_attack", False)
-                    for eff in self.effects.values()
-                    for b in getattr(eff, "branches", ())
-                )
-            )
-        )
-        ability_target = target if is_aggressive else caster
+        ability_target = target if self.targets_enemy else caster
         conds = self.conditions or getattr(self.blueprint, "conditions", None) or {}
         if not validate_all(conds, caster, ability_target, sim=sim):
             return False, "Conditions / requirements not met"
@@ -1670,18 +1697,7 @@ class Ability:
             )
 
         caster.current_target = target
-        is_aggressive = (
-            "tag.abl.utility.aggressive_action" in self.tags
-            or "tag.abl.utility.is_basic_attack" in self.tags
-            or (
-                not self.tags
-                and any(
-                    getattr(b, "is_attack", False)
-                    for eff in self.effects.values()
-                    for b in getattr(eff, "branches", ())
-                )
-            )
-        )
+        is_aggressive = self.is_aggressive
         if is_aggressive and hasattr(caster, "break_stealth"):
             caster.break_stealth(sim)
         if is_aggressive and not getattr(caster, "in_combat", False):
@@ -1692,7 +1708,7 @@ class Ability:
                     sim,
                     {"caster": caster, "target": target, "actor": caster},
                 )
-        ability_target = target if is_aggressive else caster
+        ability_target = target if self.targets_enemy else caster
 
         # Route by channel or cast activation (resolved above, before resource spending)
         dispatch_post_activate = True

@@ -348,11 +348,28 @@ CONDITION_REGISTRY = {
     "ability_cooldown_under": check_ability_cooldown_under,
     "ability_cooldown_above": check_ability_cooldown_above,
     "caster_buff_stacks": check_caster_buff_stacks,
-    "caster_has_buff_stacks": check_caster_buff_stacks,
-    "caster_buff_charges": check_caster_buff_stacks,
     "target_debuff_stacks": check_target_debuff_stacks,
-    "target_has_debuff_stacks": check_target_debuff_stacks,
 }
+
+
+def _find_ability(entity, spec):
+    """Returns the Ability ``spec`` on ``entity.ability_db`` (exact key, normalized name, or `_plus` stem when
+    stem matching is enabled), else None."""
+    db = getattr(entity, "ability_db", None)
+    if not db or not isinstance(spec, str):
+        return None
+    if spec in db:
+        return db[spec]
+    norm = spec.lower().replace(" ", "_")
+    if norm in db:
+        return db[norm]
+    from src.swtorsim.settings import is_stem_matching_enabled
+    if is_stem_matching_enabled():
+        base_stem = spec.split(".")[-1]
+        for abl in db.values():
+            if getattr(abl, "fqn", "").endswith(f".{base_stem}_plus"):
+                return abl
+    return None
 
 
 def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
@@ -368,6 +385,16 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         actor = context["target"]
     elif actor_str == "trigger_caster" and context and "caster" in context:
         actor = context["caster"]
+    elif actor_str == "actor_4":
+        # GOM actor 4 is the enemy the ability acts on (DoTs/debuffs "from_actor: caster", execute-range HP checks).
+        # Branches whose target_overrides redirect `target` to the caster still need the real enemy here, so
+        # prefer the trigger's enemy target, then a non-caster `target`, then the caster's current target.
+        enemy = (context or {}).get("enemy_target")
+        if enemy is None and target is not None and target is not caster:
+            enemy = target
+        if enemy is None:
+            enemy = getattr(caster, "current_target", None)
+        actor = enemy if enemy is not None else (target if target is not None else caster)
     else:
         if cond_type == "is_creature_type" and target is not None and target is not caster:
             actor = target
@@ -436,10 +463,13 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         spec = item.get("ability_spec")
         comparison = item.get("comparison", "gte")
         amount = item.get("floats", {}).get("amount", 1.0)
-        actual = 0
-        if hasattr(caster, "ability_db") and spec in caster.ability_db:
-            actual = getattr(caster.ability_db[spec], "charges", 0)
-        res = compare_values(actual, comparison, amount)
+        # The named actor's ability first; extracted self-effects often name "target" while the sim passes the
+        # enemy, so fall back to the caster's own ability like before.
+        abl = _find_ability(actor, spec)
+        if abl is None and actor is not caster:
+            abl = _find_ability(caster, spec)
+        actual = getattr(abl, "charges", None) if abl is not None else None
+        res = compare_values(actual if actual is not None else 0, comparison, amount)  # None = not a charge ability
 
     elif cond_type == "is_player":
         res = bool(getattr(actor, "is_player", False))

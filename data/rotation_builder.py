@@ -53,6 +53,8 @@ TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 MAP_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_map_ui.html"
 RULE_FORM_JS_PATH = SWTORSIM_ROOT / "tools" / "rotation_rule_form.js"
 TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
+CREDITS_JS_PATH = SWTORSIM_ROOT / "tools" / "credits_modal.js"
+CREDITS_MD_PATH = SWTORSIM_ROOT / "CREDITS.md"
 
 
 # ---------------------------------------------------------------------------
@@ -705,11 +707,7 @@ CONDITION_METADATA = [
     },
 ]
 
-KNOWN_RULE_KEYS = {item["key"] for item in CONDITION_METADATA} | {
-    "caster_has_buff_stacks",
-    "caster_buff_charges",
-    "target_has_debuff_stacks",
-}
+KNOWN_RULE_KEYS = {item["key"] for item in CONDITION_METADATA}
 
 
 def normalize_rotation_steps(raw_steps: Any) -> tuple[list[dict[str, Any]], list[str]]:
@@ -1000,6 +998,37 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
     }
 
 
+def load_builder_run_config(rel_path: str) -> dict[str, Any]:
+    """Loads a run config for the builder: its raw JSON, inline choices, and the class/spec/environment its
+    ``spec_path`` points at (run configs often carry only ``spec_path``). Raises FileNotFoundError."""
+    target_file = _resolve_workspace_path(rel_path)
+    if not target_file.is_file():
+        raise FileNotFoundError(f"Run config not found: {rel_path}")
+    rc_data = load_json_file(str(target_file))
+    choices_data: dict[str, Any] = {}
+    inline_choices = rc_data.get("choices_override") or rc_data.get("choices")
+    if isinstance(inline_choices, dict) and inline_choices:
+        choices_data.update({str(k): v for k, v in inline_choices.items()})
+    result: dict[str, Any] = {"run_config": rc_data, "choices": choices_data}
+
+    spec_path = str(rc_data.get("spec_path") or "")
+    if spec_path:
+        norm = spec_path.replace("\\", "/")
+        if "/extractor/pts/" in norm:
+            result["environment"] = "pts"
+        elif "/extractor/live/" in norm:
+            result["environment"] = "live"
+        try:
+            spec_file = _resolve_workspace_path(spec_path)
+            if spec_file.is_file():
+                class_name, spec_name = discipline_names(load_json_file(str(spec_file)), str(spec_file))
+                result["class_name"] = class_name
+                result["spec_name"] = spec_name
+        except Exception:
+            pass  # the UI falls back to matching on spec_path alone
+    return result
+
+
 def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     """Runs a quick single-iteration simulation preview for the current rotation and loadout."""
     env = payload.get("env") or payload.get("environment") or "live"
@@ -1010,11 +1039,13 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     from src.swtorsim.config_load import (
         load_character_stats_from_json,
         load_complete_loadout,
-        load_training_dummy_armor_debuff,
+        load_training_dummy_armor_debuffs,
     )
     from src.swtorsim.events import PlayerReady, ResourceTick
     from src.swtorsim.rotation import Rotation
-    from src.swtorsim.settings import set_stem_matching
+    from src.swtorsim.settings import set_data_environment, set_stem_matching
+    # Curves, debuff path and other env-aware loaders read the global environment, so pin it to the payload's.
+    set_data_environment(active_env)
     from src.swtorsim.setup import prepare_simulation, schedule_periodic
 
     spec_path = str(_resolve_workspace_path(payload["spec_path"]))
@@ -1051,8 +1082,7 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     stats_cfg = load_character_stats_from_json(class_name, stats_path, level)
     debuff_mod = {}
     try:
-        debuff = load_training_dummy_armor_debuff()
-        debuff_mod[debuff.name] = debuff
+        debuff_mod.update(load_training_dummy_armor_debuffs())
     except Exception:
         pass
 
@@ -1190,6 +1220,33 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(js_bytes)
                 return
 
+            if route == "/credits_modal.js":
+                if not CREDITS_JS_PATH.is_file():
+                    self._send_json({"error": f"Script not found at {CREDITS_JS_PATH}"}, status=500)
+                    return
+                js_bytes = CREDITS_JS_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/javascript; charset=utf-8")
+                self.send_header("Content-Length", str(len(js_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(js_bytes)
+                return
+
+            if route == "/CREDITS.md":
+                if not CREDITS_MD_PATH.is_file():
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+                md_bytes = CREDITS_MD_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/markdown; charset=utf-8")
+                self.send_header("Content-Length", str(len(md_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(md_bytes)
+                return
+
             if route.startswith("/icons/"):
                 icon_name = Path(route).name
                 if not icon_name.lower().endswith(".png"):
@@ -1255,21 +1312,12 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
             if route == "/api/run_config":
                 qs = parse_qs(parsed.query)
                 rel_path = (qs.get("path") or [""])[0]
-                target_file = _resolve_workspace_path(rel_path)
-                if not target_file.is_file():
-                    self._send_json({"error": f"Run config not found: {rel_path}"}, status=404)
+                try:
+                    bundle = load_builder_run_config(rel_path)
+                except FileNotFoundError as exc:
+                    self._send_json({"error": str(exc)}, status=404)
                     return
-                rc_data = load_json_file(str(target_file))
-                choices_data = {}
-                inline_choices = rc_data.get("choices")
-                if isinstance(inline_choices, dict) and inline_choices:
-                    choices_data.update({str(k): v for k, v in inline_choices.items()})
-                self._send_json(
-                    {
-                        "run_config": rc_data,
-                        "choices": choices_data,
-                    }
-                )
+                self._send_json(bundle)
                 return
 
             self._send_json({"error": f"Not found: {route}"}, status=404)

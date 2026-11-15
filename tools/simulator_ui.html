@@ -1547,6 +1547,8 @@
 
     <footer class="legal-footer">
       SwtorSim is an unofficial, non-commercial fan project (source code licensed under GPL-3.0). <em>Star Wars: The Old Republic</em>, ability icons, and game data are trademarks/copyrights of Lucasfilm Ltd., Electronic Arts Inc., and Broadsword Online Games.
+      &nbsp;&middot;&nbsp;
+      <a href="#" onclick="if (window.SwtorCredits) SwtorCredits.open(); return false;" style="color:var(--accent);font-weight:600;text-decoration:none;">Credits &amp; Contributors</a>
     </footer>
   </main>
 </div>
@@ -1583,6 +1585,7 @@
 </div>
 
 <script src="tutorial_showcase.js"></script>
+<script src="credits_modal.js"></script>
 <script>
   function applyTheme(theme) {
     const isDark = theme === "dark";
@@ -2249,11 +2252,14 @@
       document.getElementById("relic2Select").value = relics[1] || "";
 
       if (bundle.stats) {
+        // The backend already merged stats_override into bundle.stats; re-applying the (possibly partial)
+        // override on its own would zero every stat it does not list.
         applyStatsToInputs(bundle.stats);
-      }
-      const rawStatsOverride = (bundle && bundle.stats_override) || (rc && rc.stats_override);
-      if (rawStatsOverride && typeof rawStatsOverride === "object" && Object.keys(rawStatsOverride).length > 0) {
-        applyStatsToInputs(rawStatsOverride);
+      } else {
+        const rawStatsOverride = (bundle && bundle.stats_override) || (rc && rc.stats_override);
+        if (rawStatsOverride && typeof rawStatsOverride === "object" && Object.keys(rawStatsOverride).length > 0) {
+          applyStatsToInputs(rawStatsOverride);
+        }
       }
       applyWeaponRanges(rc);
 

@@ -42,6 +42,7 @@ INCLUDE_DIRS = [
 INCLUDE_FILES = [
     ("data/__init__.py", "data/__init__.py"),
     ("data/rotation_builder.py", "data/rotation_builder.py"),
+    ("data/modifier_id_mapping.csv", "data/modifier_id_mapping.csv"),
     ("data/extractor/live/combat_curves.json", "data/extractor/live/combat_curves.json"),
     ("data/extractor/live/adrenals.json", "data/extractor/live/adrenals.json"),
     ("data/extractor/live/gear_abilities_talents.json", "data/extractor/live/gear_abilities_talents.json"),

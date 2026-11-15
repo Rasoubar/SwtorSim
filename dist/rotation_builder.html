@@ -1260,7 +1260,7 @@
   .step-card.viz-flash { box-shadow: 0 0 0 3px var(--accent); }
   .pool-row.viz-flash { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-bg); }
 </style>
-  <script src="pyodide_client.js?v=1794755266"></script>
+  <script src="pyodide_client.js?v=1794769078"></script>
 </head>
 <body>
 
@@ -1450,6 +1450,8 @@
 
 <footer class="legal-footer">
   SwtorSim is an unofficial, non-commercial fan project (source code licensed under GPL-3.0). <em>Star Wars: The Old Republic</em>, ability icons, and game data are trademarks/copyrights of Lucasfilm Ltd., Electronic Arts Inc., and Broadsword Online Games.
+  &nbsp;&middot;&nbsp;
+  <a href="#" onclick="if (window.SwtorCredits) SwtorCredits.open(); return false;" style="color:var(--accent);font-weight:600;text-decoration:none;">Credits &amp; Contributors</a>
 </footer>
 
 <!-- Guided Rule Builder Modal -->
@@ -1477,6 +1479,7 @@
 <div class="toast" id="toastBanner"></div>
 
 <script src="tutorial_showcase.js"></script>
+<script src="credits_modal.js"></script>
 <script src="rule_form.js"></script>
 <script>
   function applyTheme(theme) {
@@ -2015,6 +2018,11 @@ async function onSelectRunConfig(rcPath) {
     return;
   }
   const rc = data.run_config || {};
+  // The catalog is per environment: a PTS config selected while on Live (or vice versa) can only match
+  // its discipline after switching to the environment its spec_path lives in.
+  if (data.environment && data.environment !== currentEnvironment) {
+    await setEnvironment(data.environment);
+  }
   const targetClass = (data.class_name || rc.class_name || rc.class || "").toLowerCase().trim();
   const targetSpec = (data.spec_name || data.spec || rc.spec || rc.spec_name || "").toLowerCase().trim();
   let matched = false;
@@ -4083,9 +4091,20 @@ function openRuleModal(stepIdx, poolIdx = null, editKey = null, scope = "rotatio
 
   let initialVal = null;
   if (editKey && editKey in targetRules) {
-    // Normalize aliases to canonical keys if needed
-    sel.value = conditions.some(c => c.key === editKey) ? editKey : "caster_buff_stacks";
-    initialVal = targetRules[editKey];
+    if (conditions.some(c => c.key === editKey)) {
+      sel.value = editKey;
+      initialVal = targetRules[editKey];
+    } else {
+      // Unknown key (typo or removed rule): never guess a replacement. Leave the type unselected so Save
+      // requires an explicit choice; the old key is only removed once a type is saved.
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.disabled = true;
+      opt.textContent = `-- Unknown rule "${editKey}": pick a type --`;
+      sel.insertBefore(opt, sel.firstChild);
+      sel.value = "";
+      showToast(`Unknown rule "${editKey}". Pick a rule type to replace it.`, true);
+    }
   } else {
     sel.value = "caster_has_buff";
   }
@@ -4107,6 +4126,10 @@ function renderRuleValueForm(existingVal = null) {
   const meta = conditions.find(c => c.key === key) || {};
   document.getElementById("ruleTypeDesc").textContent = meta.description || "";
 
+  if (!key) {
+    document.getElementById("ruleDynamicFields").innerHTML = "";
+    return;
+  }
   const html = RuleForm.fieldsHtml(key, existingVal, RuleForm.listsFromLoadout(currentLoadout));
   if (html !== null) document.getElementById("ruleDynamicFields").innerHTML = html;
 }
@@ -4115,6 +4138,7 @@ function commitRuleFromModal() {
   if (!ruleModalContext) return;
   const { stepIndex, poolIndex, editKey } = ruleModalContext;
   const key = document.getElementById("ruleKeySelect").value;
+  if (!key) return showToast("Pick a rule type first.", true);
   const read = RuleForm.readValue(key);
   if (read.error) return showToast(read.error, true);
   const value = read.value;
