@@ -172,8 +172,22 @@ SwtorSim/
 
 ## Running the Test Suite
 
-Execute the unit and integration test suite via `pytest`:
+Execute the unit and integration test suite via `unittest`:
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 -m pytest
+.\tools\pyclean.exe -m unittest discover -s tests -p "*test*.py"
 ```
+
+---
+
+## License & Disclaimer
+
+### Source Code License
+The original source code in this repository is licensed under the **GNU General Public License v3.0 (GPL-3.0)** — see [LICENSE](LICENSE) for the full text.
+
+This license applies **only** to original code authored for SwtorSim and does **not** grant any rights or license to extracted game data, strings, or icons from *Star Wars: The Old Republic*.
+
+### Fan Project & IP Disclaimer
+SwtorSim is an unofficial, non-commercial fan project and is not affiliated with, endorsed by, or sponsored by **Lucasfilm Ltd.**, **Electronic Arts Inc.**, or **Broadsword Online Games**.
+
+*Star Wars*, *Star Wars: The Old Republic*, and all related logos, character/ability names, icons, and game data are trademarks and copyrights of their respective owners. If you are a rights holder and have any concerns, please open an issue on the repository.

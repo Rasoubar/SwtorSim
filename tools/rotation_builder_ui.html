@@ -76,6 +76,17 @@
     overflow: hidden;
   }
 
+  .legal-footer {
+    flex-shrink: 0;
+    padding: 6px 14px;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-subtle);
+    text-align: center;
+  }
+
   /* Header Bar */
   header {
     background: var(--bg-panel);
@@ -1438,6 +1449,10 @@
     <div class="panel-body" id="rightPanelBody"></div>
   </div>
 </div>
+
+<footer class="legal-footer">
+  SwtorSim is an unofficial, non-commercial fan project (source code licensed under GPL-3.0). <em>Star Wars: The Old Republic</em>, ability icons, and game data are trademarks/copyrights of Lucasfilm Ltd., Electronic Arts Inc., and Broadsword Online Games.
+</footer>
 
 <!-- Guided Rule Builder Modal -->
 <div class="modal-backdrop" id="ruleModalBackdrop">

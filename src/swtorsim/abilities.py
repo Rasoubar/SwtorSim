@@ -2100,7 +2100,8 @@ def handle_cooldown_action(sim, caster, action, ability=None, context=None):
     if target_abl is None and isinstance(context, dict):
         target_abl = context.get("ability")
 
-    spec = action.get("ints", {}).get("ability_spec") or action.get("ability_spec")
+    ints = action.get("ints", {})
+    spec = ints.get("timer_spec") or ints.get("ability_spec") or action.get("ability_spec")
     if spec and hasattr(caster, "ability_db") and spec in caster.ability_db:
         target_abl = caster.ability_db[spec]
 
