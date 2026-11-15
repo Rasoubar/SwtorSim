@@ -565,6 +565,8 @@ class EffectExpire(Event):
                 "current_stacks": getattr(self.instance_ref, "stacks", 1),
                 "active_effect": self.instance_ref,
                 "owner_entity": self.entity,
+                "owner_effect_key": self.effect_name,  # a remove_effect here removes this effect only
+                "effect": blueprint,
             }
             blueprint.execute_triggered_branches(
                 "on_pre_remove",
@@ -662,6 +664,8 @@ class DotTick(Event):
                         "current_stacks": getattr(self.instance_ref, "stacks", 1),
                         "active_effect": self.instance_ref,
                         "owner_entity": self.target,
+                        "owner_effect_key": dot_name,  # a remove_effect here removes this effect only
+                        "effect": effect_blueprint,
                     }
                     effect_blueprint.execute_triggered_branches(
                         "on_pre_remove",

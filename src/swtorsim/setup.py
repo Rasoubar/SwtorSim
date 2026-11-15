@@ -381,8 +381,9 @@ def prepare_simulation(
     rot_precast = rotation_config.get("precast") if isinstance(rotation_config, dict) else None
     rot_pre_combat = rotation_config.get("pre_combat") if isinstance(rotation_config, dict) else None
 
-    resolved_precast = precast or rot_precast
-    resolved_pre_combat = pre_combat or rot_pre_combat
+    # An explicit empty value ([] / "") overrides the rotation file; only None falls back to it.
+    resolved_precast = precast if precast is not None else rot_precast
+    resolved_pre_combat = pre_combat if pre_combat is not None else rot_pre_combat
     pre_combat_steps = normalize_pre_combat(resolved_precast, resolved_pre_combat)
 
     # Track the equipped tactical so pre-combat swaps can unequip it, and validate/preload swap targets

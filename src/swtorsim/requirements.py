@@ -309,6 +309,8 @@ def check_caster_buff_stacks(data: Any, caster: "Player", _target: "Dummy", **_k
         expected_stacks = float(data.get("stacks", data.get("count", data.get("value", data.get("charges", 1)))))
         comparison = data.get("comparison", data.get("operator", "gte"))
         tags = data.get("tags")
+    elif isinstance(data, str):
+        name, expected_stacks, comparison, tags = data, 1.0, "gte", None  # bare name: at least one stack
     else:
         return False
 
@@ -328,10 +330,13 @@ def check_target_debuff_stacks(data: Any, _caster: "Player", target: "Dummy", **
         expected_stacks = float(data.get("stacks", data.get("count", data.get("value", 1))))
         comparison = data.get("comparison", data.get("operator", "gte"))
         tags = data.get("tags")
+    elif isinstance(data, str):
+        name, expected_stacks, comparison, tags = data, 1.0, "gte", None  # bare name: at least one stack
     else:
         return False
 
-    actual_stacks = get_entity_effect_stacks(target, tags=tags, ability_spec=name)
+    # Same name lookup as the caster buff rule (exact key / name / FQN, then case- and underscore-insensitive).
+    actual_stacks = get_caster_buff_stacks(target, buff_name=name, tags=tags)
     return compare_values(actual_stacks, comparison, expected_stacks)
 
 
@@ -685,6 +690,23 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
             res = not bool(context["missed"])
         else:
             res = True
+
+    elif cond_type == "not_has_effect":
+        res = not entity_has_effect(
+            actor, tags=item.get("tags"), ability_spec=item.get("ability_spec"), count=item.get("count", 1)
+        )
+
+    elif cond_type == "is_dead":
+        res = getattr(actor, "hp", 1) <= 0
+
+    elif cond_type == "has_pending_revive":
+        res = False  # the sim has no revive mechanic, so no revive is ever pending
+
+    elif cond_type == "is_area":
+        res = False  # the sim fight is never inside one of the named game areas
+
+    elif cond_type in ("is_object", "if_not_weapon_type"):
+        res = True  # unmodeled: no placeable objects or weapon-type restrictions in the sim
 
     else:
         # Fallback for unmodeled visual/flavor conditions

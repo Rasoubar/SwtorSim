@@ -68,7 +68,7 @@ class TriggerManager:
 
     def subscribe(self, owner_id, ability, branch, caster, target, effect_key=None, effect_tags=None):
         """Registers every event-bus trigger rule defined on a branch independently."""
-        for raw_trigger in getattr(branch, "triggers", []):
+        for trigger_index, raw_trigger in enumerate(getattr(branch, "triggers", [])):
             event = raw_trigger.get("trigger")
             if not event or event in _LIFECYCLE_TRIGGERS:
                 continue
@@ -92,12 +92,31 @@ class TriggerManager:
                 "proc_chance": (raw_trigger.get("floats") or {}).get("proc_chance_percent"),
                 "min_interval": min_interval,
                 "next_allowed_time": 0.0,
+                "icd_key": (event, id(branch), trigger_index),
                 "effect_tags": frozenset(effect_tags or ()),
             }
             # Trigger tags + owning effect tags: what 228/229 modifiers are matched against.
             entry["all_tags"] = entry["tags"] | entry["effect_tags"]
             self._listeners.setdefault(event, []).append(entry)
             self._owner_events.setdefault(owner_id, {})[event] = None
+
+    def icd_snapshot(self, owner_id):
+        """Running rate-limit lockouts of an owner's triggers, keyed by (event, branch, trigger index)."""
+        snapshot = {}
+        for event in self._owner_events.get(owner_id, ()):
+            for sub in self._listeners.get(event, ()):
+                if sub["owner_id"] == owner_id and sub["next_allowed_time"] > 0.0:
+                    snapshot[sub["icd_key"]] = sub["next_allowed_time"]
+        return snapshot
+
+    def icd_restore(self, owner_id, snapshot):
+        """Puts a snapshot from ``icd_snapshot`` back on the owner's freshly subscribed triggers."""
+        if not snapshot:
+            return
+        for event in self._owner_events.get(owner_id, ()):
+            for sub in self._listeners.get(event, ()):
+                if sub["owner_id"] == owner_id and sub["icd_key"] in snapshot:
+                    sub["next_allowed_time"] = snapshot[sub["icd_key"]]
 
     def unsubscribe(self, owner_id):
         """Removes all triggers tied to a specific effect or passive instance."""

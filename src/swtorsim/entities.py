@@ -210,6 +210,8 @@ class Entity:
                 effect_instance.is_passive = getattr(existing, "is_passive", False)
             elif expires_at is not None:
                 effect_instance.expires_at = max(existing.expires_at, expires_at)
+            # A refresh does not re-run on_apply, so what that first application granted stays with the effect.
+            effect_instance.immunities |= set(getattr(existing, "immunities", ()) or ())
 
         owner_id = f"{id(self)}:{effect_key}"
         effect_instance.owner_id = owner_id
@@ -245,6 +247,10 @@ class Entity:
                         is_passive=is_passive,
                     )
             if hasattr(sim, "triggers") and ability is not None:
+                # Only a refresh of this very effect carries its running trigger ICDs over; a new application
+                # (nothing active under this key) subscribes with fresh ones.
+                is_refresh = existing is not None and not getattr(existing, "is_expired", False)
+                icd_saved = sim.triggers.icd_snapshot(owner_id) if is_refresh else None
                 sim.triggers.unsubscribe(owner_id)
                 effect_tags = (
                     effect.get("tags", ())
@@ -261,6 +267,8 @@ class Entity:
                         effect_key=effect_key,
                         effect_tags=effect_tags,
                     )
+                if icd_saved:
+                    sim.triggers.icd_restore(owner_id, icd_saved)
                 eff_ctx = {
                     "caster": caster or self,
                     "target": self,
@@ -462,7 +470,16 @@ class Player(Entity):
             and "combat_stealth" not in getattr(eff, "tags", ())
         ]
         if stealth_keys:
-            self.cleanup_expired_effects(stealth_keys)
+            if sim is None:
+                self.cleanup_expired_effects(stealth_keys)
+            else:
+                # Leaving stealth runs the effect's on_pre_remove branches (the 6 s Stealth cooldown, vanish dispels,
+                # talent-conditioned follow-ups) like every other way of removing an effect.
+                from src.swtorsim.abilities import remove_effect_firing_pre_remove
+
+                for key in stealth_keys:
+                    if key in self.effects:
+                        remove_effect_firing_pre_remove(sim, self, key, fallback_caster=self)
 
     def get_next_action_time(self, current_time: float, sim=None) -> float:
         """Calculates the timestamp for the next rotation evaluation, honoring lead_time on upcoming optional off-GCD steps."""

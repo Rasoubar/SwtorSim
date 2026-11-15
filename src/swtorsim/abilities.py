@@ -1015,6 +1015,13 @@ def remove_effect_firing_pre_remove(sim, entity, effect_key, fallback_caster=Non
     entity.cleanup_expired_effects([effect_key])
 
 
+def _defines_stack_capacity(effect) -> bool:
+    """True when the effect's blueprint declares a stack charge limit (``stack_charge`` with a ``max``)."""
+    bp = getattr(effect, "effect_blueprint", None)
+    stack_charge = bp.get("stack_charge") if isinstance(bp, dict) else getattr(bp, "stack_charge", None)
+    return isinstance(stack_charge, dict) and "max" in stack_charge
+
+
 def handle_modify_stack_charge(sim, caster, target, action, context=None):
     """Modifies stacks on an active effect (e.g. Deathmark consuming a stack, Deadly Saber charges)."""
     floats = action.get("floats") or {}
@@ -1068,9 +1075,12 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
         from src.swtorsim.settings import is_stem_matching_enabled
         stem_enabled = is_stem_matching_enabled()
 
+        # The action names only the ability (the game data carries no effect id): it acts on that ability's effect
+        # that declares a stack charge (live and PTS data: exactly one per target ability). Its other effects are
+        # not stack holders; with no such effect active the action does nothing.
         for ent in entities:
             for k, e in getattr(ent, "effects", {}).items():
-                if not getattr(e, "is_expired", False):
+                if not getattr(e, "is_expired", False) and _defines_stack_capacity(e):
                     e_fqn = getattr(e, "fqn", "") or ""
                     abl_ref = getattr(e, "ability_ref", None)
                     abl_fqn = getattr(abl_ref, "fqn", "") or ""
@@ -1310,21 +1320,10 @@ def handle_buff_remove_action(sim, caster, target, action, ability=None, context
         if owner_key and owner_entity is not None and owner_key in getattr(owner_entity, "effects", {}):
             remove_effect_firing_pre_remove(sim, owner_entity, owner_key, fallback_caster=caster)
             return
-        if owner_key:
-            # The owning effect is already gone: nothing left to remove. Never fall through to the
-            # ability-wide sweep, which would strip unrelated sibling effects (e.g. Hidden Power).
-            return
-        if ability is not None:
-            for actor in (caster, target):
-                effects_dict = getattr(actor, "effects", {})
-                to_remove = [
-                    k for k, eff in effects_dict.items()
-                    if not getattr(eff, "is_passive", False)
-                    and not any("lockout" in t for t in getattr(eff, "tags", ()))
-                    and (getattr(eff, "fqn", None) == ability.fqn or k == ability.name)
-                ]
-                for k in to_remove:
-                    remove_effect_firing_pre_remove(sim, actor, k, fallback_caster=caster)
+        # remove_effect has no parameters in the game data: it means "the effect this branch belongs to". With no
+        # owning effect (it is gone, or the branch is an instant sub-effect that is never applied, such as the
+        # Volatile Substance / Blood Boiler explosions) there is nothing to remove. Never sweep the ability's other
+        # effects: that would strip unrelated siblings (e.g. Hidden Power, or debuffs the same branch just applied).
         return
 
     if action_type == "dispel":
@@ -1489,6 +1488,10 @@ class Ability:
                 else:
                     # Losing a bonus charge caps what is held; it never hands back a spent one.
                     self.charges = min(self.charges, new_max)
+                    if self.charges >= new_max:
+                        # Already full at the new cap: the running recharge no longer has anything to restore.
+                        self.active_charge_event = None
+                        self.recharge_target_time = None
 
     def schedule_recharge(self, caster, sim):
         """Snapshots CDR, creates a new event reference, and schedules it."""
