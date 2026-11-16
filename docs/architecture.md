@@ -19,13 +19,15 @@ flowchart TD
         LOADER --> PREP["prepare_simulation()"]
         PREP --> ENT["Player & Dummy Entities"]
         PREP --> TRIG["TriggerManager Subscriptions"]
-        PREP --> PASS["Passive Effects & 7 Raid Debuffs"]
+        PREP --> PASS["Passive Effects, Class Buffs & 7 Raid Debuffs"]
+        PREP --> PRE["PreCombatRunner (optional pull gate)"]
     end
 
     subgraph Runtime["3. Discrete-Event Loop (engine.py & events.py)"]
-        PREP --> HEAP["SimulationEngine Priority Queue (heapq)"]
+        PREP --> HEAP["SimulationEngine Priority Queue (heapq, T0 = first damage)"]
+        PRE -->|"PreCombatEvent / Tactical Swaps"| HEAP
         HEAP -->|"Pop next (timestamp, Event)"| RESOLVE["Event.resolve(sim)"]
-        RESOLVE -->|"PlayerReady"| ROT["Rotation.evaluate() -> Ability.cast()"]
+        RESOLVE -->|"PlayerReady"| ROT["Rotation.evaluate() (Opener / Loop / Weave) -> Ability.cast()"]
         ROT -->|"Instant / Cast / Channel / Projectile"| EFF["Effect.execute() -> Branch.execute()"]
         EFF -->|"execute_single_action()"| ACT["DamageHit / ActiveEffect / Cooldown / Resource"]
         ACT -->|"calculate_hit()"| MATH["combat_math.py\n(Base -> Mitigation -> 6 Buckets -> Crit)"]
@@ -84,7 +86,8 @@ flowchart TD
      - If `blueprint.type == "passive"`, applies its top-level `stat_changes` and persistent sub-effects as permanent `ActiveEffect` instances on `player` (`expires_at=None`) and calls `player.recalculate_stats()`.
      - Subscribes all event-bus triggers (`on_damage_dealt`, `on_ability_activate`, `on_enter_combat`, etc.) from passive branches into `sim.triggers`.
      - Schedules any periodic passive timers via `schedule_periodic()`.
-4. **Operations Training Dummy Raid Debuffs**:
+4. **Class Buffs & Operations Training Dummy Raid Debuffs**:
+   - `apply_class_buffs()` (`class_buffs.py`) applies universal class buffs and the hidden permanent bonus (`+1%` accuracy, crit chance, and crit multiplier).
    - When `training_dummy_armor_debuff` is enabled, `load_training_dummy_armor_debuffs()` splits the game's `training_dummy_armor_debuff.json` blueprint into the **7 canonical SWTOR raid debuffs** on the `Dummy` target:
      1. **Sundered (Physical)**: `-20%` Armor Rating (`STAT_rtg_armor`)
      2. **Beat Down (Physical)**: `+5%` Melee Damage Taken (`stat_cbt_damage_taken_scale_channel_melee_modifier_percentage`)
@@ -93,9 +96,10 @@ flowchart TD
      5. **Susceptible (Tech)**: `+5%` Tech Damage Taken (`stat_cbt_damage_taken_scale_channel_tech_modifier_percentage`)
      6. **Assailable (Mental)**: `+7%` Elemental & Internal Damage Taken (`stat_cbt_damage_taken_scale_type_elemental_modifier_percentage`, `stat_cbt_damage_taken_scale_type_internal_modifier_percentage`)
      7. **Overwhelmed (Mental)**: `+10%` AoE Damage Taken (`STAT_cbt_damage_received_modifier_percentage`, gated by `tag.abl.Attack.is_aoe` / `aoe_ability`)
-5. **Initial Timeline Seeding**:
+5. **Pre-Combat & Initial Timeline Seeding**:
+   - `prepare_tactical_swaps()` pre-hydrates any tacticals referenced by pre-combat steps so `swap_tactical()` can swap passives/effects cleanly before pull.
+   - If pre-combat steps or `pull_conditions` are configured (`normalize_pre_combat`), `PreCombatRunner` (`events.py`) executes `ability`, `swap_tactical`, `wait`, and `wait_until` steps and enforces the pull gate (raising `PullConditionsNotMetError` if unmet after `pull_max_wait`) before calling `PreCombatRunner.finish()` to schedule the first `PlayerReady`. Otherwise, `PlayerReady(player, target)` is scheduled directly at `t = 0.0s`.
    - Schedules `ResourceTick(player, interval=1.0)` at `t = 1.0s`.
-   - Schedules `PlayerReady(player, target)` at `t = 0.0s`.
 
 ---
 
@@ -111,9 +115,9 @@ flowchart TD
 
 When two events are scheduled for the exact same timestamp, `Event.__lt__` returns `False`, preserving insertion order without raising comparison errors on `Event` instances.
 
-`run_timed(duration, target)` loops while `event_queue` is non-empty:
+`run_timed(duration, target)` loops while `event_queue` is non-empty (measuring fight duration from `time_origin()`, i.e. `T0` = first damage, so pre-combat steps have negative `relative_time()` and do not count against `duration`):
 1. Pops `(timestamp, event)`.
-2. Stops if `timestamp > duration` or `target.hp <= 0`.
+2. Stops if `timestamp > _stop_time` (where `_stop_time` is anchored to `T0 + duration` once combat starts) or `target.hp <= 0`.
 3. Advances `self.current_time = timestamp` and calls `event.resolve(self)`.
 4. After the loop terminates, calls `self.tracker.finalize(self.current_time)` to close out any buffs/debuffs still active at the end of the fight.
 
@@ -121,16 +125,17 @@ When two events are scheduled for the exact same timestamp, `Event.__lt__` retur
 
 | Event Class | Triggered / Scheduled By | Resolution Behavior |
 | :--- | :--- | :--- |
-| **`PlayerReady`** | `prepare_simulation` (`t=0`), `CastFinishEvent`, `ChannelTickEvent`, or self-retry (`+0.1s`) | Calls `player.rotation.evaluate(player, target, sim)`. If an ability acted, schedules the next `PlayerReady` at `max(sim.current_time, player.next_gcd)`. If blocked (waiting on cooldown/resource), retries in `+0.1s`. |
+| **`PreCombatEvent`** | `PreCombatRunner` (`setup.py` / `events.py`) | Advances pre-combat `ability`, `swap_tactical`, `wait`, and `wait_until` steps and checks `pull_conditions`. Once complete, `PreCombatRunner.finish()` schedules the first `PlayerReady`. |
+| **`PlayerReady`** | `prepare_simulation` (`t=0`), `PreCombatRunner.finish`, `schedule_next_decision`, or self-retry (`+0.1s`) | Calls `player.rotation.evaluate(player, target, sim)` (evaluating Opener, Loop, and loop-only `weave` steps). If an ability acted, schedules the next decision at `max(sim.current_time, player.next_gcd)`. If blocked, retries in `+0.1s`. |
 | **`AbilityCast`** | Queued cast helper | Calls `Ability.cast(ability, source, target, sim)`. |
-| **`CastFinishEvent`** | `Ability.cast` (when `activation.type == "cast"` and `duration > 0`) | Verifies `caster.active_cast is self.ability`, clears casting state, executes all `entry_effect_ids`, dispatches `on_ability_post_activate`, and schedules `PlayerReady`. |
-| **`ChannelTickEvent`** | `Ability._start_channel` and self-rescheduling | Verifies `source.active_channel is self.channel`, increments `current_tick`, decrements `remaining_ticks`, executes `on_tick` branches across all ability effects, and either schedules the next tick or finishes the channel (dispatching `on_channeling_ended` and calling `cleanup_channel_effects`). |
+| **`CastFinishEvent`** | `Ability.cast` (when `activation.type == "cast"` and `duration > 0`) | Verifies `caster.active_cast is self.ability`, clears casting state, executes all `entry_effect_ids`, dispatches `on_ability_post_activate`, and calls `schedule_next_decision()` (resuming `PreCombatRunner` or scheduling `PlayerReady`). |
+| **`ChannelTickEvent`** | `Ability._start_channel` and self-rescheduling | Verifies `source.active_channel is self.channel`, increments `current_tick`, decrements `remaining_ticks`, executes `on_tick` branches across all ability effects, and either schedules the next tick or finishes the channel (dispatching `on_channeling_ended`, calling `cleanup_channel_effects`, and calling `schedule_next_decision()`). |
 | **`ProjectileImpactEvent`** | `handle_invoke_projectile` (`abilities.py`) | Fires when a distance-based or fixed-time projectile reaches the target, executing `on_travel_complete` branches on the parent `Effect`. |
 | **`DelayedBranchEvent`** | `Effect.schedule_timer_branches` (`on_timer_expired`) | Executes a delayed branch (e.g., secondary strikes or delayed detonations) at `current_time + delay`. |
 | **`DamageHit`** | `handle_damage_action` (`abilities.py`) | Calls `calculate_hit(source, target, action_with_ctx)`, dispatches `on_pre_damage_dealt` / `on_pre_damage_taken`, resolves `ApplyDamageLand`, breaks stealth if non-periodic, and dispatches `on_damage_dealt` / `on_damage_taken`. |
 | **`ApplyDamageLand`** | `DamageHit.resolve` | Logs damage into `sim.tracker`, subtracts `final_damage` from `target.hp`, and if `target.hp <= 0` marks target dead and dispatches `on_pre_death`, `on_death`, and `on_kill`. |
 | **`DotTick`** | `Entity.apply_effect` (when `tick_interval > 0`) and self-rescheduling | Verifies the effect instance hasn't expired or been overwritten, computes `current_tick` and `stack_multiplier`, executes `on_tick` branches on the `Effect`, decrements `ticks_remaining`, and either reschedules at `+tick_interval` or cleans up the expired DoT/HoT. |
-| **`EffectExpire`** | `Entity.apply_effect`, `handle_reset_timer`, `handle_modify_active_duration` | Verifies `entity.effects.get(effect_name) is self.instance_ref`, executes `on_pre_remove` branches on the blueprint, and removes the effect via `entity.cleanup_expired_effects()`. |
+| **`EffectExpire`** | `Entity.apply_effect`, `handle_reset_timer`, `handle_modify_active_duration` | Verifies `entity.effects.get(effect_name) is self.instance_ref`, executes `on_pre_remove` branches once (`ActiveEffect.pre_remove_fired`), and removes the effect via `entity.cleanup_expired_effects()`. (Early removal via `remove_effect_firing_pre_remove` uses the same guard.) |
 | **`ChargeRestoreEvent`** | `Ability.apply_cooldown_locks` / `Ability.restore_charge` | Restores 1 ability charge when `ability.active_charge_event is self`, rescheduling itself if `charges < max_charges`. |
 | **`ResourceTick`** | `prepare_simulation` (`t=1.0s`) and self-rescheduling (`+1.0s`) | Computes `alacrity_mod = 1.0 + Alacrity`, ticks passive regeneration on `player.resource`, and schedules the next tick in `1.0s`. |
 | **`ResourceGainEvent`** | `handle_resource_gain_action` (with `delay > 0`) | Calls `player.resource.generate(amount)`. |
@@ -249,7 +254,7 @@ When `Entity.apply_effect(sim, ability, effect_blueprint, caster)` is called:
 
 When `sim.triggers.dispatch(event_name, sim, context)` is called, each subscribed listener checks:
 1. **Actor Match**: Matches caster or target according to the trigger category, plus `from_actor` / `to_actor` checks.
-2. **Internal Cooldown (ICD)**: Checks `sim.current_time >= listener["next_allowed_time"]` (where `min_interval` is parsed from GOM `intervals["interval_61"]`). Rotation conditions (`check_proc_cooldown_above`) can also query remaining trigger ICDs via `TriggerManager.get_remaining_icd(source_fqn, current_time, caster)`.
+2. **Internal Cooldown (ICD)**: Checks `sim.current_time >= listener["next_allowed_time"]` (where `min_interval` is parsed from GOM `intervals["interval_61"]` + `229`, then scaled by the caster's Alacrity via `scale_time_total` / `scale_time_modifier`). Rotation conditions (`check_proc_cooldown_above`) can also query remaining trigger ICDs via `TriggerManager.get_remaining_icd(source_fqn, current_time, caster)`.
 3. **Weapon Mode / Periodic / Spell Type / Damage Type / Crit Filters**:
    - `weapon_mode`: Ensures weapon-only procs only fire on direct Melee/Ranged hits (`is_weapon_attack`).
    - `spell_types`: Filters by Weapon (`1`), Tech (`2`), or Force (`3`).
@@ -260,7 +265,7 @@ When `sim.triggers.dispatch(event_name, sim, context)` is called, each subscribe
 5. **Probability Roll & Execution**:
    - Rolls `random.random() <= chance` (where `chance` defaults to `1.0`).
    - Executes `branch.execute(sim, caster, target, context=merged_ctx, ability=ability)`.
-   - Only if the branch conditions passed (`ran == True`) and `min_interval > 0` does the listener lock `next_available_time = round(sim.current_time + min_interval, 4)`.
+   - Only if the branch conditions passed (`ran == True`) and `effective_interval > 0` does the listener lock `next_allowed_time = sim.current_time + effective_interval` (unrounded).
 
 ---
 
