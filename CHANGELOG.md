@@ -3296,3 +3296,7 @@ Added a "Beta" pill next to the app name and a dismissible bug-report banner (li
 ### Carnage Config Implants Updated to Dispatcher + Fearless Victor (`data/run_config/carnage_14gcd.json`) - [DONE]
 - **Implementation**: Replaced `abl.itm.legendary.war_kni.mar_sen.berserkers_call` with `abl.itm.legendary.war_kni.mar_sen.dispatcher` (alongside `abl.itm.legendary.war_kni.fearless_victor`) in `data/run_config/carnage_14gcd.json`.
 - **Verification**: Full `unittest discover` suite passes (100%).
+
+### Carnage Config Replaced (`data/run_config/carnage_14gcd.json`) - [DONE]
+- **Implementation**: Replaced `data/run_config/carnage_14gcd.json` with `marauder_carnage_config(1).json` (`L80_14-3gcd_red.json` stats, `stats_override`, `choices`, `main_hand`/`off_hand` `2094-3141`, `dispatcher` + `fearless_victor`, `dummy_hp: 10000000`, `seed: 18237`, `in_flashpoint_operation: true`), keeping `rotation_path` pointed to `data/rotations/marauder/carnage/carnage_basic_priority.json`.
+- **Verification**: Full `unittest discover` suite passes (100%). Mean DPS on `data/run_config/carnage_14gcd.json` (50 iterations, seed `42`): `30,021.1` -> `30,100.7` DPS.
