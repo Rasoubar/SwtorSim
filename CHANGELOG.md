@@ -3300,3 +3300,6 @@ Added a "Beta" pill next to the app name and a dismissible bug-report banner (li
 ### Carnage Config Replaced (`data/run_config/carnage_14gcd.json`) - [DONE]
 - **Implementation**: Replaced `data/run_config/carnage_14gcd.json` with `marauder_carnage_config(1).json` (`L80_14-3gcd_red.json` stats, `stats_override`, `choices`, `main_hand`/`off_hand` `2094-3141`, `dispatcher` + `fearless_victor`, `dummy_hp: 10000000`, `seed: 18237`, `in_flashpoint_operation: true`), keeping `rotation_path` pointed to `data/rotations/marauder/carnage/carnage_basic_priority.json`.
 - **Verification**: Full `unittest discover` suite passes (100%). Mean DPS on `data/run_config/carnage_14gcd.json` (50 iterations, seed `42`): `30,021.1` -> `30,100.7` DPS.
+
+## 2026-11-16
+- Fixed `Entity.apply_effect` stack refresh in `src/swtorsim/entities.py` (`can_accumulate_stacks` now requires `initial_stacks < max_stacks` rather than `scales_with_stacks`), so countdown charge-pool effects with `initial == max` (such as Creeping Terror Effect 9 and Affliction's Finish Them burst tracker) reset to `initial_stacks` on refresh instead of incrementing by `+1`. Added unit tests in `tests/test_stack_refresh_reset.py`.
