@@ -101,10 +101,16 @@ class SimulationIntegrationTests(unittest.TestCase):
         with self.subTest("dot_ticks_six_times_and_expires"):
             self.sim.run_timed(duration=6.5, target=self.target)
             eradicate_metrics = self.sim.tracker.breakdown.get("Eradicate", {})
+            dot_metrics = self.sim.tracker.breakdown.get("Crushed (Eradicate)", {})
             self.assertEqual(
                 eradicate_metrics.get("hit_count", 0),
-                7,
-                "Eradicate should record 1 initial hit + 6 periodic DoT ticks (7 total hits)",
+                1,
+                "Eradicate should record only the 1 initial hit under the ability name",
+            )
+            self.assertEqual(
+                dot_metrics.get("hit_count", 0),
+                6,
+                "DoT ticks should be logged under the effect name 'Crushed (Eradicate)'",
             )
             self.assertFalse(
                 self.target.has_effect("Crushed (Eradicate)"),

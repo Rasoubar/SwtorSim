@@ -10,6 +10,7 @@ from src.swtorsim.entities import Dummy, Player
 from src.swtorsim.events import ChargeRestoreEvent, DamageHit, ResourceGainEvent
 from src.swtorsim.requirements import validate_all
 from src.swtorsim.engine import sim_log
+from src.swtorsim.metrics import has_proper_effect_name
 
 
 
@@ -40,6 +41,17 @@ def _resolve_target_overrides(overrides, current_target, caster, context=None):
         elif o_type == "trigger_caster" and context and "caster" in context:
             resolved = context["caster"]
     return resolved
+
+def damage_source_name(context, ability_name):
+    """Breakdown label for a damage hit: the effect's display name when it has a real one
+    (e.g. 'Radiation Burns'), else the parent ability name. Empty names and the extractor's
+    auto-generated 'Parent_N' names for unnamed helper effects fall back to the ability."""
+    eff = (context or {}).get("effect")
+    name = getattr(eff, "name", None)
+    if isinstance(name, str) and has_proper_effect_name(name):
+        return name.strip()
+    return ability_name
+
 
 HIT_RESULTS = {"effResultOk", "effResultGlance", "effResultCrit"}
 FAIL_RESULTS = {"effResultMiss", "effResultImmune", "effResultResisted"}
@@ -116,8 +128,12 @@ class Branch:
                 if not passed:
                     continue
 
+            action_source = source_name
+            if action_type == "damage":
+                action_source = damage_source_name(context, source_name)
+
             success = execute_single_action(
-                sim, caster, actual_target, action, source_name, ability=ability, context=context
+                sim, caster, actual_target, action, action_source, ability=ability, context=context
             )
 
             if action_type == "damage":
