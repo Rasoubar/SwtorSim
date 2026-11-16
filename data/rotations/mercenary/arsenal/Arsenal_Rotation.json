@@ -96,7 +96,7 @@
                 {
                     "ability_id": "rapid_shots",
                     "rules": {
-                        "caster_energy_above": 30,
+                        "caster_energy_above": 18,
                         "ability_cooldown_above": {
                             "name": "Vent Heat",
                             "value": 1.5
