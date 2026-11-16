@@ -1058,14 +1058,46 @@
     font-weight: 700;
     color: var(--text-main);
   }
+  .beta-pill {
+    background: transparent;
+    color: #ffb36b;
+    border: 1px solid #ff7818;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    cursor: help;
+  }
+  .beta-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px;
+    font-size: 12px;
+    background: var(--accent-bg);
+    color: var(--text);
+    border-bottom: 1px solid var(--accent);
+  }
+  .beta-banner a { color: var(--accent); font-weight: 700; }
+  .beta-banner button {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+  }
 </style>
-  <script src="pyodide_client.js?v=1794797130"></script>
+  <script src="pyodide_client.js?v=1794799234"></script>
 </head>
 <body>
 
 <header>
   <div class="brand">
     <span class="brand-badge">SwtorSim</span>
+    <span class="beta-pill" title="Beta: expect some bugs. Please report anything that looks wrong (see the banner below).">Beta</span>
     <span>Combat Simulator Dashboard</span>
     <span id="statusPill" class="status-pill status-ready">Ready</span>
     <div id="simProgressBox" class="sim-progress-box">
@@ -1098,6 +1130,22 @@
     <button class="btn btn-primary" id="runSimBtn" title="Run Simulation (Ctrl+Enter)">▶ Run Simulation</button>
   </div>
 </header>
+<div class="beta-banner" id="betaBanner" style="display:none;">
+  <span><strong>Beta:</strong> SwtorSim is still in beta, so you may run into bugs or poor implementations in the engine. If something looks wrong, please <a href="https://discord.gg/VWfDcjPqcg" target="_blank" rel="noopener">report it on Discord</a> and include your run config or rotation file if you can. Good feedback is crucial to make sure nothing is missed before 8.0 arrives.</span>
+  <button type="button" id="betaBannerClose" title="Dismiss" aria-label="Dismiss">&#10005;</button>
+</div>
+<script>
+(function () {
+  var el = document.getElementById('betaBanner'), key = 'swtorsim_beta_banner_dismissed';
+  var dismissed = false;
+  try { dismissed = localStorage.getItem(key) === '1'; } catch (e) {}
+  if (!dismissed) el.style.display = 'flex';
+  document.getElementById('betaBannerClose').onclick = function () {
+    el.style.display = 'none';
+    try { localStorage.setItem(key, '1'); } catch (e) {}
+  };
+})();
+</script>
 
 <div class="workspace">
   <!-- LEFT SIDEBAR: CONFIGURATION -->
