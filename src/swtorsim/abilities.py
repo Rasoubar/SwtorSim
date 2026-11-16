@@ -46,7 +46,8 @@ def damage_source_name(context, ability_name):
     """Breakdown label for a damage hit: the effect's display name when it has a real one
     (e.g. 'Radiation Burns'), else the parent ability name. Empty names and the extractor's
     auto-generated 'Parent_N' names for unnamed helper effects fall back to the ability."""
-    eff = (context or {}).get("effect")
+    ctx = context or {}
+    eff = ctx.get("effect") or getattr(ctx.get("active_effect"), "effect_blueprint", None)
     name = getattr(eff, "name", None)
     if isinstance(name, str) and has_proper_effect_name(name):
         return name.strip()

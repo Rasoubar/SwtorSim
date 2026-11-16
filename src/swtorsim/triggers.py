@@ -277,8 +277,11 @@ class TriggerManager:
             if owner_effect is not None and not getattr(owner_effect, "is_expired", False):
                 owner_stacks = getattr(owner_effect, "stacks", 1)
                 branch_ctx["active_effect"] = owner_effect
+                branch_ctx["effect"] = getattr(owner_effect, "effect_blueprint", None)
                 branch_ctx["current_stacks"] = owner_stacks
                 branch_ctx["stack_multiplier"] = owner_stacks if getattr(owner_effect, "scales_with_stacks", False) else 1
+            else:
+                branch_ctx.pop("effect", None)
             if effective_interval > 0.0:
                 sub["next_allowed_time"] = sim.current_time + effective_interval
             ran = sub["ability"].execute_branch(
