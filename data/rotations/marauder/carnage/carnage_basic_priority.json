@@ -1,0 +1,137 @@
+[
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.frenzy"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.dual_saber_throw"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.force_charge"
+    },
+    {
+        "type": "loop_anchor"
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.sith_warrior.skill.carnage.berserk_ataru",
+        "rules": {}
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.massacre"
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.sith_warrior.skill.carnage.ferocity",
+        "rules": {}
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.massacre"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.vicious_throw"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.devastating_blast"
+    },
+    {
+        "type": "priority_block",
+        "name": "massacre or gore",
+        "pool": [
+            {
+                "ability_id": "abl.sith_warrior.skill.carnage.gore",
+                "rules": {
+                    "caster_energy_above": 8
+                }
+            },
+            {
+                "ability_id": "abl.sith_warrior.skill.carnage.massacre",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.battering_assault"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.massacre"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.massacre"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.massacre"
+    },
+    {
+        "type": "optional",
+        "ability_id": "abl.sith_warrior.skill.carnage.ferocity",
+        "rules": {},
+        "lead_time": 0.5
+    },
+    {
+        "type": "priority_block",
+        "name": "gore or (<30 throw) or no_rage_compensation1",
+        "pool": [
+            {
+                "ability_id": "abl.sith_warrior.vicious_throw",
+                "rules": {
+                    "target_hp_below_pct": 0.3
+                }
+            },
+            {
+                "ability_id": "abl.sith_warrior.skill.carnage.gore",
+                "rules": {}
+            },
+            {
+                "ability_id": "dual_saber_throw",
+                "rules": {
+                    "caster_energy_below": 4
+                }
+            }
+        ]
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.devastating_blast"
+    },
+    {
+        "type": "priority_block",
+        "name": "no_rage_compensation2",
+        "pool": [
+            {
+                "ability_id": "dual_saber_throw",
+                "rules": {}
+            },
+            {
+                "ability_id": "abl.sith_warrior.skill.carnage.gore",
+                "rules": {}
+            }
+        ]
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.battering_assault"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.massacre"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.ravage"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "abl.sith_warrior.skill.carnage.massacre"
+    }
+]
