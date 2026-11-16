@@ -183,11 +183,18 @@ class Entity:
             for existing_k, existing_eff in list(self.effects.items()):
                 if getattr(existing_eff, "is_expired", False):
                     continue
+                is_dummy_debuff = (
+                    getattr(existing_eff, "is_passive", False)
+                    and getattr(existing_eff, "expires_at", None) is None
+                )
+                if not getattr(existing_eff, "is_by_tag", False) and not is_dummy_debuff:
+                    continue
                 eff_tags = getattr(existing_eff, "tags", frozenset())
                 if rel_tags & set(eff_tags):
-                    existing = existing_eff
                     if nr_occurances == 1:
                         self._drop_replaced_effect(existing_k, existing_eff, sim)
+                    if is_dummy_debuff or nr_occurances != 1:
+                        existing = existing_eff
                     break
 
         if existing is not None and not getattr(existing, "is_expired", False):

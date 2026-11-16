@@ -164,6 +164,7 @@ class ActiveEffect:
     max_stacks: int = 1
     initial_stacks: int = 1
     scales_with_stacks: bool = False
+    is_by_tag: bool = False
 
     @property
     def charges(self) -> int:
@@ -326,6 +327,7 @@ class ActiveEffect:
             max_stacks=max_stacks,
             initial_stacks=initial_stacks,
             scales_with_stacks=scales_with_stacks,
+            is_by_tag=bool(stack_charge.get("is_by_tag", False)),
             modifiers=parsed_modifiers,
             branches=serialized_branches,
             is_passive=is_passive,
@@ -423,6 +425,7 @@ class ActiveEffect:
             max_stacks=max_stacks,
             initial_stacks=initial_stacks,
             scales_with_stacks=scales_with_stacks,
+            is_by_tag=bool(stack_charge.get("is_by_tag", False)),
             modifiers=parsed_modifiers,
             branches=serialized_branches,
             is_passive=is_passive,
