@@ -1,0 +1,30 @@
+{
+  "spec_path": "data/extractor/live/disciplines/marauder/carnage.json",
+  "stats_path": "data/builds/L80_14gcd_marauder.json",
+  "rotation_path": "data/rotations/marauder/carnage/carnage_basic_priority.json",
+  "tactical_fqn": "abl.itm.tactical.sow.war_kni.mar_sen.car_comb.dmg_burst_03",
+  "legendary_fqns": [
+    "abl.itm.legendary.war_kni.fearless_victor",
+    "abl.itm.legendary.war_kni.mar_sen.berserkers_call"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_power.scales_with_item_rating"
+  ],
+  "mode": "TEST",
+  "iterations": 1,
+  "level": 80,
+  "dummy_hp": 6000000,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": true,
+  "choices": {
+    "23": 3,
+    "27": 2,
+    "39": 3,
+    "43": 1,
+    "51": 2,
+    "64": 1,
+    "68": 2,
+    "73": 1
+  }
+}

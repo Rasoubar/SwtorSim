@@ -1,0 +1,117 @@
+{
+    "pre_combat": [
+        {
+            "ability": "recharge_and_reload"
+        }
+    ],
+    "weave": [
+        {
+            "ability_id": "high_velocity_supercharged_gas",
+            "rules": {}
+        },
+        {
+            "ability_id": "vent_heat",
+            "rules": {
+                "caster_energy_above": 85
+            }
+        }
+    ],
+    "sequence": [
+        {
+            "type": "fixed",
+            "ability_id": "fusion_missile"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "electro_net"
+        },
+        {
+            "type": "optional",
+            "ability_id": "high_velocity_supercharged_gas",
+            "rules": {}
+        },
+        {
+            "type": "loop_anchor"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "priming_shot"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "heatseeker_missiles"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "blazing_bolts"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "tracer_missile"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "blazing_bolts"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "tracer_missile"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "tracer_missile"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "tracer_missile"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "rail_shot"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 14",
+            "pool": [
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 30,
+                        "ability_cooldown_above": {
+                            "name": "Vent Heat",
+                            "value": 1.5
+                        }
+                    }
+                },
+                {
+                    "ability_id": "tracer_missile",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 15",
+            "pool": [
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 30,
+                        "ability_cooldown_above": {
+                            "name": "Vent Heat",
+                            "value": 1.5
+                        }
+                    }
+                },
+                {
+                    "ability_id": "electro_net",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "tracer_missile",
+                    "rules": {}
+                }
+            ]
+        }
+    ]
+}

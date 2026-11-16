@@ -1,0 +1,142 @@
+{
+    "weave": [
+        {
+            "ability_id": "laze_target",
+            "rules": {}
+        },
+        {
+            "ability_id": "adrenaline_probe",
+            "rules": {}
+        }
+    ],
+    "sequence": [
+        {
+            "type": "fixed",
+            "ability_id": "crouch"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "laze_target"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "ambush"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "corrosive_dart"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "penetrating_blasts"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "sniper_volley"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "penetrating_blasts"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "followthrough"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "snipe"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "snipe"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "followthrough"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "snipe"
+        },
+        {
+            "type": "loop_anchor"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "ambush"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "followthrough"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "penetrating_blasts"
+        },
+        {
+            "type": "optional",
+            "ability_id": "sniper_volley",
+            "rules": {}
+        },
+        {
+            "type": "optional",
+            "ability_id": "penetrating_blasts",
+            "rules": {
+                "caster_has_buff": "Sniper Volley"
+            },
+            "lead_time": 0
+        },
+        {
+            "type": "priority_block",
+            "name": "Sub 30: Takedown / Followthrough",
+            "pool": [
+                {
+                    "ability_id": "takedown",
+                    "rules": {
+                        "target_hp_below_pct": 0.3
+                    }
+                },
+                {
+                    "ability_id": "followthrough",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Sub 30: Takedown / Snipe",
+            "pool": [
+                {
+                    "ability_id": "followthrough",
+                    "rules": {
+                        "target_hp_below_pct": 0.3
+                    }
+                },
+                {
+                    "ability_id": "snipe",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "snipe"
+        },
+        {
+            "type": "priority_block",
+            "name": "Sub 30: Takedown / Followthrough",
+            "pool": [
+                {
+                    "ability_id": "snipe",
+                    "rules": {
+                        "target_hp_below_pct": 0.3
+                    }
+                },
+                {
+                    "ability_id": "followthrough",
+                    "rules": {}
+                }
+            ]
+        }
+    ]
+}
