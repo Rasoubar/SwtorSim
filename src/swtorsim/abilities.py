@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from pathlib import Path
 from src.swtorsim.combat_math import accuracy_roll
 from src.swtorsim.entities import Dummy, Player
-from src.swtorsim.events import ChargeRestoreEvent, DamageHit, ResourceGainEvent
+from src.swtorsim.events import ChargeRestoreEvent, DamageHit, HitGroup, ResourceGainEvent
 from src.swtorsim.requirements import validate_all
 from src.swtorsim.engine import sim_log
 from src.swtorsim.metrics import has_proper_effect_name
@@ -111,37 +111,53 @@ class Branch:
         combat_outcomes: list[bool] = []
         crit_flags: list = []  # True / False / None (unknown), parallel to combat_outcomes
 
-        for action in self.actions:
-            action_type = action.get("action_type")
+        # Two or more damage actions in one branch (main + off-hand) are evaluated together: their post-hit
+        # triggers (buff consumption, procs) wait for the last hit. Other branches resolve hit by hit as before.
+        group = None
+        previous_group = None
+        if sim is not None:
+            previous_group = getattr(sim, "hit_group", None)
+            if sum(1 for a in self.actions if a.get("action_type") == "damage") >= 2:
+                group = HitGroup()
+            if group is not None or previous_group is not None:
+                sim.hit_group = group
+        try:
+            for action in self.actions:
+                action_type = action.get("action_type")
 
-            req = set(action.get("results") or ())
-            if (action.get("combat_math_only", False) or req) and combat_outcomes:
-                agg = all if action.get("match_all", False) else any
-                hit = agg(combat_outcomes)
-                if req and req <= FAIL_RESULTS:
-                    passed = not hit  # only when the attack failed
-                elif req == {"effResultCrit"}:
-                    vals = [(f if f is not None else o)  # unknown crit: fall back to "hit"
-                            for f, o in zip(crit_flags, combat_outcomes)]
-                    passed = agg(vals)
-                else:
-                    passed = hit  # any-hit gate
-                if not passed:
-                    continue
+                req = set(action.get("results") or ())
+                if (action.get("combat_math_only", False) or req) and combat_outcomes:
+                    agg = all if action.get("match_all", False) else any
+                    hit = agg(combat_outcomes)
+                    if req and req <= FAIL_RESULTS:
+                        passed = not hit  # only when the attack failed
+                    elif req == {"effResultCrit"}:
+                        vals = [(f if f is not None else o)  # unknown crit: fall back to "hit"
+                                for f, o in zip(crit_flags, combat_outcomes)]
+                        passed = agg(vals)
+                    else:
+                        passed = hit  # any-hit gate
+                    if not passed:
+                        continue
 
-            action_source = source_name
-            if action_type == "damage":
-                action_source = damage_source_name(context, source_name)
+                action_source = source_name
+                if action_type == "damage":
+                    action_source = damage_source_name(context, source_name)
 
-            success = execute_single_action(
-                sim, caster, actual_target, action, action_source, ability=ability, context=context
-            )
+                success = execute_single_action(
+                    sim, caster, actual_target, action, action_source, ability=ability, context=context
+                )
 
-            if action_type == "damage":
-                combat_outcomes.append(bool(success))
-                crit_flags.append(getattr(success, "crit", None) if success else False)
-            elif not success:
-                return True, False
+                if action_type == "damage":
+                    combat_outcomes.append(bool(success))
+                    crit_flags.append(getattr(success, "crit", None) if success else False)
+                elif not success:
+                    return True, False
+        finally:
+            if group is not None or previous_group is not None:
+                sim.hit_group = previous_group
+            if group is not None:
+                group.seal(sim)
 
         branch_success = any(combat_outcomes) if combat_outcomes else True
         return True, branch_success
@@ -739,6 +755,7 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
     hit_any = False
     crit_any = False
     crit_known = True
+    group = getattr(sim, "hit_group", None)
     for i in range(flurry_count):
         if not accuracy_roll(
             caster,
@@ -758,8 +775,12 @@ def handle_damage_action(sim, caster, target, action, source_name, delay, abilit
             tags=combined_tags,
             from_proc=from_proc,
             ability_fqn=getattr(ability, "fqn", None),
+            group=group,
         )
         if delay > 0.0:
+            if group is not None:
+                group.hit_scheduled()
+                hit_event.counted = True
             sim.schedule_relative(delay, hit_event)
             crit_known = False
         else:

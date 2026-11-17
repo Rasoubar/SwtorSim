@@ -523,7 +523,7 @@ def handle_caster_buffs(caster, target, action_tags, ability_fqn, attack_type, d
                 modifiers['base_weapon_damage_modifier'] = modifiers.get('base_weapon_damage_modifier', 0.0) + val
                 continue
 
-            # 6. Dual Wield Damage Done Modifier (Stat 127) - modifies off-hand weapon damage scalar (0.30 + val)
+            # 6. Dual Wield Damage Done Modifier (Stat 127) - modifies off-hand weapon damage scalar (0.25 + val)
             if stat in ("STAT_cbt_dual_wield_damage_done_modifier_percentage", "127"):
                 if hand == "off":
                     modifiers['dual_wield_damage_modifier'] = modifiers.get('dual_wield_damage_modifier', 0.0) + val
@@ -735,7 +735,7 @@ def calculate_base_damage(caster, action_data, attack_type, modifiers=None):
                     for mod in eff_mods:
                         if str(mod.stat) in ("STAT_cbt_dual_wield_damage_done_modifier_percentage", "127"):
                             dual_wield_mod += float(mod.value)
-            offhand_ratio = 0.30 + dual_wield_mod
+            offhand_ratio = 0.25 + dual_wield_mod
             weapon_min = caster.stats.get("Off_hand_min", 0.0) * offhand_ratio * weapon_multiplier
             weapon_max = caster.stats.get("Off_hand_max", 0.0) * offhand_ratio * weapon_multiplier
         else:

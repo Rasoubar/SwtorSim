@@ -42,6 +42,8 @@ class Simulation:
         self.tracker = Metrics()
         self.tracker.seed = seed
         self.triggers = TriggerManager()
+        # HitGroup of the multi-hit branch being executed; None outside one (see events.HitGroup).
+        self.hit_group = None
         self.verbose = verbose
         from src.swtorsim.settings import is_in_flashpoint_operation
         self.in_flashpoint_operation = (

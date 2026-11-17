@@ -92,10 +92,47 @@ class ApplyDamageLand(Event):
                 math_audit=getattr(self, "math_audit", None),
             )
 
+class HitGroup:
+    """Hits resolved by one branch (e.g. main + off-hand) share a snapshot: their post-hit triggers are parked until
+    every hit of the branch has landed, so a buff the first hit consumes is still active for the others."""
+    __slots__ = ("parked", "pending", "sealed", "flushed")
+
+    def __init__(self):
+        self.parked = []
+        self.pending = 0  # delayed hits scheduled but not yet resolved
+        self.sealed = False  # the branch has finished issuing its damage actions
+        self.flushed = False
+
+    def park(self, ctx):
+        self.parked.append(ctx)
+
+    def hit_scheduled(self):
+        self.pending += 1
+
+    def hit_resolved(self, sim):
+        self.pending -= 1
+        self.release(sim)
+
+    def seal(self, sim):
+        self.sealed = True
+        self.release(sim)
+
+    def release(self, sim):
+        """Fires the parked dispatches, in hit order, once the branch is sealed and no delayed hit is outstanding."""
+        if not self.sealed or self.pending > 0 or self.flushed:
+            return
+        self.flushed = True
+        parked, self.parked = self.parked, []
+        for ctx in parked:
+            sim.triggers.dispatch("on_damage_dealt", sim, ctx)
+            sim.triggers.dispatch("on_damage_taken", sim, ctx)
+
 class DamageHit(Event):
     """ Represents a hit execution. Holds the data needed to calculate damage, and trigger procs."""
-    def __init__(self, source: "Player", target: "Dummy", action_data: dict, ability_name: str, tags=None, from_proc: bool = False, ability_fqn: str = None):
+    def __init__(self, source: "Player", target: "Dummy", action_data: dict, ability_name: str, tags=None, from_proc: bool = False, ability_fqn: str = None, group: "HitGroup" = None):
         super().__init__(f"{ability_name} Hit")
+        self.group = group
+        self.counted = False  # True when scheduled as a delayed hit the group is waiting on
         self.source = source
         self.target = target
         self.action_data = action_data
@@ -178,8 +215,13 @@ class DamageHit(Event):
             self.source.break_stealth(sim)
 
         if sim is not None and hasattr(sim, "triggers"):
-            sim.triggers.dispatch("on_damage_dealt", sim, ctx)
-            sim.triggers.dispatch("on_damage_taken", sim, ctx)
+            if self.group is not None:
+                self.group.park(ctx)
+            else:
+                sim.triggers.dispatch("on_damage_dealt", sim, ctx)
+                sim.triggers.dispatch("on_damage_taken", sim, ctx)
+        if self.group is not None and self.counted:
+            self.group.hit_resolved(sim)
 
 class PeriodicProcTick(Event):
     """Represents tics that are pre-scheduled and always happening."""
