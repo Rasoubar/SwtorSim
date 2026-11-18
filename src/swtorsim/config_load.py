@@ -164,11 +164,39 @@ def selected_fqns_from_config(config: RunConfig) -> List[str]:
     ]
 
 
+_PROGRAMMATIC_ABILITY_HOOK = "6855115466292073041"
+
+
+def _referenced_ability_fqns(node: Any) -> List[str]:
+    """Ability FQNs a parsed ability triggers by name: execute_ability targets and programmatic-hook (custom) targets."""
+    found: List[str] = []
+    if isinstance(node, dict):
+        action_type = node.get("action_type")
+        ints = node.get("ints") if isinstance(node.get("ints"), dict) else {}
+        spec = None
+        if action_type == "execute_ability":
+            spec = ints.get("ability_spec") or node.get("ability_spec")
+        elif action_type == "custom" and str(ints.get("param1", "")) == _PROGRAMMATIC_ABILITY_HOOK:
+            spec = ints.get("param2")
+        if isinstance(spec, str) and spec.startswith("abl."):
+            found.append(spec)
+        for value in node.values():
+            found.extend(_referenced_ability_fqns(value))
+    elif isinstance(node, list):
+        for item in node:
+            found.extend(_referenced_ability_fqns(item))
+    return found
+
+
 def load_complete_loadout(
     selected_fqns: List[str],
     parsed_dir: str | None = None,
 ) -> Dict[str, AbilityBlueprint]:
-    """Resolves ability, talent, gear, and relic FQNs into a unified blueprint dictionary."""
+    """Resolves ability, talent, gear, and relic FQNs into a unified blueprint dictionary.
+
+    Abilities that another loaded ability triggers by name (execute_ability, programmatic custom hook, e.g. Shoulder
+    Cannon's missile sub-ability) are loaded too, transitively, so those triggers find their target at runtime.
+    """
     if parsed_dir is None:
         from src.swtorsim.settings import get_extractor_data_dir
         base_parsed_path = (get_extractor_data_dir() / "parsed").resolve()
@@ -176,9 +204,13 @@ def load_complete_loadout(
         base_parsed_path = Path(parsed_dir).resolve()
     blueprints: Dict[str, AbilityBlueprint] = {}
 
-    for fqn in selected_fqns:
-        if not fqn or not isinstance(fqn, str) or not fqn.strip():
+    queue = list(selected_fqns)
+    seen: set[str] = set()
+    while queue:
+        fqn = queue.pop(0)
+        if not fqn or not isinstance(fqn, str) or not fqn.strip() or fqn in seen:
             continue
+        seen.add(fqn)
         rel_path = fqn_to_relative_path(fqn)
         full_path = base_parsed_path / rel_path
 
@@ -188,6 +220,7 @@ def load_complete_loadout(
 
         blueprint = AbilityBlueprint.from_file(full_path)
         blueprints[blueprint.fqn] = blueprint
+        queue.extend(_referenced_ability_fqns(load_json_file(str(full_path))))
 
     print(f"[OK] Loaded {len(blueprints)} total blueprints into unified loadout database.")
     return blueprints

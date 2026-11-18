@@ -141,10 +141,17 @@ class DamageHit(Event):
         self.from_proc = from_proc
         self.ability_fqn = ability_fqn
         self.is_crit = False
+        # Pre-combat (pre-pull) casts never hit the dummy: a hit issued while the pre-combat runner owns the
+        # player is dropped, even if it lands later (projectile flight), so the fight clock starts on the rotation.
+        self.pre_combat_dropped = source is not target and is_pre_combat_active(source)
 
     def resolve(self, sim):
         """Calls damage calculation, determines when to apply damage, calls for damage to land,
         calls for proc evaluation."""
+        if self.pre_combat_dropped:
+            if self.group is not None and self.counted:
+                self.group.hit_resolved(sim)
+            return
         action_with_ctx = dict(self.action_data)
         action_with_ctx["tags"] = self.tags
         action_with_ctx["ability_fqn"] = self.ability_fqn

@@ -339,6 +339,12 @@ class Effect:
         if hasattr(effect_target, "is_immune_to_effect") and effect_target.is_immune_to_effect(self):
             return
 
+        # Pre-combat (pre-pull) casts never touch the dummy: effects they aim at an enemy are not applied.
+        if caster is not None and effect_target is not caster:
+            from src.swtorsim.events import is_pre_combat_active
+            if is_pre_combat_active(caster):
+                return
+
         if self.is_persistent:
             parent_fqn = (
                 getattr(getattr(ability, "blueprint", None), "fqn", None)
