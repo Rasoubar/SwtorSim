@@ -196,6 +196,9 @@ def load_complete_loadout(
 
     Abilities that another loaded ability triggers by name (execute_ability, programmatic custom hook, e.g. Shoulder
     Cannon's missile sub-ability) are loaded too, transitively, so those triggers find their target at runtime.
+    Those dependency-only blueprints come first in the result: ``Player.build_ability_db`` indexes abilities by display
+    name with last-wins, and a sub-ability may share the name of the ability that triggers it ("Shoulder Cannon"), so
+    the selected ability must be indexed after it.
     """
     if parsed_dir is None:
         from src.swtorsim.settings import get_extractor_data_dir
@@ -205,6 +208,7 @@ def load_complete_loadout(
     blueprints: Dict[str, AbilityBlueprint] = {}
 
     queue = list(selected_fqns)
+    selected = {f for f in selected_fqns if isinstance(f, str)}
     seen: set[str] = set()
     while queue:
         fqn = queue.pop(0)
@@ -222,8 +226,10 @@ def load_complete_loadout(
         blueprints[blueprint.fqn] = blueprint
         queue.extend(_referenced_ability_fqns(load_json_file(str(full_path))))
 
-    print(f"[OK] Loaded {len(blueprints)} total blueprints into unified loadout database.")
-    return blueprints
+    ordered = {k: v for k, v in blueprints.items() if k not in selected}
+    ordered.update({k: v for k, v in blueprints.items() if k in selected})
+    print(f"[OK] Loaded {len(ordered)} total blueprints into unified loadout database.")
+    return ordered
 
 
 # -----------------------------------------------------------------------------

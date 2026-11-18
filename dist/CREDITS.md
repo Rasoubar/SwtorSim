@@ -5,7 +5,7 @@
 - **Sinrai** — Game Data Extraction and Parsing, Combat Math, Statistical Analysis
 
 ## Contributors
-- **Azrael** — Fixes & minor improvements
+- **Azrael229** — Fixes & minor improvements
 - **Randomno** — HeroScripts for understanding game mechanics
 - **Dantiko** — Valuable debugging insights
 
