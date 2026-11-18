@@ -797,17 +797,23 @@ def _collect_conditions(
     valid_ids = {item["id"] for item in decoded_list}
 
     logic: dict[str, Any] | None = None
+    reduced_to_true = False
     for logic_list in logic_lists:
         candidate = _filter_condition_logic(
             _decode_condition_logic(logic_list),
             valid_ids,
         )
+        if candidate is ALWAYS_TRUE_LOGIC:
+            reduced_to_true = True
+            continue
         if candidate is not None:
             logic = candidate
             break
+    if logic is None and reduced_to_true:
+        return None
 
     return _finalize_conditions(
-        {"list": decoded_list, "logic": logic},
+        {"list": _conditions_for_logic(decoded_list, logic), "logic": logic},
         context=effect_record.entry.fqn,
     )
 
@@ -1042,28 +1048,55 @@ def _effect_has_if_called_by_effect(effect_record: NodeRecord) -> bool:
     return False
 
 
+ALWAYS_TRUE_LOGIC: dict[str, Any] = {"always_true": True}
+
+
 def _filter_condition_logic(
     logic: dict[str, Any] | None,
     valid_ids: set[str],
 ) -> dict[str, Any] | None:
+    """Removes leaves whose condition was dropped (range, alive, enemy, ...), treating each as satisfied.
+
+    A dropped leaf is assumed true: an AND simply loses it, and an OR containing it is true as a whole
+    (``InRange OR (InRange2 AND HasAbility)`` must not shrink to ``HasAbility``). Returns None when
+    ``logic`` is None, ``ALWAYS_TRUE_LOGIC`` when the whole expression reduces to true, else the tree.
+    """
     if logic is None:
         return None
+    return _reduce_condition_logic(logic, valid_ids)
+
+
+def _reduce_condition_logic(logic: dict[str, Any], valid_ids: set[str]) -> dict[str, Any]:
     if "condition" in logic:
-        if logic["condition"] in valid_ids:
-            return logic
-        return None
+        return logic if logic["condition"] in valid_ids else ALWAYS_TRUE_LOGIC
     if "op" in logic and "operands" in logic:
-        filtered = [
-            child
-            for child in (_filter_condition_logic(op, valid_ids) for op in logic["operands"])
-            if child is not None
-        ]
-        if not filtered:
-            return None
-        if len(filtered) == 1:
-            return filtered[0]
-        return {"op": logic["op"], "operands": filtered}
+        reduced = [_reduce_condition_logic(op, valid_ids) for op in logic["operands"]]
+        if logic["op"] == "or" and any(child is ALWAYS_TRUE_LOGIC for child in reduced):
+            return ALWAYS_TRUE_LOGIC
+        kept = [child for child in reduced if child is not ALWAYS_TRUE_LOGIC]
+        if not kept:
+            return ALWAYS_TRUE_LOGIC
+        if len(kept) == 1:
+            return kept[0]
+        return {"op": logic["op"], "operands": kept}
     return logic
+
+
+def _referenced_condition_ids(logic: dict[str, Any]) -> set[str]:
+    if "condition" in logic:
+        return {logic["condition"]}
+    return {cid for op in logic.get("operands") or () for cid in _referenced_condition_ids(op)}
+
+
+def _conditions_for_logic(
+    decoded_list: list[dict[str, Any]],
+    logic: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Keeps only the conditions the filtered logic still references (an OR collapsed to true orphans its leaves)."""
+    if logic is None:
+        return decoded_list
+    referenced = _referenced_condition_ids(logic)
+    return [item for item in decoded_list if item["id"] in referenced]
 
 
 def _branch_conditions(
@@ -1125,9 +1158,11 @@ def _branch_conditions(
                 _decode_condition_logic(postfix_list),
                 valid_ids,
             )
+    if logic is ALWAYS_TRUE_LOGIC:
+        return marker, None
 
     return marker, _finalize_conditions(
-        {"list": decoded_list, "logic": logic},
+        {"list": _conditions_for_logic(decoded_list, logic), "logic": logic},
         context=context,
     )
 

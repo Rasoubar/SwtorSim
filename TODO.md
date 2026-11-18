@@ -1,6 +1,7 @@
 # Active Task Queue & Current Roadmap
 
 ## 1. Active Roadmap & Backlog
+- [ ] **Re-extract live + PTS after the condition OR fix** (CHANGELOG: extractor condition logic): `src/extractor/abilities.py` now treats dropped conditions (InRange, IsAlive, ...) as true inside an OR. Parsed data still holds the old logic (e.g. Shoulder Cannon gated on Efficient Suit). After re-extracting, run the DPS compare; 22 live abilities are affected (all BH/Trooper Shoulder Cannon variants, Force Scream, Obliterate, Blade Storm, Zealous Leap).
 - [ ] **Additional Class Disciplines Verification**: Continue verifying and testing combat parses across additional classes and disciplines (e.g. Deception Assassin, Sorcerer, Operative).
 - [ ] **Stack Modification Target Resolution Optimization**: Investigate whether effect target type (`Target Type: Self` per Jedipedia / GOM ability/effect root targeting rules) can be extracted directly into blueprints to bypass participant fallback iteration (`caster`/`target`) in `handle_modify_stack_charge`.
 - [ ] **Restore Missing Tools**: `tools/catalog_game_data.py` (+ `data/catalog_summary.md`), `tools/parse_combat_log.py`, `tools/validate_modifiers_vs_log.py`, and `tests/test_modifier_multipliers.py` / `tests/test_validate_modifiers_vs_log.py` are referenced by the docs but were never committed. Only a stale `tools/__pycache__/parse_combat_log.cpython-313.pyc` remains locally.
