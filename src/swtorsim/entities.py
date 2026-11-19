@@ -459,9 +459,10 @@ class Player(Entity):
             ability_db[key] = abl
             # Store normalized key
             ability_db[key.lower().replace(" ", "_")] = abl
-            # Store normalized human-readable name if available
+            # Store normalized human-readable name if available (stripped: some game names carry
+            # trailing spaces, e.g. "Halted Offensive ", which must still match the rotation slug)
             if hasattr(abl, "name"):
-                ability_db[abl.name.lower().replace(" ", "_")] = abl
+                ability_db[abl.name.strip().lower().replace(" ", "_")] = abl
         return ability_db
 
     def break_stealth(self, sim=None) -> None:

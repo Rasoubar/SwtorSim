@@ -246,6 +246,14 @@ class PriorityBlockStep:
                     "reason": reason,
                     "accepted": False,
                 })
+            else:
+                candidates_trace.append({
+                    "ability": ability_name,
+                    "rules_passed": True,
+                    "can_cast": False,
+                    "reason": "Ability not found in loadout",
+                    "accepted": False,
+                })
 
         tracer.record_rotation_evaluation(
             timestamp=sim.current_time,

@@ -117,7 +117,7 @@ def _register_passive_blueprint(player, bp, sim):
     passive_abl = Ability(bp)
     player.passive_db[bp.fqn] = passive_abl
     if passive_abl.name:
-        player.passive_db[passive_abl.name.lower().replace(" ", "_")] = passive_abl
+        player.passive_db[passive_abl.name.strip().lower().replace(" ", "_")] = passive_abl
     if getattr(bp, "stat_changes", None):
         eff = ActiveEffect.from_stat_changes(
             {
@@ -205,7 +205,7 @@ def _unequip_passive(player, fqn: str, sim) -> None:
     """Removes a passive's registration, permanent effects and procs; timed effects it already produced are kept."""
     old_abl = player.passive_db.pop(fqn, None)
     if old_abl is not None and getattr(old_abl, "name", None):
-        alias = old_abl.name.lower().replace(" ", "_")
+        alias = old_abl.name.strip().lower().replace(" ", "_")
         if player.passive_db.get(alias) is old_abl:
             player.passive_db.pop(alias, None)
     old_name = getattr(old_abl, "name", None) if old_abl is not None else None

@@ -36,7 +36,7 @@ def inject_pyodide_client(html_content: str, version: int | None = None) -> str:
     v_str = f"?v={version}" if version else ""
     tag = f'  <script src="pyodide_client.js{v_str}"></script>\n</head>'
     if '</head>' in html_content:
-        return html_content.replace('</head>', tag, 1)
+        return html_content.replace('</head>', tag, 1)q
     return html_content + f'\n<script src="pyodide_client.js{v_str}"></script>'
 
 
