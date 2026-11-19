@@ -3359,3 +3359,9 @@ Added a "Beta" pill next to the app name and a dismissible bug-report banner (li
 - **Fix:** `src/extractor/abilities.py`: `_filter_condition_logic` returns `ALWAYS_TRUE_LOGIC` for a dropped leaf; an OR with a true operand is true, an AND drops true operands; a branch/ability whose whole gate reduces to true gets no conditions. Condition lists keep only ids the filtered logic references (`_conditions_for_logic`).
 - **Tests:** new `tests/test_extractor_condition_logic.py` (logic cases + the raw `shoulder_cannon_custom/17/1` header now yields no conditions). Full unittest suite 429/429 OK.
 - **Not done:** parsed data is unchanged until live and PTS are re-extracted (TODO). DPS compare pending re-extraction. 22 live abilities affected.
+
+## Rotation Builder: Skill Tree drawer cut off with no scroll
+
+- **Cause:** in `tools/rotation_builder_ui.html` the left panel's top block (Class/Discipline/Tactical/Implant/Relic selects + Skill Tree drawer) had `flex-shrink:0` inside an `overflow:hidden` panel. Opening the drawer made the block taller than the panel, so the lower tree rows were clipped and could not be scrolled to.
+- **Fix:** the block is now `.loadout-top` (`flex: 0 1 auto; min-height: 0; overflow-y: auto`), so it scrolls when the drawer is open; the ability palette (`.palette-body`) keeps `min-height: 140px` so it stays usable. Closed-drawer layout is unchanged.
+- **Tests:** UI-only CSS change, no unit test covers it. Verified in the browser (Assassin / Darkness, 768px window): open drawer scrolls, last tree row fully reachable. Full unittest suite 429/429 OK.

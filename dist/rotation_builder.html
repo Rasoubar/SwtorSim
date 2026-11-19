@@ -201,6 +201,18 @@
     background: var(--bg-base);
   }
 
+  /* Left panel top block (selects + Skill Tree drawer): scrolls when the
+     drawer is taller than the panel; palette keeps a usable minimum. */
+  .loadout-top {
+    flex: 0 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .palette-body {
+    min-height: 140px;
+  }
+
   /* Controls & Inputs */
   select, input[type="text"], input[type="number"], textarea {
     background: var(--bg-input);
@@ -1291,7 +1303,7 @@
     font-size: 14px;
   }
 </style>
-  <script src="pyodide_client.js?v=1794965275"></script>
+  <script src="pyodide_client.js?v=1795057685"></script>
 </head>
 <body>
 
@@ -1347,7 +1359,7 @@
       <span>1. Spec, Choices & Auto-Discovery</span>
       <button class="btn-sm" onclick="toggleSkillTreeDrawer()" id="toggleTreeBtn">Skill Tree</button>
     </div>
-    <div style="padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;">
+    <div class="loadout-top" style="padding:10px 12px;border-bottom:1px solid var(--border);">
       <div class="form-row">
         <div class="form-group" style="margin-bottom:6px;">
           <label>Class</label>
@@ -1419,7 +1431,7 @@
       <button class="tab-btn" id="tabProcs" onclick="switchPaletteTab('procs')">Procs (<span id="countProcs">0</span>)</button>
     </div>
 
-    <div class="panel-body" id="paletteContainer"></div>
+    <div class="panel-body palette-body" id="paletteContainer"></div>
   </div>
 
   <!-- CENTER PANEL: Interactive Rotation Timeline -->
