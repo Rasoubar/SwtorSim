@@ -222,6 +222,8 @@ class Entity:
 
         owner_id = f"{id(self)}:{effect_key}"
         effect_instance.owner_id = owner_id
+        # Activation this (re)application happened in; see TriggerManager.dispatch (on_ability_post_activate).
+        effect_instance.applied_activation = getattr(sim, "current_activation", None) if sim is not None else None
         self.effects[effect_key] = effect_instance
         self.consider_recalculation(effect_instance)
 
@@ -459,10 +461,12 @@ class Player(Entity):
             ability_db[key] = abl
             # Store normalized key
             ability_db[key.lower().replace(" ", "_")] = abl
-            # Store normalized human-readable name if available (stripped: some game names carry
-            # trailing spaces, e.g. "Halted Offensive ", which must still match the rotation slug)
+            # Store normalized human-readable name if available. Some game names carry stray
+            # spaces (e.g. "Halted Offensive "): the stripped slug matches the rotation builder,
+            # the unstripped one matches name-based lookups (cost/cast/cooldown helpers).
             if hasattr(abl, "name"):
                 ability_db[abl.name.strip().lower().replace(" ", "_")] = abl
+                ability_db[abl.name.lower().replace(" ", "_")] = abl
         return ability_db
 
     def break_stealth(self, sim=None) -> None:

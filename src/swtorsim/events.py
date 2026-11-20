@@ -898,22 +898,31 @@ class CastFinishEvent(Event):
         if getattr(sim, "verbose", True):
             sim_log(sim, f"{self.caster.name} finished casting {self.ability.name}")
 
-        for entry_id in self.entry_effect_ids:
-            self.ability.execute_effect(entry_id, self.caster, self.target, sim)
+        activation = object()
+        prev_activation = getattr(sim, "current_activation", None) if sim is not None else None
+        if sim is not None:
+            sim.current_activation = activation
+        try:
+            for entry_id in self.entry_effect_ids:
+                self.ability.execute_effect(entry_id, self.caster, self.target, sim)
 
-        if sim is not None and hasattr(sim, "triggers"):
-            sim.triggers.dispatch(
-                "on_ability_post_activate",
-                sim,
-                {
-                    "caster": self.caster,
-                    "target": self.target,
-                    "enemy_target": self.target,
-                    "ability_spec": getattr(self.ability, "fqn", None),
-                    "tags": getattr(self.ability, "tags", ()),
-                    "from_actor": 2,
-                },
-            )
+            if sim is not None and hasattr(sim, "triggers"):
+                sim.triggers.dispatch(
+                    "on_ability_post_activate",
+                    sim,
+                    {
+                        "caster": self.caster,
+                        "target": self.target,
+                        "enemy_target": self.target,
+                        "ability_spec": getattr(self.ability, "fqn", None),
+                        "tags": getattr(self.ability, "tags", ()),
+                        "from_actor": 2,
+                        "activation": activation,
+                    },
+                )
+        finally:
+            if sim is not None:
+                sim.current_activation = prev_activation
 
         schedule_next_decision(self.caster, getattr(self.caster, "current_target", self.target), sim)
 

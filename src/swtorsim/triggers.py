@@ -223,6 +223,18 @@ class TriggerManager:
 
             # The pure filters above run first; the modifier lookups below only for surviving listeners.
             abl_fqn = getattr(sub["ability"], "fqn", None)
+
+            # 4b. An effect (re)applied during this activation (e.g. Lightning Effusion from a crit) belongs to
+            # the *next* activations: the procing cast does not consume its charges or remove it.
+            activation = context.get("activation")
+            if activation is not None:
+                sub_owner_effects = getattr(sub["target"], "effects", None)
+                sub_owner_effect = (
+                    sub_owner_effects.get(sub["effect_key"])
+                    if sub_owner_effects is not None and sub["effect_key"] else None
+                )
+                if sub_owner_effect is not None and getattr(sub_owner_effect, "applied_activation", None) is activation:
+                    continue
             sub_tags = sub["all_tags"]
             mods = trigger_mods.get(id(caster))
             if mods is None:

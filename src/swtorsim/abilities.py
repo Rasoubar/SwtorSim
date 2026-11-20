@@ -1759,43 +1759,52 @@ class Ability:
 
         # Route by channel or cast activation (resolved above, before resource spending)
         dispatch_post_activate = True
-        if act_type == "channel" and act_dur > 0.0:
-            self._start_channel(caster, ability_target, sim, act_dur)
-        elif act_type == "cast" and act_dur > 0.0:
-            if is_timed_cast:
-                caster.active_cast = self
-                caster.is_casting = True
-                from src.swtorsim.events import CastFinishEvent
-                sim.schedule_absolute(
-                    sim.current_time + scaled_cast_time,
-                    CastFinishEvent(
-                        caster=caster,
-                        target=ability_target,
-                        ability=self,
-                        entry_effect_ids=list(self.entry_effect_ids),
-                    ),
-                )
-                dispatch_post_activate = False
+        activation = object()
+        prev_activation = getattr(sim, "current_activation", None) if sim is not None else None
+        if sim is not None:
+            sim.current_activation = activation
+        try:
+            if act_type == "channel" and act_dur > 0.0:
+                self._start_channel(caster, ability_target, sim, act_dur)
+            elif act_type == "cast" and act_dur > 0.0:
+                if is_timed_cast:
+                    caster.active_cast = self
+                    caster.is_casting = True
+                    from src.swtorsim.events import CastFinishEvent
+                    sim.schedule_absolute(
+                        sim.current_time + scaled_cast_time,
+                        CastFinishEvent(
+                            caster=caster,
+                            target=ability_target,
+                            ability=self,
+                            entry_effect_ids=list(self.entry_effect_ids),
+                        ),
+                    )
+                    dispatch_post_activate = False
+                else:
+                    for entry_id in self.entry_effect_ids:
+                        self.execute_effect(entry_id, caster, ability_target, sim)
             else:
                 for entry_id in self.entry_effect_ids:
                     self.execute_effect(entry_id, caster, ability_target, sim)
-        else:
-            for entry_id in self.entry_effect_ids:
-                self.execute_effect(entry_id, caster, ability_target, sim)
 
-        if dispatch_post_activate and sim is not None and hasattr(sim, "triggers"):
-            sim.triggers.dispatch(
-                "on_ability_post_activate",
-                sim,
-                {
-                    "caster": caster,
-                    "target": target,
-                    "enemy_target": target,
-                    "ability_spec": self.fqn,
-                    "tags": self.tags,
-                    "from_actor": 2,
-                },
-            )
+            if dispatch_post_activate and sim is not None and hasattr(sim, "triggers"):
+                sim.triggers.dispatch(
+                    "on_ability_post_activate",
+                    sim,
+                    {
+                        "caster": caster,
+                        "target": target,
+                        "enemy_target": target,
+                        "ability_spec": self.fqn,
+                        "tags": self.tags,
+                        "from_actor": 2,
+                        "activation": activation,
+                    },
+                )
+        finally:
+            if sim is not None:
+                sim.current_activation = prev_activation
 
         tracker = getattr(sim, "tracker", None)
         if tracker is not None:
