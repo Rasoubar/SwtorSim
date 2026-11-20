@@ -224,8 +224,11 @@ class TriggerManager:
             # The pure filters above run first; the modifier lookups below only for surviving listeners.
             abl_fqn = getattr(sub["ability"], "fqn", None)
 
-            # 4b. An effect (re)applied during this activation (e.g. Lightning Effusion from a crit) belongs to
-            # the *next* activations: the procing cast does not consume its charges or remove it.
+            # 4b. An effect (re)applied during this activation belongs to the *next* activations: a proc
+            # (Lightning Effusion from a crit) keeps its charges, a called buff (Translocate's Benign Presence,
+            # Take Cover's Hot Pursuit) is not removed by the activation that granted it. Exception: the
+            # activating ability's own entry effects run as part of the activation and hear it
+            # (Thundering Blast_7: 25% Forked Darkness echo on Thundering Blast's post-activate).
             activation = context.get("activation")
             if activation is not None:
                 sub_owner_effects = getattr(sub["target"], "effects", None)
@@ -234,7 +237,12 @@ class TriggerManager:
                     if sub_owner_effects is not None and sub["effect_key"] else None
                 )
                 if sub_owner_effect is not None and getattr(sub_owner_effect, "applied_activation", None) is activation:
-                    continue
+                    is_own_entry = (
+                        abl_fqn == context.get("ability_spec")
+                        and bool(getattr(getattr(sub_owner_effect, "effect_blueprint", None), "entry", False))
+                    )
+                    if not is_own_entry:
+                        continue
             sub_tags = sub["all_tags"]
             mods = trigger_mods.get(id(caster))
             if mods is None:
