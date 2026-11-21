@@ -1660,7 +1660,8 @@ class Ability:
             old_channel.is_finished = True
             caster.active_channel = None
             caster.is_channeling = False
-            cleanup_channel_effects(old_channel, sim)
+            # Dispatch before the cleanup: the channel's own effect 1 must still be subscribed to hear its
+            # interruption (Kolto Waves' is_successful: false branch).
             if sim is not None and hasattr(sim, "triggers"):
                 sim.triggers.dispatch(
                     "on_channeling_ended",
@@ -1674,6 +1675,7 @@ class Ability:
                         "is_successful": False,
                     },
                 )
+            cleanup_channel_effects(old_channel, sim)
 
         if getattr(caster, "active_cast", None) is not None:
             sim_log(sim, f"{caster.name} interrupted cast to cast {self.name}!")
@@ -2143,8 +2145,8 @@ def handle_ability_cancel(caster, target, action):
         active_channel.is_finished = True
         actor.active_channel = None
         actor.is_channeling = False
-        cleanup_channel_effects(active_channel, getattr(actor, "_sim_ref", None))
         sim_ref = getattr(actor, "_sim_ref", None)
+        # Dispatch before the cleanup, as in Ability.cast: the channel's own effect 1 hears its interruption.
         if sim_ref is not None and hasattr(sim_ref, "triggers"):
             sim_ref.triggers.dispatch(
                 "on_channeling_ended",
@@ -2158,6 +2160,7 @@ def handle_ability_cancel(caster, target, action):
                     "is_successful": False,
                 },
             )
+        cleanup_channel_effects(active_channel, sim_ref)
 
     active_cast = getattr(actor, "active_cast", None)
     if active_cast is not None:

@@ -151,6 +151,10 @@ class TriggerManager:
         event_tags = frozenset(context.get("tags") or [])
         # Per-caster (rate-limit mods, proc-chance mods), valid until a branch runs and may change effects.
         trigger_mods = {}
+        # Per owner, the indices of the branches that ran on this event: an else-gated branch (run_if_none_ran)
+        # is skipped when one of its gate branches ran, as Effect.execute_triggered_branches does. An owner's
+        # listeners are registered together in branch order, so the gate branches are always seen first.
+        ran_by_owner = {}
 
         # Snapshot the list to allow cascading actions/triggers during iteration
         for sub in list(entries):
@@ -221,6 +225,13 @@ class TriggerManager:
                     if ctx_weapon_mode != req_weapon_mode:
                         continue
 
+            # 4a. Else gate, before the rate limit and proc roll: a skipped branch spends neither.
+            gate = getattr(sub["branch"], "run_if_none_ran", None)
+            if gate:
+                owner_ran = ran_by_owner.get(sub["owner_id"])
+                if owner_ran and any(b in owner_ran for b in gate):
+                    continue
+
             # The pure filters above run first; the modifier lookups below only for surviving listeners.
             abl_fqn = getattr(sub["ability"], "fqn", None)
 
@@ -229,13 +240,13 @@ class TriggerManager:
             # Take Cover's Hot Pursuit) is not removed by the activation that granted it. Exception: the
             # activating ability's own entry effects run as part of the activation and hear it
             # (Thundering Blast_7: 25% Forked Darkness echo on Thundering Blast's post-activate).
+            sub_owner_effect = None
+            if sub["effect_key"]:
+                sub_owner_effects = getattr(sub["target"], "effects", None)
+                if sub_owner_effects is not None:
+                    sub_owner_effect = sub_owner_effects.get(sub["effect_key"])
             activation = context.get("activation")
             if activation is not None:
-                sub_owner_effects = getattr(sub["target"], "effects", None)
-                sub_owner_effect = (
-                    sub_owner_effects.get(sub["effect_key"])
-                    if sub_owner_effects is not None and sub["effect_key"] else None
-                )
                 if sub_owner_effect is not None and getattr(sub_owner_effect, "applied_activation", None) is activation:
                     is_own_entry = (
                         abl_fqn == context.get("ability_spec")
@@ -312,6 +323,8 @@ class TriggerManager:
                 context=branch_ctx,
             )
             trigger_mods.clear()  # the branch may have applied, removed or restacked effects
+            if ran:
+                ran_by_owner.setdefault(sub["owner_id"], set()).add(getattr(sub["branch"], "index", None))
             if ran and getattr(sim, "tracer", None) is not None:
                 sim.tracer.record_proc_dispatch(
                     timestamp=sim.current_time,

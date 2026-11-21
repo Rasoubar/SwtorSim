@@ -155,7 +155,7 @@ When a rotation step invokes `ability.cast(caster, target, sim)`:
    - Computes modified resource cost via `caster.calculate_resource_cost(name, energy_cost, apply=False)` and checks `caster.resource.can_afford(cost)`.
    - Evaluates top-level ability `conditions` via `validate_all()`.
 2. **Channel Clipping**:
-   - If `caster.is_channeling` is `True`, casting a new ability clips the active channel (`old_channel.is_finished = True`), cleans up channel-bound effects, and dispatches `on_channeling_ended` with `is_successful: False`.
+   - If `caster.is_channeling` is `True`, casting a new ability clips the active channel (`old_channel.is_finished = True`), dispatches `on_channeling_ended` with `is_successful: False`, then cleans up channel-bound effects (so the channel's own effect 1 still hears its interruption).
 3. **Resource Spend & Cooldown / GCD Locks**:
    - Deducts `final_spend` (consuming single-use cost-reduction buffs when `apply=True`).
    - Calls `apply_cooldown_locks(caster, sim)` to update `caster.next_gcd` (if `triggers_gcd`) and either lock `caster.cooldowns[name]` or consume a charge and schedule `ChargeRestoreEvent`.

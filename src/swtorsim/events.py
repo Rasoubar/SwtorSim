@@ -825,17 +825,8 @@ class ChannelTickEvent(Event):
             if getattr(sim, "verbose", True):
                 sim_log(sim, f"{self.channel.name} channel over.")
             ability = getattr(self.channel, "ability", None)
-            if ability is not None:
-                for eff in getattr(ability, "effects", {}).values():
-                    if hasattr(eff, "execute_triggered_branches"):
-                        eff.execute_triggered_branches(
-                            "on_channeling_ended",
-                            sim,
-                            self.source,
-                            self.target,
-                            ability=ability,
-                            context={"is_successful": True, "caster": self.source, "target": self.target},
-                        )
+            # The channel's own on_channeling_ended branches sit on its applied effect 1, which is subscribed on
+            # the bus, so the dispatch below runs them once (running them directly as well ran them twice).
             if sim is not None and hasattr(sim, "triggers"):
                 sim.triggers.dispatch(
                     "on_channeling_ended",
