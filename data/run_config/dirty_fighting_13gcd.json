@@ -3,9 +3,10 @@
   "class_name": "Gunslinger",
   "spec": "Dirty Fighting",
   "spec_name": "Dirty Fighting",
-  "spec_path": "data/extractor/disciplines/gunslinger/dirty_fighting.json",
+  "spec_path": "data/extractor/pts/disciplines/gunslinger/dirty_fighting.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
-  "rotation_path": "data/rotations/gunslinger/dirty_fighting/DirtyFighting.json",
+  "rotation_path": "data/rotations/gunslinger/dirty_fighting/DirtyFighting_pts.json",
   "choices": {
     "23": 3,
     "27": 2,

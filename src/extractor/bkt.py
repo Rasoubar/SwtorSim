@@ -211,3 +211,21 @@ def fqn_to_relative_path(fqn: str, suffix: str = ".json") -> Path:
     invalid = re.compile(r'[<>:"/\\|?*]')
     safe = [invalid.sub("_", part) for part in parts]
     return Path(*safe[:-1]) / f"{safe[-1]}{suffix}"
+
+
+def prune_stale_json(root: Path, written: set[Path]) -> int:
+    """Deletes `*.json` files under `root` that are not in `written` (files left by an earlier
+    extraction whose node no longer exists), then removes directories left empty.
+    Returns the number of files deleted. Does nothing when `written` is empty."""
+    if not written or not root.is_dir():
+        return 0
+    keep = {path.resolve() for path in written}
+    removed = 0
+    for path in root.rglob("*.json"):
+        if path.resolve() not in keep:
+            path.unlink()
+            removed += 1
+    for directory in sorted((d for d in root.rglob("*") if d.is_dir()), reverse=True):
+        if not any(directory.iterdir()):
+            directory.rmdir()
+    return removed

@@ -4,6 +4,7 @@
   "spec": "Dirty Fighting",
   "spec_name": "Dirty Fighting",
   "spec_path": "data/extractor/pts/disciplines/gunslinger/dirty_fighting.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
   "stats_override": {
     "Mastery": 23098,

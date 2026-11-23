@@ -33,7 +33,7 @@ def _resolve_target_overrides(overrides, current_target, caster, context=None):
             resolved = caster
         elif o_type in ("aoe_sphere", "aoe_cone", "enemies_list", "primary_target"):
             resolved = enemy_target
-        elif o_type in ("party_members"):
+        elif o_type == "party_members":
             # In single-actor simulation, party members resolves to caster
             resolved = caster
         elif o_type == "trigger_target" and context and "target" in context:

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from extractor.bkt import fqn_to_relative_path
+from extractor.bkt import fqn_to_relative_path, prune_stale_json
 from extractor.config import OUTPUT_DIR
 from extractor.eff_triggers import (
     EFFECT_DURATION_TRIGGERS,
@@ -2170,6 +2170,7 @@ def build_abilities(
 
     count = 0
     icon_stems: set[str] = set()
+    written: set[Path] = set()
     for record in records.values():
         if not record.entry.fqn.startswith("abl."):
             continue
@@ -2188,5 +2189,9 @@ def build_abilities(
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        written.add(dest)
         count += 1
+    removed = prune_stale_json(output_dir / "abl", written)
+    if removed:
+        print(f"[INFO] Removed {removed} stale ability files from {output_dir / 'abl'}")
     return count, icon_stems

@@ -3422,3 +3422,31 @@ Added a "Beta" pill next to the app name and a dismissible bug-report banner (li
 - Tests: `tests/test_channel_end_once.py` (live Force Lightning end hit once per completed channel, none on interruption; live Kolto Waves hears its interruption), `tests/test_bus_else_gate.py` (gate skip / run, per event, per owner, rate limit untouched). Full suite: 449 tests OK.
 - DPS baseline compare (6 shipped configs, same seeds; `dirty_fighting_13gcd` skipped, rotation file missing): all unchanged (Anni_Mara 30358.76, Arsenal_Merc 27105.69, carnage_14gcd 10261.29, dirty_fighting_13gcd_uv 41423.08, hatred_14gcd 41540.05, marksmanship_sniper 13300.54); no shipped loadout contains the affected abilities.
 - Docs: `docs/engine_mechanics.md` (sections 6, 8, 9, 11 step 6b, 18 items 1-2 marked fixed), `docs/architecture.md` (clip order).
+
+## Dirty Fighting configs load PTS data; `party_members` override check
+
+- **Cause:** `load_run_config` reads the key `environment` (default `live`) and rewrites the `spec_path` to that environment (`resolve_env_extractor_path`). Neither Dirty Fighting config set it, so `dirty_fighting_13gcd_uv.json` (PTS path) loaded Live data, and every earlier CHANGELOG DPS figure for it (41423.08 at seed 48) is a Live-data number. `dirty_fighting_13gcd.json` also pointed at a missing rotation (`DirtyFighting.json`), so the baseline tool skipped it.
+- **Fix (user files, by request):** both configs set `"environment": "pts"`; `dirty_fighting_13gcd.json` uses `data/extractor/pts/disciplines/gunslinger/dirty_fighting.json` and `DirtyFighting_pts.json`. The web dashboard is unaffected: its Live / PTS toggle sets the environment.
+- **Code:** `src/swtorsim/abilities.py :: _resolve_target_overrides` tests `o_type == "party_members"` (was `in ("party_members")`, a substring test on a string). No override type tripped it.
+- **DPS compare:** 5 configs unchanged; `dirty_fighting_13gcd_uv` 41423.08 -> 60913.15 (Live -> PTS data); `dirty_fighting_13gcd` now runs: 57147.55 (seed 42).
+
+## Extractor deletes stale parsed files
+
+- **Cause:** `build_abilities` / `build_talents` only wrote files, so abilities removed from the game stayed in `parsed/abl` (128 live and 6 PTS files dated before the last extraction, e.g. `agent/stim_boost_plus.json`, the old Shoulder Cannon variants).
+- **Fix:** new `src/extractor/bkt.py :: prune_stale_json`; after writing, `build_abilities` (`parsed/abl`) and `build_talents` (`parsed/tal`) delete every `.json` they did not write this run and remove empty folders (no-op when nothing was written). None of the stale files is referenced by a shipped config, rotation or discipline file (the PTS rotations' `blood_sights_plus` is current in PTS).
+- **Tests:** new `tests/test_extractor_prune_stale.py`. Parsed data changes on the next re-extract (TODO).
+
+## Conditions: `from_actor: caster` counts only the caster's effects
+
+- `src/swtorsim/requirements.py`: `entity_has_effect` / `get_entity_effect_stacks` take `source`; `has_effect`, `not_has_effect` and `has_effect_at_stack_charge_count` pass the caster when the condition says `from_actor: caster` (`_condition_source`). Effects match on `ActiveEffect.caster_ref`; an effect with no recorded applier still counts. Other values (`actor_1`, `target`) stay unrestricted (meaning not established; TODO).
+- **Tests:** new `tests/test_condition_from_actor.py`. DPS compare: all configs unchanged with the filter on and off (single player, so every effect on the dummy is the caster's).
+
+## Marksmanship deadlock: rotation, not engine
+
+- `marksmanshipv2_sub30_crouch_test.json`, seed 42 (stall now at 198 s): step 21 (fixed Penetrating Blasts) fires at 12.1 energy; the 10-energy cost leaves 2.1, and every Penetrating Blasts tick branch requires `has_specified_resource_amount >= 4` (game data), so the channel ends after 0.37 s with no ticks and no Followthrough. Step 26 (`Sub 30: Takedown / Followthrough`) then waits for Followthrough forever. The earlier TODO note "energy was ~100" was wrong.
+- Decision: the engine follows the data and a priority block keeps its wait semantics; the rotation needs an energy gate or a fallback (TODO). No code change.
+
+## Web release rebuilt
+
+- `tools/build_web_release.py` rerun (`dist/`, 5085 files). Browser check on a local server: dashboard loads with no console errors; a 100-iteration PTS Dirty Fighting batch ran in about 15 s (mean 54,816 DPS). The proc damage is labelled "Major Hemorrhaging (Dirty Blast)", which closes the old "Exploited Weakness" naming residual. Save / delete / rotation save in the browser were not tried (TODO).
+- Full unittest suite: 456/456 OK.

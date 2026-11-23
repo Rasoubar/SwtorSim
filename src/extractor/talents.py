@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from extractor.bkt import fqn_to_relative_path
+from extractor.bkt import fqn_to_relative_path, prune_stale_json
 from extractor.graph import NodeRecord
 
 _RANK_STAT_LIST_FIELDS = (
@@ -164,6 +164,7 @@ def build_talents(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     count = 0
+    written: set[Path] = set()
     for record in records.values():
         if not record.entry.fqn.startswith("tal."):
             continue
@@ -181,5 +182,9 @@ def build_talents(
             json.dumps(payload, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
+        written.add(dest)
         count += 1
+    removed = prune_stale_json(output_dir / "tal", written)
+    if removed:
+        print(f"[INFO] Removed {removed} stale talent files from {output_dir / 'tal'}")
     return count

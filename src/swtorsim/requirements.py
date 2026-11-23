@@ -153,12 +153,29 @@ def compare_values(actual: float, comparison: str, expected: float) -> bool:
     return True
 
 
-def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str | None = None, count: int = 1) -> bool:
+def _applied_by(eff, source) -> bool:
+    """True when `source` is None (any applier) or the effect was applied by `source`.
+    An effect with no recorded applier (`caster_ref` None) still counts."""
+    if source is None:
+        return True
+    applier = getattr(eff, "caster_ref", None)
+    return applier is None or applier is source
+
+
+def _condition_source(item: dict, caster):
+    """Applier an effect condition is restricted to: the caster for `from_actor: caster`, else None
+    (other `from_actor` values, e.g. `actor_1` / `target`, are not restricted)."""
+    return caster if item.get("from_actor") == "caster" else None
+
+
+def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str | None = None, count: int = 1,
+                      source=None) -> bool:
     """Checks whether an entity has an active effect or dot matching tags or an ability spec.
 
     `count` is the combined stack total across all matching active effects and dots, so one
     effect with 3 stacks and three separate effects sharing a tag (e.g. three DoTs tagged
-    sinister_succor_dot) both satisfy count=3.
+    sinister_succor_dot) both satisfy count=3. `source` limits active effects to those applied
+    by that entity (`from_actor: caster`).
     """
     if not entity:
         return False
@@ -169,6 +186,8 @@ def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str |
 
     for eff in effects.values():
         if getattr(eff, "is_expired", False):
+            continue
+        if not _applied_by(eff, source):
             continue
         eff_tags = set(getattr(eff, "tags", []) or getattr(eff, "required_tags", []) or [])
         eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "")
@@ -202,8 +221,10 @@ def entity_has_effect(entity, tags: list[str] | None = None, ability_spec: str |
     return False
 
 
-def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec: str | None = None) -> int:
-    """Returns the current stack/charge count of an active effect or dot matching tags or ability spec."""
+def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec: str | None = None,
+                             source=None) -> int:
+    """Returns the current stack/charge count of an active effect or dot matching tags or ability spec.
+    `source` limits active effects to those applied by that entity (`from_actor: caster`)."""
     if not entity:
         return 0
 
@@ -215,6 +236,8 @@ def get_entity_effect_stacks(entity, tags: list[str] | None = None, ability_spec
 
     for eff in effects.values():
         if getattr(eff, "is_expired", False):
+            continue
+        if not _applied_by(eff, source):
             continue
         eff_tags = set(getattr(eff, "tags", []) or getattr(eff, "required_tags", []) or [])
         eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "")
@@ -449,7 +472,8 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         tags = item.get("tags")
         spec = item.get("ability_spec")
         count = item.get("count", 1)
-        res = entity_has_effect(actor, tags=tags, ability_spec=spec, count=count)
+        res = entity_has_effect(actor, tags=tags, ability_spec=spec, count=count,
+                                source=_condition_source(item, caster))
 
     elif cond_type == "if_toughness":
         expected = item.get("ints", {}).get("toughness", 3)
@@ -529,7 +553,8 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
         spec = item.get("ability_spec")
         comparison = item.get("comparison", "eq")
         expected_count = int(item.get("count", 1))
-        actual_stacks = get_entity_effect_stacks(actor, tags=tags, ability_spec=spec)
+        actual_stacks = get_entity_effect_stacks(actor, tags=tags, ability_spec=spec,
+                                                 source=_condition_source(item, caster))
         res = compare_values(actual_stacks, comparison, expected_count)
 
     elif cond_type == "if_stack_charge":
@@ -705,7 +730,8 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
 
     elif cond_type == "not_has_effect":
         res = not entity_has_effect(
-            actor, tags=item.get("tags"), ability_spec=item.get("ability_spec"), count=item.get("count", 1)
+            actor, tags=item.get("tags"), ability_spec=item.get("ability_spec"), count=item.get("count", 1),
+            source=_condition_source(item, caster),
         )
 
     elif cond_type == "is_dead":
