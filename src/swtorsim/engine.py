@@ -45,7 +45,7 @@ class Simulation:
         # Token of the ability activation whose effects are executing (None outside one). Effects (re)applied
         # during it (e.g. Lightning Effusion on a crit) skip its on_ability_post_activate.
         self.current_activation = None
-        # HitGroup of the multi-hit branch being executed; None outside one (see events.HitGroup).
+        # HitGroup of the branch being executed (damage action followed by more actions); None outside one (see events.HitGroup).
         self.hit_group = None
         self.verbose = verbose
         from src.swtorsim.settings import is_in_flashpoint_operation

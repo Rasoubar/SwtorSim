@@ -93,8 +93,9 @@ class ApplyDamageLand(Event):
             )
 
 class HitGroup:
-    """Hits resolved by one branch (e.g. main + off-hand) share a snapshot: their post-hit triggers are parked until
-    every hit of the branch has landed, so a buff the first hit consumes is still active for the others."""
+    """Hits resolved by one branch (main + off-hand, or a hit followed by call_effect etc.) share a snapshot: their
+    post-hit triggers are parked until the branch has run and every hit has landed, so a buff the first hit consumes is
+    still active for the rest of the branch."""
     __slots__ = ("parked", "pending", "sealed", "flushed")
 
     def __init__(self):

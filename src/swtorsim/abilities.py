@@ -111,13 +111,14 @@ class Branch:
         combat_outcomes: list[bool] = []
         crit_flags: list = []  # True / False / None (unknown), parallel to combat_outcomes
 
-        # Two or more damage actions in one branch (main + off-hand) are evaluated together: their post-hit
-        # triggers (buff consumption, procs) wait for the last hit. Other branches resolve hit by hit as before.
+        # A branch whose damage action is followed by more actions (main + off-hand hits, or a hit followed by
+        # call_effect etc.) resolves from one state: post-hit triggers (buff consumption, procs) wait until the
+        # whole branch has run. A branch whose only damage action is its last action dispatches immediately.
         group = None
         previous_group = None
         if sim is not None:
             previous_group = getattr(sim, "hit_group", None)
-            if sum(1 for a in self.actions if a.get("action_type") == "damage") >= 2:
+            if any(a.get("action_type") == "damage" for a in self.actions[:-1]):
                 group = HitGroup()
             if group is not None or previous_group is not None:
                 sim.hit_group = group
