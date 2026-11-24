@@ -525,12 +525,19 @@ function draw() {
     return out;
   };
 
+  // Off-GCD icons that would overlap (e.g. two instants in the same moment) are pushed right so each
+  // stays visible; the amber marker below still sits at the real cast time.
+  let offRight = -Infinity;
   m.all.forEach((c) => {
     const dim = selected && (c.phase !== "rotation" || c.step_index !== selected) ? " dim" : "";
-    const x = X(c.t);
     const onGcd = !!c.triggers_gcd;
     const rowR = onGcd ? gr : or;
     const s = onGcd ? gcdIcon : offIcon;
+    let x = X(c.t);
+    if (!onGcd) {
+      x = Math.max(x, offRight + 2);
+      offRight = x + s;
+    }
     const y = rowR.y + (rowR.h - s) / 2 + 2;
     g += `<g class="cast${dim}" data-id="${c.id}">${activationShape(c, x, y, s)}${iconTile(c, x, y, s)}</g>`;
   });
