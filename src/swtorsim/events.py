@@ -813,7 +813,9 @@ class ChannelTickEvent(Event):
                 self.source.is_channeling = False
             from src.swtorsim.abilities import cleanup_channel_effects
             cleanup_channel_effects(self.channel, sim)
-            schedule_next_decision(self.source, self.target, sim)
+            # The channel's target is the caster for self-target channels (Force Barrier); the rotation resumes on
+            # the caster's enemy target, as after a cast-time ability.
+            schedule_next_decision(self.source, getattr(self.source, "current_target", self.target), sim)
             return
 
         if self.channel.remaining_ticks > 0:
@@ -843,7 +845,7 @@ class ChannelTickEvent(Event):
                 )
             from src.swtorsim.abilities import cleanup_channel_effects
             cleanup_channel_effects(self.channel, sim)
-            schedule_next_decision(self.source, self.target, sim)
+            schedule_next_decision(self.source, getattr(self.source, "current_target", self.target), sim)
 
 class CastFinishEvent(Event):
     """Fired when an ability with a cast time finishes casting."""

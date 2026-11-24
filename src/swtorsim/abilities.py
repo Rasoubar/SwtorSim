@@ -1882,7 +1882,7 @@ class Ability:
             cleanup_channel_effects(channel, sim)
             if sim is not None:
                 from src.swtorsim.events import schedule_next_decision
-                schedule_next_decision(caster, ability_target, sim)
+                schedule_next_decision(caster, getattr(caster, "current_target", ability_target), sim)
             return
 
         # Schedule the first periodic tick event
