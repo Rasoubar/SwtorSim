@@ -103,6 +103,10 @@
     const opOf = (o, fallback) => ops[String(o || fallback).toLowerCase()] || String(o || fallback);
     const obj = val && typeof val === "object" && !Array.isArray(val) ? val : null;
     switch (key) {
+      case "caster_buff_remaining":
+        return obj ? `Buff left ${opOf(obj.comparison || obj.operator, "<")} ${obj.value}s: ${obj.name}` : `${key}: ${JSON.stringify(val)}`;
+      case "target_debuff_remaining":
+        return obj ? `Debuff left ${opOf(obj.comparison || obj.operator, "<")} ${obj.value}s: ${obj.name}` : `${key}: ${JSON.stringify(val)}`;
       case "target_hp_pct": {
         const sym = opOf(obj && (obj.comparison || obj.operator), "≤");
         const shown = `Target HP ${sym} ${pct(obj ? obj.pct ?? 0.3 : val)}`;

@@ -57,6 +57,21 @@ class _Sim:
         self.current_time = now
 
 
+class _Effect:
+    def __init__(self, name, expires_at, passive=False, expired=False, tags=()):
+        self.name = name
+        self.fqn = ""
+        self.expires_at = expires_at
+        self.is_passive = passive
+        self.is_expired = expired
+        self.tags = tags
+
+    def time_remaining(self, now):
+        if self.expires_at is None:
+            return float("inf")
+        return max(0.0, self.expires_at - now)
+
+
 class RuleComparisonTests(unittest.TestCase):
     def test_picker_hides_legacy_keys(self):
         visible = {item["key"] for item in CONDITION_METADATA if item.get("picker", True)}
@@ -158,6 +173,74 @@ class RuleComparisonTests(unittest.TestCase):
         self.assertFalse(
             validate_all({"proc_cooldown_above": {"name": "Bloodletting", "value": 0.0}}, caster, target, sim=sim)
         )
+
+
+class EffectRemainingTests(unittest.TestCase):
+    def _actor(self, effects):
+        actor = _Actor()
+        actor.effects = effects
+        return actor
+
+    def test_each_operator_matches_compare_values(self):
+        caster = self._actor({"recklessness": _Effect("Recklessness", expires_at=7.0)})
+        target = self._actor({"terror": _Effect("Creeping Terror", expires_at=5.0)})
+        sim = _Sim(2.0)
+        samples = (
+            ("caster_buff_remaining", "Recklessness", 5.0),
+            ("target_debuff_remaining", "Creeping Terror", 3.0),
+        )
+        for key, name, actual in samples:
+            for op in OPERATORS:
+                for expected in (actual - 1, actual, actual + 1):
+                    with self.subTest(key=key, op=op, expected=expected):
+                        rule = {"name": name, "value": expected, "comparison": op}
+                        self.assertEqual(
+                            validate_all({key: rule}, caster, target, sim=sim),
+                            compare_values(actual, op, expected),
+                        )
+
+    def test_missing_effect_counts_as_zero(self):
+        caster = _Actor()
+        target = _Actor()
+        sim = _Sim(0.0)
+        self.assertTrue(validate_all(
+            {"caster_buff_remaining": {"name": "Recklessness", "value": 3, "comparison": "lt"}},
+            caster, target, sim=sim,
+        ))
+        self.assertFalse(validate_all(
+            {"target_debuff_remaining": {"name": "Creeping Terror", "value": 0, "comparison": "gt"}},
+            caster, target, sim=sim,
+        ))
+
+    def test_uses_the_longer_copy_and_ignores_expired_passive_and_lockout(self):
+        caster = self._actor({
+            "short": _Effect("Recklessness", expires_at=4.0),
+            "long": _Effect("Recklessness", expires_at=9.0),
+            "gone": _Effect("Recklessness", expires_at=100.0, expired=True),
+            "passive": _Effect("Recklessness", expires_at=None, passive=True),
+            "lock": _Effect("Recklessness", expires_at=100.0, tags=("lockout",)),
+        })
+        sim = _Sim(1.0)
+        self.assertTrue(validate_all(
+            {"caster_buff_remaining": {"name": "recklessness", "value": 8, "comparison": "eq"}},
+            caster, _Actor(), sim=sim,
+        ))
+        self.assertFalse(validate_all(
+            {"caster_buff_remaining": {"name": "Recklessness", "value": 3, "comparison": "lte"}},
+            caster, _Actor(), sim=sim,
+        ))
+
+    def test_permanent_buff_has_infinite_time_left(self):
+        caster = self._actor({"a": _Effect("Recklessness", expires_at=None)})
+        sim = _Sim(10.0)
+        self.assertTrue(validate_all(
+            {"caster_buff_remaining": {"name": "Recklessness", "value": 5, "comparison": "gt"}},
+            caster, _Actor(), sim=sim,
+        ))
+        self.assertFalse(validate_all(
+            {"caster_buff_remaining": {"name": "Recklessness", "value": 5, "comparison": "lt"}},
+            caster, _Actor(), sim=sim,
+        ))
 
 
 if __name__ == "__main__":

@@ -252,9 +252,11 @@ All conditions inside a `"rules"` dictionary must evaluate to `True` (logical `A
 | `caster_has_buff` | `["Raze"]` or `"Raze"` | True if the caster has any of the listed buffs active. |
 | `caster_does_not_have_buff` | `[" recklessness "]` | True if the caster does **not** have any of the listed buffs active. |
 | `caster_buff_stacks` | `{"name": "Voltage", "comparison": "gte", "value": 2}` | Compares the stack count of a caster buff (`eq`, `lt`, `lte`, `gt`, `gte`). |
+| `caster_buff_remaining` | `{"name": "Recklessness", "comparison": "lt", "value": 3}` | Compares seconds left on a caster buff (`lt`, `lte`, `eq`, `gt`, `gte`). Not active counts as 0. A permanent buff has infinite time left. `eq` is an exact second match. |
 | `target_has_debuff` | `["Discharge", "Creeping Terror"]` | True if the target has any of the listed debuffs/DoTs active. |
 | `target_missing_debuff` | `["Creeping Terror"]` | True if the target is missing the listed debuff/DoT. |
 | `target_debuff_stacks` | `{"name": "Sundered", "comparison": "gte", "value": 5}` | Compares the stack count of a target debuff/DoT. |
+| `target_debuff_remaining` | `{"name": "Creeping Terror", "comparison": "lt", "value": 3}` | Compares seconds left on a target debuff or DoT. Not active counts as 0. `eq` is an exact second match. |
 | `target_hp_pct` | `{"pct": 0.3, "comparison": "lte"}` | Compares the target HP ratio to `pct` (`lt`, `lte`, `eq`, `gt`, `gte`). `eq` is an exact ratio. Optional `bypass_if_buff_active` makes the rule true on its own. |
 | `target_hp_below_pct` | `0.3` or `{"pct": 0.3, "bypass_if_buff_active": "Reaper's Rush"}` | Legacy name for `target_hp_pct` with `lte`. |
 | `target_hp_above_pct` | `0.3` | Legacy name for `target_hp_pct` with `gt`. |

@@ -637,6 +637,13 @@ CONDITION_METADATA = [
         "description": "Checks stack/charge count on a caster buff (e.g. Harnessed Darkness >= 3).",
     },
     {
+        "key": "caster_buff_remaining",
+        "label": "Caster Buff Time Left",
+        "category": "Caster Buffs",
+        "value_type": "buff_remaining",
+        "description": "Compares how many seconds are left on a caster buff (lt, lte, eq, gt, gte). A buff that is not active has 0 seconds left. A permanent buff has infinite time left.",
+    },
+    {
         "key": "target_has_debuff",
         "label": "Target Has Debuff / DoT",
         "category": "Target Debuffs",
@@ -656,6 +663,13 @@ CONDITION_METADATA = [
         "category": "Target Debuffs",
         "value_type": "debuff_stacks",
         "description": "Checks stack count on a target debuff or DoT.",
+    },
+    {
+        "key": "target_debuff_remaining",
+        "label": "Target Debuff Time Left",
+        "category": "Target Debuffs",
+        "value_type": "debuff_remaining",
+        "description": "Compares how many seconds are left on a target debuff or DoT (lt, lte, eq, gt, gte). One that is not active has 0 seconds left.",
     },
     {
         "key": "target_hp_pct",

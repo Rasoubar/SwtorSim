@@ -3499,6 +3499,13 @@ function comparisonHtml(op) {
 function formatRulePillText(key, val) {
   const obj = val && typeof val === "object" && !Array.isArray(val) ? val : null;
   switch (key) {
+    case "caster_buff_remaining":
+    case "target_debuff_remaining": {
+      if (!obj) return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+      const who = key === "target_debuff_remaining" ? "Debuff left" : "Buff left";
+      const op = comparisonHtml(obj.comparison || obj.operator || "lt");
+      return `<strong>${who} ${op} ${escapeHtml(String(obj.value))}s:</strong> ${escapeHtml(String(obj.name))}`;
+    }
     case "target_hp_pct": {
       const pct = Math.round(Number(obj ? obj.pct ?? 0.3 : val) * 100);
       const op = comparisonHtml((obj && (obj.comparison || obj.operator)) || "lte");
@@ -4595,6 +4602,8 @@ function vizRuleList(rules) {
     else if (k === "caster_does_not_have_buff") { cls = "buff"; txt = `no ${list(v)}`; }
     else if (k === "target_has_debuff") { cls = "buff"; txt = `tgt ${list(v)}`; }
     else if (k === "target_doesnt_have_debuff") { cls = "buff"; txt = `tgt no ${list(v)}`; }
+    else if (k === "caster_buff_remaining" && obj) { cls = "buff"; txt = `${obj.name} left ${obj.comparison || obj.operator || "lt"} ${obj.value}s`; }
+    else if (k === "target_debuff_remaining" && obj) { cls = "buff"; txt = `${obj.name} left ${obj.comparison || obj.operator || "lt"} ${obj.value}s`; }
     else if (k === "proc_cooldown" && obj) { txt = `${obj.name} ICD ${obj.comparison || obj.operator || "gt"} ${obj.value}s`; }
     else if (k === "proc_cooldown_above" && obj) { txt = `${obj.name} ICD > ${obj.value}s`; }
     else if (k === "ability_cooldown" && obj) { txt = `${obj.name} CD ${obj.comparison || obj.operator || "lt"} ${obj.value}s`; }

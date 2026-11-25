@@ -163,6 +163,30 @@
     `;
     }
 
+    if (key === "caster_buff_remaining" || key === "target_debuff_remaining") {
+      const isTarget = key === "target_debuff_remaining";
+      const items = isTarget ? debuffItems : buffItems;
+      const curName = (existingVal && existingVal.name) ? existingVal.name : (items[0]?.name || "");
+      const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 3;
+      const curOp = (existingVal && (existingVal.comparison || existingVal.operator)) || "lt";
+      return `
+      <div class="form-group">
+        <label>${isTarget ? "Target Debuff / DoT Name" : "Caster Buff Name"}</label>
+        ${buildDatalistOrSelect("ruleRemainNameInput", items, curName, isTarget ? "Debuff" : "Buff")}
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Comparison Operator</label>
+          ${comparisonSelect("ruleRemainOpInput", curOp)}
+        </div>
+        <div class="form-group">
+          <label>Time Left (seconds)</label>
+          <input type="number" id="ruleRemainSecInput" min="0" max="600" step="0.1" value="${escapeAttr(curVal)}" style="width:100%;">
+        </div>
+      </div>
+    `;
+    }
+
     if (key === "target_hp_pct") {
       let curDec = 0.4;
       let curBypass = "";
@@ -291,6 +315,11 @@
       const count = parseInt(el("ruleStackCountInput").value, 10) || 1;
       if (!name) return { error: "Please select or enter an effect name." };
       value = op === "gte" ? [name, count] : [name, count, op];
+    } else if (key === "caster_buff_remaining" || key === "target_debuff_remaining") {
+      const name = el("ruleRemainNameInput").value.trim();
+      const sec = readNonNegative(el("ruleRemainSecInput"), 3);
+      if (!name) return { error: "Please select or enter an effect name." };
+      value = { name: name, value: sec, comparison: el("ruleRemainOpInput").value };
     } else if (key === "target_hp_pct") {
       let dec = parseFloat(el("ruleHpDecInput").value);
       if (isNaN(dec) || dec <= 0) dec = 0.4;

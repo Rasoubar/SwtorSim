@@ -417,6 +417,97 @@ def check_target_debuff_stacks(data: Any, _caster: "Player", target: "Dummy", **
     return compare_values(actual_stacks, comparison, expected_stacks)
 
 
+def _effect_name_matches(eff, key, name: str) -> bool:
+    """True when ``name`` is this effect's key, display name, or FQN (case- and underscore-insensitive)."""
+    if not name:
+        return False
+    if key == name:
+        return True
+    target_norm = name.strip().lower().replace("_", " ")
+    eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "") or key
+    eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")
+    return target_norm in {
+        str(eff_name).strip().lower().replace("_", " "),
+        str(eff_fqn).strip().lower().replace("_", " "),
+        str(key).strip().lower().replace("_", " "),
+    }
+
+
+def _seconds_left(eff, now: float) -> float:
+    """Remaining seconds. A permanent effect (no expiry) is infinite."""
+    if hasattr(eff, "time_remaining"):
+        return float(eff.time_remaining(now))
+    expires_at = getattr(eff, "expires_at", None)
+    if expires_at is None:
+        return float("inf")
+    return max(0.0, float(expires_at) - now)
+
+
+def effect_time_remaining(entity, name: str, sim) -> float:
+    """Longest remaining seconds of a matching active effect.
+
+    An effect that is not active counts as 0, so a "less than" refresh rule is true when it is missing.
+    Expired effects, passives, and lockouts are ignored. A permanent effect has infinite time left.
+    When several copies match, the longest remaining time is the one that is still up.
+    """
+    if not entity or not name:
+        return 0.0
+    now = float(sim.current_time) if sim is not None else 0.0
+    best: float | None = None
+
+    def consider(eff, key) -> None:
+        nonlocal best
+        if getattr(eff, "is_expired", False) or getattr(eff, "is_passive", False):
+            return
+        tags = getattr(eff, "tags", ()) or ()
+        if any("lockout" in t for t in tags):
+            return
+        if not _effect_name_matches(eff, key, name):
+            return
+        remaining = _seconds_left(eff, now)
+        best = remaining if best is None else max(best, remaining)
+
+    for key, eff in (getattr(entity, "effects", {}) or {}).items():
+        consider(eff, key)
+    for key, eff in (getattr(entity, "dots", {}) or {}).items():
+        consider(eff, key)
+    return 0.0 if best is None else best
+
+
+def _remaining_rule_parts(data: Any) -> tuple[str, float, str] | None:
+    """``(name, seconds, comparison)`` from a duration rule. Comparison defaults to ``lt``."""
+    if not isinstance(data, dict):
+        return None
+    name = data.get("name") or data.get("buff") or data.get("debuff") or ""
+    seconds = float(data.get("value", data.get("seconds", 0)))
+    comparison = data.get("comparison", data.get("operator", "lt"))
+    return str(name), seconds, comparison
+
+
+def check_caster_buff_remaining(data: Any, caster: "Player", _target: "Dummy", sim=None, **_kwargs) -> bool:
+    """True when the named caster buff's remaining seconds match ``comparison`` (default <) against ``value``.
+
+    A buff that is not active has 0 seconds left.
+    """
+    parts = _remaining_rule_parts(data)
+    if parts is None or not parts[0]:
+        return False
+    name, seconds, comparison = parts
+    return compare_values(effect_time_remaining(caster, name, sim), comparison, seconds)
+
+
+def check_target_debuff_remaining(data: Any, _caster: "Player", target: "Dummy", sim=None, **_kwargs) -> bool:
+    """True when the named target debuff or DoT's remaining seconds match ``comparison`` (default <) against ``value``.
+
+    A debuff that is not active has 0 seconds left.
+    """
+    parts = _remaining_rule_parts(data)
+    if parts is None or not parts[0]:
+        return False
+    name, seconds, comparison = parts
+    return compare_values(effect_time_remaining(target, name, sim), comparison, seconds)
+
+
 CONDITION_REGISTRY = {
     "target_hp_below_pct": check_target_hp,
     "target_hp_pct": check_target_hp_pct,
@@ -434,7 +525,9 @@ CONDITION_REGISTRY = {
     "ability_cooldown_under": check_ability_cooldown_under,
     "ability_cooldown_above": check_ability_cooldown_above,
     "caster_buff_stacks": check_caster_buff_stacks,
+    "caster_buff_remaining": check_caster_buff_remaining,
     "target_debuff_stacks": check_target_debuff_stacks,
+    "target_debuff_remaining": check_target_debuff_remaining,
 }
 
 
