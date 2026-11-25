@@ -9,19 +9,32 @@ def _to_list(val: Any) -> list:
     """Helper to convert single string/item conditions into an iterable list."""
     return [val] if isinstance(val, str) else val
 
-def check_target_hp(conditions, caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    """Checks if target HP ratio is at or below threshold, or if an execute-bypass buff is active."""
+def check_target_hp_pct(conditions, caster: "Player", target: "Dummy", **_kwargs) -> bool:
+    """True when target HP ratio matches ``comparison`` (default <=) against ``pct``.
+
+    An optional ``bypass_if_buff_active`` still makes the rule true on its own.
+    """
     if isinstance(conditions, dict):
         threshold = conditions.get("pct", 0.3)
+        comparison = conditions.get("comparison", conditions.get("operator", "lte"))
         bypass_buffs = conditions.get("bypass_if_buff_active", None)
     else:
         threshold = conditions
+        comparison = "lte"
         bypass_buffs = None
-    if target.hp_ratio <= threshold:
+    if compare_values(target.hp_ratio, comparison, threshold):
         return True
     if bypass_buffs and check_caster_buff(bypass_buffs, caster, target):
         return True
     return False
+
+def check_target_hp(conditions, caster: "Player", target: "Dummy", **_kwargs) -> bool:
+    """Legacy key: target HP ratio is at or below the threshold, or an execute-bypass buff is active."""
+    if isinstance(conditions, dict):
+        forced = dict(conditions)
+        forced["comparison"] = "lte"
+        return check_target_hp_pct(forced, caster, target)
+    return check_target_hp_pct(conditions, caster, target)
 
 def check_caster_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     """Returns True if the caster has any of the specified active buffs."""
@@ -35,19 +48,28 @@ def inverse_check_target_debuff(conditions: Any, caster: "Player", target: "Dumm
     """Returns True if the target does NOT have any of the specified debuffs."""
     return not check_target_debuff(conditions, caster, target, **kwargs)
 
+def check_caster_energy(data, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
+    """True when the caster's primary resource matches ``comparison`` (default >=) against ``value``."""
+    if isinstance(data, dict):
+        threshold = data.get("value", data.get("threshold", 0))
+        comparison = data.get("comparison", data.get("operator", "gte"))
+    else:
+        threshold = data
+        comparison = "gte"
+    return compare_values(caster.resource.current_value, comparison, threshold)
+
 def check_caster_energy_above(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
-    """Returns True if the caster's current primary resource is at or above ``threshold``."""
-    return caster.resource.current_value >= threshold
+    """Legacy key: the caster's current primary resource is at or above ``threshold``."""
+    return compare_values(caster.resource.current_value, "gte", threshold)
 
 def check_caster_energy_below(threshold: int, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
-    """Returns True if the caster's current primary resource is strictly below ``threshold``."""
-    return caster.resource.current_value < threshold
+    """Legacy key: the caster's current primary resource is strictly below ``threshold``."""
+    return compare_values(caster.resource.current_value, "lt", threshold)
 
-def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
-    """Returns True if the named proc is not currently active and its remaining ICD exceeds ``data['value']``."""
-    name = data["name"]
+def _proc_remaining_seconds(name: str, caster: "Player", sim) -> float | None:
+    """Remaining proc ICD or lockout. None means the proc buff is active, so the rule is false."""
     if caster.has_effect(name):
-        return False
+        return None
 
     current_time = sim.current_time if sim is not None else 0.0
     remaining_cooldown = 0.0
@@ -63,12 +85,12 @@ def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", si
                 if getattr(eff, "name", None) == target_eff_name and any("lockout" in t for t in getattr(eff, "tags", ())):
                     if getattr(eff, "expires_at", None) is not None:
                         remaining_cooldown = max(remaining_cooldown, eff.expires_at - current_time)
-            return remaining_cooldown > data["value"]
+            return remaining_cooldown
         elif kind == "trigger_icd":
             if sim is not None and hasattr(sim, "triggers"):
                 source_fqn = proc_info.get("source_fqn", "")
                 remaining_cooldown = sim.triggers.get_remaining_icd(source_fqn, current_time, caster=caster)
-            return remaining_cooldown > data["value"]
+            return remaining_cooldown
 
     proc = getattr(caster, "procs", {}).get(name)
     if proc is not None and hasattr(proc, "next_possible_proc"):
@@ -81,11 +103,26 @@ def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", si
                 if getattr(eff, "expires_at", None) is not None:
                     remaining_cooldown = max(remaining_cooldown, eff.expires_at - current_time)
 
-    return remaining_cooldown > data["value"]
+    return remaining_cooldown
+
+def check_proc_cooldown(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
+    """True when the named proc buff is inactive and its remaining ICD matches ``comparison`` (default >)."""
+    remaining = _proc_remaining_seconds(data["name"], caster, sim)
+    if remaining is None:
+        return False
+    comparison = data.get("comparison", data.get("operator", "gt"))
+    return compare_values(remaining, comparison, data["value"])
+
+def check_proc_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
+    """Legacy key: the named proc is inactive and its remaining ICD is strictly above ``data['value']``."""
+    remaining = _proc_remaining_seconds(data["name"], caster, sim)
+    if remaining is None:
+        return False
+    return compare_values(remaining, "gt", data["value"])
 
 def check_target_hp_above(threshold: float, _caster: "Player", target: "Dummy", **_kwargs) -> bool:
-    """Returns True if the target's HP ratio is strictly above ``threshold``."""
-    return target.hp_ratio > threshold
+    """Legacy key: the target's HP ratio is strictly above ``threshold``."""
+    return compare_values(target.hp_ratio, "gt", threshold)
 
 def check_caster_does_not_have_buff(conditions: Any, caster: "Player", _target: "Dummy", **_kwargs) -> bool:
     """Returns True if the caster does not have any of the specified buffs active."""
@@ -129,13 +166,18 @@ def remaining_ability_cooldown(name: str, caster, sim) -> float:
     return ready_at - now
 
 
+def check_ability_cooldown(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
+    """True when the remaining cooldown of ``data['name']`` matches ``comparison`` (default <) against ``value``."""
+    comparison = data.get("comparison", data.get("operator", "lt"))
+    return compare_values(remaining_ability_cooldown(data["name"], caster, sim), comparison, data["value"])
+
 def check_ability_cooldown_under(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
-    """Returns True if the remaining cooldown of ``data['name']`` is strictly below ``data['value']`` seconds."""
-    return remaining_ability_cooldown(data["name"], caster, sim) < data["value"]
+    """Legacy key: the remaining cooldown of ``data['name']`` is strictly below ``data['value']`` seconds."""
+    return compare_values(remaining_ability_cooldown(data["name"], caster, sim), "lt", data["value"])
 
 def check_ability_cooldown_above(data: dict, caster: "Player", _target: "Dummy", sim, **_kwargs) -> bool:
-    """Returns True if the remaining cooldown of ``data['name']`` is strictly above ``data['value']`` seconds."""
-    return remaining_ability_cooldown(data["name"], caster, sim) > data["value"]
+    """Legacy key: the remaining cooldown of ``data['name']`` is strictly above ``data['value']`` seconds."""
+    return compare_values(remaining_ability_cooldown(data["name"], caster, sim), "gt", data["value"])
 
 
 def compare_values(actual: float, comparison: str, expected: float) -> bool:
@@ -375,20 +417,117 @@ def check_target_debuff_stacks(data: Any, _caster: "Player", target: "Dummy", **
     return compare_values(actual_stacks, comparison, expected_stacks)
 
 
+def _effect_name_matches(eff, key, name: str) -> bool:
+    """True when ``name`` is this effect's key, display name, or FQN (case- and underscore-insensitive)."""
+    if not name:
+        return False
+    if key == name:
+        return True
+    target_norm = name.strip().lower().replace("_", " ")
+    eff_name = getattr(eff, "name", "") or getattr(eff, "effect_name", "") or key
+    eff_fqn = getattr(eff, "fqn", "") or getattr(eff, "source_ability", "")
+    return target_norm in {
+        str(eff_name).strip().lower().replace("_", " "),
+        str(eff_fqn).strip().lower().replace("_", " "),
+        str(key).strip().lower().replace("_", " "),
+    }
+
+
+def _seconds_left(eff, now: float) -> float:
+    """Remaining seconds. A permanent effect (no expiry) is infinite."""
+    if hasattr(eff, "time_remaining"):
+        return float(eff.time_remaining(now))
+    expires_at = getattr(eff, "expires_at", None)
+    if expires_at is None:
+        return float("inf")
+    return max(0.0, float(expires_at) - now)
+
+
+def effect_time_remaining(entity, name: str, sim) -> float:
+    """Longest remaining seconds of a matching active effect.
+
+    An effect that is not active counts as 0, so a "less than" refresh rule is true when it is missing.
+    Expired effects, passives, and lockouts are ignored. A permanent effect has infinite time left.
+    When several copies match, the longest remaining time is the one that is still up.
+    """
+    if not entity or not name:
+        return 0.0
+    now = float(sim.current_time) if sim is not None else 0.0
+    best: float | None = None
+
+    def consider(eff, key) -> None:
+        nonlocal best
+        if getattr(eff, "is_expired", False) or getattr(eff, "is_passive", False):
+            return
+        tags = getattr(eff, "tags", ()) or ()
+        if any("lockout" in t for t in tags):
+            return
+        if not _effect_name_matches(eff, key, name):
+            return
+        remaining = _seconds_left(eff, now)
+        best = remaining if best is None else max(best, remaining)
+
+    for key, eff in (getattr(entity, "effects", {}) or {}).items():
+        consider(eff, key)
+    for key, eff in (getattr(entity, "dots", {}) or {}).items():
+        consider(eff, key)
+    return 0.0 if best is None else best
+
+
+def _remaining_rule_parts(data: Any) -> tuple[str, float, str] | None:
+    """``(name, seconds, comparison)`` from a duration rule. Comparison defaults to ``lt``."""
+    if not isinstance(data, dict):
+        return None
+    name = data.get("name") or data.get("buff") or data.get("debuff") or ""
+    seconds = float(data.get("value", data.get("seconds", 0)))
+    comparison = data.get("comparison", data.get("operator", "lt"))
+    return str(name), seconds, comparison
+
+
+def check_caster_buff_remaining(data: Any, caster: "Player", _target: "Dummy", sim=None, **_kwargs) -> bool:
+    """True when the named caster buff's remaining seconds match ``comparison`` (default <) against ``value``.
+
+    A buff that is not active has 0 seconds left.
+    """
+    parts = _remaining_rule_parts(data)
+    if parts is None or not parts[0]:
+        return False
+    name, seconds, comparison = parts
+    return compare_values(effect_time_remaining(caster, name, sim), comparison, seconds)
+
+
+def check_target_debuff_remaining(data: Any, _caster: "Player", target: "Dummy", sim=None, **_kwargs) -> bool:
+    """True when the named target debuff or DoT's remaining seconds match ``comparison`` (default <) against ``value``.
+
+    A debuff that is not active has 0 seconds left.
+    """
+    parts = _remaining_rule_parts(data)
+    if parts is None or not parts[0]:
+        return False
+    name, seconds, comparison = parts
+    return compare_values(effect_time_remaining(target, name, sim), comparison, seconds)
+
+
 CONDITION_REGISTRY = {
     "target_hp_below_pct": check_target_hp,
+    "target_hp_pct": check_target_hp_pct,
     "target_has_debuff": check_target_debuff,
     "caster_has_buff": check_caster_buff,
     "target_doesnt_have_debuff": inverse_check_target_debuff,
+    "caster_energy": check_caster_energy,
     "caster_energy_above": check_caster_energy_above,
     "caster_energy_below": check_caster_energy_below,
     "target_hp_above_pct": check_target_hp_above,
+    "proc_cooldown": check_proc_cooldown,
     "proc_cooldown_above": check_proc_cooldown_above,
     "caster_does_not_have_buff": check_caster_does_not_have_buff,
+    "ability_cooldown": check_ability_cooldown,
     "ability_cooldown_under": check_ability_cooldown_under,
     "ability_cooldown_above": check_ability_cooldown_above,
     "caster_buff_stacks": check_caster_buff_stacks,
+    "caster_buff_remaining": check_caster_buff_remaining,
     "target_debuff_stacks": check_target_debuff_stacks,
+    "target_debuff_remaining": check_target_debuff_remaining,
 }
 
 

@@ -3131,8 +3131,34 @@ function onStepCardDragLeave(e, idx) {
 }
 
 // Rules for abilities dropped from the palette: in Sub 30 helper mode they inherit the HP threshold.
+function sub30HpFraction(rules) {
+  if (!rules) return null;
+  if (rules.target_hp_below_pct !== undefined) {
+    const v = rules.target_hp_below_pct;
+    return (v && typeof v === "object") ? Number(v.pct ?? 0.3) : Number(v);
+  }
+  const hp = rules.target_hp_pct;
+  if (hp && typeof hp === "object") {
+    const op = hp.comparison || hp.operator || "lte";
+    if (op === "lte" || op === "<=") return Number(hp.pct ?? 0.3);
+  } else if (typeof hp === "number") {
+    return hp;
+  }
+  return null;
+}
+
+function sub30RuleValue() {
+  return { pct: SUB30_THRESHOLD, comparison: "lte" };
+}
+
+function clearSub30Rule(rules) {
+  if (!rules) return;
+  delete rules.target_hp_below_pct;
+  delete rules.target_hp_pct;
+}
+
 function sub30DropRules() {
-  return TIMELINE_VIEW_MODE === "sub30" ? { target_hp_below_pct: SUB30_THRESHOLD } : {};
+  return TIMELINE_VIEW_MODE === "sub30" ? { target_hp_pct: sub30RuleValue() } : {};
 }
 
 function onStepCardDrop(e, idx) {
@@ -3460,8 +3486,50 @@ function buildAbilitySelectHtml(currentId, onChangeJs) {
   return `<select onchange="${onChangeJs}">${opts}</select>`;
 }
 
+function comparisonHtml(op) {
+  const raw = String(op || "").toLowerCase();
+  if (raw === "lt" || raw === "<") return "&lt;";
+  if (raw === "lte" || raw === "<=") return "&le;";
+  if (raw === "gt" || raw === ">") return "&gt;";
+  if (raw === "gte" || raw === ">=") return "&ge;";
+  if (raw === "eq" || raw === "==" || raw === "=") return "=";
+  return escapeHtml(String(op || ""));
+}
+
 function formatRulePillText(key, val) {
+  const obj = val && typeof val === "object" && !Array.isArray(val) ? val : null;
   switch (key) {
+    case "caster_buff_remaining":
+    case "target_debuff_remaining": {
+      if (!obj) return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+      const who = key === "target_debuff_remaining" ? "Debuff left" : "Buff left";
+      const op = comparisonHtml(obj.comparison || obj.operator || "lt");
+      return `<strong>${who} ${op} ${escapeHtml(String(obj.value))}s:</strong> ${escapeHtml(String(obj.name))}`;
+    }
+    case "target_hp_pct": {
+      const pct = Math.round(Number(obj ? obj.pct ?? 0.3 : val) * 100);
+      const op = comparisonHtml((obj && (obj.comparison || obj.operator)) || "lte");
+      const bypass = obj && obj.bypass_if_buff_active;
+      const bypassTxt = bypass ? ` (or buff: ${escapeHtml(String(bypass))})` : "";
+      return `<strong>Target HP ${op} ${pct}%</strong>${bypassTxt}`;
+    }
+    case "caster_energy": {
+      const amount = obj ? (obj.value ?? obj.threshold ?? "") : val;
+      const op = comparisonHtml((obj && (obj.comparison || obj.operator)) || "gte");
+      return `<strong>Energy/Force ${op}</strong> ${escapeHtml(String(amount))}`;
+    }
+    case "proc_cooldown":
+      if (obj) {
+        const op = comparisonHtml(obj.comparison || obj.operator || "gt");
+        return `<strong>Proc ICD ${op} ${escapeHtml(String(obj.value))}s:</strong> ${escapeHtml(String(obj.name))}`;
+      }
+      return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
+    case "ability_cooldown":
+      if (obj) {
+        const op = comparisonHtml(obj.comparison || obj.operator || "lt");
+        return `<strong>Ability CD ${op} ${escapeHtml(String(obj.value))}s:</strong> ${escapeHtml(String(obj.name))}`;
+      }
+      return `<strong>${escapeHtml(key)}:</strong> ${escapeHtml(JSON.stringify(val))}`;
     case "target_hp_below_pct":
       if (val && typeof val === "object") {
         const pct = Math.round((val.pct ?? 0.3) * 100);
@@ -3607,7 +3675,7 @@ function setTimelineViewMode(mode) {
 }
 
 function hasSub30Rule(rules) {
-  return rules && (rules.target_hp_below_pct !== undefined);
+  return sub30HpFraction(rules) !== null && !Number.isNaN(sub30HpFraction(rules));
 }
 
 function getStepSub30Status(step) {
@@ -3615,12 +3683,12 @@ function getStepSub30Status(step) {
     const pool = step.pool || [];
     const idx = pool.findIndex(r => hasSub30Rule(r.rules));
     if (idx !== -1) {
-      return { hasSub30: true, candidateIndex: idx, candidate: pool[idx], threshold: pool[idx].rules.target_hp_below_pct };
+      return { hasSub30: true, candidateIndex: idx, candidate: pool[idx], threshold: sub30HpFraction(pool[idx].rules) };
     }
     return { hasSub30: false };
   } else if (step.type === "optional") {
     if (hasSub30Rule(step.rules)) {
-      return { hasSub30: true, threshold: step.rules.target_hp_below_pct };
+      return { hasSub30: true, threshold: sub30HpFraction(step.rules) };
     }
     return { hasSub30: false };
   }
@@ -3642,7 +3710,7 @@ function transformFixedToSub30Priority(stepIdx) {
     pool: [
       {
         ability_id: executeAbl,
-        rules: { target_hp_below_pct: SUB30_THRESHOLD },
+        rules: { target_hp_pct: sub30RuleValue() },
         lead_time: isOffGcd ? step.lead_time : null
       },
       {
@@ -3679,7 +3747,7 @@ function addSub30ToPriorityBlock(stepIdx) {
   if (!step.pool) step.pool = [];
   step.pool.unshift({
     ability_id: executeAbl,
-    rules: { target_hp_below_pct: SUB30_THRESHOLD }
+    rules: { target_hp_pct: sub30RuleValue() }
   });
   renderTimeline();
   renderRightPanel();
@@ -3697,10 +3765,10 @@ function toggleSub30Optional(stepIdx) {
   const step = rotationSteps[stepIdx];
   if (!step || step.type !== "optional") return;
   if (!step.rules) step.rules = {};
-  if (step.rules.target_hp_below_pct !== undefined) {
-    delete step.rules.target_hp_below_pct;
+  if (hasSub30Rule(step.rules)) {
+    clearSub30Rule(step.rules);
   } else {
-    step.rules.target_hp_below_pct = SUB30_THRESHOLD;
+    step.rules.target_hp_pct = sub30RuleValue();
   }
   renderTimeline();
   renderRightPanel();
@@ -3714,7 +3782,7 @@ function insertSub30OptionalAt(index) {
   const newStep = {
     type: "optional",
     ability_id: executeAbl,
-    rules: { target_hp_below_pct: SUB30_THRESHOLD }
+    rules: { target_hp_pct: sub30RuleValue() }
   };
   if (!isOffGcd) newStep.lead_time = 0.0;
   rotationSteps.splice(index, 0, newStep);
@@ -4200,9 +4268,14 @@ function ruleHostFor(ctx, create = false) {
   return obj.rules || {};
 }
 
+function pickerConditions(conditions) {
+  return (conditions || []).filter(c => c.picker !== false);
+}
+
 function openRuleModal(stepIdx, poolIdx = null, editKey = null, scope = "rotation") {
   ruleModalContext = { stepIndex: stepIdx, poolIndex: poolIdx, editKey: editKey, scope: scope };
-  const conditions = (workspaceCatalog && workspaceCatalog.conditions) || [];
+  const allConditions = (workspaceCatalog && workspaceCatalog.conditions) || [];
+  const conditions = pickerConditions(allConditions);
   const sel = document.getElementById("ruleKeySelect");
   sel.innerHTML = "";
 
@@ -4217,9 +4290,10 @@ function openRuleModal(stepIdx, poolIdx = null, editKey = null, scope = "rotatio
 
   let initialVal = null;
   if (editKey && editKey in targetRules) {
-    if (conditions.some(c => c.key === editKey)) {
-      sel.value = editKey;
-      initialVal = targetRules[editKey];
+    const prepared = RuleForm.prepare(editKey, targetRules[editKey]);
+    if (conditions.some(c => c.key === prepared.key)) {
+      sel.value = prepared.key;
+      initialVal = prepared.value;
     } else {
       // Unknown key (typo or removed rule): never guess a replacement. Leave the type unselected so Save
       // requires an explicit choice; the old key is only removed once a type is saved.
@@ -4271,12 +4345,13 @@ function commitRuleFromModal() {
   const read = RuleForm.readValue(key);
   if (read.error) return showToast(read.error, true);
   const value = read.value;
+  const saveKey = read.key || key;
 
   const host = ruleHostFor(ruleModalContext, true);
-  if (editKey && editKey !== key) {
+  if (editKey && editKey !== saveKey) {
     delete host[editKey];
   }
-  host[key] = value;
+  host[saveKey] = value;
 
   closeRuleModal();
   renderTimeline();
@@ -4513,15 +4588,25 @@ function vizRuleList(rules) {
     const obj = v && typeof v === "object" && !Array.isArray(v) ? v : null;
     const list = (x) => (Array.isArray(x) ? x.join(" / ") : String(x));
     let cls = "cd", txt = k;
-    if (k === "target_hp_below_pct") { cls = "hp"; txt = `HP <= ${Math.round(Number(obj ? obj.pct ?? 0.3 : v) * 100)}%`; }
+    if (k === "target_hp_pct") {
+      cls = "hp";
+      const op = (obj && (obj.comparison || obj.operator)) || "lte";
+      txt = `HP ${op} ${Math.round(Number(obj ? obj.pct ?? 0.3 : v) * 100)}%`;
+    }
+    else if (k === "target_hp_below_pct") { cls = "hp"; txt = `HP <= ${Math.round(Number(obj ? obj.pct ?? 0.3 : v) * 100)}%`; }
     else if (k === "target_hp_above_pct") { cls = "hp"; txt = `HP > ${Math.round(Number(v) * 100)}%`; }
+    else if (k === "caster_energy") { cls = "res"; txt = `Res ${(obj && (obj.comparison || obj.operator)) || "gte"} ${obj ? obj.value : v}`; }
     else if (k === "caster_energy_below") { cls = "res"; txt = `Res < ${v}`; }
     else if (k === "caster_energy_above") { cls = "res"; txt = `Res >= ${v}`; }
     else if (k === "caster_has_buff") { cls = "buff"; txt = `has ${list(v)}`; }
     else if (k === "caster_does_not_have_buff") { cls = "buff"; txt = `no ${list(v)}`; }
     else if (k === "target_has_debuff") { cls = "buff"; txt = `tgt ${list(v)}`; }
     else if (k === "target_doesnt_have_debuff") { cls = "buff"; txt = `tgt no ${list(v)}`; }
+    else if (k === "caster_buff_remaining" && obj) { cls = "buff"; txt = `${obj.name} left ${obj.comparison || obj.operator || "lt"} ${obj.value}s`; }
+    else if (k === "target_debuff_remaining" && obj) { cls = "buff"; txt = `${obj.name} left ${obj.comparison || obj.operator || "lt"} ${obj.value}s`; }
+    else if (k === "proc_cooldown" && obj) { txt = `${obj.name} ICD ${obj.comparison || obj.operator || "gt"} ${obj.value}s`; }
     else if (k === "proc_cooldown_above" && obj) { txt = `${obj.name} ICD > ${obj.value}s`; }
+    else if (k === "ability_cooldown" && obj) { txt = `${obj.name} CD ${obj.comparison || obj.operator || "lt"} ${obj.value}s`; }
     else if (k === "ability_cooldown_under" && obj) { txt = `${obj.name} CD < ${obj.value}s`; }
     else if (k === "ability_cooldown_above" && obj) { txt = `${obj.name} CD > ${obj.value}s`; }
     else if (k.includes("stacks") || k.includes("charges")) { cls = "buff"; txt = k.replace(/_/g, " "); }
@@ -4579,7 +4664,7 @@ function vizMapPayload() {
       abilities: (currentLoadout.abilities || []).map(a => ({
         slug: a.slug, name: a.name, icon: a.icon || "", gcd: a.triggers_gcd !== false, cooldown: a.cooldown || 0,
       })),
-      conditions: ((workspaceCatalog && workspaceCatalog.conditions) || []).map(c => ({
+      conditions: ((workspaceCatalog && workspaceCatalog.conditions) || []).filter(c => c.picker !== false).map(c => ({
         key: c.key, label: c.label, category: c.category, description: c.description || "",
       })),
       lists: RuleForm.listsFromLoadout(currentLoadout),

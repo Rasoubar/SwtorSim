@@ -318,6 +318,11 @@ function buildModel(state) {
     const r = p.rules || {};
     if (typeof r.caster_energy_below === "number") thresholds.add(r.caster_energy_below);
     if (typeof r.caster_energy_above === "number") thresholds.add(r.caster_energy_above);
+    if (r.caster_energy && typeof r.caster_energy === "object" && typeof r.caster_energy.value === "number") {
+      thresholds.add(r.caster_energy.value);
+    } else if (typeof r.caster_energy === "number") {
+      thresholds.add(r.caster_energy);
+    }
   }));
 
   const tMin = Math.min(0, ...all.map((c) => c.t));
