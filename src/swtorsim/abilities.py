@@ -1060,6 +1060,14 @@ def remove_effect_firing_pre_remove(sim, entity, effect_key, fallback_caster=Non
     entity.cleanup_expired_effects([effect_key])
 
 
+def _logged_effect_name(eff, fallback: str) -> str:
+    """Name the buff report already uses for this effect, so a stack change updates that row."""
+    name = getattr(eff, "name", None)
+    if isinstance(name, str) and name.strip():
+        return name
+    return fallback
+
+
 def _defines_stack_capacity(effect) -> bool:
     """True when the effect's blueprint declares a stack charge limit (``stack_charge`` with a ``max``)."""
     bp = getattr(effect, "effect_blueprint", None)
@@ -1170,7 +1178,7 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
     if cur_stacks > 0 and sim is not None and hasattr(sim, "tracker") and sim.tracker is not None:
         sim.tracker.log_effect_applied(
             owner_entity.name,
-            owner_key,
+            _logged_effect_name(eff, owner_key),
             getattr(sim, "current_time", 0.0),
             stacks=cur_stacks,
             is_passive=getattr(eff, "is_passive", False),
@@ -1335,7 +1343,7 @@ def handle_set_effect_stack_charge(sim, caster, target, action, ability=None, co
     if getattr(eff, "stacks", 1) > 0 and sim is not None and hasattr(sim, "tracker") and sim.tracker is not None:
         sim.tracker.log_effect_applied(
             owner_entity.name,
-            owner_key,
+            _logged_effect_name(eff, owner_key),
             getattr(sim, "current_time", 0.0),
             stacks=eff.stacks,
             is_passive=getattr(eff, "is_passive", False),

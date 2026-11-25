@@ -4,7 +4,20 @@
 
 ## Completed Fixes
 
-### 111. Saved run configs omit an unchanged stats override (`tools/simulator_ui.html`, `src/swtorsim/web_gui.py`, `tests/test_run_config_class_spec.py`)
+### 113. Boiling Point lets Thermal Yield reach 6 stacks (`src/swtorsim/effects.py`, `src/swtorsim/entities.py`, `tests/test_incoming_attack.py`)
+- Boiling Point's +1 max charge (stat 61) names the Thermal Yield ability. The stack cap was matched on the effect's display name, so the bonus never attached, and the bonus is applied on post-activate, after the stack effect already exists at 5. The cap now matches the parent ability, and a charge-cap modifier updates effects already on the actor. Kolto Overload, then Thermal Yield, then damage taken, reaches 6. A Thermal Yield with no Boiling Point window stays at 5.
+- Tests: `tests/test_incoming_attack.py` (`test_boiling_point_raises_thermal_yield_cap_to_six`). Full `unittest discover`: 54 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
+- DPS, one seed per loadable config, identical before and after: Arsenal 42055.2594, Carnage 42457.8511, Darkness 23913.4591, Dirty Fighting 60774.8416, Hatred 53046.1844, Immortal 44024.0666, Marksmanship 44056.9753, Pyrotech 46054.1786. The Pyrotech rotation does not cast Kolto Overload, so that parse never opens the Boiling Point window. Annihilation was skipped; its rotation file is missing.
+
+### 112. Thermal Yield stacks show, and Close and Personal hears area swings (`src/swtorsim/events.py`, `src/swtorsim/abilities.py`, `tests/test_incoming_attack.py`)
+- Thermal Yield's damage-taken branches were already adding a stack and refreshing the 10s buff. The buff report stayed at 1 stack because a stack change was logged under the raw effect id (`abl....:2`), which the report skips. Stack changes now use the same display name as the application, so the row shows the real count (5 on the Pyrotech rotation while swings are landing).
+- Close and Personal only listens for damage tagged `tag.abl.utility.is_aoe`. The incoming swing carried no tags, so it never vented heat and, with Reflective Armor selected, never reflected. The swing now carries that area tag. A listener that requires a different tag still does not run. The 2.5% heal on that branch is still one of the engine's unimplemented heal actions, and the swing does not reduce health.
+- Tests: `tests/test_incoming_attack.py` (7, was 5). Full `unittest discover`: 53 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
+- DPS with no incoming swings, one seed per loadable config, identical before and after: Arsenal 42055.2594, Carnage 42457.8511, Darkness 23913.4591, Dirty Fighting 60774.8416, Hatred 53046.1844, Immortal 44024.0666, Marksmanship 44056.9753. Annihilation was skipped; its rotation file is missing. `data/run_config/Pyrotech.json` is set to 1.5s, so that run does take the swings: 45161.5025 DPS, of which Close and Personal reflected 756457.
+
+### 111. Saved run configs omit an unchanged stats override (`tools/
+simulator_ui.html`, `src/swtorsim/web_gui.py`, `tests/
+test_run_config_class_spec.py`)
 - Saving or exporting a run config wrote every character stat into `stats_override`, including values already stored in the build file named by `stats_path`. The file now keeps a stat in `stats_override` only when its value differs from that build. When every stat matches, `stats_override` is left out. A blank `stats_path`, or a build file that cannot be read, leaves the submitted override in place.
 - Tests: `tests/test_run_config_class_spec.py` (`RunConfigStatsOverrideTests`, 7). Full `unittest discover`: 51 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
 

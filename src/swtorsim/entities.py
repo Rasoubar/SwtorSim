@@ -14,7 +14,7 @@ from src.swtorsim.combat_curves import (
     derived_stat,
 )
 from src.swtorsim.combat_math import calc_dr
-from src.swtorsim.effects import ActiveEffect, EffectCollection
+from src.swtorsim.effects import ActiveEffect, EffectCollection, _effect_charge_mods, reconcile_charge_caps
 
 
 class Entity:
@@ -225,6 +225,8 @@ class Entity:
         # Activation this (re)application happened in; see TriggerManager.dispatch (on_ability_post_activate).
         effect_instance.applied_activation = getattr(sim, "current_activation", None) if sim is not None else None
         self.effects[effect_key] = effect_instance
+        if _effect_charge_mods(effect_instance):
+            reconcile_charge_caps(self)
         self.consider_recalculation(effect_instance)
 
         if sim is not None:
@@ -347,11 +349,13 @@ class Entity:
         if not expired_keys:
             return
         needs_stat_recalc = False
+        removed_charge_mods = []
         sim_ref = getattr(self, "_sim_ref", None)
         for r_id in expired_keys:
             popped_effect = self.effects.pop(r_id, None)
             if popped_effect is None:
                 continue
+            removed_charge_mods.extend(_effect_charge_mods(popped_effect))
             if hasattr(popped_effect, "is_expired"):
                 popped_effect.is_expired = True
             display_name = getattr(popped_effect, "name", None) or getattr(popped_effect, "fqn", None) or r_id
@@ -364,6 +368,8 @@ class Entity:
                 sim_ref.triggers.unsubscribe(owner_id)
             if getattr(popped_effect, "modifiers", None):
                 needs_stat_recalc = True
+        if removed_charge_mods:
+            reconcile_charge_caps(self, removed_mods=removed_charge_mods)
         if needs_stat_recalc:
             self.recalculate_stats()
 

@@ -1,0 +1,393 @@
+{
+    "pre_combat": [
+        {
+            "ability": "personal_heavy_ordinance"
+        },
+        {
+            "ability": "flame_sweep"
+        },
+        {
+            "ability": "flame_sweep"
+        },
+        {
+            "ability": "flame_sweep"
+        },
+        {
+            "ability": "flame_sweep"
+        },
+        {
+            "ability": "flame_sweep"
+        },
+        {
+            "wait": 5
+        }
+    ],
+    "weave": [
+        {
+            "ability_id": "thermal_yield",
+            "rules": {}
+        },
+        {
+            "ability_id": "personal_heavy_ordinance",
+            "rules": {
+                "target_doesnt_have_debuff": "Burning (Shoulder Cannon)"
+            }
+        },
+        {
+            "ability_id": "energy_shield",
+            "rules": {}
+        }
+    ],
+    "sequence": [
+        {
+            "type": "fixed",
+            "ability_id": "scorch"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "incendiary_missile"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flaming_fist"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "rail_shot"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flame_burst"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "searing_wave"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flame_burst"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "explosive_fuel",
+            "lead_time": 0.1
+        },
+        {
+            "type": "fixed",
+            "ability_id": "immolate"
+        },
+        {
+            "type": "optional",
+            "ability_id": "personal_heavy_ordinance",
+            "rules": {},
+            "lead_time": 0.1
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flaming_fist"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flame_burst"
+        },
+        {
+            "type": "optional",
+            "ability_id": "personal_heavy_ordinance",
+            "rules": {},
+            "lead_time": 0.1
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flame_burst"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "incendiary_missile"
+        },
+        {
+            "type": "optional",
+            "ability_id": "personal_heavy_ordinance",
+            "rules": {},
+            "lead_time": 0.1
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flame_burst"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "rail_shot"
+        },
+        {
+            "type": "optional",
+            "ability_id": "personal_heavy_ordinance",
+            "rules": {},
+            "lead_time": 0.1
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flaming_fist"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "searing_wave"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flame_burst"
+        },
+        {
+            "type": "optional",
+            "ability_id": "vent_heat",
+            "rules": {},
+            "lead_time": 0.1
+        },
+        {
+            "type": "fixed",
+            "ability_id": "immolate"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flame_burst"
+        },
+        {
+            "type": "loop_anchor"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "scorch"
+        },
+        {
+            "type": "optional",
+            "ability_id": "vent_heat",
+            "rules": {},
+            "lead_time": 0.1
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "incendiary_missile"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flaming_fist"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "rail_shot"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28 (Copy)",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "searing_wave"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28 (Copy) (Copy)",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "optional",
+            "ability_id": "explosive_fuel",
+            "rules": {},
+            "lead_time": 0.1
+        },
+        {
+            "type": "fixed",
+            "ability_id": "immolate"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flaming_fist"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28 (Copy) (Copy) (Copy)",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28 (Copy) (Copy) (Copy) (Copy)",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "incendiary_missile"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28 (Copy) (Copy)",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "rail_shot"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "flaming_fist"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "searing_wave"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28 (Copy) (Copy) (Copy)",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "immolate"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 28 (Copy) (Copy) (Copy)",
+            "pool": [
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {
+                        "caster_has_buff": "Explosive Fuel"
+                    }
+                },
+                {
+                    "ability_id": "rapid_shots",
+                    "rules": {
+                        "caster_energy_above": 15
+                    }
+                },
+                {
+                    "ability_id": "flame_burst",
+                    "rules": {}
+                }
+            ]
+        }
+    ]
+}
