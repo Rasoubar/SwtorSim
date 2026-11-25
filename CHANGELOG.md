@@ -4,6 +4,12 @@
 
 ## Completed Fixes
 
+### 115. Discipline conditional name wins over the shared English ability string (`src/extractor/abilities.py`, `src/extractor/graph.py`, `src/extractor/strings.py`)
+- `blood_sights_plus` stored "Snake Eyes" from the English `locTextRetrieverMap` entry. On PTS the in-game name is the `ablNameConditionalIds` slot for Dirty Fighting, string "Heart Beat Acquired". The same slot on `target_hack_plus` is "Exploit Vulnerability".
+- Ability names now use a conditional entry when its discipline token is a segment of the ability FQN. A conditional for another spec or the mirror class stays unused, so `smugglers_luck_plus` stays "Snake Eyes" and `redirected_wrath` stays "Redirected Wrath". The English string is still the name when no conditional matches. Loc resolution also keeps each retriever key in `resolved_by_key`.
+- The parsed PTS files are unchanged until the next extract. Rotation lookups that used the old display name are updated to match: `SimpleUV.json` cooldown checks say "Heart Beat Acquired", and the Fury rotation's `frenzy` steps say `rabid`. Carnage still casts `abl.sith_warrior.frenzy`, which stays "Frenzy". No rotation file references Saboteur, Annihilation, Sentinel Combat, or Tactics.
+- Tests: `tests/test_ability_name.py` (`AbilityNameTests`, 5). Full `unittest discover`: 54 before, 59 after, all passing. No combat-math change. No DPS baseline: shipped parses still use the previous extracted names.
+
 ### 114. PTS is the default environment on the web UI (`tools/simulator_ui.html`, `tools/rotation_builder_ui.html`, `dist/index.html`, `dist/rotation_builder.html`)
 - The Live / PTS toggle opens on PTS (8.0). The simulator level field opens at 85, the PTS level `setEnvironment` already writes when that side is chosen. Choosing Live still sets the level to 80. A saved run config that names its own environment still switches the toggle when it is loaded.
 - UI only. No tests cover the toggle. No damage math.

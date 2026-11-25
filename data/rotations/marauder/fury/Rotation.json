@@ -1,7 +1,7 @@
 {
     "weave": [
         {
-            "ability_id": "frenzy",
+            "ability_id": "rabid",
             "rules": {}
         }
     ],
@@ -12,7 +12,7 @@
         },
         {
             "type": "optional",
-            "ability_id": "frenzy",
+            "ability_id": "rabid",
             "rules": {}
         },
         {

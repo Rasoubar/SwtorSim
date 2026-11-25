@@ -466,8 +466,51 @@ def _decode_comparison(raw: Any, *, context: str | None = None) -> str:
     return f"cmp_{key}"
 
 
+def _condition_discipline_token(condition: str) -> str:
+    """``cnd.trp.discipline.gunslinger.is_dirty_fighting`` -> ``dirty_fighting``."""
+    token = condition.rsplit(".", 1)[-1]
+    if token.startswith("is_"):
+        return token[3:]
+    return token
+
+
+def _conditional_ability_name(record: NodeRecord, loc_text: Any) -> str | None:
+    """Name from ``ablNameConditionalIds`` when that condition is this ability's discipline.
+
+    The English ``locTextRetrieverMap`` entry is the shared default (``blood_sights_plus``
+    still says "Snake Eyes"). The in-game name is the conditional slot whose discipline
+    token is a segment of the ability FQN ("Heart Beat Acquired" for Dirty Fighting).
+    A conditional for a different spec or mirror class is left unused.
+    """
+    if not isinstance(loc_text, dict):
+        return None
+    by_key = loc_text.get("resolved_by_key")
+    if not isinstance(by_key, dict):
+        return None
+    entries = _field_value(record, "ablNameConditionalIds")
+    if not isinstance(entries, list):
+        return None
+    segments = set(record.entry.fqn.split("."))
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        condition = entry.get("key")
+        if not isinstance(condition, str) or not condition:
+            continue
+        token = _condition_discipline_token(condition)
+        if not token or token not in segments:
+            continue
+        text = by_key.get(str(entry.get("value")))
+        if isinstance(text, str) and text.strip():
+            return text
+    return None
+
+
 def _ability_name(record: NodeRecord) -> str | None:
     loc_text = _field_value(record, "locTextRetrieverMap")
+    conditional = _conditional_ability_name(record, loc_text)
+    if conditional:
+        return conditional
     if isinstance(loc_text, dict):
         resolved = loc_text.get("resolved_text")
         if isinstance(resolved, str):
