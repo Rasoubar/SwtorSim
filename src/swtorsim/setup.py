@@ -294,6 +294,7 @@ def prepare_simulation(
     pull_conditions: dict | None = None,
     pull_max_wait: float | None = None,
     gcd_stall: float = 0.0,
+    incoming_attack_interval: float = 0.0,
 ):
     """Prepares simulation entities from unified loadout blueprints."""
     active_abilities = {}
@@ -340,6 +341,9 @@ def prepare_simulation(
     if seed is not None:
         random.seed(seed)
     sim = Simulation(verbose=verbose, seed=seed, tracer=tracer)
+    sim.incoming_attack_interval = float(incoming_attack_interval)
+    sim.incoming_attack_attacker = target
+    sim.incoming_attack_victim = player
     player.current_target = target
 
     for eff_key, eff in target.effects.items():

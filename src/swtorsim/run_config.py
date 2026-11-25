@@ -123,6 +123,7 @@ class RunConfig:
     in_flashpoint_operation: bool = True
     combat_distance: float = 30.0
     gcd_stall: float = 0.0
+    incoming_attack_interval: float = 0.0
     level: int = 85
     seed: int = 42
     environment: str = "live"
@@ -296,6 +297,9 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
             raw, "combat_distance", 30.0
         ),
         gcd_stall=_optional_config_float(raw, "gcd_stall", 0.0),
+        incoming_attack_interval=_require_non_negative_float(
+            raw, "incoming_attack_interval", 0.0
+        ),
         level=_optional_config_int(raw, "level", 85),
         seed=_optional_config_int(raw, "seed", 42),
         environment=active_env,
@@ -352,6 +356,12 @@ def validate_run_config(
         or not 0.0 <= config.gcd_stall <= 1.0
     ):
         errors.append("gcd_stall must be a number from 0 to 1.")
+    if (
+        isinstance(config.incoming_attack_interval, bool)
+        or not isinstance(config.incoming_attack_interval, (int, float))
+        or config.incoming_attack_interval < 0.0
+    ):
+        errors.append("incoming_attack_interval must be a number greater than or equal to 0.")
     if not isinstance(config.training_dummy_armor_debuff, bool):
         errors.append("training_dummy_armor_debuff must be true or false.")
     elif config.training_dummy_armor_debuff and not _is_file(actual_debuff):
@@ -676,4 +686,14 @@ def _optional_config_float(raw: dict, key: str, default: float) -> float:
         return float(val)
     except (ValueError, TypeError):
         raise ValueError(f"Run config value for '{key}' must be a float.")
+
+
+def _require_non_negative_float(raw: dict, key: str, default: float) -> float:
+    """Reads a seconds value. Missing means ``default``. Bools and other non-numbers are rejected."""
+    if key not in raw or raw.get(key) is None:
+        return default
+    val = raw.get(key)
+    if isinstance(val, bool) or not isinstance(val, (int, float)):
+        raise ValueError(f"Run config value for '{key}' must be a number.")
+    return float(val)
 

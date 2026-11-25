@@ -4,6 +4,12 @@
 
 ## Completed Fixes
 
+### 110. Incoming attack interval (`src/swtorsim/events.py`, `src/swtorsim/setup.py`, `src/swtorsim/run_config.py`, `src/swtorsim/web_gui.py`, `src/swtorsim/tester.py`, `main.py`, `tools/simulator_ui.html`, `tools/share_image.js`, `tests/test_incoming_attack.py`)
+- Engine Mechanics gains "Gets attacked every (seconds)", chips 0 and 1.5. The value is `incoming_attack_interval` in seconds. 0, and any saved config that omits the key, schedules nothing.
+- A positive interval lands a melee kinetic swing on the player one interval after combat starts, then again on that interval. Each swing dispatches `on_pre_damage_taken` and `on_damage_taken` with the dummy as the attacker. Wildcard damage-taken abilities (Lightning Reflexes) and melee listeners run; Force, Tech, ranged, and tag-gated listeners do not. The swing does not reduce health and is not added to the damage log. A `trigger_caster` retaliation hits the dummy and is logged as damage. The interval does not scale with alacrity. Ability rate limits still do.
+- Tests: `tests/test_incoming_attack.py` (5). Full `unittest discover` suite: 44 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
+- DPS baseline, one seed per loadable config, identical before and after: Arsenal 31137.1882, Darkness 19790.1642, Dirty Fighting 60774.8416, Hatred 36405.5959, Marksmanship 33728.9010. Annihilation and Carnage were skipped; their stats or rotation files are missing.
+
 ### 109. Palette tab counts sit on their own line (`tools/rotation_builder_ui.html`, `dist/rotation_builder.html`)
 - The left-bar tabs (Abilities, Buffs, Debuffs, Procs) kept the count in the same flex line as the label. Narrow columns wrapped the parenthesis away from the number and the button gap opened space inside the brackets. Each count is now a second line, `(28)`, centered under the label.
 - UI only. No tests cover the builder page. No damage math.
