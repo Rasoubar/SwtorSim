@@ -860,24 +860,42 @@ def normalize_pull_gate(raw: Any) -> dict[str, Any]:
     return gate
 
 
+def normalize_default_lead(raw: Any) -> dict[str, Any]:
+    """Extracts the rotation-wide ``default_lead_time`` (seconds, >= 0) from a rotation file.
+
+    Empty dict when unset or invalid: the engine then uses ``DEFAULT_OFF_GCD_LEAD_TIME``.
+    """
+    if not isinstance(raw, dict) or raw.get("default_lead_time") is None:
+        return {}
+    try:
+        value = float(raw["default_lead_time"])
+    except (TypeError, ValueError):
+        return {}
+    return {"default_lead_time": value} if value >= 0.0 else {}
+
+
 def build_rotation_file_data(
     steps: list[dict[str, Any]],
     pre_combat: list[dict[str, Any]] | None,
     pull_conditions: dict[str, Any] | None = None,
     pull_max_wait: float | None = None,
     weave: list[dict[str, Any]] | None = None,
+    default_lead_time: float | None = None,
 ) -> Any:
-    """Rotation file payload: a bare step array, or a ``{"pre_combat", "pull_conditions", "weave", "sequence"}``
-    wrapper when pre-combat steps, fight-start (pull) conditions or loop-only weave entries are set."""
+    """Rotation file payload: a bare step array, or a
+    ``{"pre_combat", "pull_conditions", "default_lead_time", "weave", "sequence"}`` wrapper when pre-combat
+    steps, fight-start (pull) conditions, a rotation-wide default lead or loop-only weave entries are set."""
     pre = normalize_pre_combat_steps({"pre_combat": pre_combat or []})
     gate = normalize_pull_gate({"pull_conditions": pull_conditions, "pull_max_wait": pull_max_wait})
+    lead = normalize_default_lead({"default_lead_time": default_lead_time})
     weave_entries = normalize_weave_steps(weave or [])
-    if not pre and not gate and not weave_entries:
+    if not pre and not gate and not lead and not weave_entries:
         return steps
     data: dict[str, Any] = {}
     if pre:
         data["pre_combat"] = pre
     data.update(gate)
+    data.update(lead)
     if weave_entries:
         data["weave"] = weave_entries
     data["sequence"] = steps
@@ -1058,9 +1076,11 @@ def run_dry_run_preview(payload: dict[str, Any]) -> dict[str, Any]:
     relic_fqns = payload.get("relic_fqns") or []
     rotation_steps = payload.get("rotation") or []
     weave_entries = normalize_weave_steps(payload.get("weave") or [])
-    if weave_entries:
-        # Loop-only weave entries travel with the steps in the dict form Rotation understands.
-        rotation_steps = {"sequence": rotation_steps, "weave": weave_entries}
+    default_lead = normalize_default_lead(payload)
+    if weave_entries or default_lead:
+        # Loop-only weave entries and the rotation-wide default lead travel with the steps in the
+        # dict form Rotation understands.
+        rotation_steps = {"sequence": rotation_steps, "weave": weave_entries, **default_lead}
     duration = min(120.0, max(5.0, float(payload.get("duration") or 30.0)))
 
     builds = _resolve_workspace_path(BUILDS_DIR)
@@ -1319,6 +1339,7 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                         "pre_combat": normalize_pre_combat_steps(raw_data),
                         "weave": normalize_weave_steps(raw_data),
                         **normalize_pull_gate(raw_data),
+                        **normalize_default_lead(raw_data),
                         "warnings": warnings,
                     }
                 )
@@ -1385,7 +1406,7 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
 
                 file_data = build_rotation_file_data(
                     steps, payload.get("pre_combat"), payload.get("pull_conditions"), payload.get("pull_max_wait"),
-                    weave=payload.get("weave"),
+                    weave=payload.get("weave"), default_lead_time=payload.get("default_lead_time"),
                 )
                 formatted = json.dumps(file_data, indent=4, ensure_ascii=False)
                 # Write with Windows CRLF line endings per Rule #6

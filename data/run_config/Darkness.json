@@ -2,6 +2,7 @@
   "class": "Assassin",
   "spec": "Darkness",
   "spec_path": "data/extractor/pts/disciplines/assassin/darkness.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_Tank_14gcd.json",
   "stats_override": {
     "Mastery": 23362,

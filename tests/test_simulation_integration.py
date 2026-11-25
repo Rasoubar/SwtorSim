@@ -33,7 +33,9 @@ class SimulationIntegrationTests(unittest.TestCase):
         os.chdir(cls._previous_cwd)
 
     def setUp(self):
-        self.config = load_run_config(str(RUN_CONFIG_PATH))
+        # These tests (and their direct loadouts, which follow the global data environment) are written for
+        # live data; Hatred.json itself is a PTS preset.
+        self.config = load_run_config(str(RUN_CONFIG_PATH), environment="live")
         self.inputs = load_from_run_config(self.config)
         self.sim, self.player, self.target = prepare_simulation(
             self.inputs.rotation_config,

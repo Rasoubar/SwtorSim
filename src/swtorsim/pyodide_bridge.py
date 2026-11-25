@@ -34,6 +34,7 @@ from data.rotation_builder import (
     discover_loadout_catalog,
     get_workspace_catalog,
     load_builder_run_config,
+    normalize_default_lead,
     normalize_pre_combat_steps,
     normalize_pull_gate,
     normalize_weave_steps,
@@ -111,6 +112,7 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
                 "pre_combat": normalize_pre_combat_steps(raw_data),
                 "weave": normalize_weave_steps(raw_data),
                 **normalize_pull_gate(raw_data),
+                **normalize_default_lead(raw_data),
                 "warnings": warnings,
             }
 
@@ -143,7 +145,7 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
                 return json.dumps({"error": "steps must be a list."}, ensure_ascii=False)
             file_data = build_rotation_file_data(
                 steps, data.get("pre_combat"), data.get("pull_conditions"), data.get("pull_max_wait"),
-                weave=data.get("weave"),
+                weave=data.get("weave"), default_lead_time=data.get("default_lead_time"),
             )
             result = {"ok": True, "content": json.dumps(file_data, indent=4, ensure_ascii=False)}
 
@@ -162,9 +164,9 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
             full_path = target_dir / filename
             file_data = build_rotation_file_data(
                 steps, data.get("pre_combat"), data.get("pull_conditions"), data.get("pull_max_wait"),
-                weave=data.get("weave"),
+                weave=data.get("weave"), default_lead_time=data.get("default_lead_time"),
             )
-            formatted = json.dumps(file_data, indent=4, ensure_ascii=False)
+            formatted =json.dumps(file_data, indent=4, ensure_ascii=False)
             formatted_crlf = formatted.replace("\r\n", "\n").replace("\n", "\r\n") + "\r\n"
             full_path.write_bytes(formatted_crlf.encode("utf-8"))
             rel_saved = full_path.relative_to(SWTORSIM_ROOT).as_posix()

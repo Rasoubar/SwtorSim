@@ -2,7 +2,21 @@
 
 from src.swtorsim.requirements import validate_all
 
-DEFAULT_OFF_GCD_LEAD_TIME: float = 0.4
+DEFAULT_OFF_GCD_LEAD_TIME: float = 0.1
+
+
+def resolve_default_lead_time(steps_config) -> float:
+    """Rotation-wide lead for off-GCD steps without their own ``lead_time``.
+
+    Read from the rotation file's ``default_lead_time`` key (dict form only); falls back to
+    ``DEFAULT_OFF_GCD_LEAD_TIME`` when unset, invalid or negative.
+    """
+    raw = steps_config.get("default_lead_time") if isinstance(steps_config, dict) else None
+    try:
+        value = float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        value = None
+    return value if value is not None and value >= 0.0 else DEFAULT_OFF_GCD_LEAD_TIME
 
 
 class Rotation:
@@ -14,6 +28,7 @@ class Rotation:
         self.current_step = 0
         self.loop_start_index = 0
         self.loop = loop
+        self.default_lead_time = resolve_default_lead_time(steps_config)
         # Loop-only "always weave" entries: each is tried like an optional step before every
         # sequence step from the loop anchor on. weave_pos = entries already resolved at this step.
         self.weave = []
@@ -82,7 +97,7 @@ class Rotation:
                 lead = getattr(step, "lead_time", None)
                 if lead is not None:
                     return max(0.0, float(lead))
-                return DEFAULT_OFF_GCD_LEAD_TIME
+                return self.default_lead_time
             if ability:
                 return 0.0  # on-GCD ability: it cannot be cast early, so there is nothing to lead
 
@@ -99,7 +114,7 @@ class Rotation:
                     lead = option.get("lead_time")
                     if lead is None:
                         lead = getattr(step, "lead_time", None)
-                    return max(0.0, float(lead)) if lead is not None else DEFAULT_OFF_GCD_LEAD_TIME
+                    return max(0.0, float(lead)) if lead is not None else self.default_lead_time
                 # First viable candidate in priority block is an on-GCD ability; do not lead early (an early wake-up
                 # would only let a lower-priority off-GCD option jump ahead of it)
                 return 0.0

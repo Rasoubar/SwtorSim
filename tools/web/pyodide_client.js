@@ -765,7 +765,8 @@
           pre_combat: payload.pre_combat,
           pull_conditions: payload.pull_conditions,
           pull_max_wait: payload.pull_max_wait,
-          weave: payload.weave
+          weave: payload.weave,
+          default_lead_time: payload.default_lead_time
         });
         if (!formatted || formatted.error !== undefined || typeof formatted.content !== "string") {
           return new Response(JSON.stringify({ error: (formatted && formatted.error) || "Could not format rotation." }), {

@@ -285,7 +285,8 @@ class ExtractedLoadTests(unittest.TestCase):
             self.assertGreater(len(present_gear), 0, "No valid gear FQNs resolved on disk")
 
     def test_hatred_run_config_loads(self):
-        config = load_run_config(str(RUN_CONFIG_PATH))
+        # PARSED_DIR is the live data; Hatred.json itself is a PTS preset.
+        config = load_run_config(str(RUN_CONFIG_PATH), environment="live")
         inputs = load_from_run_config(config)
         self.assertEqual(set(inputs.loadout_blueprints), set(selected_fqns_from_config(config)))
 
