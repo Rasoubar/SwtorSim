@@ -11,7 +11,7 @@ Usage Examples:
     .\\tools\\pyclean.exe main.py
 
     # 3. Run a specific configuration directly with custom flags
-    .\\tools\\pyclean.exe main.py hatred_14gcd --hp 6.5m --mode TEST
+    .\\tools\\pyclean.exe main.py Hatred --hp 6.5m --mode TEST
     .\\tools\\pyclean.exe main.py hatred_13gcd --hp 6m --mode BATCH --iterations 50
     .\\tools\\pyclean.exe main.py --config run_config.json
 
@@ -178,6 +178,7 @@ def run(config):
         debuff_module=inputs.debuff_module,
         enable_stem_matching=getattr(config, "enable_stem_matching", True),
         gcd_stall=getattr(config, "gcd_stall", 0.0),
+        incoming_attack_interval=getattr(config, "incoming_attack_interval", 0.0),
     )
 
     if config.mode == "TEST":
@@ -194,7 +195,7 @@ def main():
         "config",
         nargs="?",
         default=None,
-        help="Config name (e.g. 'hatred_14gcd') or file path to run_config.json.",
+        help="Config name (e.g. 'Hatred') or file path to run_config.json.",
     )
     parser.add_argument(
         "--config",
@@ -277,7 +278,7 @@ def main():
     if args.debug:
         from tools.debug_sim import run_debug_simulation
 
-        cfg_arg = args.config_opt or args.config or "hatred_14gcd"
+        cfg_arg = args.config_opt or args.config or "Hatred"
         hp_val = parse_hp_value(args.hp) if args.hp else None
         active_env = "pts" if args.pts else "live"
         run_debug_simulation(

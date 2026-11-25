@@ -4,6 +4,34 @@
 
 ## Completed Fixes
 
+### 111. Saved run configs omit an unchanged stats override (`tools/simulator_ui.html`, `src/swtorsim/web_gui.py`, `tests/test_run_config_class_spec.py`)
+- Saving or exporting a run config wrote every character stat into `stats_override`, including values already stored in the build file named by `stats_path`. The file now keeps a stat in `stats_override` only when its value differs from that build. When every stat matches, `stats_override` is left out. A blank `stats_path`, or a build file that cannot be read, leaves the submitted override in place.
+- Tests: `tests/test_run_config_class_spec.py` (`RunConfigStatsOverrideTests`, 7). Full `unittest discover`: 51 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
+
+### 110. Incoming attack interval (`src/swtorsim/events.py`, `src/swtorsim/setup.py`, `src/swtorsim/run_config.py`, `src/swtorsim/web_gui.py`, `src/swtorsim/tester.py`, `main.py`, `tools/simulator_ui.html`, `tools/share_image.js`, `tests/test_incoming_attack.py`)
+- Engine Mechanics gains "Gets attacked every (seconds)", chips 0 and 1.5. The value is `incoming_attack_interval` in seconds. 0, and any saved config that omits the key, schedules nothing.
+- A positive interval lands a melee kinetic swing on the player one interval after combat starts, then again on that interval. Each swing dispatches `on_pre_damage_taken` and `on_damage_taken` with the dummy as the attacker. Wildcard damage-taken abilities (Lightning Reflexes) and melee listeners run; Force, Tech, ranged, and tag-gated listeners do not. The swing does not reduce health and is not added to the damage log. A `trigger_caster` retaliation hits the dummy and is logged as damage. The interval does not scale with alacrity. Ability rate limits still do.
+- Tests: `tests/test_incoming_attack.py` (5). Full `unittest discover` suite: 44 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
+- DPS baseline, one seed per loadable config, identical before and after: Arsenal 31137.1882, Darkness 19790.1642, Dirty Fighting 60774.8416, Hatred 36405.5959, Marksmanship 33728.9010. Annihilation and Carnage were skipped; their stats or rotation files are missing.
+
+### 109. Palette tab counts sit on their own line (`tools/rotation_builder_ui.html`, `dist/rotation_builder.html`)
+- The left-bar tabs (Abilities, Buffs, Debuffs, Procs) kept the count in the same flex line as the label. Narrow columns wrapped the parenthesis away from the number and the button gap opened space inside the brackets. Each count is now a second line, `(28)`, centered under the label.
+- UI only. No tests cover the builder page. No damage math.
+
+### 108. Saved run configs keep one class and one spec (`tools/simulator_ui.html`, `src/swtorsim/web_gui.py`)
+- Saving a run config from the simulator wrote both `class` and `class_name`, and both `spec` and `spec_name`. The discipline dropdown placeholder (`-- Select Discipline --`) was stored as the spec. The file now has `class` and `spec` only. A blank or placeholder name is filled from the discipline behind `spec_path`. Older files that still say `class_name` or `spec_name` still load. The shipped configs in `data/run_config/` already use `class` and `spec`.
+- Tests: `tests/test_run_config_class_spec.py`.
+
+### 107. Rotation Map opens in a browser tab by default (`tools/rotation_builder_ui.html`, `dist/rotation_builder.html`)
+- `openVisualMapWindow` passes `defaultMode: "tab"` into `openCompanionWindow`. With no saved `swtorsim_map_open_mode`, Open Visual Map and the Visual Map tab open `map.html` as a browser tab. A saved `tab` or `popup` value still wins, and Shift+click still flips that one open. Cast Timeline stays a popup unless its own preference says otherwise.
+- UI only. No tests cover the builder page. No damage math.
+
+### 106. Run configs aligned to spec filenames, level 85, and the endgame weapon row (`data/run_config/`, `data/rotations/`)
+- Run configs are named for the spec (`Dirty Fighting`, `Carnage`, `Annihilation`, `Marksmanship`, `Hatred`, `Arsenal`). `dirty_fighting_13gcd.json` stays under that name because it is a second Dirty Fighting file and its rotation `DirtyFighting_pts.json` is not in the tree. Rotations renamed to `BasicMali`, `SimpleUV`, `BasicPriority`, `Rotation`, and `FixedRotation`.
+- Every config is level 85, BATCH, 100 iterations, 10,000,000 dummy HP, training-dummy armor debuff on, stem matching off, `gcd_stall` 0.3. The class is stored once as `class`. The loader still fills its own `class_name` and `spec` from the discipline.
+- Weapon min/max taken from the `cbtWeaponPerLevelPrototype` row where pistols are 2305-4280 (the Dirty Fighting values). Vibroknife id `16141171601309861681` is 3161-4741. Lightsabers 2634-3951, polesaber 3161-4741, sniper rifle 3556-4346, Arsenal both pistols 2305-4280.
+- Tests and the CLI default that named `hatred_14gcd` now name `Hatred`.
+
 ### 105. Damage Breakdown Split by Effect Display Name (`src/swtorsim/abilities.py`, `tests/test_effect_damage_source_name.py`, `tests/test_simulation_integration.py`)
 - **Implementation**: New `damage_source_name(context, ability_name)`; `Branch.execute` passes it as the label of every `damage` action, so hits log under `context["effect"].name` (e.g. `Crushed (Eradicate)` DoT ticks vs `Eradicate` direct hit), periodic or not. Empty names and the extractor's auto-generated `Parent_N` names (checked with `metrics.has_proper_effect_name`) fall back to the ability name. `Metrics.log_cast` / `cast_counts` still key on the ability name; the web breakdown already shows `casts = None` for rows with no matching cast. The extractor already fills `effect["name"]` (SetName initializer, else parent name, else `Parent_N` for hidden effects), so no re-extract is required for this change; the label is purely a breakdown key (the combat math never reads it).
 - **Verification**: Full `unittest discover` suite passes (100%). New: `tests/test_effect_damage_source_name.py` (named periodic / non-periodic effect, empty / `Parent_N` name fallback, casts vs damage keys). `test_simulation_integration.test_02` updated from 7 hits under `Eradicate` to 1 hit `Eradicate` + 6 ticks `Crushed (Eradicate)`. Mean DPS (BATCH, 100 iter, 2m HP, seeds 42+i) `hatred_14gcd` 34,631.6 and `Arsenal_Merc` 31,480.5, identical before and after.

@@ -1,19 +1,9 @@
 {
   "class": "Gunslinger",
-  "class_name": "Gunslinger",
   "spec": "Dirty Fighting",
-  "spec_name": "Dirty Fighting",
   "spec_path": "data/extractor/pts/disciplines/gunslinger/dirty_fighting.json",
   "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
-  "stats_override": {
-    "Mastery": 23098,
-    "Power": 18498,
-    "Force-Tech Power": 11740,
-    "Critical Rating": 2945,
-    "Alacrity Rating": 6048,
-    "Accuracy Rating": 2910
-  },
   "main_hand": {
     "min": 2305,
     "max": 4280
@@ -22,7 +12,7 @@
     "min": 2305,
     "max": 4280
   },
-  "rotation_path": "data/rotations/gunslinger/dirty_fighting/DirtyFighting_UV.json",
+  "rotation_path": "data/rotations/gunslinger/dirty_fighting/SimpleUV.json",
   "choices": {
     "23": 2,
     "27": 2,
@@ -50,7 +40,8 @@
   "seed": 48,
   "training_dummy_armor_debuff": true,
   "enable_stem_matching": false,
-  "enable_projectile_flight_time": false,
+  "enable_projectile_flight_time": true,
   "in_flashpoint_operation": true,
-  "combat_distance": 30
+  "combat_distance": 30,
+  "gcd_stall": 0.3
 }

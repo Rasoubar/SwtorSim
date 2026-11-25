@@ -6,7 +6,7 @@
 3. **Stat IDs:** verify against `src/extractor/mod_stats.py` (user's `Stat_IDs.xlsx` is not in the repo; ask for it). Never invent or guess IDs.
 4. **Runner:** run everything from `SwtorSim/` via `.\tools\pyclean.exe` (CPython 3.13, forces UTF-8; untracked in git). Tests use unittest (no pytest): `.\tools\pyclean.exe -m unittest discover -s tests -p "*test*.py"`
 5. **Console output:** ASCII tags (`[OK]`, `[WARN]`, `[FAIL]`), no emojis (cp1252 crashes).
-6. **Line endings:** files are CRLF; preserve it.
+6. **Line endings:** files are CRLF on Windows and LF on Linux; preserve it.
 7. **Stem matching** (`assassinate` ~ `assassinate_plus`) must respect `is_stem_matching_enabled()` in `src/swtorsim/settings.py`.
 8. **State files:** `TODO.md` = open work only (remove finished items). `CHANGELOG.md` = completion logs; append, don't read unless investigating regressions.
 9. **Protocol:** baseline test run -> implement -> test -> update `CHANGELOG.md`/`TODO.md` -> show diffs with justification. Require 100% pass; name covering tests; report pre-existing failures instead of fixing them unasked. Test counts in docs are stale snapshots. Damage-affecting changes: before editing, save a baseline via `.\tools\pyclean.exe tools/dps_baseline.py --save $env:TEMP\swtorsim_dps_baseline.json`; after editing, run `--compare $env:TEMP\swtorsim_dps_baseline.json` (same seeds across all saved `data/run_config/` configs), report the before/after table, and delete the temp file.

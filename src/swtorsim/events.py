@@ -52,6 +52,11 @@ class ApplyDamageLand(Event):
         crit_string = " (CRITICAL!)" if self.is_crit else ""
         if sim is not None and getattr(sim, "combat_start_time", None) is None:
             sim.combat_start_time = sim.current_time
+            interval = float(getattr(sim, "incoming_attack_interval", 0.0) or 0.0)
+            attacker = getattr(sim, "incoming_attack_attacker", None)
+            victim = getattr(sim, "incoming_attack_victim", None)
+            if interval > 0.0 and attacker is not None and victim is not None:
+                sim.schedule_relative(interval, IncomingAttack(attacker, victim, interval))
         sim.tracker.log_damage(
             self.ability_name,
             self.final_damage,
@@ -90,6 +95,41 @@ class ApplyDamageLand(Event):
                 attack_type=at_name,
                 damage_type=dt_name,
                 math_audit=getattr(self, "math_audit", None),
+            )
+
+class IncomingAttack(Event):
+    """A landed melee swing on the player. Fires damage-taken triggers and deals no health damage."""
+
+    def __init__(self, attacker, victim, interval: float):
+        super().__init__("Incoming Attack")
+        self.attacker = attacker
+        self.victim = victim
+        self.interval = float(interval)
+
+    def resolve(self, sim):
+        """Dispatches the taken triggers, then queues the next swing one interval later."""
+        ctx = {
+            "caster": self.attacker,
+            "target": self.victim,
+            "enemy_target": self.attacker,
+            "tags": frozenset(),
+            "is_crit": False,
+            "damage_type": 1,
+            "attack_type": 1,
+            "spell_type": 1,
+            "is_weapon_attack": True,
+            "is_periodic": False,
+            "weapon_mode": 2,
+            "final_damage": 0.0,
+        }
+        if sim is not None and hasattr(sim, "triggers"):
+            sim.triggers.dispatch("on_pre_damage_taken", sim, ctx)
+            sim.triggers.dispatch("on_damage_taken", sim, ctx)
+        if getattr(sim, "verbose", True):
+            sim_log(sim, f"Incoming attack on {getattr(self.victim, 'name', 'player')}")
+        if sim is not None and self.interval > 0.0:
+            sim.schedule_relative(
+                self.interval, IncomingAttack(self.attacker, self.victim, self.interval)
             )
 
 class HitGroup:

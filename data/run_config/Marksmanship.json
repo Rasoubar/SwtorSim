@@ -1,27 +1,18 @@
 {
   "class": "Sniper",
-  "class_name": "Sniper",
   "spec": "Marksmanship",
-  "spec_name": "Marksmanship",
   "spec_path": "data/extractor/live/disciplines/sniper/marksmanship.json",
-  "stats_path": "data/builds/L80_14gcd_yellow.json",
-  "stats_override": {
-    "Mastery": 16570,
-    "Power": 14394,
-    "Force-Tech Power": 9332,
-    "Critical Rating": 4029,
-    "Alacrity Rating": 2218,
-    "Accuracy Rating": 2824
-  },
+  "environment": "live",
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
   "main_hand": {
-    "min": 2877,
-    "max": 3455
+    "min": 3556,
+    "max": 4346
   },
   "off_hand": {
-    "min": 2513,
-    "max": 3769
+    "min": 3161,
+    "max": 4741
   },
-  "rotation_path": "data/rotations/sniper/marksmanship/marksmanship_sniper.json",
+  "rotation_path": "data/rotations/sniper/marksmanship/FixedRotation.json",
   "choices": {
     "23": 2,
     "27": 3,
@@ -38,18 +29,19 @@
     "abl.itm.legendary.age_smu.locked_and_loaded"
   ],
   "relic_fqns": [
-    "abl.itm.relic.onhit.dps_power.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating",
     "abl.itm.relic.onhit.primary_stat.scales_with_item_rating"
   ],
-  "mode": "TEST",
-  "iterations": 50,
+  "mode": "BATCH",
+  "iterations": 100,
   "duration": 1000,
-  "level": 80,
+  "level": 85,
   "dummy_hp": 10000000,
   "seed": 42,
   "training_dummy_armor_debuff": true,
-  "enable_stem_matching": true,
+  "enable_stem_matching": false,
   "enable_projectile_flight_time": true,
   "in_flashpoint_operation": true,
-  "combat_distance": 30
-}
+  "combat_distance": 30,
+  "gcd_stall": 0.3
+}

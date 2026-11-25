@@ -314,6 +314,7 @@
           ["Distance", `${s.combat_distance}m`],
           ["Flight time", yesNo(s.flight_time)],
           ["GCD stall", `${Math.round(Number(s.gcd_stall || 0) * 100)}%`],
+          ["Attacked every", Number(s.incoming_attack_interval) > 0 ? `${Number(s.incoming_attack_interval)}s` : "off"],
         ] : [];
         const cs = res.computed_player_stats || {};
         const pct2 = (v) => `${Number(v || 0).toFixed(2)}%`;

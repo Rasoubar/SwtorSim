@@ -625,6 +625,14 @@
     background: rgba(255, 120, 24, 0.22);
   }
 
+  .palette-tab-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
   /* Ability & Effect Icons */
   .ability-icon {
     width: 28px;
@@ -1319,7 +1327,7 @@
     <span class="brand-badge" id="activeSpecBadge">Loading...</span>
   </div>
   <div class="header-actions">
-    <button type="button" class="btn-simulator-link" id="openMapBtn" onclick="openVisualMapWindow()" title="Build the rotation visually: drag abilities, reorder steps, set rules (opens in its own window)">Open Visual Map &#8599;</button>
+    <button type="button" class="btn-simulator-link" id="openMapBtn" onclick="openVisualMapWindow()" title="Build the rotation visually: drag abilities, reorder steps, set rules (opens in a browser tab)">Open Visual Map &#8599;</button>
     <label style="font-size:11.5px;color:var(--text-muted);">Quick Preset (RunConfig):</label>
     <select id="runConfigSelect" onchange="onSelectRunConfig(this.value)">
       <option value="">-- Load from Run Config --</option>
@@ -1425,10 +1433,10 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" id="tabAbilities" onclick="switchPaletteTab('abilities')">Abilities (<span id="countAbilities">0</span>)</button>
-      <button class="tab-btn" id="tabBuffs" onclick="switchPaletteTab('buffs')">Buffs (<span id="countBuffs">0</span>)</button>
-      <button class="tab-btn" id="tabDebuffs" onclick="switchPaletteTab('debuffs')">Debuffs (<span id="countDebuffs">0</span>)</button>
-      <button class="tab-btn" id="tabProcs" onclick="switchPaletteTab('procs')">Procs (<span id="countProcs">0</span>)</button>
+      <button class="tab-btn active" id="tabAbilities" onclick="switchPaletteTab('abilities')"><span class="palette-tab-label">Abilities<span class="palette-tab-count">(<span id="countAbilities">0</span>)</span></span></button>
+      <button class="tab-btn" id="tabBuffs" onclick="switchPaletteTab('buffs')"><span class="palette-tab-label">Buffs<span class="palette-tab-count">(<span id="countBuffs">0</span>)</span></span></button>
+      <button class="tab-btn" id="tabDebuffs" onclick="switchPaletteTab('debuffs')"><span class="palette-tab-label">Debuffs<span class="palette-tab-count">(<span id="countDebuffs">0</span>)</span></span></button>
+      <button class="tab-btn" id="tabProcs" onclick="switchPaletteTab('procs')"><span class="palette-tab-label">Procs<span class="palette-tab-count">(<span id="countProcs">0</span>)</span></span></button>
     </div>
 
     <div class="panel-body palette-body" id="paletteContainer"></div>
@@ -1500,7 +1508,7 @@
 
     <div class="tabs">
       <button class="tab-btn active" id="rTabLint" onclick="switchRightTab('lint')">Linter & Clipboard</button>
-      <button class="tab-btn" id="rBtnMap" onclick="openVisualMapWindow()" title="Open the rotation map in its own window">Visual Map &#8599;</button>
+      <button class="tab-btn" id="rBtnMap" onclick="openVisualMapWindow()" title="Open the rotation map in a browser tab">Visual Map &#8599;</button>
       <button class="tab-btn" id="rTabPreview" onclick="switchRightTab('preview')">Dry-Run Sim</button>
       <button class="tab-btn" id="rTabJson" onclick="switchRightTab('json')">Raw JSON</button>
     </div>
@@ -4865,10 +4873,11 @@ if (vizMapChannel) {
   };
 }
 
-function openCompanionWindow({ url, targetBase, features, prefKey, label, ev, afterOpen }) {
-  let mode = "popup";
+function openCompanionWindow({ url, targetBase, features, prefKey, label, ev, afterOpen, defaultMode }) {
+  let mode = defaultMode === "tab" ? "tab" : "popup";
   try {
-    if (localStorage.getItem(prefKey) === "tab") mode = "tab";
+    const saved = localStorage.getItem(prefKey);
+    if (saved === "tab" || saved === "popup") mode = saved;
   } catch (e) {}
   const shift = Boolean((ev && ev.shiftKey) || (window.event && window.event.shiftKey));
   if (shift) mode = mode === "popup" ? "tab" : "popup";
@@ -4899,6 +4908,7 @@ function openVisualMapWindow(ev) {
     targetBase: "swtorsim_rotation_map",
     features: "width=1500,height=700",
     prefKey: "swtorsim_map_open_mode",
+    defaultMode: "tab",
     label: "Rotation Map",
     ev,
     afterOpen: () => vizBroadcastMap(),

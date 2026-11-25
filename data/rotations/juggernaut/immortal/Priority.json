@@ -1,0 +1,110 @@
+[
+    {
+        "type": "fixed",
+        "ability_id": "force_charge"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "aegis_assault"
+    },
+    {
+        "type": "loop_anchor"
+    },
+    {
+        "type": "optional",
+        "ability_id": "taunt",
+        "rules": {
+            "ability_cooldown_under": {
+                "name": "Crushing Blow",
+                "value": 6
+            },
+            "target_doesnt_have_debuff": "Taunt"
+        },
+        "lead_time": 0.1
+    },
+    {
+        "type": "optional",
+        "ability_id": "enrage",
+        "rules": {
+            "target_has_debuff": "Taunt",
+            "caster_energy_below": 7
+        },
+        "lead_time": 0.1
+    },
+    {
+        "type": "optional",
+        "ability_id": "threatening_scream",
+        "rules": {
+            "target_doesnt_have_debuff": "Taunt",
+            "ability_cooldown_under": {
+                "name": "Crushing Blow",
+                "value": 6
+            }
+        },
+        "lead_time": 0.1
+    },
+    {
+        "type": "priority_block",
+        "name": "Priority Window 4",
+        "pool": [
+            {
+                "ability_id": "retaliation",
+                "rules": {}
+            },
+            {
+                "ability_id": "crushing_blow",
+                "rules": {}
+            },
+            {
+                "ability_id": "aegis_assault",
+                "rules": {}
+            },
+            {
+                "ability_id": "saber_throw",
+                "rules": {
+                    "caster_energy_below": 10
+                }
+            },
+            {
+                "ability_id": "force_scream",
+                "rules": {}
+            },
+            {
+                "ability_id": "ravage",
+                "rules": {}
+            },
+            {
+                "ability_id": "vicious_throw",
+                "rules": {}
+            },
+            {
+                "ability_id": "smash",
+                "rules": {}
+            },
+            {
+                "ability_id": "backhand",
+                "rules": {}
+            },
+            {
+                "ability_id": "force_choke",
+                "rules": {}
+            },
+            {
+                "ability_id": "vicious_slash",
+                "rules": {}
+            },
+            {
+                "ability_id": "force_push",
+                "rules": {}
+            },
+            {
+                "ability_id": "force_charge",
+                "rules": {}
+            },
+            {
+                "ability_id": "assault",
+                "rules": {}
+            }
+        ]
+    }
+]

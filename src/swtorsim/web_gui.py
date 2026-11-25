@@ -400,6 +400,124 @@ def get_class_gear_options(spec_path: str, env: str = "live") -> dict[str, Any]:
     }
 
 
+_UNSET_RUN_CONFIG_LABELS = {
+    "-- select class --",
+    "-- select discipline --",
+    "-- select spec --",
+}
+
+
+def _run_config_label(value: Any) -> str:
+    """A class or spec string from a form, or empty when it is blank or a dropdown placeholder."""
+    text = str(value or "").strip()
+    folded = text.lower()
+    if not text or folded in _UNSET_RUN_CONFIG_LABELS or folded.startswith("-- select"):
+        return ""
+    return text
+
+
+def normalize_saved_run_config(rc_obj: dict[str, Any], env: str | None = None) -> dict[str, Any]:
+    """Keeps one ``class`` and one ``spec`` on a run config about to be written.
+
+    ``class_name`` and ``spec_name`` are folded into those keys and removed. Empty values
+    and dropdown placeholders are filled from the discipline behind ``spec_path``.
+    """
+    class_label = _run_config_label(rc_obj.get("class")) or _run_config_label(rc_obj.get("class_name"))
+    spec_label = _run_config_label(rc_obj.get("spec")) or _run_config_label(rc_obj.get("spec_name"))
+    spec_path = str(rc_obj.get("spec_path") or "")
+    active_env = str(env or rc_obj.get("environment") or rc_obj.get("env") or "live")
+    if spec_path and (not class_label or not spec_label):
+        try:
+            gear_opts = get_class_gear_options(spec_path, env=active_env)
+            if not class_label:
+                class_label = _run_config_label(gear_opts.get("class_name"))
+            if not spec_label:
+                spec_label = _run_config_label(gear_opts.get("spec"))
+        except Exception:
+            pass
+
+    rc_obj.pop("class_name", None)
+    rc_obj.pop("spec_name", None)
+    ordered: dict[str, Any] = {"class": class_label, "spec": spec_label}
+    for key, value in rc_obj.items():
+        if key in ("class", "spec"):
+            continue
+        ordered[key] = value
+    rc_obj.clear()
+    rc_obj.update(ordered)
+    return rc_obj
+
+
+def _stat_number(value: Any) -> float | None:
+    """A stat value as a float, or None when it is blank or not numeric."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except (ValueError, TypeError):
+        return None
+
+
+def _baseline_stat(file_stats: dict[str, Any], key: str) -> float:
+    """The build-file value for one form stat. A missing key counts as 0, matching an empty input."""
+    if key == "Force-Tech Power":
+        if "Force-Tech Power" in file_stats:
+            number = _stat_number(file_stats.get("Force-Tech Power"))
+            return 0.0 if number is None else number
+        for alt in ("Force Power", "Tech Power"):
+            if alt in file_stats:
+                number = _stat_number(file_stats.get(alt))
+                return 0.0 if number is None else number
+        return 0.0
+    if key not in file_stats:
+        return 0.0
+    number = _stat_number(file_stats.get(key))
+    return 0.0 if number is None else number
+
+
+def prune_unchanged_stats_override(rc_obj: dict[str, Any]) -> dict[str, Any]:
+    """Keeps ``stats_override`` entries that differ from the ``stats_path`` file.
+
+    Matching entries are dropped. The key is removed when nothing differs, or when the
+    override is empty. The override is left as submitted when ``stats_path`` is blank or
+    the build file cannot be read.
+    """
+    override = rc_obj.get("stats_override")
+    if not isinstance(override, dict):
+        return rc_obj
+    if not override:
+        rc_obj.pop("stats_override", None)
+        return rc_obj
+
+    stats_path = str(rc_obj.get("stats_path") or "").strip()
+    if not stats_path:
+        return rc_obj
+    try:
+        loaded = load_json_file(str(_resolve_workspace_path(stats_path)))
+    except Exception:
+        return rc_obj
+    if not isinstance(loaded, dict):
+        return rc_obj
+
+    kept: dict[str, Any] = {}
+    for key, value in override.items():
+        number = _stat_number(value)
+        if number is None:
+            continue
+        if number != _baseline_stat(loaded, str(key)):
+            kept[str(key)] = value
+    if kept:
+        rc_obj["stats_override"] = kept
+    else:
+        rc_obj.pop("stats_override", None)
+    return rc_obj
+
+
 def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
     """Loads a run_config JSON along with its referenced stats and choices dictionaries."""
     active_env = str(env).lower().strip()
@@ -414,8 +532,8 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
         if _resolve_workspace_path(cand_spec).is_file():
             spec_path = cand_spec
             raw_rc["spec_path"] = cand_spec
-    class_name = str(raw_rc.get("class_name") or raw_rc.get("class") or "").strip()
-    spec_name = str(raw_rc.get("spec") or raw_rc.get("spec_name") or "").strip()
+    class_name = _run_config_label(raw_rc.get("class")) or _run_config_label(raw_rc.get("class_name"))
+    spec_name = _run_config_label(raw_rc.get("spec")) or _run_config_label(raw_rc.get("spec_name"))
     gear_opts = {"tacticals": [], "legendaries": [], "skill_tree_levels": []}
     if spec_path:
         try:
@@ -426,13 +544,6 @@ def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
                 spec_name = gear_opts["spec"]
         except Exception:
             pass
-
-    if class_name:
-        raw_rc.setdefault("class", class_name)
-        raw_rc.setdefault("class_name", class_name)
-    if spec_name:
-        raw_rc.setdefault("spec", spec_name)
-        raw_rc.setdefault("spec_name", spec_name)
 
     stats_data = {}
     if raw_rc.get("stats_path"):
@@ -540,6 +651,10 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     in_flashpoint_operation = bool(payload.get("in_flashpoint_operation", True))
     combat_distance = max(0.0, float(payload.get("combat_distance", 30.0)))
     gcd_stall = min(1.0, max(0.0, float(payload.get("gcd_stall") or 0.0)))
+    raw_attack_interval = payload.get("incoming_attack_interval", 0.0)
+    if isinstance(raw_attack_interval, bool) or not isinstance(raw_attack_interval, (int, float)):
+        raw_attack_interval = 0.0
+    incoming_attack_interval = max(0.0, float(raw_attack_interval or 0.0))
 
     # Resolve choices
     choices_data = {}
@@ -572,6 +687,7 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         in_flashpoint_operation=in_flashpoint_operation,
         combat_distance=combat_distance,
         gcd_stall=gcd_stall,
+        incoming_attack_interval=incoming_attack_interval,
         level=level,
         seed=seed,
         environment=env,
@@ -736,6 +852,7 @@ def _run_single_test_detailed(
             seed=config.seed,
             config=config,
             gcd_stall=config.gcd_stall,
+            incoming_attack_interval=config.incoming_attack_interval,
         )
         player.combat_distance = config.combat_distance
         target.combat_distance = config.combat_distance
@@ -1181,6 +1298,7 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
             verbose=False,
             seed=worker_seed,
             gcd_stall=settings_dict.get("gcd_stall", 0.0),
+            incoming_attack_interval=settings_dict.get("incoming_attack_interval", 0.0),
         )
         player.combat_distance = settings_dict["combat_distance"]
         target.combat_distance = settings_dict["combat_distance"]
@@ -1290,6 +1408,7 @@ def _run_batch_monte_carlo_detailed(
         "combat_distance": config.combat_distance,
         "in_flashpoint_operation": config.in_flashpoint_operation,
         "gcd_stall": getattr(config, "gcd_stall", 0.0),
+        "incoming_attack_interval": getattr(config, "incoming_attack_interval", 0.0),
     }
 
     sim_context = {
@@ -1307,6 +1426,7 @@ def _run_batch_monte_carlo_detailed(
         settings_dict["combat_distance"],
         settings_dict["in_flashpoint_operation"],
         settings_dict["gcd_stall"],
+        settings_dict["incoming_attack_interval"],
     )
     selected_fqns_tuple = tuple(sim_inputs.get("selected_fqns") or ())
     cores = max(1, min(cpu_count() or 2, iterations))
@@ -1574,6 +1694,7 @@ def execute_simulation_slice(payload: dict[str, Any]) -> dict[str, Any]:
         "combat_distance": config.combat_distance,
         "in_flashpoint_operation": config.in_flashpoint_operation,
         "gcd_stall": getattr(config, "gcd_stall", 0.0),
+        "incoming_attack_interval": getattr(config, "incoming_attack_interval", 0.0),
     }
     sim_context = {
         "rotation_config": sim_inputs["rotation_config"],
@@ -1893,18 +2014,11 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     self._send_json({"error": "run_config must be a JSON object."}, status=400)
                     return
 
-                spec_path = str(rc_obj.get("spec_path") or "")
-                if spec_path and (not rc_obj.get("class_name") or not rc_obj.get("spec")):
-                    try:
-                        g_opts = get_class_gear_options(spec_path, env=payload.get("env") or "live")
-                        if not rc_obj.get("class_name") and not rc_obj.get("class"):
-                            rc_obj["class"] = g_opts.get("class_name", "")
-                            rc_obj["class_name"] = g_opts.get("class_name", "")
-                        if not rc_obj.get("spec") and not rc_obj.get("spec_name"):
-                            rc_obj["spec"] = g_opts.get("spec", "")
-                            rc_obj["spec_name"] = g_opts.get("spec", "")
-                    except Exception:
-                        pass
+                normalize_saved_run_config(
+                    rc_obj,
+                    env=payload.get("env") or payload.get("environment"),
+                )
+                prune_unchanged_stats_override(rc_obj)
 
                 target_file = RUN_CONFIG_DIR / filename
                 _write_json_crlf(target_file, rc_obj)
@@ -1967,18 +2081,10 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     if isinstance(content, dict):
                         if not content.get("spec_path") and (content.get("run_config") or content.get("config")):
                             content = content.get("run_config") or content.get("config")
-                        spec_path = str(content.get("spec_path") or "")
-                        if spec_path and (not content.get("class_name") or not content.get("spec")):
-                            try:
-                                g_opts = get_class_gear_options(spec_path)
-                                if not content.get("class_name") and not content.get("class"):
-                                    content["class"] = g_opts.get("class_name", "")
-                                    content["class_name"] = g_opts.get("class_name", "")
-                                if not content.get("spec") and not content.get("spec_name"):
-                                    content["spec"] = g_opts.get("spec", "")
-                                    content["spec_name"] = g_opts.get("spec", "")
-                            except Exception:
-                                pass
+                        normalize_saved_run_config(
+                            content,
+                            env=content.get("environment") or content.get("env"),
+                        )
                 else:
                     self._send_json({"error": f"Invalid category: {category}"}, status=400)
                     return
