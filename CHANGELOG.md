@@ -4,6 +4,10 @@
 
 ## Completed Fixes
 
+### 114. PTS is the default environment on the web UI (`tools/simulator_ui.html`, `tools/rotation_builder_ui.html`, `dist/index.html`, `dist/rotation_builder.html`)
+- The Live / PTS toggle opens on PTS (8.0). The simulator level field opens at 85, the PTS level `setEnvironment` already writes when that side is chosen. Choosing Live still sets the level to 80. A saved run config that names its own environment still switches the toggle when it is loaded.
+- UI only. No tests cover the toggle. No damage math.
+
 ### 113. Boiling Point lets Thermal Yield reach 6 stacks (`src/swtorsim/effects.py`, `src/swtorsim/entities.py`, `tests/test_incoming_attack.py`)
 - Boiling Point's +1 max charge (stat 61) names the Thermal Yield ability. The stack cap was matched on the effect's display name, so the bonus never attached, and the bonus is applied on post-activate, after the stack effect already exists at 5. The cap now matches the parent ability, and a charge-cap modifier updates effects already on the actor. Kolto Overload, then Thermal Yield, then damage taken, reaches 6. A Thermal Yield with no Boiling Point window stays at 5.
 - Tests: `tests/test_incoming_attack.py` (`test_boiling_point_raises_thermal_yield_cap_to_six`). Full `unittest discover`: 54 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
