@@ -1,8 +1,8 @@
 {
   "class": "Marauder",
   "spec": "Carnage",
-  "spec_path": "data/extractor/live/disciplines/marauder/carnage.json",
-  "environment": "live",
+  "spec_path": "data/extractor/pts/disciplines/marauder/carnage.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
   "stats_override": {
     "Mastery": 17676,

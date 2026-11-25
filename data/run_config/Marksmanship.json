@@ -1,8 +1,8 @@
 {
   "class": "Sniper",
   "spec": "Marksmanship",
-  "spec_path": "data/extractor/live/disciplines/sniper/marksmanship.json",
-  "environment": "live",
+  "spec_path": "data/extractor/pts/disciplines/sniper/marksmanship.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
   "main_hand": {
     "min": 3556,

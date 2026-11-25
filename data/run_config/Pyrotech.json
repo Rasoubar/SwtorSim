@@ -2,6 +2,7 @@
   "class": "Powertech",
   "spec": "Pyrotech",
   "spec_path": "data/extractor/pts/disciplines/powertech/firebug.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
   "main_hand": {
     "min": 2305,
@@ -38,7 +39,7 @@
   "enable_stem_matching": false,
   "enable_projectile_flight_time": false,
   "in_flashpoint_operation": true,
-  "combat_distance": 30,
+  "combat_distance": 4,
   "gcd_stall": 0.3,
   "incoming_attack_interval": 1.5
 }

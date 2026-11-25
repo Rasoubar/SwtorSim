@@ -34,8 +34,13 @@
             }
         },
         {
-            "ability_id": "energy_shield",
-            "rules": {}
+            "ability_id": "vent_heat",
+            "rules": {
+                "ability_cooldown_under": {
+                    "name": "Explosive Fuel",
+                    "value": 110
+                }
+            }
         }
     ],
     "sequence": [
@@ -60,6 +65,11 @@
             "ability_id": "flame_burst"
         },
         {
+            "type": "optional",
+            "ability_id": "thermal_yield",
+            "rules": {}
+        },
+        {
             "type": "fixed",
             "ability_id": "searing_wave"
         },
@@ -68,8 +78,9 @@
             "ability_id": "flame_burst"
         },
         {
-            "type": "fixed",
+            "type": "optional",
             "ability_id": "explosive_fuel",
+            "rules": {},
             "lead_time": 0.1
         },
         {
@@ -133,6 +144,11 @@
             "ability_id": "searing_wave"
         },
         {
+            "type": "optional",
+            "ability_id": "personal_heavy_ordinance",
+            "rules": {}
+        },
+        {
             "type": "fixed",
             "ability_id": "flame_burst"
         },
@@ -147,6 +163,11 @@
             "ability_id": "immolate"
         },
         {
+            "type": "optional",
+            "ability_id": "personal_heavy_ordinance",
+            "rules": {}
+        },
+        {
             "type": "fixed",
             "ability_id": "flame_burst"
         },
@@ -156,12 +177,6 @@
         {
             "type": "fixed",
             "ability_id": "scorch"
-        },
-        {
-            "type": "optional",
-            "ability_id": "vent_heat",
-            "rules": {},
-            "lead_time": 0.1
         },
         {
             "type": "priority_block",
@@ -174,13 +189,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
@@ -208,13 +223,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
@@ -234,13 +249,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
@@ -270,13 +285,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
@@ -292,13 +307,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
@@ -318,13 +333,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
@@ -352,13 +367,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
@@ -378,13 +393,13 @@
                     }
                 },
                 {
-                    "ability_id": "rapid_shots",
+                    "ability_id": "flame_burst",
                     "rules": {
-                        "caster_energy_above": 15
+                        "caster_energy_below": 15
                     }
                 },
                 {
-                    "ability_id": "flame_burst",
+                    "ability_id": "rapid_shots",
                     "rules": {}
                 }
             ]
