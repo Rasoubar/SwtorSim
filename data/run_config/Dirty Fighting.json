@@ -48,7 +48,7 @@
   "seed": 48,
   "training_dummy_armor_debuff": true,
   "enable_stem_matching": false,
-  "enable_projectile_flight_time": false,
+  "enable_projectile_flight_time": true,
   "in_flashpoint_operation": true,
   "combat_distance": 30,
   "gcd_stall": 0.3

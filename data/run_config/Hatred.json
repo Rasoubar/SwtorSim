@@ -39,6 +39,6 @@
   "enable_stem_matching": false,
   "enable_projectile_flight_time": false,
   "in_flashpoint_operation": true,
-  "combat_distance": 30,
+  "combat_distance": 4,
   "gcd_stall": 0.3
 }
