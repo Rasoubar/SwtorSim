@@ -297,7 +297,11 @@ def _resolve_value(
     if field_id in LOC_RETRIEVER_FIELD_IDS and isinstance(value, dict):
         text = strings.resolve_loc_retriever(value)
         if text is not None:
-            return {"loc_retriever": value, "resolved_text": text}
+            payload: dict[str, Any] = {"loc_retriever": value, "resolved_text": text}
+            by_key = strings.resolve_loc_retriever_map(value)
+            if by_key:
+                payload["resolved_by_key"] = by_key
+            return payload
 
     if isinstance(value, dict) and "key_type" in value and "list" in value:
         key_type = value["key_type"]

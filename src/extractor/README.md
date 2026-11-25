@@ -169,7 +169,7 @@ Some integer fields store string-table IDs rather than numeric values. These are
 
 For example, `disDisciplineTabName` value `2031339142381639` on `dis.specialist.plasmatech` resolves to `"Vanguard"`. Unresolved string IDs remain as their original numeric strings.
 
-Loc retriever fields on abilities and talents (`locTextRetrieverMap`) are resolved separately via the English language entry in their embedded lookup list. Bucket names in the retriever are aliased to on-disk STB files: `str.abl` → `abl.stb`, `str.tal` → `tal.stb`, `str.itm` → `itm.stb`. For example, `strLocalizedTextRetrieverStringID` `814776770887680` on `abl.agent.adrenaline_probe` resolves to `"Adrenaline Probe"`. Resolved fields are written as `{"loc_retriever": …, "resolved_text": "…"}`.
+Loc retriever fields on abilities and talents (`locTextRetrieverMap`) are resolved separately via the English language entry in their embedded lookup list. Bucket names in the retriever are aliased to on-disk STB files: `str.abl` → `abl.stb`, `str.tal` → `tal.stb`, `str.itm` → `itm.stb`. For example, `strLocalizedTextRetrieverStringID` `814776770887680` on `abl.agent.adrenaline_probe` resolves to `"Adrenaline Probe"`. Resolved fields are written as `{"loc_retriever": …, "resolved_text": "…", "resolved_by_key": {…}}`. An ability name uses `ablNameConditionalIds` when one entry's discipline token is a segment of that ability's FQN (Dirty Fighting `blood_sights_plus` is "Heart Beat Acquired", not the shared English default "Snake Eyes"). Otherwise the name stays the English `resolved_text`.
 
 ## Tag-name resolution
 

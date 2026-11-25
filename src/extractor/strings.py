@@ -85,6 +85,15 @@ class StringResolver:
         bucket, string_id = mapping[lang_key]
         return self.resolve(bucket, string_id)
 
+    def resolve_loc_retriever_map(self, value: Any) -> dict[str, str]:
+        """Every loc-retriever key that resolves, including conditional name slots."""
+        resolved: dict[str, str] = {}
+        for key, (bucket, string_id) in convert_loc_retriever(value).items():
+            text = self.resolve(bucket, string_id)
+            if text:
+                resolved[key] = text
+        return resolved
+
 
 # Field IDs known to carry loc retriever lookup lists on abilities/talents.
 LOC_RETRIEVER_FIELD_IDS = frozenset(
