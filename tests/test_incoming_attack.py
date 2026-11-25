@@ -43,11 +43,13 @@ class _Probe:
         return ran
 
 
-def _listener(name, trigger, ints=None, actions=None, target_overrides=None):
+def _listener(name, trigger, ints=None, actions=None, target_overrides=None, tags=None):
     probe = _Probe(name)
     raw = {"trigger": trigger}
     if ints:
         raw["ints"] = ints
+    if tags:
+        raw["tags"] = list(tags)
     branch = Branch(
         index=1,
         triggers=[raw],
@@ -205,6 +207,108 @@ class IncomingAttackTests(unittest.TestCase):
         self.assertLess(target.hp, dummy_hp)
         self.assertEqual(player.hp, player_hp)
         self.assertNotIn("Incoming Attack", sim.tracker.breakdown)
+
+    def test_area_tag_listeners_fire_and_other_tags_do_not(self):
+        sim, player, target = self._prepare(1.5)
+        area, area_branch = _listener(
+            "area",
+            "on_damage_taken",
+            tags=["tag.abl.utility.is_aoe"],
+        )
+        other, other_branch = _listener(
+            "other",
+            "on_damage_taken",
+            tags=["tag.abl.debuff.damage_over_time"],
+        )
+        self._subscribe(sim, player, area, area_branch, "area")
+        self._subscribe(sim, player, other, other_branch, "other")
+        self._open_combat(sim, player, target)
+        sim.run_timed(4.0, target)
+        self.assertEqual(len(area.times), 2)
+        self.assertEqual(other.times, [])
+
+    def test_pyrotech_yield_stacks_and_close_and_personal_reflects(self):
+        config = load_run_config("data/run_config/Pyrotech.json")
+        inputs = load_from_run_config(config)
+        sim, player, target = prepare_simulation(
+            inputs.rotation_config,
+            inputs.stats_config,
+            inputs.loadout_blueprints,
+            config.dummy_hp,
+            inputs.debuff_module,
+            verbose=False,
+            seed=config.seed,
+            config=config,
+            gcd_stall=0.0,
+            incoming_attack_interval=1.5,
+        )
+        yield_key = "abl.bounty_hunter.skill.firebug.mods.special.thermal_yield:2"
+        watch = {"applied": None, "still_up": None, "stacks": None}
+
+        class _Watch:
+            def resolve(self, sim):
+                eff = player.effects.get(yield_key)
+                if eff is None or getattr(eff, "is_expired", False):
+                    if sim.current_time < 80.0:
+                        sim.schedule_absolute(sim.current_time + 0.5, self)
+                    return
+                if watch["applied"] is None:
+                    watch["applied"] = sim.current_time
+                    sim.schedule_absolute(sim.current_time + 5.0, _Later())
+
+        class _Later:
+            def resolve(self, sim):
+                eff = player.effects.get(yield_key)
+                watch["still_up"] = eff is not None and not getattr(eff, "is_expired", False)
+                watch["stacks"] = getattr(eff, "stacks", None)
+
+        sim.schedule_absolute(0.5, _Watch())
+        sim.run_timed(120.0, target)
+        sim.tracker.finalize_effects(sim.current_time)
+
+        self.assertIsNotNone(watch["applied"])
+        self.assertTrue(watch["still_up"])
+        self.assertGreater(watch["stacks"], 1)
+        windows = sim.tracker.effect_history.get((player.name, "Thermal Yield"), [])
+        self.assertTrue(windows)
+        self.assertGreater(max(row["max_stacks"] for row in windows), 1)
+        reflected = sim.tracker.breakdown.get("Close and Personal")
+        self.assertIsNotNone(reflected)
+        self.assertGreater(reflected["total_damage"], 0.0)
+
+    def test_boiling_point_raises_thermal_yield_cap_to_six(self):
+        config = load_run_config("data/run_config/Pyrotech.json")
+        inputs = load_from_run_config(config)
+        yield_key = "abl.bounty_hunter.skill.firebug.mods.special.thermal_yield:2"
+
+        def fight():
+            sim, player, target = prepare_simulation(
+                {"steps": []},
+                inputs.stats_config,
+                inputs.loadout_blueprints,
+                config.dummy_hp,
+                {},
+                verbose=False,
+                seed=config.seed,
+                config=config,
+                incoming_attack_interval=1.5,
+            )
+            return sim, player, target
+
+        plain, plain_player, plain_target = fight()
+        self._open_combat(plain, plain_player, plain_target)
+        self.assertTrue(plain_player.ability_db["thermal_yield"].cast(plain_player, plain_target, plain))
+        self.assertEqual(plain_player.effects[yield_key].max_stacks, 5)
+
+        sim, player, target = fight()
+        self._open_combat(sim, player, target)
+        self.assertTrue(player.ability_db["kolto_overload"].cast(player, target, sim))
+        self.assertTrue(player.ability_db["thermal_yield"].cast(player, target, sim))
+        self.assertEqual(player.effects[yield_key].max_stacks, 6)
+        sim.run_timed(12.0, target)
+        boosted = player.effects[yield_key]
+        self.assertEqual(boosted.max_stacks, 6)
+        self.assertEqual(boosted.stacks, 6)
 
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
 {
   "class": "Mercenary",
   "spec": "Arsenal",
-  "spec_path": "data/extractor/live/disciplines/mercenary/arsenal.json",
-  "environment": "live",
+  "spec_path": "data/extractor/pts/disciplines/mercenary/arsenal.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
   "main_hand": {
     "min": 2305,

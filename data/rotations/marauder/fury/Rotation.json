@@ -1,0 +1,192 @@
+{
+    "weave": [
+        {
+            "ability_id": "frenzy",
+            "rules": {}
+        }
+    ],
+    "sequence": [
+        {
+            "type": "fixed",
+            "ability_id": "force_charge"
+        },
+        {
+            "type": "optional",
+            "ability_id": "frenzy",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "force_crush"
+        },
+        {
+            "type": "optional",
+            "ability_id": "berserk",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "raging_burst"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "furious_strike"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "obliterate"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "ravage"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "force_scream"
+        },
+        {
+            "type": "loop_anchor"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "raging_burst"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "furious_strike"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 13",
+            "pool": [
+                {
+                    "ability_id": "vicious_throw",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "force_scream",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "battering_assault",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "assault",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "obliterate"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 13 (Copy)",
+            "pool": [
+                {
+                    "ability_id": "vicious_throw",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "force_scream",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "battering_assault",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "assault",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "force_crush"
+        },
+        {
+            "type": "optional",
+            "ability_id": "berserk",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "raging_burst"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "furious_strike"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 13 (Copy)",
+            "pool": [
+                {
+                    "ability_id": "vicious_throw",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "force_scream",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "battering_assault",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "assault",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "obliterate"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 13 (Copy)",
+            "pool": [
+                {
+                    "ability_id": "vicious_throw",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "force_scream",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "battering_assault",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "assault",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "fixed",
+            "ability_id": "ravage"
+        }
+    ]
+}

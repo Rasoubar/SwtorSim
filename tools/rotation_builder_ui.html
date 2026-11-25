@@ -1320,8 +1320,8 @@
     <span>SWTOR SIM // ROTATION BUILDER</span>
     <span class="beta-pill" title="Beta: expect some bugs. Please report anything that looks wrong (see the banner below).">Beta</span>
     <div style="display:inline-flex;align-items:center;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-left:6px;">
-      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--accent-bg);color:var(--accent);" onclick="setEnvironment('live')">Live (7.9)</button>
-      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('pts')">PTS (8.0)</button>
+      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('live')">Live (7.9)</button>
+      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--amber-bg);color:var(--amber);" onclick="setEnvironment('pts')">PTS (8.0)</button>
     </div>
     <span class="brand-badge" id="activeSpecBadge">Loading...</span>
   </div>
@@ -1680,7 +1680,7 @@ function showToast(msg, isError = false) {
   }, 3200);
 }
 
-let currentEnvironment = "live";
+let currentEnvironment = "pts";
 
 async function setEnvironment(env) {
   currentEnvironment = env === "pts" ? "pts" : "live";

@@ -5,6 +5,85 @@ from typing import Any, Dict, List, Optional
 
 from src.swtorsim.modifiers import Modifier
 
+_CHARGE_MAX_STATS = frozenset({"61", "STAT_eff_charges_max"})
+_CHARGE_INITIAL_STATS = frozenset({"60", "STAT_eff_charges_initial"})
+_CHARGE_CAP_STATS = _CHARGE_MAX_STATS | _CHARGE_INITIAL_STATS
+
+
+def _charge_mod_applies(mod, *, fqn, name, tags) -> bool:
+    """True when a max/initial-charge modifier names this effect's ability, display name, or tags."""
+    if mod.applies_to(ability_fqn=fqn, ability_tags=tags):
+        return True
+    return bool(name) and mod.applies_to(ability_fqn=name)
+
+
+def _blueprint_charge_max(eff) -> int:
+    """Stack cap declared on the effect blueprint, before STAT_eff_charges_max."""
+    bp = getattr(eff, "effect_blueprint", None)
+    stack_charge = getattr(bp, "stack_charge", None) if bp is not None else None
+    if isinstance(stack_charge, dict) and "max" in stack_charge:
+        return int(stack_charge.get("max") or 1)
+    if isinstance(stack_charge, dict):
+        return int(stack_charge.get("nr_occurances", getattr(eff, "max_stacks", 1)) or 1)
+    return int(getattr(eff, "max_stacks", 1) or 1)
+
+
+def _effect_charge_mods(eff):
+    if getattr(eff, "is_expired", False):
+        return ()
+    getter = getattr(eff, "get_effective_modifiers", None)
+    mods = getter() if getter is not None else getattr(eff, "modifiers", None)
+    return tuple(m for m in (mods or ()) if str(m.stat) in _CHARGE_CAP_STATS)
+
+
+def reconcile_charge_caps(entity, removed_mods=()) -> None:
+    """Rebuild stack caps from the blueprint plus the charge modifiers currently on this entity.
+
+    A modifier applied in the same cast as the effect it raises (Boiling Point's +1 max charge lands
+    on post-activate, after Thermal Yield's stack effect already exists) has to update that effect
+    in place. Removing the modifier returns the cap to the blueprint.
+    """
+    effects = getattr(entity, "effects", None)
+    if not effects:
+        return
+    live = []
+    for eff in effects.values():
+        mods = _effect_charge_mods(eff)
+        if mods:
+            live.append(mods)
+    removed = tuple(m for m in (removed_mods or ()) if str(m.stat) in _CHARGE_MAX_STATS)
+    if not live and not removed:
+        return
+    for eff in effects.values():
+        if getattr(eff, "is_expired", False):
+            continue
+        fqn = getattr(eff, "fqn", None)
+        name = getattr(eff, "name", None)
+        tags = getattr(eff, "tags", frozenset()) or frozenset()
+        matched = any(
+            _charge_mod_applies(mod, fqn=fqn, name=name, tags=tags)
+            for mods in live
+            for mod in mods
+            if str(mod.stat) in _CHARGE_MAX_STATS
+        ) or any(_charge_mod_applies(mod, fqn=fqn, name=name, tags=tags) for mod in removed)
+        if not matched:
+            continue
+        max_stacks = _blueprint_charge_max(eff)
+        for mods in live:
+            for mod in mods:
+                if str(mod.stat) not in _CHARGE_MAX_STATS:
+                    continue
+                if not _charge_mod_applies(mod, fqn=fqn, name=name, tags=tags):
+                    continue
+                if mod.is_percent:
+                    max_stacks = int(round(max_stacks * (1.0 + float(mod.value))))
+                else:
+                    max_stacks += int(mod.value)
+        max_stacks = max(1, max_stacks)
+        eff.max_stacks = max_stacks
+        if getattr(eff, "stacks", 1) > max_stacks:
+            eff.stacks = max_stacks
+
 
 def _resolve_branch_modifiers(
     raw_branches: List[Any],
@@ -367,7 +446,8 @@ class ActiveEffect:
         max_stacks = int(stack_charge.get("max", stack_charge.get("nr_occurances", 1)) or 1)
         initial_stacks = int(stack_charge.get("initial", 1) or 1)
 
-        # Apply STAT_eff_charges_max (61) and STAT_eff_charges_initial (60)
+        # Apply STAT_eff_charges_max (61) and STAT_eff_charges_initial (60).
+        # The modifier names the parent ability (Boiling Point's +1 on Thermal Yield), not the effect's display name.
         eff_tags = frozenset(getattr(effect, "tags", None) or [])
         eff_name = getattr(effect, "name", "") or parent_name
 
@@ -380,14 +460,14 @@ class ActiveEffect:
                 c_mods = getter() if getter is not None else getattr(c_eff, "modifiers", [])
                 for mod in c_mods or ():
                     st = str(mod.stat)
-                    if st in ("61", "STAT_eff_charges_max"):
-                        if mod.applies_to(ability_tags=eff_tags) or (eff_name and mod.applies_to(ability_fqn=eff_name)):
+                    if st in _CHARGE_MAX_STATS:
+                        if _charge_mod_applies(mod, fqn=parent_fqn, name=eff_name, tags=eff_tags):
                             if mod.is_percent:
                                 max_stacks = int(round(max_stacks * (1.0 + mod.value)))
                             else:
                                 max_stacks += int(mod.value)
-                    elif st in ("60", "STAT_eff_charges_initial"):
-                        if mod.applies_to(ability_tags=eff_tags) or (eff_name and mod.applies_to(ability_fqn=eff_name)):
+                    elif st in _CHARGE_INITIAL_STATS:
+                        if _charge_mod_applies(mod, fqn=parent_fqn, name=eff_name, tags=eff_tags):
                             if mod.is_percent:
                                 initial_stacks = int(round(initial_stacks * (1.0 + mod.value)))
                             else:

@@ -1,0 +1,45 @@
+{
+  "class": "Powertech",
+  "spec": "Pyrotech",
+  "spec_path": "data/extractor/pts/disciplines/powertech/firebug.json",
+  "environment": "pts",
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
+  "main_hand": {
+    "min": 2305,
+    "max": 4280
+  },
+  "off_hand": null,
+  "rotation_path": "data/rotations/powertech/firebug/Rotation.json",
+  "choices": {
+    "23": 3,
+    "27": 3,
+    "39": 2,
+    "43": 1,
+    "51": 1,
+    "64": 1,
+    "68": 2,
+    "73": 2
+  },
+  "tactical_fqn": "abl.itm.tactical.sow.bou_tro.pow_vang.pyro_plas.dmg_sust_01",
+  "legendary_fqns": [
+    "abl.itm.legendary.bh_tr.powertech.combat_tech",
+    "abl.itm.legendary.bh_tr.powertech.mandalorian_armaments"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
+  ],
+  "mode": "BATCH",
+  "iterations": 100,
+  "duration": 1000,
+  "level": 85,
+  "dummy_hp": 10000000,
+  "seed": 884243,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false,
+  "enable_projectile_flight_time": false,
+  "in_flashpoint_operation": true,
+  "combat_distance": 4,
+  "gcd_stall": 0.3,
+  "incoming_attack_interval": 1.5
+}

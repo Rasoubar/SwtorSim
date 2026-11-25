@@ -1111,8 +1111,8 @@
 
   <div class="header-controls">
     <div style="display:inline-flex;align-items:center;background:var(--bg-input);border:1px solid var(--border);border-radius:5px;overflow:hidden;margin-right:4px;">
-      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--accent-bg);color:var(--accent);" onclick="setEnvironment('live')">Live (7.9)</button>
-      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('pts')">PTS (8.0)</button>
+      <button id="envLiveBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:transparent;color:var(--text-muted);" onclick="setEnvironment('live')">Live (7.9)</button>
+      <button id="envPtsBtn" type="button" class="btn" style="padding:4px 9px;font-size:11px;border:none;border-radius:0;background:var(--amber-bg);color:var(--amber);" onclick="setEnvironment('pts')">PTS (8.0)</button>
     </div>
     <label style="font-size:11px;color:var(--text-muted);font-weight:600;">Preset Config:</label>
     <select id="presetConfigSelect" style="min-width:170px;">
@@ -1198,7 +1198,7 @@
           </div>
           <div class="form-row">
             <label class="form-label"><span>Char Level</span></label>
-            <input type="number" id="levelInput" value="80" min="1" max="100">
+            <input type="number" id="levelInput" value="85" min="1" max="100">
           </div>
           <div class="form-row">
             <div class="form-label">
@@ -1758,7 +1758,7 @@
     openModal("saveBuildModal");
   }
 
-  let currentEnvironment = "live";
+  let currentEnvironment = "pts";
 
   async function setEnvironment(env) {
     currentEnvironment = env === "pts" ? "pts" : "live";

@@ -2,6 +2,7 @@
   "class": "Juggernaut",
   "spec": "Immortal",
   "spec_path": "data/extractor/pts/disciplines/juggernaut/immortal.json",
+  "environment": "pts",
   "stats_path": "data/builds/L85_Tank_14gcd.json",
   "main_hand": {
     "min": 2634,

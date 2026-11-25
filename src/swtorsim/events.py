@@ -98,7 +98,7 @@ class ApplyDamageLand(Event):
             )
 
 class IncomingAttack(Event):
-    """A landed melee swing on the player. Fires damage-taken triggers and deals no health damage."""
+    """A landed area melee swing on the player. Fires damage-taken triggers and deals no health damage."""
 
     def __init__(self, attacker, victim, interval: float):
         super().__init__("Incoming Attack")
@@ -112,7 +112,7 @@ class IncomingAttack(Event):
             "caster": self.attacker,
             "target": self.victim,
             "enemy_target": self.attacker,
-            "tags": frozenset(),
+            "tags": frozenset({"tag.abl.utility.is_aoe"}),
             "is_crit": False,
             "damage_type": 1,
             "attack_type": 1,
