@@ -756,7 +756,9 @@ def _run_single_test_detailed(
                     if ok:
                         a_name = ability_obj.name or ability_obj.fqn
                         res_val = round(float(getattr(caster.resource, "current_value", 0.0)), 1)
-                        hp_pct = round(float(tgt.hp_ratio) * 100.0, 1)
+                        # HP columns track the dummy: a self-target cast (pre-combat "target": "self") hands
+                        # the Player here, which has no hp_ratio.
+                        hp_pct = round(float(target.hp_ratio) * 100.0, 1)
                         combat_events.insert(
                             insert_idx,
                             {
@@ -766,7 +768,7 @@ def _run_single_test_detailed(
                                 "triggers_gcd": bool(ability_obj.triggers_gcd),
                                 "damage": 0.0,
                                 "is_crit": False,
-                                "target_hp": round(float(tgt.hp), 0),
+                                "target_hp": round(float(target.hp), 0),
                                 "target_hp_pct": hp_pct,
                                 "resource": res_val,
                                 "text": f"Casts {a_name}" + ("" if ability_obj.triggers_gcd else " (off-GCD)"),
