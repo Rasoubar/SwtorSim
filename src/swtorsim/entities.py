@@ -655,15 +655,18 @@ class Player(Entity):
         flat_mod = 0.0
         pct_mod = 1.0
         alacrity_bonus = 0.0
+        ignore_alacrity = False
 
         if ability is not None:
             if isinstance(ability, str):
                 abl_obj = getattr(self, "ability_db", {}).get(ability) or getattr(self, "ability_db", {}).get(ability.lower().replace(" ", "_"))
                 abl_fqn = getattr(abl_obj, "fqn", ability)
                 abl_tags = getattr(abl_obj, "tags", frozenset()) or frozenset()
+                ignore_alacrity = getattr(abl_obj, "abl_ignore_alacrity", False) or getattr(getattr(abl_obj, "blueprint", None), "abl_ignore_alacrity", False)
             else:
                 abl_fqn = getattr(ability, "fqn", None)
                 abl_tags = getattr(ability, "tags", frozenset()) or frozenset()
+                ignore_alacrity = getattr(ability, "abl_ignore_alacrity", False) or getattr(getattr(ability, "blueprint", None), "abl_ignore_alacrity", False)
 
             for effect in self.effects.values():
                 if getattr(effect, "is_expired", False):
@@ -682,6 +685,8 @@ class Player(Entity):
                             alacrity_bonus += val
 
         adjusted_base = max(0.0, (base_cooldown * pct_mod) + flat_mod)
+        if ignore_alacrity:
+            return round(adjusted_base, 2)
         cdr = self.stats.get("Alacrity", 0.0) + alacrity_bonus
         cooldown = adjusted_base / (1.0 + cdr)
         scaled_cooldown = math.ceil(cooldown * 10) / 10
