@@ -2302,6 +2302,41 @@
     return out;
   }
 
+  function baselineStatNumber(fileStats, key) {
+    if (!fileStats || typeof fileStats !== "object") return 0;
+    if (key === "Force-Tech Power") {
+      const shared = Number(forceTechFromStats(fileStats));
+      return Number.isFinite(shared) ? shared : 0;
+    }
+    if (fileStats[key] === undefined || fileStats[key] === null || fileStats[key] === "") return 0;
+    const n = Number(fileStats[key]);
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function statsOverrideDiff(current, fileStats) {
+    if (!fileStats) return current || {};
+    const diff = {};
+    Object.entries(current || {}).forEach(([k, v]) => {
+      if (WEAPON_STAT_KEYS.includes(k)) return;
+      const n = Number(v);
+      if (!Number.isFinite(n)) return;
+      if (n !== baselineStatNumber(fileStats, k)) diff[k] = n;
+    });
+    return diff;
+  }
+
+  async function loadStatsFile(statsPath) {
+    if (!statsPath) return null;
+    try {
+      const res = await fetch(`/api/build_stats?path=${encodeURIComponent(statsPath)}`);
+      const data = await res.json();
+      if (res.ok && data.stats && typeof data.stats === "object" && !Array.isArray(data.stats)) return data.stats;
+    } catch (e) {
+      // A missing build file leaves the submitted override unchanged.
+    }
+    return null;
+  }
+
   async function applyPresetRunConfig(path, fallbackParsed = null) {
     if (!path) return;
     try {
@@ -3508,15 +3543,19 @@
     compContainer.innerHTML = cHtml;
   }
 
-  function buildExportRunConfigObject() {
+  async function buildExportRunConfigObject() {
     const p = buildPayloadFromForm();
+    const fileStats = await loadStatsFile(p.stats_path);
+    const diff = statsOverrideDiff(p.stats_override || getStatsOverrideFromInputs(), fileStats);
 
-    return {
+    const rc = {
       class: p.class,
       spec: p.spec,
       spec_path: p.spec_path,
       stats_path: p.stats_path,
-      stats_override: p.stats_override || getStatsOverrideFromInputs(),
+    };
+    if (Object.keys(diff).length) rc.stats_override = diff;
+    Object.assign(rc, {
       main_hand: p.main_hand,
       off_hand: p.off_hand,
       rotation_path: p.rotation_path,
@@ -3537,11 +3576,12 @@
       combat_distance: p.combat_distance,
       gcd_stall: p.gcd_stall,
       incoming_attack_interval: p.incoming_attack_interval,
-    };
+    });
+    return rc;
   }
 
-  function exportRunConfigDirectly() {
-    const rcObj = buildExportRunConfigObject();
+  async function exportRunConfigDirectly() {
+    const rcObj = await buildExportRunConfigObject();
     const specSlug = rcObj.spec || "config";
     const defaultName = `${rcObj.class || "custom"}_${specSlug}_config.json`.toLowerCase().replace(/\s+/g, "_");
     const entered = prompt("Enter filename to export run config:", defaultName);
@@ -3559,7 +3599,7 @@
 
   async function confirmSaveRunConfig() {
     const filename = document.getElementById("saveConfigFilenameInput").value.trim() || "custom_config.json";
-    const rcObj = buildExportRunConfigObject();
+    const rcObj = await buildExportRunConfigObject();
 
     const res = await fetch("/api/run_config/save", {
       method: "POST",

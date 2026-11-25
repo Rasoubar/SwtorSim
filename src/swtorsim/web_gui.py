@@ -448,6 +448,76 @@ def normalize_saved_run_config(rc_obj: dict[str, Any], env: str | None = None) -
     return rc_obj
 
 
+def _stat_number(value: Any) -> float | None:
+    """A stat value as a float, or None when it is blank or not numeric."""
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except (ValueError, TypeError):
+        return None
+
+
+def _baseline_stat(file_stats: dict[str, Any], key: str) -> float:
+    """The build-file value for one form stat. A missing key counts as 0, matching an empty input."""
+    if key == "Force-Tech Power":
+        if "Force-Tech Power" in file_stats:
+            number = _stat_number(file_stats.get("Force-Tech Power"))
+            return 0.0 if number is None else number
+        for alt in ("Force Power", "Tech Power"):
+            if alt in file_stats:
+                number = _stat_number(file_stats.get(alt))
+                return 0.0 if number is None else number
+        return 0.0
+    if key not in file_stats:
+        return 0.0
+    number = _stat_number(file_stats.get(key))
+    return 0.0 if number is None else number
+
+
+def prune_unchanged_stats_override(rc_obj: dict[str, Any]) -> dict[str, Any]:
+    """Keeps ``stats_override`` entries that differ from the ``stats_path`` file.
+
+    Matching entries are dropped. The key is removed when nothing differs, or when the
+    override is empty. The override is left as submitted when ``stats_path`` is blank or
+    the build file cannot be read.
+    """
+    override = rc_obj.get("stats_override")
+    if not isinstance(override, dict):
+        return rc_obj
+    if not override:
+        rc_obj.pop("stats_override", None)
+        return rc_obj
+
+    stats_path = str(rc_obj.get("stats_path") or "").strip()
+    if not stats_path:
+        return rc_obj
+    try:
+        loaded = load_json_file(str(_resolve_workspace_path(stats_path)))
+    except Exception:
+        return rc_obj
+    if not isinstance(loaded, dict):
+        return rc_obj
+
+    kept: dict[str, Any] = {}
+    for key, value in override.items():
+        number = _stat_number(value)
+        if number is None:
+            continue
+        if number != _baseline_stat(loaded, str(key)):
+            kept[str(key)] = value
+    if kept:
+        rc_obj["stats_override"] = kept
+    else:
+        rc_obj.pop("stats_override", None)
+    return rc_obj
+
+
 def load_run_config_bundle(rel_path: str, env: str = "live") -> dict[str, Any]:
     """Loads a run_config JSON along with its referenced stats and choices dictionaries."""
     active_env = str(env).lower().strip()
@@ -1948,6 +2018,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                     rc_obj,
                     env=payload.get("env") or payload.get("environment"),
                 )
+                prune_unchanged_stats_override(rc_obj)
 
                 target_file = RUN_CONFIG_DIR / filename
                 _write_json_crlf(target_file, rc_obj)

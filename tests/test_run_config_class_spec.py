@@ -10,7 +10,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from src.swtorsim.web_gui import load_run_config_bundle, normalize_saved_run_config
+from src.swtorsim.web_gui import (
+    load_run_config_bundle,
+    normalize_saved_run_config,
+    prune_unchanged_stats_override,
+)
 
 MARKSMANSHIP_SPEC = "data/extractor/live/disciplines/sniper/marksmanship.json"
 
@@ -92,6 +96,78 @@ class RunConfigClassSpecTests(unittest.TestCase):
             self.assertNotIn("spec_name", data, path.name)
             self.assertFalse(str(data["class"]).lower().startswith("-- select"), path.name)
             self.assertFalse(str(data["spec"]).lower().startswith("-- select"), path.name)
+
+
+class RunConfigStatsOverrideTests(unittest.TestCase):
+    def test_matching_override_is_omitted(self):
+        body = {
+            "stats_path": "data/builds/L85_Tank_14gcd.json",
+            "stats_override": {
+                "Mastery": 23362,
+                "Power": 18607,
+                "Force-Tech Power": 11740,
+                "Critical Rating": 1000,
+                "Alacrity Rating": 2646,
+                "Accuracy Rating": 0,
+            },
+            "seed": 1,
+        }
+        out = prune_unchanged_stats_override(body)
+        self.assertIs(out, body)
+        self.assertNotIn("stats_override", out)
+        self.assertEqual(out["seed"], 1)
+
+    def test_only_changed_stats_are_kept(self):
+        body = {
+            "stats_path": "data/builds/L85_13gcd_yellow.json",
+            "stats_override": {
+                "Mastery": 23098,
+                "Power": 18498,
+                "Force-Tech Power": 11740,
+                "Critical Rating": 3000,
+                "Alacrity Rating": 6048,
+                "Accuracy Rating": 2910,
+            },
+        }
+        out = prune_unchanged_stats_override(body)
+        self.assertEqual(out["stats_override"], {"Critical Rating": 3000})
+
+    def test_whole_number_float_matches_the_file_integer(self):
+        body = {
+            "stats_path": "data/builds/L85_Tank_14gcd.json",
+            "stats_override": {"Mastery": 23362.0, "Power": 1},
+        }
+        out = prune_unchanged_stats_override(body)
+        self.assertEqual(out["stats_override"], {"Power": 1})
+
+    def test_shared_power_key_matches_split_force_and_tech(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "split.json"
+            path.write_text(json.dumps({"Force Power": 50, "Tech Power": 50, "Mastery": 10}), encoding="utf-8")
+            body = {
+                "stats_path": str(path),
+                "stats_override": {"Force-Tech Power": 50, "Mastery": 11},
+            }
+            out = prune_unchanged_stats_override(body)
+        self.assertEqual(out["stats_override"], {"Mastery": 11})
+
+    def test_missing_stats_file_keeps_the_override(self):
+        body = {
+            "stats_path": "data/builds/does_not_exist.json",
+            "stats_override": {"Mastery": 1},
+        }
+        out = prune_unchanged_stats_override(body)
+        self.assertEqual(out["stats_override"], {"Mastery": 1})
+
+    def test_blank_stats_path_keeps_the_override(self):
+        body = {"stats_override": {"Mastery": 1}}
+        out = prune_unchanged_stats_override(body)
+        self.assertEqual(out["stats_override"], {"Mastery": 1})
+
+    def test_empty_override_is_removed(self):
+        body = {"stats_path": "data/builds/L85_13gcd_yellow.json", "stats_override": {}}
+        out = prune_unchanged_stats_override(body)
+        self.assertNotIn("stats_override", out)
 
 
 if __name__ == "__main__":

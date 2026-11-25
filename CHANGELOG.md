@@ -4,6 +4,10 @@
 
 ## Completed Fixes
 
+### 111. Saved run configs omit an unchanged stats override (`tools/simulator_ui.html`, `src/swtorsim/web_gui.py`, `tests/test_run_config_class_spec.py`)
+- Saving or exporting a run config wrote every character stat into `stats_override`, including values already stored in the build file named by `stats_path`. The file now keeps a stat in `stats_override` only when its value differs from that build. When every stat matches, `stats_override` is left out. A blank `stats_path`, or a build file that cannot be read, leaves the submitted override in place.
+- Tests: `tests/test_run_config_class_spec.py` (`RunConfigStatsOverrideTests`, 7). Full `unittest discover`: 51 tests, all passing. `tools/pyclean.exe` is not on this machine; the suite ran with Python 3.14.10.
+
 ### 110. Incoming attack interval (`src/swtorsim/events.py`, `src/swtorsim/setup.py`, `src/swtorsim/run_config.py`, `src/swtorsim/web_gui.py`, `src/swtorsim/tester.py`, `main.py`, `tools/simulator_ui.html`, `tools/share_image.js`, `tests/test_incoming_attack.py`)
 - Engine Mechanics gains "Gets attacked every (seconds)", chips 0 and 1.5. The value is `incoming_attack_interval` in seconds. 0, and any saved config that omits the key, schedules nothing.
 - A positive interval lands a melee kinetic swing on the player one interval after combat starts, then again on that interval. Each swing dispatches `on_pre_damage_taken` and `on_damage_taken` with the dummy as the attacker. Wildcard damage-taken abilities (Lightning Reflexes) and melee listeners run; Force, Tech, ranged, and tag-gated listeners do not. The swing does not reduce health and is not added to the damage log. A `trigger_caster` retaliation hits the dummy and is logged as damage. The interval does not scale with alacrity. Ability rate limits still do.
