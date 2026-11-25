@@ -1090,7 +1090,7 @@
     font-size: 14px;
   }
 </style>
-  <script src="pyodide_client.js?v=1795571089"></script>
+  <script src="pyodide_client.js?v=1795593699"></script>
 </head>
 <body>
 
@@ -1510,6 +1510,8 @@
         </button>
       </div>
       <div style="display:flex;align-items:center;gap:10px;">
+        <button type="button" class="btn btn-sm" id="shareImageBtn" onclick="openShareImage()" disabled
+                title="Make a PNG summary of the shown run (setup, stats, ability breakdown, rotation) to copy or download">Share Image</button>
         <button type="button" class="btn btn-sm" id="castTimelineBtn" onclick="openCastTimeline()" disabled
                 title="Open the last TEST (Single Run) as a visual cast timeline in its own window">Cast Timeline</button>
         <div id="wallTimeLabel" style="font-size:11px;color:var(--text-muted);"></div>
@@ -1635,6 +1637,7 @@
 
 <script src="tutorial_showcase.js"></script>
 <script src="credits_modal.js"></script>
+<script src="share_image.js"></script>
 <script>
   function applyTheme(theme) {
     const isDark = theme === "dark";
@@ -2551,6 +2554,7 @@
       ACTIVE_RESULT = result;
       ACTIVE_RESULT._timestamp = new Date().toLocaleTimeString();
       ACTIVE_RESULT._rotationLabel = document.getElementById("rotationSelect").selectedOptions[0]?.textContent || "";
+      ACTIVE_RESULT._shareContext = captureShareContext(payload);
       RUN_HISTORY.unshift(ACTIVE_RESULT);
 
       document.getElementById("pinCurrentRunBtn").disabled = false;
@@ -2769,6 +2773,8 @@
     renderCombatLog();
     renderHistoryAndComparison();
     castTimelineSync();
+    const shareBtn = document.getElementById("shareImageBtn");
+    if (shareBtn) shareBtn.disabled = !ACTIVE_RESULT;
   }
 
   // -------------------------------------------------------------------------
@@ -2844,6 +2850,47 @@
     }
     w.focus();
     castTimelineChannel.postMessage(castTimelinePayload());
+  }
+
+  // -------------------------------------------------------------------------
+  // Share Image: the PNG cards are drawn by tools/share_image.js (ShareImage, served as
+  // /share_image.js and shared with the Rotation Builder). This page adds the run setup the
+  // result does not carry and opens the dialog for the shown result.
+  // -------------------------------------------------------------------------
+  // Run setup that the result itself does not carry (selected item names, fight settings).
+  function captureShareContext(payload) {
+    const selText = (id) => {
+      const el = document.getElementById(id);
+      const opt = el && el.selectedOptions && el.selectedOptions[0];
+      // Item options end in "(<fqn tail>)"; the card shows the display name only.
+      return opt && el.value ? opt.textContent.replace(/\s*\([^()]*\)\s*$/, "").trim() : "";
+    };
+    const tacticalNames = {};
+    for (const opt of (document.getElementById("tacticalSelect")?.options || [])) {
+      if (opt.value) tacticalNames[opt.value] = opt.textContent.replace(/\s*\([^()]*\)\s*$/, "").trim();
+    }
+    return {
+      ran_at: new Date().toISOString(),
+      build: selText("buildSelect"),
+      tactical: selText("tacticalSelect"),
+      legendaries: [selText("legendary1Select"), selText("legendary2Select")].filter(Boolean),
+      relics: [...new Set([selText("relic1Select"), selText("relic2Select")].filter(Boolean))],
+      tacticalNames,
+      settings: {
+        dummy_hp: payload.dummy_hp,
+        duration: payload.duration,
+        armor_debuff: payload.training_dummy_armor_debuff,
+        in_operation: payload.in_flashpoint_operation,
+        flight_time: payload.enable_projectile_flight_time,
+        combat_distance: payload.combat_distance,
+        gcd_stall: payload.gcd_stall,
+      },
+    };
+  }
+
+  function openShareImage() {
+    if (!ACTIVE_RESULT || !window.ShareImage) return;
+    ShareImage.open(ACTIVE_RESULT, { placement: true, button: document.getElementById("shareImageBtn") });
   }
 
   function renderStallAlert(res) {

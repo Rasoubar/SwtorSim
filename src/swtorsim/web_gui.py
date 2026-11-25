@@ -30,7 +30,7 @@ SWTORSIM_ROOT = Path(__file__).resolve().parents[2]
 if str(SWTORSIM_ROOT) not in sys.path:
     sys.path.insert(0, str(SWTORSIM_ROOT))
 
-from src.swtorsim.cast_timeline import CastTimelineRecorder, rotation_steps_of
+from src.swtorsim.cast_timeline import CastTimelineRecorder, rotation_snapshot, rotation_steps_of
 from src.swtorsim.cli import index_disciplines
 from src.swtorsim.config_load import (
     expand_force_tech_power,
@@ -83,6 +83,7 @@ SIM_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
 TIMELINE_UI_HTML_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
 CREDITS_JS_PATH = SWTORSIM_ROOT / "tools" / "credits_modal.js"
+SHARE_IMAGE_JS_PATH = SWTORSIM_ROOT / "tools" / "share_image.js"
 CREDITS_MD_PATH = SWTORSIM_ROOT / "CREDITS.md"
 RUN_CONFIG_DIR = SWTORSIM_ROOT / "data" / "run_config"
 
@@ -1032,6 +1033,7 @@ def _run_single_test_detailed(
         "buffs": buff_rows,
         "combat_log": combat_events,
         "cast_timeline": cast_timeline,
+        "rotation_snapshot": rotation_snapshot(sim_inputs["rotation_config"], player),
         "stalls": {
             "total_stalled_time": round(sim.tracker.total_stalled_time, 2),
             "stall_count": len(sim.tracker.stall_events),
@@ -1374,7 +1376,10 @@ def _run_batch_monte_carlo_detailed(
         _update_simulation_progress(False, "BATCH", len(harvested), iterations)
 
     wall_ms = round((time.perf_counter() - t0) * 1000.0, 1)
-    return _aggregate_batch_results(harvested, config, wall_ms, iterations, computed_stats)
+    return _aggregate_batch_results(
+        harvested, config, wall_ms, iterations, computed_stats,
+        rotation_snapshot=rotation_snapshot(sim_inputs["rotation_config"], player0),
+    )
 
 
 def _aggregate_batch_results(
@@ -1383,8 +1388,12 @@ def _aggregate_batch_results(
     wall_ms: float,
     iterations: int,
     computed_stats: dict[str, Any],
+    rotation_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Calculates statistical distributions and ability breakdowns from harvested runs."""
+    """Calculates statistical distributions and ability breakdowns from harvested runs.
+
+    ``rotation_snapshot`` (cast_timeline.rotation_snapshot) is passed through for the Share Image card.
+    """
     all_dps = [float(r["dps"]) for r in harvested]
     all_durations = [float(r["elapsed"]) for r in harvested]
     total_time = sum(all_durations)
@@ -1535,6 +1544,7 @@ def _aggregate_batch_results(
         "execute_breakdown": exec_rows,
         "buffs": [],
         "combat_log": [],
+        "rotation_snapshot": rotation_snapshot,
         "stalls": {
             "stalled_runs_count": len(stalled_runs),
             "deadlocked_runs_count": len(deadlocked_runs),
@@ -1616,7 +1626,10 @@ def aggregate_batch_slices(payload: dict[str, Any]) -> dict[str, Any]:
         computed_stats = _extract_computed_player_stats(player0)
 
     all_harvested.sort(key=lambda r: r.get("run_id", 0))
-    return _aggregate_batch_results(all_harvested, config, wall_ms, total_iterations, computed_stats)
+    return _aggregate_batch_results(
+        all_harvested, config, wall_ms, total_iterations, computed_stats,
+        rotation_snapshot=rotation_snapshot(sim_inputs["rotation_config"], player0),
+    )
 
 
 
@@ -1699,6 +1712,20 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(html_bytes)
+                return
+
+            # Share Image painter, shared with the Rotation Builder page.
+            if route == "/share_image.js":
+                if not SHARE_IMAGE_JS_PATH.is_file():
+                    self._send_json({"error": f"Script not found at {SHARE_IMAGE_JS_PATH}"}, status=500)
+                    return
+                js_bytes = SHARE_IMAGE_JS_PATH.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/javascript; charset=utf-8")
+                self.send_header("Content-Length", str(len(js_bytes)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(js_bytes)
                 return
 
             if route == "/tutorial_showcase.js":

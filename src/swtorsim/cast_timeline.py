@@ -26,6 +26,35 @@ def rotation_steps_of(rotation_config: Any) -> list[dict]:
     return list(rotation_config or [])
 
 
+def rotation_snapshot(rotation_config: Any, player: Any) -> dict[str, Any]:
+    """Rotation structure (pre-combat, sequence, weave) plus icon / name / off-GCD maps for the share image.
+
+    Display-only: reads the rotation config and `player.ability_db`; nothing is changed.
+    """
+    cfg = rotation_config if isinstance(rotation_config, dict) else {}
+    sequence = rotation_steps_of(rotation_config)
+    pre_combat = list(cfg.get("pre_combat") or [])
+    weave = list(cfg.get("weave") or [])
+    lookup_steps = (
+        sequence
+        + weave
+        + [{"ability_id": p["ability"]} for p in pre_combat if isinstance(p, dict) and p.get("ability")]
+    )
+    maps = CastTimelineRecorder(player).ability_maps(lookup_steps)
+    db = getattr(player, "ability_db", {}) or {}
+    off_gcd: dict[str, bool] = {}
+    for abl in db.values():
+        if getattr(abl, "triggers_gcd", True) is False:
+            off_gcd[ability_name_to_slug(abl.name, abl.fqn)] = True
+    return {
+        "pre_combat": pre_combat,
+        "sequence": sequence,
+        "weave": weave,
+        "off_gcd": {slug: True for slug in maps["slugs"].values() if slug in off_gcd},
+        **maps,
+    }
+
+
 class CastTimelineRecorder:
     """Wraps the player's abilities and records one row per successful cast.
 

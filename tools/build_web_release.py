@@ -22,6 +22,7 @@ ROT_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
 TIMELINE_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_timeline_ui.html"
 MAP_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_map_ui.html"
 RULE_FORM_JS_PATH = SWTORSIM_ROOT / "tools" / "rotation_rule_form.js"
+SHARE_IMAGE_JS_PATH = SWTORSIM_ROOT / "tools" / "share_image.js"
 TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
 CREDITS_JS_PATH = SWTORSIM_ROOT / "tools" / "credits_modal.js"
 CREDITS_MD_PATH = SWTORSIM_ROOT / "CREDITS.md"
@@ -121,6 +122,13 @@ def build_web_release() -> None:
         print("[OK] Copied dist/rule_form.js (rule form shared by the builder and the map)")
     else:
         print(f"[FAIL] rotation_rule_form.js not found at {RULE_FORM_JS_PATH}")
+
+    # 7b. Copy the Share Image script loaded by index.html (simulator) and rotation_builder.html
+    if SHARE_IMAGE_JS_PATH.is_file():
+        shutil.copy2(SHARE_IMAGE_JS_PATH, DIST_DIR / "share_image.js")
+        print("[OK] Copied dist/share_image.js (share image shared by the simulator and the builder)")
+    else:
+        print(f"[FAIL] share_image.js not found at {SHARE_IMAGE_JS_PATH}")
 
     # 8. Copy the in-page tutorial showcase script
     if TUTORIAL_JS_PATH.is_file():

@@ -1492,6 +1492,7 @@
           <input type="text" id="saveFilename" style="flex:1;" value="CustomRotation.json" placeholder="CustomRotation.json">
           <button class="btn-success btn-sm" onclick="saveRotationToDisk()" title="Save into simulator presets" style="font-weight:600;white-space:nowrap;">Save</button>
           <button class="btn-sm" onclick="downloadRotationJson()" title="Download rotation .json file to PC" style="font-weight:600;white-space:nowrap;">Download</button>
+          <button class="btn-sm" id="rotationImageBtn" onclick="openRotationImage()" title="Make a PNG image of this rotation to copy or download" style="font-weight:600;white-space:nowrap;">Image</button>
         </div>
       </div>
     </div>
@@ -1540,6 +1541,7 @@
 <script src="tutorial_showcase.js"></script>
 <script src="credits_modal.js"></script>
 <script src="rule_form.js"></script>
+<script src="share_image.js"></script>
 <script>
   function applyTheme(theme) {
     const isDark = theme === "dark";
@@ -5057,6 +5059,57 @@ function downloadRotationJson() {
   document.body.removeChild(a);
   URL.revokeObjectURL(a.href);
   showToast(`[OK] Downloaded ${filename}`);
+}
+
+// Rotation Image: the same rotation image the Combat Simulator's Share Image makes (tools/share_image.js),
+// drawn from the builder's current steps. Names, icons and off-GCD come from the loaded loadout.
+function builderRotationSnapshot() {
+  const icons = {};
+  const names = {};
+  const slugs = {};
+  const offGcd = {};
+  const remember = (aid) => {
+    if (!aid || slugs[aid]) return;
+    const a = resolveAbilityDisplay(aid);
+    const slug = a ? a.slug : String(aid).toLowerCase().replace(/\s+/g, "_");
+    slugs[aid] = slug;
+    names[aid] = a ? a.name : String(aid);
+    names[slug] = names[aid];
+    if (a && a.icon) icons[slug] = a.icon;
+    if (a && !a.triggers_gcd) offGcd[slug] = true;
+  };
+  for (const step of rotationSteps) {
+    for (const p of (step && step.type === "priority_block" ? (step.pool || []) : [step])) remember(p && p.ability_id);
+  }
+  for (const w of weaveSteps) remember(w && w.ability_id);
+  for (const p of preCombatSteps) remember(p && p.ability);
+  return { pre_combat: preCombatSteps, sequence: rotationSteps, weave: weaveSteps, icons, names, slugs, off_gcd: offGcd };
+}
+
+function openRotationImage() {
+  if (!window.ShareImage) {
+    showToast("The image script did not load.", true);
+    return;
+  }
+  if (!currentLoadout || !currentLoadout.class_name || !currentLoadout.spec_name) {
+    showToast("Please select a Class and Discipline first.", true);
+    return;
+  }
+  if (!rotationSteps.length) {
+    showToast("The rotation has no steps yet.", true);
+    return;
+  }
+  const tacticalNames = {};
+  for (const t of currentLoadout.tacticals || []) tacticalNames[t.fqn] = t.name;
+  const filename = (document.getElementById("saveFilename")?.value || "").trim().replace(/^.*[\\/]/, "");
+  ShareImage.open({
+    class_name: currentLoadout.class_name,
+    spec: currentLoadout.spec_name,
+    environment: currentEnvironment,
+    _rotationLabel: filename.replace(/\.json$/i, ""),
+    rotation_snapshot: builderRotationSnapshot(),
+    _shareContext: { ran_at: new Date().toISOString(), tacticalNames },
+  }, { button: document.getElementById("rotationImageBtn") });
 }
 
 function escapeHtml(str) {
