@@ -3,15 +3,7 @@
   "spec": "Marksmanship",
   "spec_path": "data/extractor/live/disciplines/sniper/marksmanship.json",
   "environment": "live",
-  "stats_path": "data/builds/L80_14gcd_yellow.json",
-  "stats_override": {
-    "Mastery": 16570,
-    "Power": 14394,
-    "Force-Tech Power": 9332,
-    "Critical Rating": 4029,
-    "Alacrity Rating": 2218,
-    "Accuracy Rating": 2824
-  },
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
   "main_hand": {
     "min": 3556,
     "max": 4346
@@ -37,7 +29,7 @@
     "abl.itm.legendary.age_smu.locked_and_loaded"
   ],
   "relic_fqns": [
-    "abl.itm.relic.onhit.dps_power.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating",
     "abl.itm.relic.onhit.primary_stat.scales_with_item_rating"
   ],
   "mode": "BATCH",

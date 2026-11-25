@@ -1,0 +1,41 @@
+{
+  "class": "Juggernaut",
+  "spec": "Immortal",
+  "spec_path": "data/extractor/pts/disciplines/juggernaut/immortal.json",
+  "stats_path": "data/builds/L85_Tank_14gcd.json",
+  "main_hand": {
+    "min": 2634,
+    "max": 3951
+  },
+  "off_hand": null,
+  "rotation_path": "data/rotations/juggernaut/immortal/Priority.json",
+  "choices": {
+    "23": 3,
+    "27": 2,
+    "39": 2,
+    "43": 1,
+    "51": 1,
+    "64": 1,
+    "68": 1,
+    "73": 1
+  },
+  "tactical_fqn": "abl.itm.tactical.sow.war_kni.jug_guar.utl_def_02",
+  "legendary_fqns": [
+    "abl.itm.legendary.war_kni.fearless_victor",
+    "abl.itm.legendary.war_kni.jug_gua.retaliator"
+  ],
+  "relic_fqns": [],
+  "mode": "BATCH",
+  "iterations": 100,
+  "duration": 1000,
+  "level": 85,
+  "dummy_hp": 10000000,
+  "seed": 69,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false,
+  "enable_projectile_flight_time": false,
+  "in_flashpoint_operation": true,
+  "combat_distance": 30,
+  "gcd_stall": 0.3,
+  "incoming_attack_interval": 1.5
+}

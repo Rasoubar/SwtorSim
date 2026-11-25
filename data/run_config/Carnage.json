@@ -3,7 +3,7 @@
   "spec": "Carnage",
   "spec_path": "data/extractor/live/disciplines/marauder/carnage.json",
   "environment": "live",
-  "stats_path": "data/builds/custom/L80_14-3gcd_red.json",
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
   "stats_override": {
     "Mastery": 17676,
     "Power": 14503,
@@ -38,7 +38,7 @@
   ],
   "relic_fqns": [
     "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
-    "abl.itm.relic.onhit.dps_power.scales_with_item_rating"
+    "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
   ],
   "mode": "BATCH",
   "iterations": 100,

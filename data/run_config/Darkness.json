@@ -1,0 +1,49 @@
+{
+  "class": "Assassin",
+  "spec": "Darkness",
+  "spec_path": "data/extractor/pts/disciplines/assassin/darkness.json",
+  "stats_path": "data/builds/L85_Tank_14gcd.json",
+  "stats_override": {
+    "Mastery": 23362,
+    "Power": 18607,
+    "Force-Tech Power": 11740,
+    "Critical Rating": 1000,
+    "Alacrity Rating": 2646,
+    "Accuracy Rating": 0
+  },
+  "main_hand": {
+    "min": 3161,
+    "max": 4741
+  },
+  "off_hand": null,
+  "rotation_path": "data/rotations/assassin/darkness/Priority.json",
+  "choices": {
+    "23": 2,
+    "27": 2,
+    "39": 2,
+    "43": 3,
+    "51": 1,
+    "64": 1,
+    "68": 1,
+    "73": 2
+  },
+  "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
+  "legendary_fqns": [
+    "abl.itm.legendary.inq_con.dynamic_force",
+    "abl.itm.legendary.generic.dps.second_wind"
+  ],
+  "relic_fqns": [],
+  "mode": "BATCH",
+  "iterations": 100,
+  "duration": 1000,
+  "level": 85,
+  "dummy_hp": 10000000,
+  "seed": 69,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false,
+  "enable_projectile_flight_time": false,
+  "in_flashpoint_operation": true,
+  "combat_distance": 30,
+  "gcd_stall": 0.3,
+  "incoming_attack_interval": 1.5
+}

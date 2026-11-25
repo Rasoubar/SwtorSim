@@ -1,0 +1,99 @@
+[
+    {
+        "type": "fixed",
+        "ability_id": "shock"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "wither"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "discharge"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "thrash"
+    },
+    {
+        "type": "fixed",
+        "ability_id": "shock"
+    },
+    {
+        "type": "loop_anchor"
+    },
+    {
+        "type": "optional",
+        "ability_id": "mind_control",
+        "rules": {
+            "caster_buff_stacks": [
+                "Harnessed Darkness",
+                3,
+                "eq"
+            ]
+        }
+    },
+    {
+        "type": "optional",
+        "ability_id": "recklessness",
+        "rules": {
+            "caster_has_buff": "Energize"
+        }
+    },
+    {
+        "type": "priority_block",
+        "name": "Priority Window 7",
+        "pool": [
+            {
+                "ability_id": "shock",
+                "rules": {
+                    "caster_has_buff": "Energize"
+                }
+            },
+            {
+                "ability_id": "execution",
+                "rules": {}
+            },
+            {
+                "ability_id": "depredating_volts",
+                "rules": {
+                    "caster_buff_stacks": [
+                        "Harnessed Darkness",
+                        3,
+                        "eq"
+                    ]
+                }
+            },
+            {
+                "ability_id": "shock",
+                "rules": {}
+            },
+            {
+                "ability_id": "wither",
+                "rules": {}
+            },
+            {
+                "ability_id": "discharge",
+                "rules": {
+                    "caster_has_buff": "Lightning Reflexes"
+                }
+            },
+            {
+                "ability_id": "maul",
+                "rules": {
+                    "caster_has_buff": "Conspirator's Cloak"
+                }
+            },
+            {
+                "ability_id": "saber_strike",
+                "rules": {
+                    "caster_energy_below": 20
+                }
+            },
+            {
+                "ability_id": "thrash",
+                "rules": {}
+            }
+        ]
+    }
+]

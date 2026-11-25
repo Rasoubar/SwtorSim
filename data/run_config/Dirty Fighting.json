@@ -4,14 +4,6 @@
   "spec_path": "data/extractor/pts/disciplines/gunslinger/dirty_fighting.json",
   "environment": "pts",
   "stats_path": "data/builds/L85_13gcd_yellow.json",
-  "stats_override": {
-    "Mastery": 23098,
-    "Power": 18498,
-    "Force-Tech Power": 11740,
-    "Critical Rating": 2945,
-    "Alacrity Rating": 6048,
-    "Accuracy Rating": 2910
-  },
   "main_hand": {
     "min": 2305,
     "max": 4280

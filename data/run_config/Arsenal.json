@@ -3,15 +3,7 @@
   "spec": "Arsenal",
   "spec_path": "data/extractor/live/disciplines/mercenary/arsenal.json",
   "environment": "live",
-  "stats_path": "data/builds/L80_14gcd_yellow.json",
-  "stats_override": {
-    "Mastery": 16570,
-    "Power": 14503,
-    "Force-Tech Power": 9468,
-    "Critical Rating": 2224,
-    "Alacrity Rating": 4021,
-    "Accuracy Rating": 2722
-  },
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
   "main_hand": {
     "min": 2305,
     "max": 4280
