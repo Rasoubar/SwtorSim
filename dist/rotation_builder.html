@@ -625,6 +625,14 @@
     background: rgba(255, 120, 24, 0.22);
   }
 
+  .palette-tab-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+
   /* Ability & Effect Icons */
   .ability-icon {
     width: 28px;
@@ -1425,10 +1433,10 @@
     </div>
 
     <div class="tabs">
-      <button class="tab-btn active" id="tabAbilities" onclick="switchPaletteTab('abilities')">Abilities (<span id="countAbilities">0</span>)</button>
-      <button class="tab-btn" id="tabBuffs" onclick="switchPaletteTab('buffs')">Buffs (<span id="countBuffs">0</span>)</button>
-      <button class="tab-btn" id="tabDebuffs" onclick="switchPaletteTab('debuffs')">Debuffs (<span id="countDebuffs">0</span>)</button>
-      <button class="tab-btn" id="tabProcs" onclick="switchPaletteTab('procs')">Procs (<span id="countProcs">0</span>)</button>
+      <button class="tab-btn active" id="tabAbilities" onclick="switchPaletteTab('abilities')"><span class="palette-tab-label">Abilities<span class="palette-tab-count">(<span id="countAbilities">0</span>)</span></span></button>
+      <button class="tab-btn" id="tabBuffs" onclick="switchPaletteTab('buffs')"><span class="palette-tab-label">Buffs<span class="palette-tab-count">(<span id="countBuffs">0</span>)</span></span></button>
+      <button class="tab-btn" id="tabDebuffs" onclick="switchPaletteTab('debuffs')"><span class="palette-tab-label">Debuffs<span class="palette-tab-count">(<span id="countDebuffs">0</span>)</span></span></button>
+      <button class="tab-btn" id="tabProcs" onclick="switchPaletteTab('procs')"><span class="palette-tab-label">Procs<span class="palette-tab-count">(<span id="countProcs">0</span>)</span></span></button>
     </div>
 
     <div class="panel-body palette-body" id="paletteContainer"></div>

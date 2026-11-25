@@ -4,6 +4,10 @@
 
 ## Completed Fixes
 
+### 109. Palette tab counts sit on their own line (`tools/rotation_builder_ui.html`, `dist/rotation_builder.html`)
+- The left-bar tabs (Abilities, Buffs, Debuffs, Procs) kept the count in the same flex line as the label. Narrow columns wrapped the parenthesis away from the number and the button gap opened space inside the brackets. Each count is now a second line, `(28)`, centered under the label.
+- UI only. No tests cover the builder page. No damage math.
+
 ### 108. Saved run configs keep one class and one spec (`tools/simulator_ui.html`, `src/swtorsim/web_gui.py`)
 - Saving a run config from the simulator wrote both `class` and `class_name`, and both `spec` and `spec_name`. The discipline dropdown placeholder (`-- Select Discipline --`) was stored as the spec. The file now has `class` and `spec` only. A blank or placeholder name is filled from the discipline behind `spec_path`. Older files that still say `class_name` or `spec_name` still load. The shipped configs in `data/run_config/` already use `class` and `spec`.
 - Tests: `tests/test_run_config_class_spec.py`.
