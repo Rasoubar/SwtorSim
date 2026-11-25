@@ -1,0 +1,55 @@
+{
+  "class": "Marauder",
+  "spec": "Carnage",
+  "spec_path": "data/extractor/live/disciplines/marauder/carnage.json",
+  "environment": "live",
+  "stats_path": "data/builds/custom/L80_14-3gcd_red.json",
+  "stats_override": {
+    "Mastery": 17676,
+    "Power": 14503,
+    "Force-Tech Power": 9332,
+    "Critical Rating": 4722,
+    "Alacrity Rating": 1254,
+    "Accuracy Rating": 2722
+  },
+  "main_hand": {
+    "min": 2634,
+    "max": 3951
+  },
+  "off_hand": {
+    "min": 2634,
+    "max": 3951
+  },
+  "rotation_path": "data/rotations/marauder/carnage/BasicPriority.json",
+  "choices": {
+    "23": 3,
+    "27": 3,
+    "39": 3,
+    "43": 2,
+    "51": 2,
+    "64": 1,
+    "68": 3,
+    "73": 1
+  },
+  "tactical_fqn": "abl.itm.tactical.sow.war_kni.mar_sen.car_comb.dmg_burst_03",
+  "legendary_fqns": [
+    "abl.itm.legendary.war_kni.mar_sen.dispatcher",
+    "abl.itm.legendary.war_kni.fearless_victor"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_power.scales_with_item_rating"
+  ],
+  "mode": "BATCH",
+  "iterations": 100,
+  "duration": 1000,
+  "level": 85,
+  "dummy_hp": 10000000,
+  "seed": 18237,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false,
+  "enable_projectile_flight_time": false,
+  "in_flashpoint_operation": true,
+  "combat_distance": 4,
+  "gcd_stall": 0.3
+}

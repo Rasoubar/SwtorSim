@@ -1916,6 +1916,22 @@
     }
   }
 
+  function isUnsetClassSpecLabel(value) {
+    const text = String(value || "").trim().toLowerCase();
+    return !text || text.startsWith("-- select");
+  }
+
+  function selectedClassAndSpec() {
+    const clsSel = document.getElementById("classSelect");
+    const specSel = document.getElementById("specSelect");
+    const clsOpt = (clsSel && clsSel.selectedIndex >= 0) ? clsSel.options[clsSel.selectedIndex] : null;
+    const specOpt = (specSel && specSel.selectedIndex >= 0) ? specSel.options[specSel.selectedIndex] : null;
+    // Option values are empty on the placeholder rows. Their labels are not a class or spec.
+    const clsName = (clsOpt && clsOpt.value) ? String(clsOpt.value).trim() : "";
+    const specName = (specOpt && specOpt.value) ? specOpt.textContent.trim() : "";
+    return { clsName, specName };
+  }
+
   function getActiveSpecInfo() {
     const specSel = document.getElementById("specSelect");
     const specPath = specSel ? specSel.value : "";
@@ -2280,8 +2296,12 @@
       if (!res.ok) throw new Error(bundle.error || "Failed to load preset");
 
       const rc = bundle.run_config || (fallbackParsed || {});
-      const rawCls = bundle.class_name || rc.class_name || rc.class;
-      const rawSpec = bundle.spec_name || bundle.spec || rc.spec || rc.spec_name;
+      const rawCls = (!isUnsetClassSpecLabel(rc.class) && rc.class)
+        || (!isUnsetClassSpecLabel(rc.class_name) && rc.class_name)
+        || bundle.class_name;
+      const rawSpec = (!isUnsetClassSpecLabel(rc.spec) && rc.spec)
+        || (!isUnsetClassSpecLabel(rc.spec_name) && rc.spec_name)
+        || bundle.spec;
       const clsSel = document.getElementById("classSelect");
       if (rawCls) {
         setSelectValueCaseInsensitive(clsSel, rawCls);
@@ -2361,26 +2381,14 @@
     if (rel1) relics.push(rel1);
     if (rel2 && rel2 !== rel1) relics.push(rel2);
 
-    const clsSel = document.getElementById("classSelect");
-    const specSel = document.getElementById("specSelect");
-    let clsName = clsSel ? clsSel.value : "";
-    let specName = (specSel && specSel.selectedIndex >= 0 && specSel.options[specSel.selectedIndex])
-      ? specSel.options[specSel.selectedIndex].textContent.trim()
-      : "";
-    if (!clsName || !specName) {
-      const specInfo = getActiveSpecInfo();
-      if (!clsName) clsName = specInfo.classSlug || "";
-      if (!specName) specName = specInfo.specSlug || "";
-    }
+    const { clsName, specName } = selectedClassAndSpec();
 
     return {
       environment: currentEnvironment,
       env: currentEnvironment,
       pts: currentEnvironment === "pts",
       class: clsName,
-      class_name: clsName,
       spec: specName,
-      spec_name: specName,
       spec_path: document.getElementById("specSelect").value,
       stats_path: document.getElementById("buildSelect").value,
       stats_override: getStatsOverrideFromInputs(),
@@ -3484,23 +3492,10 @@
 
   function buildExportRunConfigObject() {
     const p = buildPayloadFromForm();
-    const clsSel = document.getElementById("classSelect");
-    const specSel = document.getElementById("specSelect");
-    let clsName = (clsSel && clsSel.value) ? clsSel.value : "";
-    let specName = (specSel && specSel.selectedIndex >= 0 && specSel.options[specSel.selectedIndex])
-      ? specSel.options[specSel.selectedIndex].textContent.trim()
-      : "";
-    if (!clsName || !specName) {
-      const specInfo = getActiveSpecInfo();
-      if (!clsName) clsName = specInfo.classSlug || "";
-      if (!specName) specName = specInfo.specSlug || "";
-    }
 
     return {
-      class: clsName,
-      class_name: clsName,
-      spec: specName,
-      spec_name: specName,
+      class: p.class,
+      spec: p.spec,
       spec_path: p.spec_path,
       stats_path: p.stats_path,
       stats_override: p.stats_override || getStatsOverrideFromInputs(),
@@ -3786,8 +3781,12 @@
         }
 
         const { classSlug, specSlug } = getActiveSpecInfo();
-        const itemClass = (parsed && (parsed.class || parsed.class_name)) || classSlug;
-        const itemSpec = (parsed && (parsed.spec || parsed.spec_name)) || specSlug;
+        const itemClass = (parsed && !isUnsetClassSpecLabel(parsed.class) && parsed.class)
+          || (parsed && !isUnsetClassSpecLabel(parsed.class_name) && parsed.class_name)
+          || classSlug;
+        const itemSpec = (parsed && !isUnsetClassSpecLabel(parsed.spec) && parsed.spec)
+          || (parsed && !isUnsetClassSpecLabel(parsed.spec_name) && parsed.spec_name)
+          || specSlug;
         const res = await fetch("/api/custom_file/import", {
           method: "POST",
           headers: { "Content-Type": "application/json" },

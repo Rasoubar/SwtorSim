@@ -4,6 +4,20 @@
 
 ## Completed Fixes
 
+### 108. Saved run configs keep one class and one spec (`tools/simulator_ui.html`, `src/swtorsim/web_gui.py`)
+- Saving a run config from the simulator wrote both `class` and `class_name`, and both `spec` and `spec_name`. The discipline dropdown placeholder (`-- Select Discipline --`) was stored as the spec. The file now has `class` and `spec` only. A blank or placeholder name is filled from the discipline behind `spec_path`. Older files that still say `class_name` or `spec_name` still load. The shipped configs in `data/run_config/` already use `class` and `spec`.
+- Tests: `tests/test_run_config_class_spec.py`.
+
+### 107. Rotation Map opens in a browser tab by default (`tools/rotation_builder_ui.html`, `dist/rotation_builder.html`)
+- `openVisualMapWindow` passes `defaultMode: "tab"` into `openCompanionWindow`. With no saved `swtorsim_map_open_mode`, Open Visual Map and the Visual Map tab open `map.html` as a browser tab. A saved `tab` or `popup` value still wins, and Shift+click still flips that one open. Cast Timeline stays a popup unless its own preference says otherwise.
+- UI only. No tests cover the builder page. No damage math.
+
+### 106. Run configs aligned to spec filenames, level 85, and the endgame weapon row (`data/run_config/`, `data/rotations/`)
+- Run configs are named for the spec (`Dirty Fighting`, `Carnage`, `Annihilation`, `Marksmanship`, `Hatred`, `Arsenal`). `dirty_fighting_13gcd.json` stays under that name because it is a second Dirty Fighting file and its rotation `DirtyFighting_pts.json` is not in the tree. Rotations renamed to `BasicMali`, `SimpleUV`, `BasicPriority`, `Rotation`, and `FixedRotation`.
+- Every config is level 85, BATCH, 100 iterations, 10,000,000 dummy HP, training-dummy armor debuff on, stem matching off, `gcd_stall` 0.3. The class is stored once as `class`. The loader still fills its own `class_name` and `spec` from the discipline.
+- Weapon min/max taken from the `cbtWeaponPerLevelPrototype` row where pistols are 2305-4280 (the Dirty Fighting values). Vibroknife id `16141171601309861681` is 3161-4741. Lightsabers 2634-3951, polesaber 3161-4741, sniper rifle 3556-4346, Arsenal both pistols 2305-4280.
+- Tests and the CLI default that named `hatred_14gcd` now name `Hatred`.
+
 ### 105. Damage Breakdown Split by Effect Display Name (`src/swtorsim/abilities.py`, `tests/test_effect_damage_source_name.py`, `tests/test_simulation_integration.py`)
 - **Implementation**: New `damage_source_name(context, ability_name)`; `Branch.execute` passes it as the label of every `damage` action, so hits log under `context["effect"].name` (e.g. `Crushed (Eradicate)` DoT ticks vs `Eradicate` direct hit), periodic or not. Empty names and the extractor's auto-generated `Parent_N` names (checked with `metrics.has_proper_effect_name`) fall back to the ability name. `Metrics.log_cast` / `cast_counts` still key on the ability name; the web breakdown already shows `casts = None` for rows with no matching cast. The extractor already fills `effect["name"]` (SetName initializer, else parent name, else `Parent_N` for hidden effects), so no re-extract is required for this change; the label is purely a breakdown key (the combat math never reads it).
 - **Verification**: Full `unittest discover` suite passes (100%). New: `tests/test_effect_damage_source_name.py` (named periodic / non-periodic effect, empty / `Parent_N` name fallback, casts vs damage keys). `test_simulation_integration.test_02` updated from 7 hits under `Eradicate` to 1 hit `Eradicate` + 6 ticks `Crushed (Eradicate)`. Mean DPS (BATCH, 100 iter, 2m HP, seeds 42+i) `hatred_14gcd` 34,631.6 and `Arsenal_Merc` 31,480.5, identical before and after.

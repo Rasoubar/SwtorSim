@@ -1,0 +1,44 @@
+{
+  "class": "Assassin",
+  "spec": "Hatred",
+  "spec_path": "data/extractor/live/disciplines/assassin/hatred.json",
+  "environment": "live",
+  "stats_path": "data/builds/L80_14gcd_yellow.json",
+  "main_hand": {
+    "min": 3161,
+    "max": 4741
+  },
+  "off_hand": null,
+  "rotation_path": "data/rotations/assassin/hatred/BasicMali.json",
+  "choices": {
+    "23": 2,
+    "27": 1,
+    "39": 3,
+    "43": 1,
+    "51": 1,
+    "64": 1,
+    "68": 3,
+    "73": 1
+  },
+  "tactical_fqn": "abl.itm.tactical.sow.inq_con.sin_shad.hat_sen.dmg_sust_01",
+  "legendary_fqns": [
+    "abl.itm.legendary.inq_con.dynamic_force",
+    "abl.itm.legendary.inq_con.sin_shad.force_training"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_power.scales_with_item_rating"
+  ],
+  "mode": "BATCH",
+  "iterations": 100,
+  "duration": 1000,
+  "level": 85,
+  "dummy_hp": 10000000,
+  "seed": 42,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false,
+  "enable_projectile_flight_time": false,
+  "in_flashpoint_operation": true,
+  "combat_distance": 30,
+  "gcd_stall": 0.3
+}
