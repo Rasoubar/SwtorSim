@@ -1311,7 +1311,7 @@
     font-size: 14px;
   }
 </style>
-  <script src="pyodide_client.js?v=1795593699"></script>
+  <script src="pyodide_client.js?v=1795614455"></script>
 </head>
 <body>
 
@@ -1477,6 +1477,10 @@
         <button onclick="addLoopAnchor()">+ End Of Opener</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;">
+        <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;color:var(--text-muted);white-space:nowrap;" title="Seconds before the GCD ends that off-GCD abilities fire, for every step without its own lead. Leave empty for the engine default.">
+          Default lead:
+          <input type="number" id="defaultLeadInput" step="0.05" min="0" max="1.5" style="width:52px;padding:2px 4px;font-size:11px;" onchange="setDefaultLeadTime(this.value)">s
+        </label>
         <button class="btn-sm" onclick="expandCollapseAll(false)">Expand All</button>
         <button class="btn-sm" onclick="expandCollapseAll(true)">Collapse All</button>
         <button class="btn-sm btn-danger" onclick="clearRotation()" title="Clear all steps">Clear</button>
@@ -1605,8 +1609,12 @@ let rotationSteps = [];
 let preCombatSteps = []; // [{ability, target?, wait_for_cooldown?} | {swap_tactical} | {wait} | {wait_until, max_wait?}]
 let weaveSteps = []; // loop-only "always weave": [{ability_id, rules, lead_time?}] tried before every loop step
 let dryRunWeaveJson = "[]"; // JSON of weaveSteps at the time of the last dry-run (stale detection)
+let dryRunDefaultLead = null; // defaultLeadTime at the time of the last dry-run (stale detection)
 let pullConditions = {}; // fight-start gate: rotation-style rules that must hold before the rotation starts
 let pullMaxWait = 60;    // seconds; the run fails if the pull conditions are still false after this
+// Lead for off-GCD steps without their own lead_time. Must match DEFAULT_OFF_GCD_LEAD_TIME in src/swtorsim/rotation.py.
+const ENGINE_DEFAULT_LEAD_TIME = 0.1;
+let defaultLeadTime = null; // rotation-wide override (saved as default_lead_time); null = engine default
 // UI only: which editor panels are minimized to their header row (remembered per browser).
 const panelCollapsed = { precombat: false, weave: false };
 for (const k of Object.keys(panelCollapsed)) {
@@ -2143,6 +2151,7 @@ async function onSelectExistingRotation(rotPath) {
   weaveSteps = Array.isArray(data.weave) ? data.weave : [];
   pullConditions = (data.pull_conditions && typeof data.pull_conditions === "object") ? data.pull_conditions : {};
   pullMaxWait = data.pull_max_wait !== undefined && data.pull_max_wait !== null ? Number(data.pull_max_wait) : 60;
+  defaultLeadTime = parseDefaultLead(data.default_lead_time);
   lastImportWarnings = data.warnings || [];
   undoResetHistory();
   collapsedSteps.clear();
@@ -2509,12 +2518,13 @@ function addLoopAnchor() {
 }
 
 function clearRotation() {
-  if (!rotationSteps.length && !preCombatSteps.length && !weaveSteps.length && !Object.keys(pullConditions).length) return;
+  if (!rotationSteps.length && !preCombatSteps.length && !weaveSteps.length && !Object.keys(pullConditions).length && defaultLeadTime === null) return;
   rotationSteps = [];
   preCombatSteps = [];
   weaveSteps = [];
   pullConditions = {};
   pullMaxWait = 60;
+  defaultLeadTime = null;
   activeBlockIndex = null;
   collapsedSteps.clear();
   renderTimeline();
@@ -2532,11 +2542,57 @@ function pullGatePayload() {
   return hasPullGate() ? { pull_conditions: pullConditions, pull_max_wait: pullMaxWait } : {};
 }
 
+// ---------------------------------------------------------------------------
+// Rotation-wide default lead (off-GCD steps without their own lead_time)
+// ---------------------------------------------------------------------------
+function parseDefaultLead(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const v = Number(value);
+  return isFinite(v) && v >= 0 ? v : null;
+}
+
+function effectiveDefaultLead() {
+  return defaultLeadTime !== null ? defaultLeadTime : ENGINE_DEFAULT_LEAD_TIME;
+}
+
+function defaultLeadPayload() {
+  return defaultLeadTime !== null ? { default_lead_time: defaultLeadTime } : {};
+}
+
+function setDefaultLeadTime(value) {
+  defaultLeadTime = parseDefaultLead(value);
+  renderTimeline();
+  renderRightPanel();
+}
+
+function renderDefaultLeadControl() {
+  const el = document.getElementById("defaultLeadInput");
+  if (!el) return;
+  el.placeholder = String(ENGINE_DEFAULT_LEAD_TIME);
+  if (document.activeElement !== el) el.value = defaultLeadTime !== null ? String(defaultLeadTime) : "";
+}
+
+// Value / placeholder pair for a per-step lead input: empty when the step inherits `inherited`.
+function leadInputAttrs(lead, inherited) {
+  const own = lead !== undefined && lead !== null && lead !== "";
+  return `value="${own ? Number(lead) : ""}" placeholder="${Number(inherited)}"`;
+}
+
+function updatePoolRowLeadTime(idx, rIdx, val) {
+  const row = rotationSteps[idx] && rotationSteps[idx].pool && rotationSteps[idx].pool[rIdx];
+  if (!row) return;
+  const num = parseFloat(val);
+  if (isNaN(num) || num < 0) delete row.lead_time; else row.lead_time = num;
+  renderTimeline();
+  renderRightPanel();
+}
+
 function rotationFileData() {
-  if (!preCombatSteps.length && !hasPullGate() && !weaveSteps.length) return rotationSteps;
+  if (!preCombatSteps.length && !hasPullGate() && !weaveSteps.length && defaultLeadTime === null) return rotationSteps;
   const data = {};
   if (preCombatSteps.length) data.pre_combat = preCombatSteps;
   Object.assign(data, pullGatePayload());
+  Object.assign(data, defaultLeadPayload());
   if (weaveSteps.length) data.weave = weaveSteps;
   data.sequence = rotationSteps;
   return data;
@@ -2549,6 +2605,7 @@ function applyRotationFileData(parsed) {
     weaveSteps = [];
     pullConditions = {};
     pullMaxWait = 60;
+    defaultLeadTime = null;
     return;
   }
   if (parsed && typeof parsed === "object" && Array.isArray(parsed.sequence || parsed.steps)) {
@@ -2557,9 +2614,10 @@ function applyRotationFileData(parsed) {
     weaveSteps = Array.isArray(parsed.weave) ? parsed.weave.filter(w => w && w.ability_id) : [];
     pullConditions = (parsed.pull_conditions && typeof parsed.pull_conditions === "object") ? parsed.pull_conditions : {};
     pullMaxWait = parsed.pull_max_wait !== undefined ? Number(parsed.pull_max_wait) : 60;
+    defaultLeadTime = parseDefaultLead(parsed.default_lead_time);
     return;
   }
-  throw new Error("Rotation JSON must be an array of steps or an object with 'sequence' (and optional 'pre_combat' / 'weave').");
+  throw new Error("Rotation JSON must be an array of steps or an object with 'sequence' (and optional 'pre_combat' / 'weave' / 'default_lead_time').");
 }
 
 function tacticalDisplayName(fqn) {
@@ -2869,8 +2927,8 @@ function renderWeave() {
         ${panelAbilityIconHtml(entry.ability_id)}
         <select style="max-width:230px;" onchange="updateWeaveStep(${idx}, 'ability_id', this.value)">${opts}</select>
         ${renderScopedRulesHtml(entry.rules || {}, "weave", idx)}
-        <label title="How long before the GCD ends an off-GCD ability may fire (default 0.4s)">lead
-          <input type="number" min="0" step="0.1" value="${entry.lead_time !== undefined ? Number(entry.lead_time) : ""}" placeholder="0.4" style="width:54px;" onchange="updateWeaveStep(${idx}, 'lead_time', this.value)">s
+        <label title="How long before the GCD ends an off-GCD ability may fire (empty = rotation default lead)">lead
+          <input type="number" min="0" step="0.05" ${leadInputAttrs(entry.lead_time, effectiveDefaultLead())} style="width:54px;" onchange="updateWeaveStep(${idx}, 'lead_time', this.value)">s
         </label>
         ${onGcd ? '<span class="badge badge-sub30" title="This ability uses the GCD: it will take a whole GCD in front of the next loop step whenever it is ready">uses GCD</span>' : ""}
         <span class="pc-spacer"></span>
@@ -3586,7 +3644,7 @@ function transformFixedToSub30Priority(stepIdx) {
       {
         ability_id: executeAbl,
         rules: { target_hp_below_pct: SUB30_THRESHOLD },
-        lead_time: isOffGcd ? (step.lead_time || 0.4) : null
+        lead_time: isOffGcd ? step.lead_time : null
       },
       {
         ability_id: origAbl,
@@ -3618,14 +3676,11 @@ function addSub30ToPriorityBlock(stepIdx) {
   if (!step || step.type !== "priority_block") return;
   const executeAbl = SUB30_DEFAULT_ABILITY || detectExecuteAbilitySlug();
   if (!executeAbl) return;
-  const execDisp = resolveAbilityDisplay(executeAbl);
-  const isOffGcd = execDisp && !execDisp.triggers_gcd;
 
   if (!step.pool) step.pool = [];
   step.pool.unshift({
     ability_id: executeAbl,
-    rules: { target_hp_below_pct: SUB30_THRESHOLD },
-    lead_time: isOffGcd ? 0.4 : null
+    rules: { target_hp_below_pct: SUB30_THRESHOLD }
   });
   renderTimeline();
   renderRightPanel();
@@ -3660,9 +3715,9 @@ function insertSub30OptionalAt(index) {
   const newStep = {
     type: "optional",
     ability_id: executeAbl,
-    rules: { target_hp_below_pct: SUB30_THRESHOLD },
-    lead_time: isOffGcd ? 0.4 : 0.0
+    rules: { target_hp_below_pct: SUB30_THRESHOLD }
   };
+  if (!isOffGcd) newStep.lead_time = 0.0;
   rotationSteps.splice(index, 0, newStep);
   renderTimeline();
   renderRightPanel();
@@ -3670,6 +3725,7 @@ function insertSub30OptionalAt(index) {
 
 function renderTimeline() {
   queueMicrotask(vizOnRotationChanged);
+  renderDefaultLeadControl();
   renderPreCombat();
   renderWeave();
   const container = document.getElementById("timelineContainer");
@@ -3809,9 +3865,9 @@ function renderTimeline() {
       );
       const offGcdControlsHtml = isOffGcd ? `
         <span class="badge badge-offgcd" title="Off-GCD: Casts early before next GCD">Off-GCD (Early Weave)</span>
-        <label style="font-size:11px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;color:var(--text-muted);" title="Seconds to pre-cast before next GCD finishes (default 0.4s, 0 to disable)">
+        <label style="font-size:11px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;color:var(--text-muted);" title="Seconds to pre-cast before next GCD finishes (empty = rotation default lead, 0 to disable)">
           Lead:
-          <input type="number" step="0.05" min="0" max="1.5" style="width:52px;padding:2px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-main);" value="${step.lead_time !== undefined ? step.lead_time : 0.4}" onchange="updateStepLeadTime(${idx}, this.value)">s
+          <input type="number" step="0.05" min="0" max="1.5" style="width:52px;padding:2px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-main);" ${leadInputAttrs(step.lead_time, effectiveDefaultLead())} onchange="updateStepLeadTime(${idx}, this.value)">s
         </label>
       ` : "";
 
@@ -3866,9 +3922,9 @@ function renderTimeline() {
       );
       const offGcdControlsHtml = isOffGcd ? `
         <span class="badge badge-offgcd" title="Off-GCD: Casts early before next GCD">Off-GCD (Early Weave)</span>
-        <label style="font-size:11px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;color:var(--text-muted);" title="Seconds to pre-cast before next GCD finishes (default 0.4s, 0 to disable)">
+        <label style="font-size:11px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;color:var(--text-muted);" title="Seconds to pre-cast before next GCD finishes (empty = rotation default lead, 0 to disable)">
           Lead:
-          <input type="number" step="0.05" min="0" max="1.5" style="width:52px;padding:2px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-main);" value="${step.lead_time !== undefined ? step.lead_time : 0.4}" onchange="updateStepLeadTime(${idx}, this.value)">s
+          <input type="number" step="0.05" min="0" max="1.5" style="width:52px;padding:2px 4px;font-size:11px;border-radius:4px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-main);" ${leadInputAttrs(step.lead_time, effectiveDefaultLead())} onchange="updateStepLeadTime(${idx}, this.value)">s
         </label>
       ` : `
         <label style="font-size:11px;margin-left:6px;display:inline-flex;align-items:center;gap:3px;color:var(--text-muted);" title="Seconds to pre-cast before next GCD finishes">
@@ -3959,11 +4015,12 @@ function renderTimeline() {
           const rowAbl = resolveAbilityDisplay(row.ability_id);
           const rowIconHtml = getAbilityIconHtml(rowAbl?.icon, "pool-row-icon");
           const isRowOffGcd = rowAbl && !rowAbl.triggers_gcd;
-          const rowLeadVal = (row.lead_time !== undefined && row.lead_time !== null) ? row.lead_time : 0.4;
+          // An unset row lead falls back to the block's lead, then to the rotation default (rotation.py).
+          const blockLead = (step.lead_time !== undefined && step.lead_time !== null) ? Number(step.lead_time) : effectiveDefaultLead();
           const rowOffGcdBadge = isRowOffGcd ? `
             <span class="badge badge-offgcd" style="font-size:10px;padding:1px 4px;margin-left:4px;" title="Off-GCD Ability: will be evaluated early before next GCD">Off-GCD (Early Weave)</span>
             <label class="control-label" style="margin:0 0 0 4px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:3px;" title="Seconds before GCD ends to weave this off-GCD ability">Lead:
-              <input type="number" step="0.05" min="0" max="1.5" style="width:48px;padding:1px 4px;font-size:11px;" value="${rowLeadVal}" onclick="event.stopPropagation()" onchange="rotationSteps[${idx}].pool[${rIdx}].lead_time = parseFloat(this.value); renderTimeline(); renderRightPanel();" />s
+              <input type="number" step="0.05" min="0" max="1.5" style="width:48px;padding:1px 4px;font-size:11px;" ${leadInputAttrs(row.lead_time, blockLead)} onclick="event.stopPropagation()" onchange="updatePoolRowLeadTime(${idx}, ${rIdx}, this.value)" />s
             </label>` : "";
 
           const sub30RowClass = isRowSub30 ? " sub30-row-highlight" : "";
@@ -4436,7 +4493,8 @@ try { vizChannel = new BroadcastChannel(VIZ_CHANNEL_NAME); } catch (e) { vizChan
 
 function vizIsStale() {
   return !!dryRunResult
-    && (JSON.stringify(rotationSteps) !== dryRunRotationJson || JSON.stringify(weaveSteps) !== dryRunWeaveJson);
+    && (JSON.stringify(rotationSteps) !== dryRunRotationJson || JSON.stringify(weaveSteps) !== dryRunWeaveJson
+        || defaultLeadTime !== dryRunDefaultLead);
 }
 
 // Executable steps (no loop_anchor) with their index in rotationSteps.
@@ -4541,7 +4599,7 @@ let redoStack = [];
 let undoLastJson = null; // snapshot the stacks are relative to; null = adopt the next one silently
 
 function undoSnapshotJson() {
-  return JSON.stringify({ r: rotationSteps, w: weaveSteps, p: preCombatSteps, pc: pullConditions, pm: pullMaxWait });
+  return JSON.stringify({ r: rotationSteps, w: weaveSteps, p: preCombatSteps, pc: pullConditions, pm: pullMaxWait, dl: defaultLeadTime });
 }
 
 // A rotation was loaded or imported: its history starts fresh.
@@ -4568,6 +4626,7 @@ function undoApply(json) {
   preCombatSteps = s.p;
   pullConditions = s.pc;
   pullMaxWait = s.pm;
+  defaultLeadTime = parseDefaultLead(s.dl);
   const active = activeBlockIndex === null ? null : rotationSteps[activeBlockIndex];
   if (!active || active.type !== "priority_block") activeBlockIndex = null;
   undoLastJson = json;
@@ -4965,6 +5024,7 @@ async function runDryRunSimulation() {
         pre_combat: preCombatSteps,
         weave: weaveSteps,
         ...pullGatePayload(),
+        ...defaultLeadPayload(),
         duration: 30.0
       })
     });
@@ -4981,6 +5041,7 @@ async function runDryRunSimulation() {
   dryRunResult = data;
   dryRunRotationJson = JSON.stringify(rotationSteps);
   dryRunWeaveJson = JSON.stringify(weaveSteps);
+  dryRunDefaultLead = defaultLeadTime;
   dryRunRotationSnapshot = JSON.parse(dryRunRotationJson);
   renderRightPanel();
   vizBroadcastState();
@@ -5032,7 +5093,8 @@ async function saveRotationToDisk() {
         steps: rotationSteps,
         pre_combat: preCombatSteps,
         weave: weaveSteps,
-        ...pullGatePayload()
+        ...pullGatePayload(),
+        ...defaultLeadPayload()
       })
     });
     data = await res.json();
