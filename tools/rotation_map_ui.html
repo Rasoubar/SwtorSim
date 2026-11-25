@@ -597,8 +597,9 @@ function renderRuleFields(existingVal = null) {
 function openRulePop(target, editKey, anchorEl) {
   closePops();
   const conditions = (STATE.catalog && STATE.catalog.conditions) || [];
+  const pickable = conditions.filter((c) => c.picker !== false);
   const pop = document.getElementById("rulePop");
-  const options = conditions.map((c) => `<option value="${esc(c.key)}">${esc(c.category)}: ${esc(c.label)} (${esc(c.key)})</option>`).join("");
+  const options = pickable.map((c) => `<option value="${esc(c.key)}">${esc(c.category)}: ${esc(c.label)} (${esc(c.key)})</option>`).join("");
   pop.innerHTML = `
     <div class="pop-title">${editKey ? "Edit rule" : "Add rule"}: ${esc(target.name)}</div>
     <div class="form-group">
@@ -616,9 +617,10 @@ function openRulePop(target, editKey, anchorEl) {
   const sel = document.getElementById("rpKey");
   let initial = null;
   if (editKey && editKey in target.raw) {
-    if (conditions.some((c) => c.key === editKey)) {
-      sel.value = editKey;
-      initial = target.raw[editKey];
+    const prepared = RuleForm.prepare(editKey, target.raw[editKey]);
+    if (pickable.some((c) => c.key === prepared.key)) {
+      sel.value = prepared.key;
+      initial = prepared.value;
     } else {
       // Unknown key (typo or removed rule): never guess a replacement; Save stays disabled until a type is picked.
       const opt = document.createElement("option");
@@ -639,7 +641,7 @@ function openRulePop(target, editKey, anchorEl) {
     const key = sel.value;
     const read = RuleForm.readValue(key);
     if (read.error) { document.getElementById("rpErr").textContent = read.error; return; }
-    send({ op: "setRule", scope: ruleCtx.scope, step: ruleCtx.step, row: ruleCtx.row, key, value: read.value, editKey: ruleCtx.editKey });
+    send({ op: "setRule", scope: ruleCtx.scope, step: ruleCtx.step, row: ruleCtx.row, key: read.key || key, value: read.value, editKey: ruleCtx.editKey });
     closePops();
   });
   placePop(pop, anchorEl);

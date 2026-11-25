@@ -12,6 +12,55 @@
     return String(str ?? "").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
   }
 
+  // The five operators compare_values accepts. Same labels the stack rule already used.
+  const COMPARISON_OPTIONS = [
+    ["gte", "&ge; (At least)", ["gte", ">="]],
+    ["eq", "== (Exactly)", ["eq", "==", "="]],
+    ["lte", "&le; (At most)", ["lte", "<="]],
+    ["gt", "&gt; (Greater than)", ["gt", ">"]],
+    ["lt", "&lt; (Less than)", ["lt", "<"]]
+  ];
+
+  function comparisonSelect(id, curOp) {
+    const current = String(curOp ?? "");
+    const opts = COMPARISON_OPTIONS.map(([value, label, aliases]) => {
+      const selected = aliases.indexOf(current) !== -1 ? "selected" : "";
+      return `<option value="${value}" ${selected}>${label}</option>`;
+    }).join("");
+    return `<select id="${id}" style="width:100%;">${opts}</select>`;
+  }
+
+  // Old keys keep their historical operator when a pill is opened, then Save writes the new key.
+  const LEGACY_RULES = {
+    target_hp_below_pct: { key: "target_hp_pct", comparison: "lte", kind: "hp" },
+    target_hp_above_pct: { key: "target_hp_pct", comparison: "gt", kind: "hp" },
+    caster_energy_below: { key: "caster_energy", comparison: "lt", kind: "energy" },
+    caster_energy_above: { key: "caster_energy", comparison: "gte", kind: "energy" },
+    proc_cooldown_above: { key: "proc_cooldown", comparison: "gt", kind: "named" },
+    ability_cooldown_under: { key: "ability_cooldown", comparison: "lt", kind: "named" },
+    ability_cooldown_above: { key: "ability_cooldown", comparison: "gt", kind: "named" }
+  };
+
+  function prepare(key, value) {
+    const legacy = LEGACY_RULES[key];
+    if (!legacy) return { key: key, value: value };
+    if (legacy.kind === "hp") {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return { key: legacy.key, value: Object.assign({}, value, { comparison: legacy.comparison }) };
+      }
+      return { key: legacy.key, value: { pct: value, comparison: legacy.comparison } };
+    }
+    if (legacy.kind === "energy") {
+      const amount = (value && typeof value === "object") ? (value.value ?? value.threshold ?? 0) : value;
+      return { key: legacy.key, value: { value: amount, comparison: legacy.comparison } };
+    }
+    const named = (value && typeof value === "object") ? value : {};
+    return {
+      key: legacy.key,
+      value: { name: named.name || "", value: named.value, comparison: legacy.comparison }
+    };
+  }
+
   // Pick lists for the form, built from the builder's loadout catalog.
   function listsFromLoadout(loadout) {
     const lo = loadout || {};
@@ -53,6 +102,9 @@
 
   // HTML of the value fields for one condition key; null when the key has no guided form.
   function fieldsHtml(key, existingVal, lists) {
+    const prepared = prepare(key, existingVal);
+    key = prepared.key;
+    existingVal = prepared.value;
     const buffItems = (lists && lists.buffItems) || [];
     const debuffItems = (lists && lists.debuffItems) || [];
     const procItems = (lists && lists.procItems) || [];
@@ -101,13 +153,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Comparison Operator</label>
-          <select id="ruleStackOpInput" style="width:100%;">
-            <option value="gte" ${curOp === "gte" || curOp === ">=" ? "selected" : ""}>&ge; (At least)</option>
-            <option value="eq" ${curOp === "eq" || curOp === "==" ? "selected" : ""}>== (Exactly)</option>
-            <option value="lte" ${curOp === "lte" || curOp === "<=" ? "selected" : ""}>&le; (At most)</option>
-            <option value="gt" ${curOp === "gt" || curOp === ">" ? "selected" : ""}>&gt; (Greater than)</option>
-            <option value="lt" ${curOp === "lt" || curOp === "<" ? "selected" : ""}>&lt; (Less than)</option>
-          </select>
+          ${comparisonSelect("ruleStackOpInput", curOp)}
         </div>
         <div class="form-group">
           <label>Required Stacks</label>
@@ -117,17 +163,23 @@
     `;
     }
 
-    if (key === "target_hp_below_pct" || key === "target_hp_above_pct") {
+    if (key === "target_hp_pct") {
       let curDec = 0.4;
       let curBypass = "";
+      let curOp = "lte";
       if (typeof existingVal === "number") {
         curDec = existingVal;
       } else if (existingVal && typeof existingVal === "object") {
         curDec = existingVal.pct ?? 0.4;
         curBypass = existingVal.bypass_if_buff_active || "";
+        curOp = existingVal.comparison || existingVal.operator || "lte";
       }
       return `
       <div class="form-row">
+        <div class="form-group">
+          <label>Comparison Operator</label>
+          ${comparisonSelect("ruleHpOpInput", curOp)}
+        </div>
         <div class="form-group">
           <label>Decimal Fraction (0.0 - 1.0)</label>
           <input type="number" id="ruleHpDecInput" min="0.01" max="1.0" step="0.05" value="${escapeAttr(curDec)}" style="width:100%;" oninput="document.getElementById('ruleHpPctPreview').textContent = Math.round(this.value * 100) + '%'">
@@ -137,51 +189,76 @@
           <div id="ruleHpPctPreview" style="padding:6px 10px;font-weight:700;color:var(--accent);font-size:14px;">${Math.round(curDec * 100)}%</div>
         </div>
       </div>
-      ${key === "target_hp_below_pct" ? `
       <div class="form-group">
         <label>Optional: Bypass HP Check if Caster Buff Active</label>
         ${buildDatalistOrSelect("ruleHpBypassInput", buffItems, curBypass, "Bypass Buff")}
-      </div>` : ""}
-    `;
-    }
-
-    if (key === "caster_energy_below" || key === "caster_energy_above") {
-      const cur = typeof existingVal === "number" ? existingVal : 35;
-      return `
-      <div class="form-group">
-        <label>Resource Threshold (Force / Energy / Heat)</label>
-        <input type="number" id="ruleResourceInput" min="0" max="600" step="5" value="${escapeAttr(cur)}" style="width:100%;">
       </div>
     `;
     }
 
-    if (key === "proc_cooldown_above") {
+    if (key === "caster_energy") {
+      let cur = 35;
+      let curOp = "gte";
+      if (typeof existingVal === "number") {
+        cur = existingVal;
+      } else if (existingVal && typeof existingVal === "object") {
+        cur = existingVal.value ?? existingVal.threshold ?? 35;
+        curOp = existingVal.comparison || existingVal.operator || "gte";
+      }
+      return `
+      <div class="form-row">
+        <div class="form-group">
+          <label>Comparison Operator</label>
+          ${comparisonSelect("ruleEnergyOpInput", curOp)}
+        </div>
+        <div class="form-group">
+          <label>Resource Threshold (Force / Energy / Heat)</label>
+          <input type="number" id="ruleResourceInput" min="0" max="600" step="5" value="${escapeAttr(cur)}" style="width:100%;">
+        </div>
+      </div>
+    `;
+    }
+
+    if (key === "proc_cooldown") {
       const curName = (existingVal && existingVal.name) ? existingVal.name : (procItems[0]?.name || "Bloodletting");
       const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 1.5;
+      const curOp = (existingVal && (existingVal.comparison || existingVal.operator)) || "gt";
       return `
       <div class="form-group">
         <label>Proc / Lockout Name</label>
         ${buildDatalistOrSelect("ruleProcNameInput", procItems, curName, "Proc")}
       </div>
-      <div class="form-group">
-        <label>Remaining Lockout / ICD Above (seconds)</label>
-        <input type="number" id="ruleProcSecInput" min="0" max="120" step="0.1" value="${escapeAttr(curVal)}" style="width:100%;">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Comparison Operator</label>
+          ${comparisonSelect("ruleProcOpInput", curOp)}
+        </div>
+        <div class="form-group">
+          <label>Remaining Lockout / ICD (seconds)</label>
+          <input type="number" id="ruleProcSecInput" min="0" max="120" step="0.1" value="${escapeAttr(curVal)}" style="width:100%;">
+        </div>
       </div>
     `;
     }
 
-    if (key === "ability_cooldown_under" || key === "ability_cooldown_above") {
-      const isAbove = key === "ability_cooldown_above";
+    if (key === "ability_cooldown") {
       const curName = (existingVal && existingVal.name) ? existingVal.name : (abilityItems[0]?.name || "");
       const curVal = (existingVal && existingVal.value !== undefined) ? existingVal.value : 1.5;
+      const curOp = (existingVal && (existingVal.comparison || existingVal.operator)) || "lt";
       return `
       <div class="form-group">
         <label>Ability Name</label>
         ${buildDatalistOrSelect("ruleAblCdNameInput", abilityItems, curName, "Ability")}
       </div>
-      <div class="form-group">
-        <label>Remaining Cooldown ${isAbove ? "Above" : "Under"} (seconds)</label>
-        <input type="number" id="ruleAblCdSecInput" min="0" max="180" step="0.1" value="${escapeAttr(curVal)}" style="width:100%;">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Comparison Operator</label>
+          ${comparisonSelect("ruleAblCdOpInput", curOp)}
+        </div>
+        <div class="form-group">
+          <label>Remaining Cooldown (seconds)</label>
+          <input type="number" id="ruleAblCdSecInput" min="0" max="180" step="0.1" value="${escapeAttr(curVal)}" style="width:100%;">
+        </div>
       </div>
     `;
     }
@@ -197,6 +274,8 @@
 
   // Read the form back into a rule value: { value } on success, { error } when a field is missing.
   function readValue(key) {
+    const prepared = prepare(key, null);
+    key = prepared.key;
     const el = (id) => document.getElementById(id);
     let value = null;
 
@@ -212,29 +291,33 @@
       const count = parseInt(el("ruleStackCountInput").value, 10) || 1;
       if (!name) return { error: "Please select or enter an effect name." };
       value = op === "gte" ? [name, count] : [name, count, op];
-    } else if (key === "target_hp_below_pct" || key === "target_hp_above_pct") {
+    } else if (key === "target_hp_pct") {
       let dec = parseFloat(el("ruleHpDecInput").value);
       if (isNaN(dec) || dec <= 0) dec = 0.4;
       if (dec > 1.0) dec = Number((dec / 100.0).toFixed(4));
       const bypassEl = el("ruleHpBypassInput");
       const bypass = bypassEl ? bypassEl.value.trim() : "";
-      value = bypass ? { pct: dec, bypass_if_buff_active: bypass } : dec;
-    } else if (key === "caster_energy_below" || key === "caster_energy_above") {
-      value = parseFloat(el("ruleResourceInput").value) || 0;
-    } else if (key === "proc_cooldown_above") {
+      value = { pct: dec, comparison: el("ruleHpOpInput").value };
+      if (bypass) value.bypass_if_buff_active = bypass;
+    } else if (key === "caster_energy") {
+      value = {
+        value: parseFloat(el("ruleResourceInput").value) || 0,
+        comparison: el("ruleEnergyOpInput").value
+      };
+    } else if (key === "proc_cooldown") {
       const name = el("ruleProcNameInput").value.trim();
       const sec = readNonNegative(el("ruleProcSecInput"), 0.5);
       if (!name) return { error: "Please select or enter a proc name." };
-      value = { name, value: sec };
-    } else if (key === "ability_cooldown_under" || key === "ability_cooldown_above") {
+      value = { name: name, value: sec, comparison: el("ruleProcOpInput").value };
+    } else if (key === "ability_cooldown") {
       const name = el("ruleAblCdNameInput").value.trim();
       const sec = readNonNegative(el("ruleAblCdSecInput"), 1.5);
       if (!name) return { error: "Please select or enter an ability name." };
-      value = { name, value: sec };
+      value = { name: name, value: sec, comparison: el("ruleAblCdOpInput").value };
     }
 
-    return { value };
+    return { value: value, key: key };
   }
 
-  global.RuleForm = { listsFromLoadout, fieldsHtml, readValue };
+  global.RuleForm = { listsFromLoadout, fieldsHtml, readValue, prepare };
 })(window);

@@ -99,7 +99,19 @@
     const list = (v, j) => (Array.isArray(v) ? v.join(j) : String(v));
     const pct = (v) => `${Math.round(Number(v) * 100)}%`;
     const named = (lbl) => (val && typeof val === "object" ? `${lbl.replace("{v}", val.value)}: ${val.name}` : `${key}: ${JSON.stringify(val)}`);
+    const ops = { lt: "<", le: "≤", lte: "≤", gt: ">", ge: "≥", gte: "≥", eq: "=", "==": "=", ne: "≠" };
+    const opOf = (o, fallback) => ops[String(o || fallback).toLowerCase()] || String(o || fallback);
+    const obj = val && typeof val === "object" && !Array.isArray(val) ? val : null;
     switch (key) {
+      case "target_hp_pct": {
+        const sym = opOf(obj && (obj.comparison || obj.operator), "≤");
+        const shown = `Target HP ${sym} ${pct(obj ? obj.pct ?? 0.3 : val)}`;
+        return obj && obj.bypass_if_buff_active ? `${shown} (or buff: ${obj.bypass_if_buff_active})` : shown;
+      }
+      case "caster_energy":
+        return `Energy/Force ${opOf(obj && (obj.comparison || obj.operator), "≥")} ${obj ? (obj.value ?? obj.threshold) : val}`;
+      case "proc_cooldown": return named(`Proc ICD ${opOf(obj && (obj.comparison || obj.operator), ">")} {v}s`);
+      case "ability_cooldown": return named(`Ability CD ${opOf(obj && (obj.comparison || obj.operator), "<")} {v}s`);
       case "target_hp_below_pct":
         if (val && typeof val === "object") return `Target HP ≤ ${pct(val.pct ?? 0.3)} (or buff: ${val.bypass_if_buff_active})`;
         return `Target HP ≤ ${pct(val)}`;
@@ -119,8 +131,7 @@
       case "target_debuff_stacks":
       case "target_has_debuff_stacks": {
         const lbl = key.startsWith("target") ? "Target Debuff Stacks" : "Caster Buff Stacks";
-        const ops = { lt: "<", le: "≤", lte: "≤", gt: ">", ge: "≥", gte: "≥", eq: "=", ne: "≠" };
-        const op = (o) => ops[String(o || ">=").toLowerCase()] || String(o || ">=");
+        const op = (o) => opOf(o, ">=");
         if (Array.isArray(val)) return `${lbl}: ${val[0]} ${op(val[2])} ${val[1]}`;
         if (val && typeof val === "object") {
           const bName = val.name || val.buff || val.debuff || val.ability_spec || "?";
