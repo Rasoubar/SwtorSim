@@ -1,0 +1,45 @@
+{
+  "class": "Operative",
+  "spec": "Lethality",
+  "spec_path": "data/extractor/pts/disciplines/operative/lethality.json",
+  "environment": "pts",
+  "stats_path": "data/builds/L85_13gcd_yellow.json",
+  "main_hand": {
+    "min": 2305,
+    "max": 4280
+  },
+  "off_hand": null,
+  "rotation_path": "data/rotations/operative/lethality/Rotation.json",
+  "choices": {
+    "23": 1,
+    "27": 2,
+    "39": 1,
+    "43": 3,
+    "51": 3,
+    "64": 2,
+    "68": 3,
+    "73": 1
+  },
+  "tactical_fqn": "abl.itm.tactical.sow.generic.offensive.damage_increase_on_damage_dealt_01",
+  "legendary_fqns": [
+    "abl.itm.legendary.age_smu.locked_and_loaded",
+    "abl.itm.legendary.age_smu.ope_sco.tactician"
+  ],
+  "relic_fqns": [
+    "abl.itm.relic.onhit.primary_stat.scales_with_item_rating",
+    "abl.itm.relic.onhit.dps_critrating.scales_with_item_rating"
+  ],
+  "mode": "BATCH",
+  "iterations": 100,
+  "duration": 1000,
+  "level": 85,
+  "dummy_hp": 10000000,
+  "seed": 799131,
+  "training_dummy_armor_debuff": true,
+  "enable_stem_matching": false,
+  "enable_projectile_flight_time": false,
+  "in_flashpoint_operation": true,
+  "combat_distance": 4,
+  "gcd_stall": 0.3,
+  "incoming_attack_interval": 0
+}

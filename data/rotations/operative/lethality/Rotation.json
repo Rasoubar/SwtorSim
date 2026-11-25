@@ -1,0 +1,128 @@
+{
+    "pre_combat": [
+        {
+            "ability": "stealth"
+        }
+    ],
+    "weave": [
+        {
+            "ability_id": "experimental_stim",
+            "rules": {
+                "caster_buff_stacks": [
+                    "Tactical Advantage",
+                    2,
+                    "lt"
+                ]
+            }
+        },
+        {
+            "ability_id": "holotraverse",
+            "rules": {
+                "caster_buff_stacks": [
+                    "Tactical Advantage",
+                    2,
+                    "lt"
+                ]
+            }
+        }
+    ],
+    "sequence": [
+        {
+            "type": "optional",
+            "ability_id": "experimental_stim",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "lethal_strike"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "corrosive_grenade"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "toxic_blast"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "corrosive_dart"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "corrosive_assault"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "shiv"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "corrosive_assault"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "corrosive_assault"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "lethal_strike"
+        },
+        {
+            "type": "loop_anchor"
+        },
+        {
+            "type": "priority_block",
+            "name": "Priority Window 13",
+            "pool": [
+                {
+                    "ability_id": "lethal_strike",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "toxic_haze",
+                    "rules": {
+                        "ability_cooldown_under": {
+                            "name": "Toxic Blast",
+                            "value": 1.5
+                        }
+                    }
+                },
+                {
+                    "ability_id": "toxic_blast",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "corrosive_grenade",
+                    "rules": {
+                        "target_doesnt_have_debuff": "Corrosive Grenade"
+                    }
+                },
+                {
+                    "ability_id": "corrosive_dart",
+                    "rules": {
+                        "target_doesnt_have_debuff": "Corrosive Dart"
+                    }
+                },
+                {
+                    "ability_id": "shiv",
+                    "rules": {
+                        "caster_buff_stacks": [
+                            "Tactical Advantage",
+                            2,
+                            "lt"
+                        ]
+                    }
+                },
+                {
+                    "ability_id": "corrosive_assault",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "rifle_shot",
+                    "rules": {}
+                }
+            ]
+        }
+    ]
+}
