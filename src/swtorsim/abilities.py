@@ -409,6 +409,21 @@ class Effect:
             self.schedule_timer_branches(sim, caster, effect_target, context=branch_ctx, ability=ability)
             return
 
+        # An instant effect never reaches Entity.apply_effect, which is where lasting effects are announced. Announce it
+        # the same way, so listeners keyed on its tags hear it: Tactical Advantage / Upper Hand gain a stack when an
+        # instant `ta_granter` / `uh_granter` effect (Corrosive Return, Fatality, Lethal Strike, ...) is received.
+        if sim is not None and ability is not None and effect_target is not None and hasattr(sim, "triggers"):
+            eff_ctx = {
+                "caster": caster or effect_target,
+                "target": effect_target,
+                "tags": frozenset(self.tags),
+                "effect_tags": frozenset(self.tags),
+                "ability_spec": getattr(ability, "fqn", None),
+                "include_effect_refreshes": False,
+            }
+            sim.triggers.dispatch("on_effect_applied", sim, eff_ctx)
+            sim.triggers.dispatch("on_effect_received", sim, eff_ctx)
+
         self.execute_triggered_branches(
             "on_apply",
             sim,
@@ -1769,37 +1784,13 @@ class Ability:
         ability_target = target if self.targets_enemy else caster
 
         # Route by channel or cast activation (resolved above, before resource spending)
-        dispatch_post_activate = True
         activation = object()
         prev_activation = getattr(sim, "current_activation", None) if sim is not None else None
         if sim is not None:
             sim.current_activation = activation
-        try:
-            if act_type == "channel" and act_dur > 0.0:
-                self._start_channel(caster, ability_target, sim, act_dur)
-            elif act_type == "cast" and act_dur > 0.0:
-                if is_timed_cast:
-                    caster.active_cast = self
-                    caster.is_casting = True
-                    from src.swtorsim.events import CastFinishEvent
-                    sim.schedule_absolute(
-                        sim.current_time + scaled_cast_time,
-                        CastFinishEvent(
-                            caster=caster,
-                            target=ability_target,
-                            ability=self,
-                            entry_effect_ids=list(self.entry_effect_ids),
-                        ),
-                    )
-                    dispatch_post_activate = False
-                else:
-                    for entry_id in self.entry_effect_ids:
-                        self.execute_effect(entry_id, caster, ability_target, sim)
-            else:
-                for entry_id in self.entry_effect_ids:
-                    self.execute_effect(entry_id, caster, ability_target, sim)
 
-            if dispatch_post_activate and sim is not None and hasattr(sim, "triggers"):
+        def dispatch_post_activate():
+            if sim is not None and hasattr(sim, "triggers"):
                 sim.triggers.dispatch(
                     "on_ability_post_activate",
                     sim,
@@ -1813,6 +1804,39 @@ class Ability:
                         "activation": activation,
                     },
                 )
+
+        try:
+            if act_type == "channel" and act_dur > 0.0:
+                self._start_channel(caster, ability_target, sim, act_dur)
+                dispatch_post_activate()
+            elif act_type == "cast" and act_dur > 0.0 and is_timed_cast:
+                caster.active_cast = self
+                caster.is_casting = True
+                from src.swtorsim.events import CastFinishEvent
+                sim.schedule_absolute(
+                    sim.current_time + scaled_cast_time,
+                    CastFinishEvent(
+                        caster=caster,
+                        target=ability_target,
+                        ability=self,
+                        entry_effect_ids=list(self.entry_effect_ids),
+                    ),
+                )
+            elif act_type == "cast" and act_dur > 0.0:
+                # A cast whose cast time is reduced to 0 resolves now, in the cast-finish order: entry effects, then
+                # post-activate (Convection's +10% on Lightning Bolt is removed at the bolt's post-activate).
+                for entry_id in self.entry_effect_ids:
+                    self.execute_effect(entry_id, caster, ability_target, sim)
+                dispatch_post_activate()
+            else:
+                # Instant: post-activate runs before the entry effects, so what it spends or grants is settled before
+                # the hits are calculated and their damage triggers fire. Energize grants Energize_3 (+50% Force crit
+                # damage on Shock, 1s) at Shock's post-activate, while Shock's hit removes Energize; War Machine marks
+                # Adrenaline Rush at its post-activate for that cast's entry effect; Corrosive Return needs the Tactical
+                # Advantage that Corrosive Assault spends at post-activate to be gone when its hit lands.
+                dispatch_post_activate()
+                for entry_id in self.entry_effect_ids:
+                    self.execute_effect(entry_id, caster, ability_target, sim)
         finally:
             if sim is not None:
                 sim.current_activation = prev_activation
