@@ -11,6 +11,7 @@ from src.swtorsim.events import ChargeRestoreEvent, DamageHit, HitGroup, Resourc
 from src.swtorsim.requirements import validate_all
 from src.swtorsim.engine import sim_log
 from src.swtorsim.metrics import has_proper_effect_name
+from src.swtorsim.triggers import _LIFECYCLE_TRIGGERS, _collect_trigger_mods, effective_proc_chance
 
 
 
@@ -268,9 +269,19 @@ class Effect:
                         if "is_successful" in bools and "is_successful" in branch_context:
                             if bools["is_successful"] != branch_context["is_successful"]:
                                 continue
-                    if trigger_name == "on_stack_charge_decreased":
-                        # e.g. Deathmark's 50% chance to refund the consumed stack
+                    if trigger_name in _LIFECYCLE_TRIGGERS:
+                        # The TriggerManager never dispatches lifecycle triggers, so their proc chance is
+                        # honored here (Deathmark's 50% stack refund, Forked Darkness' 25% per DoT tick).
                         proc_chance = (t.get("floats") or {}).get("proc_chance_percent")
+                        if proc_chance is not None:
+                            # Stat 228 bonuses, matched as on the bus: trigger tags + the owning effect's tags.
+                            _, proc_chance_mods = _collect_trigger_mods(caster)
+                            proc_chance = effective_proc_chance(
+                                proc_chance,
+                                proc_chance_mods,
+                                getattr(ability, "fqn", None),
+                                set(t.get("tags") or ()) | set(self.tags or ()),
+                            )
                     matched = True
                     break
                 if not matched:

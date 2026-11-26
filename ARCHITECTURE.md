@@ -15,7 +15,7 @@
 | `swtorsim/combat_curves.py` | Level 80 curves & armor constants | `player_standard_health, derived_stat, armor_constants` |
 | `swtorsim/modifiers.py` | Stat ID mapping & target filters | `Modifier :: applies_to, from_stat_change, from_modify_stat, from_modify_meta_stat, from_conditional_stat_mod`; `resolve_stat` |
 | `swtorsim/requirements.py` | Condition evaluation (36/36 types) | `validate_all, evaluate_extracted_conditions, evaluate_logic, evaluate_single_extracted_condition, check_proc_cooldown_above, entity_has_effect, get_entity_effect_stacks` |
-| `swtorsim/triggers.py` | Proc subscriptions, ICDs, dispatch | `TriggerManager :: subscribe, unsubscribe, get_remaining_icd, dispatch` |
+| `swtorsim/triggers.py` | Proc subscriptions, ICDs, dispatch | `TriggerManager :: subscribe, unsubscribe, get_remaining_icd, dispatch`; `effective_proc_chance` (base + stat 228, shared with `abilities.py :: Effect.execute_triggered_branches` for lifecycle triggers) |
 | `swtorsim/resources.py` | Resource pools & passive regen | `ResourcePool, StandardPool, HeatPool, EnergyPool, BuilderPool :: can_afford, spend, generate, tick_passive_regen` |
 | `swtorsim/rotation.py` | Priority list & step evaluation; loop-only `weave` list (entries tried like optional steps before every step after `loop_anchor`); rotation-wide `default_lead_time` (else `DEFAULT_OFF_GCD_LEAD_TIME`) for off-GCD steps without their own `lead_time` | `Rotation :: evaluate, get_next_lead_time, build_weave, pending_weave_step`; `resolve_default_lead_time`; `PriorityBlockStep, FixedAbilityStep, OptionalAbilityStep :: evaluate` |
 | `swtorsim/config_load.py` | Loadout & JSON hydration | `load_from_run_config, load_complete_loadout` |
@@ -69,7 +69,7 @@
 
 - **Effects**: `entities.py :: Entity.apply_effect` builds `effects.py :: ActiveEffect.from_effect`, scales stacks (`60`/`61`), duration (`44`), and tick rate (`45`), subscribes triggers (`TriggerManager.subscribe`), runs `on_apply`/`on_refresh`, and schedules `events.py :: DotTick` & `EffectExpire`.
 - **Stacks & Immunities**: `ActiveEffect.modify_stacks` (dispatches `on_stack_charge_increased/decreased`) vs `ActiveEffect.set_stacks` (silent cap); `Entity.immunities` unions `_base_immunities` and effect `immunities`.
-- **Conditions & Triggers**: `requirements.py :: evaluate_single_extracted_condition` & `evaluate_logic` evaluate 36 conditions; `check_proc_cooldown_above` queries `Player.proc_registry` (built by `setup.py :: build_proc_registry`) for authoritative `lockout_effect` and `trigger_icd` mappings; `triggers.py :: TriggerManager.dispatch` filters `spell_type, attack_type, weapon_mode`, tags, ICD (`interval_61` + `229`, then divided by the caster's Alacrity via `scale_time_modifier`, unrounded), and proc chance (`228`).
+- **Conditions & Triggers**: `requirements.py :: evaluate_single_extracted_condition` & `evaluate_logic` evaluate 36 conditions; `check_proc_cooldown_above` queries `Player.proc_registry` (built by `setup.py :: build_proc_registry`) for authoritative `lockout_effect` and `trigger_icd` mappings; `triggers.py :: TriggerManager.dispatch` filters `spell_type, attack_type, weapon_mode`, tags, ICD (`interval_61` + `229`, then divided by the caster's Alacrity via `scale_time_modifier`, unrounded), and proc chance (`228`). Lifecycle triggers (`on_apply, on_refresh, on_tick, on_stack_charge_*`) skip the bus; `abilities.py :: Effect.execute_triggered_branches` rolls their proc chance (+ `228`) itself.
 
 ## 5. "Where to Look" Quick-Reference Routing Table
 

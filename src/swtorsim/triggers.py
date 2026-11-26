@@ -57,6 +57,16 @@ def _collect_trigger_mods(caster):
     return rate_limit_mods, proc_chance_mods
 
 
+def effective_proc_chance(proc_chance, proc_chance_mods, ability_fqn, tags):
+    """A trigger's proc chance (0-100) plus the matching stat 228 bonuses, clamped to 0-100."""
+    bonus_proc = 0.0
+    for mod in proc_chance_mods:
+        if mod.applies_to(ability_fqn=ability_fqn, ability_tags=tags):
+            # Stat 228 is a fraction (0.3 = +30 points); proc_chance is on a 0-100 scale.
+            bonus_proc += float(mod.value) * 100.0
+    return min(100.0, max(0.0, proc_chance + bonus_proc))
+
+
 class TriggerManager:
     """Manages reactive proc listeners, actor/tag/attack-type filtering, and rate-limit lockouts."""
 
@@ -280,13 +290,7 @@ class TriggerManager:
             # 6. Proc chance check (STAT_eff_trigger_proc_chance_percent_modifier_fixed / 228)
             proc_chance = sub["proc_chance"]
             if proc_chance is not None:
-                bonus_proc = 0.0
-                for mod in proc_chance_mods:
-                    if mod.applies_to(ability_fqn=abl_fqn, ability_tags=sub_tags):
-                        # Stat 228 is a fraction (0.3 = +30 points); proc_chance is on a 0-100 scale.
-                        bonus_proc += float(mod.value) * 100.0
-
-                effective_proc = min(100.0, max(0.0, proc_chance + bonus_proc))
+                effective_proc = effective_proc_chance(proc_chance, proc_chance_mods, abl_fqn, sub_tags)
                 if effective_proc < 100.0:
                     if random.random() * 100.0 > effective_proc:
                         continue
