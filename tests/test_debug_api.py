@@ -60,6 +60,17 @@ class TraceAndMeasureTests(unittest.TestCase):
         self.assertTrue(self.trace["proc"]["evals"])
         json.dumps(self.trace)  # must be serializable as is
 
+    def test_trace_carries_the_stat_sheet_and_the_gear_the_page_shows(self):
+        derived, gear = self.trace["derived"], self.trace["gear"]
+        for key in ("mastery", "power", "crit_rating", "crit_chance", "crit_multiplier", "alacrity_rating", "alacrity_pct",
+                    "accuracy_rating", "gcd", "weapon_range"):
+            self.assertIn(key, derived)
+        self.assertGreater(derived["mastery"], 0)
+        config = json.loads(CONFIG.read_text(encoding="utf-8"))
+        self.assertEqual(gear["tactical"]["fqn"], config["tactical_fqn"])
+        self.assertEqual(sorted(x["fqn"] for x in gear["legendaries"]), sorted(config["legendary_fqns"]))
+        self.assertEqual(sorted(x["fqn"] for x in gear["relics"]), sorted(config["relic_fqns"]))
+
     def test_tracer_does_not_change_the_fight(self):
         """The traced run (with CombatTracer) and the untraced replays must be the same fight."""
         logs = []

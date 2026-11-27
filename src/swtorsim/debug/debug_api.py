@@ -241,6 +241,8 @@ def run_trace(*, config: str | None = None, setup: dict | None = None, environme
         "summary": trace["summary"],
         "character": initial.get("character"),
         "derived": initial.get("derived"),
+        "gear": {"tactical": initial.get("tactical"), "legendaries": initial.get("legendaries") or [],
+                 "relics": initial.get("relics") or []},
         "events": events,
         "rotation": trace["rotation_decisions"],
         "icons": icons,

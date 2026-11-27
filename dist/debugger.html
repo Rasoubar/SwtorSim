@@ -84,7 +84,7 @@ body[data-backend="native"] .web-only { display: none; }
 .pill { display: inline-block; padding: 0 7px; border-radius: 9px; background: var(--stripe); border: 1px solid var(--line); font-size: 12px; }
 @media (max-width: 960px) { main { grid-template-columns: 1fr; } #detail { position: static; max-height: none; } }
 </style>
-  <script src="pyodide_client.js?v=1795804033"></script>
+  <script src="pyodide_client.js?v=1795806971"></script>
 </head>
 <body>
 <header>
@@ -100,6 +100,7 @@ body[data-backend="native"] .web-only { display: none; }
 <main>
   <div class="col">
     <div class="card"><h2>Fight</h2><div id="summary"><span class="muted">No trace yet.</span></div></div>
+    <div class="card"><h2>Character &amp; gear (at the start of the fight)</h2><div id="character"><span class="muted">No trace yet.</span></div></div>
     <div class="card">
       <h2>Timeline</h2>
       <div class="tools">
@@ -325,7 +326,7 @@ function prepare() {
   decisions = trace.rotation || [];
   offset = trace.proc.time_offset || 0;
   buildEventRows(); eventStart = 0;
-  renderSummary(); renderBuffControls(); renderProcTable(); renderDecisions(); renderAbilityTable(); renderEventLog(); renderDetail(); layout(); draw();
+  renderSummary(); renderCharacter(); renderBuffControls(); renderProcTable(); renderDecisions(); renderAbilityTable(); renderEventLog(); renderDetail(); layout(); draw();
   $("stateview").className = "muted"; $("stateview").textContent = "Pick a time, or use \"Show state just before this\" on a selected item.";
 }
 
@@ -348,6 +349,29 @@ function renderSummary() {
   const items = [[Math.round(s.dps).toLocaleString(), "DPS"], [s.duration + "s", "Duration"], [s.total_hits, "Hits"], [s.crit_pct + "%", "Crit rate"],
     [s.casts_count, "Casts"], [c.class_name || "", [c.spec, c.environment].filter(Boolean).join(" ")]];
   $("summary").innerHTML = items.map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
+}
+
+// The stat sheet the fight started with (after gear, talents and passives) and the tactical / legendaries / relics loaded.
+function renderCharacter() {
+  const d = trace.derived || {}, g = trace.gear || {}, n = (v, digits = 0) => (v === undefined || v === null ? "-" : Number(v).toLocaleString(undefined, { maximumFractionDigits: digits }));
+  const pct = (v) => (v === undefined || v === null ? "-" : `${Number(v).toFixed(2)}%`);
+  const bonus = [["Force", d.bonus_damage_force], ["Tech", d.bonus_damage_tech], ["Melee", d.bonus_damage_melee], ["Ranged", d.bonus_damage_ranged]]
+    .filter(([, v]) => v).map(([k, v]) => `${k} ${n(v)}`).join(", ") || "-";
+  const rows = [
+    ["Mastery", `${n(d.mastery)}${d.base_mastery !== undefined && d.base_mastery !== d.mastery ? ` (base ${n(d.base_mastery)})` : ""}`],
+    ["Power", n(d.power)], ["Force / Tech power", `${n(d.force_power)} / ${n(d.tech_power)}`], ["Bonus damage", bonus],
+    ["Critical rating", n(d.crit_rating)], ["Crit chance", `${pct(d.base_crit_chance)}${d.coord_bonus_pct ? ` (+${pct(d.coord_bonus_pct)} class buff)` : ""}`],
+    ["Crit multiplier", pct(d.crit_multiplier)],
+    ["Alacrity rating", n(d.alacrity_rating)], ["Alacrity", pct(d.alacrity_pct)], ["GCD", d.gcd === undefined ? "-" : `${d.gcd}s`],
+    ["Accuracy rating", n(d.accuracy_rating)], ["Accuracy", pct(d.accuracy_pct)],
+    ["Main hand", d.weapon_range || "-"],
+    ...(d.armor_rating ? [["Armor rating", n(d.armor_rating)], ["Damage reduction", pct(d.damage_reduction)]] : []), // not set for a damage dummy fight
+    ...(d.max_health ? [["Max health", n(d.max_health)]] : []),
+  ];
+  const items = (list) => (list || []).map((x) => `${ic(x.name, 16)}${esc(x.name)}`).join(", ") || '<span class="muted">none</span>';
+  $("character").innerHTML = `<div class="kv" style="grid-template-columns:auto 1fr auto 1fr">${rows.map(([k, v]) => `<span>${esc(k)}</span><span>${esc(v)}</span>`).join("")}</div>
+    <div class="kv"><span>Tactical</span><span>${g.tactical ? `${ic(g.tactical.name, 16)}${esc(g.tactical.name)}` : '<span class="muted">none</span>'}</span>
+    <span>Legendaries</span><span>${items(g.legendaries)}</span><span>Relics</span><span>${items(g.relics)}</span></div>`;
 }
 
 function renderBuffControls() {

@@ -64,6 +64,12 @@ class PageHandshakeTests(unittest.TestCase):
         self.assertRegex(SIMULATOR_HTML, r'fetch\("/api/launch_debugger", \{ method: "POST"')  # the launch routes are POST routes
         self.assertNotIn("The debugger is not running", SIMULATOR_HTML)
 
+    def test_the_debugger_shows_the_stat_sheet_and_gear_it_runs_with(self):
+        self.assertIn('id="character"', DEBUGGER_HTML)
+        self.assertIn("renderCharacter()", DEBUGGER_HTML)
+        for field in ("d.mastery", "d.crit_rating", "d.alacrity_rating", "d.accuracy_rating", "g.tactical", "g.legendaries", "g.relics"):
+            self.assertIn(field, DEBUGGER_HTML)
+
     def test_the_simulator_has_the_button(self):
         self.assertIn('id="openDebuggerBtn"', SIMULATOR_HTML)
 
