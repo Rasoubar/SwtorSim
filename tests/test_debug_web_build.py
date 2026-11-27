@@ -75,6 +75,12 @@ class PageHandshakeTests(unittest.TestCase):
         self.assertIn('window.open("about:blank", "_blank")', SIMULATOR_HTML)
         self.assertNotIn("swtorsim_debugger\"", SIMULATOR_HTML)  # no shared window name that would reuse a tab
 
+    def test_the_debugger_shows_what_caused_each_event_and_orders_the_moment_box_by_it(self):
+        for text in ("function causeHtml()", "Caused by", "shaped it", "function causeTree(", "kidsOf", "a.nodelink"):
+            self.assertIn(text, DEBUGGER_HTML)
+        self.assertIn("w.end_cause", DEBUGGER_HTML)  # a buff's end hangs under what ended it
+        self.assertNotIn("CASCADE_INDENT", DEBUGGER_HTML)  # the fixed indent by kind is gone
+
     def test_both_pages_show_missed_hits(self):
         self.assertIn("data-logfilter=\"miss\"", SIMULATOR_HTML)
         self.assertIn('ev.category === "miss"', SIMULATOR_HTML)

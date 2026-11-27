@@ -59,6 +59,9 @@ tbody tr { cursor: pointer; }
 .why { padding: 8px 10px; border-radius: 6px; background: var(--stripe); border-left: 4px solid var(--muted); margin: 8px 0; }
 .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #fff; }
 .muted { color: var(--muted); }
+a.nodelink { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--muted); cursor: pointer; white-space: nowrap; }
+a.nodelink:hover { border-bottom-style: solid; }
+.chain { line-height: 2; }
 .good { color: var(--good); } .bad { color: var(--bad); }
 .bar { position: relative; height: 18px; background: var(--stripe); border: 1px solid var(--line); border-radius: 4px; margin: 8px 0 4px; }
 .bar .range { position: absolute; top: 3px; bottom: 3px; background: var(--accent); opacity: .5; border-radius: 3px; }
@@ -84,7 +87,7 @@ body[data-backend="native"] .web-only { display: none; }
 .pill { display: inline-block; padding: 0 7px; border-radius: 9px; background: var(--stripe); border: 1px solid var(--line); font-size: 12px; }
 @media (max-width: 960px) { main { grid-template-columns: 1fr; } #detail { position: static; max-height: none; } }
 </style>
-  <script src="pyodide_client.js?v=1795812473"></script>
+  <script src="pyodide_client.js?v=1795816029"></script>
 </head>
 <body>
 <header>
@@ -214,7 +217,7 @@ function iconImage(name) {
   return entry.ok ? entry.img : null;
 }
 
-let trace = null, hits = [], misses = [], casts = [], rules = [], evalsByRule = [], buffs = [], buffNames = [], decisions = [], offset = 0, eventRows = [], eventList = [], eventStart = 0, cascadeWindow = 0, cascadeMissed = false;
+let trace = null, hits = [], misses = [], casts = [], rules = [], evalsByRule = [], buffs = [], buffNames = [], decisions = [], offset = 0, eventRows = [], selectedRow = null, nodes = new Map(), rowByObj = new Map(), kidsOf = new Map(), eventList = [], eventStart = 0, cascadeWindow = 0, cascadeMissed = false;
 const changeCache = new Map();
 let shownRules = new Set(), shownBuffs = [], selected = null, lanes = [], view = { a: 0, b: 1 }, full = { a: 0, b: 1 };
 
@@ -310,7 +313,7 @@ function prepare() {
   rules = trace.proc.rules;
   evalsByRule = rules.map(() => []);
   for (const r of trace.proc.evals) {
-    evalsByRule[r[2]].push({ t: r[0], raw: r[1], rule: r[2], outcome: outcomes[r[3]], base: r[4], chance: r[5], draw: r[6], remaining: r[7], interval: r[8] });
+    evalsByRule[r[2]].push({ t: r[0], raw: r[1], rule: r[2], outcome: outcomes[r[3]], base: r[4], chance: r[5], draw: r[6], remaining: r[7], interval: r[8], cause: r[9] ?? null, node: r[10] ?? null });
   }
   evalsByRule.forEach((a) => a.sort((x, y) => x.t - y.t));
   rules.forEach((r) => { r.stats = ruleStats(r.id); });
@@ -414,6 +417,7 @@ function whyText(e) {
 function renderDetail() {
   syncEventLog();
   renderDetailCore();
+  if (selected && selected.obj) $("detailbody").insertAdjacentHTML("beforeend", causeHtml());
   if (selectedTimes()) { $("detailbody").insertAdjacentHTML("beforeend", '<div id="cascade"></div>'); renderCascade(); }
 }
 
@@ -728,7 +732,21 @@ function eventsBetween(t0, t1) {
   return out;
 }
 
-const CASCADE_INDENT = { decision: 0, cast: 1, hit: 2, buff: 2, fired: 3, missed: 3 };
+// The rows of a time window as a tree: an event sits under the event that caused it when that one is in the window too.
+// A row whose cause is outside the window is a root and says where it came from.
+function causeTree(all, showMissed) {
+  const inWin = new Set(all.map((x) => x.row)), out = [];
+  const walk = (row, depth) => {
+    if (!showMissed && row.type === "missed") return;
+    out.push({ row, index: row.idx, depth });
+    for (const kid of kidsOf.get(row.id) || []) if (inWin.has(kid)) walk(kid, depth + 1);
+  };
+  for (const { row } of all) {
+    const parent = row.cause !== null ? nodes.get(row.cause) : null;
+    if (!parent || !inWin.has(parent)) walk(row, 0);
+  }
+  return out;
+}
 
 function renderCascade() {
   const box = $("cascade"), tm = selectedTimes();
@@ -740,14 +758,18 @@ function renderCascade() {
     else if (row.type === "buff") { row.text === "applied" ? n.applied++ : n.ended++; }
     else if (n[row.type] !== undefined) n[row.type]++;
   }
-  const shown = all.filter((x) => cascadeMissed || x.row.type !== "missed");
-  const rows = shown.slice(0, 80).map(({ row, index }) => `<tr class="cas ${selected && selected.obj === row.sel.obj ? "sel" : ""}" data-ei="${index}"><td>${fmt(row.t - tm.t, 3)}s</td><td>${eventChip(row)}</td>
-    <td style="padding-left:${8 + 12 * CASCADE_INDENT[row.type]}px">${ic(row.name, 16)}${esc(row.name)}</td><td>${esc(row.text)}</td></tr>`).join("");
+  const shown = causeTree(all, cascadeMissed);
+  const order = new Map([...all].filter((x) => x.row.id !== null).sort((a, b) => a.row.id - b.row.id).map((x, i) => [x.row, i + 1]));
+  const rows = shown.slice(0, 80).map(({ row, index, depth }) => {
+    const from = depth === 0 && row.cause !== null ? nodes.get(row.cause) : null;
+    return `<tr class="cas ${selected && selected.obj === row.sel.obj ? "sel" : ""}" data-ei="${index}"><td title="Order it happened in, within this window">${order.has(row) ? `<span class="muted">#${order.get(row)}</span> ` : ""}${fmt(row.t - tm.t, 3)}s</td><td>${eventChip(row)}</td>
+    <td style="padding-left:${8 + 14 * Math.min(depth, 6)}px">${depth ? '<span class="muted">&#8627;</span> ' : ""}${ic(row.name, 16)}${esc(row.name)}</td><td>${esc(row.text)}${from ? ` <span class="muted">from ${esc(from.name)} at ${fmt(from.t, 2)}s</span>` : ""}</td></tr>`;
+  }).join("");
   const key = `${trace.config.name}|${tm.raw}|${W}`;
   box.innerHTML = `<h2>At this moment</h2>
     <div class="tools"><label style="flex-direction:row;align-items:center;gap:6px">Include the next <input id="cas-window" type="number" step="0.1" min="0" value="${W}" style="width:70px"> s</label>
       <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cas-missed" ${cascadeMissed ? "checked" : ""}> procs that did not fire</label></div>
-    <div class="muted" style="font-size:12px">Everything recorded at this instant${W > 0 ? ` and the next ${W}s` : ""}, grouped by kind. Events at the same time happened together; that is not proof that one caused another.</div>
+    <div class="muted" style="font-size:12px">Everything recorded at this instant${W > 0 ? ` and the next ${W}s` : ""}, as a tree: an event is indented under the event that caused it (a hit under its cast, a buff under the proc that granted it). The # is the order things happened in: a branch that issues several hits holds their procs, and what they consume, until it ends, so a proc under the first hit can come after the second hit. An event whose cause is outside this window shows where it came from.</div>
     <div style="margin:6px 0">${[`${n.cast} cast`, `${n.hit} hits (${n.damage.toLocaleString()} damage${n.crit ? `, ${n.crit} crit` : ""})`, `${n.fired} procs fired`, `${n.applied} buffs applied`, `${n.ended} ended`].map((s) => `<span class="pill">${s}</span>`).join(" ")}</div>
     <div class="scroll" style="max-height:260px"><table><tbody>${rows || '<tr><td colspan="4" class="muted">Nothing else at this moment.</td></tr>'}</tbody></table></div>
     ${shown.length > 80 ? `<div class="muted" style="font-size:12px">First 80 of ${shown.length}.</div>` : ""}
@@ -794,20 +816,53 @@ async function showChange(raw) {
 const EVENT_PAGE = 300;
 function buildEventRows() {
   const rows = [];
-  decisions.forEach((d) => rows.push({ t: d.t, type: "decision", name: d.chosen ?? (d.is_stall ? "stall" : "-"), text: d.step_name, sel: { kind: "decision", obj: d } }));
-  casts.forEach((c) => rows.push({ t: c.t, type: "cast", name: c.ability, text: c.is_channel ? `channel ${fmt(c.duration, 1)}s` : "", sel: { kind: "cast", obj: c } }));
-  hits.forEach((h) => rows.push({ t: h.t, type: "hit", name: h.ability, text: h.damage.toLocaleString() + (h.is_crit ? " crit" : ""), crit: h.is_crit, sel: { kind: "hit", obj: h } }));
-  misses.forEach((m) => rows.push({ t: m.t, type: "miss", name: m.ability, text: m.hand === "off" ? "missed (off hand)" : "missed", sel: { kind: "miss", obj: m } }));
+  // id: this event's id in the trace; cause: the id of the event that caused it (see "Caused by" in the detail panel).
+  decisions.forEach((d) => rows.push({ t: d.t, type: "decision", name: d.chosen ?? (d.is_stall ? "stall" : "-"), text: d.step_name, id: d.node ?? null, cause: null, sel: { kind: "decision", obj: d } }));
+  casts.forEach((c) => rows.push({ t: c.t, type: "cast", name: c.ability, text: c.is_channel ? `channel ${fmt(c.duration, 1)}s` : "", id: c.id, cause: c.cause ?? null, sel: { kind: "cast", obj: c } }));
+  hits.forEach((h) => rows.push({ t: h.t, type: "hit", name: h.ability, text: h.damage.toLocaleString() + (h.is_crit ? " crit" : ""), crit: h.is_crit, id: h.id, cause: h.cause ?? null, sel: { kind: "hit", obj: h } }));
+  misses.forEach((m) => rows.push({ t: m.t, type: "miss", name: m.ability, text: m.hand === "off" ? "missed (off hand)" : "missed", id: m.id, cause: m.cause ?? null, sel: { kind: "miss", obj: m } }));
   evalsByRule.forEach((list) => list.forEach((e) => rows.push({
-    t: e.t, type: e.outcome === "fired" ? "fired" : "missed", name: rules[e.rule].source, outcome: e.outcome,
+    t: e.t, type: e.outcome === "fired" ? "fired" : "missed", name: rules[e.rule].source, outcome: e.outcome, id: e.node, cause: e.cause,
     text: OUTCOME_LABEL[e.outcome] + (e.chance !== null ? ` (${fmt(e.chance, 1)}%)` : ""), sel: { kind: "eval", obj: e }
   })));
   buffs.filter((w) => !w.is_passive).forEach((w) => {
-    rows.push({ t: w.start, type: "buff", name: w.name, text: "applied", sel: { kind: "buff", obj: w } });
-    if (w.end !== null && w.end !== undefined) rows.push({ t: w.end, type: "buff", name: w.name, text: "ended", sel: { kind: "buff", obj: w } });
+    rows.push({ t: w.start, type: "buff", name: w.name, text: "applied", id: w.id ?? null, cause: w.cause ?? null, sel: { kind: "buff", obj: w } });
+    if (w.end !== null && w.end !== undefined) rows.push({ t: w.end, type: "buff", name: w.name, text: "ended", id: w.end_id ?? null, cause: w.end_cause ?? null, sel: { kind: "buff", obj: w } });
   });
   rows.sort((a, b) => a.t - b.t); // stable: at the same instant a decision comes before its cast, hits and procs
   eventRows = rows;
+  nodes = new Map(); rowByObj = new Map(); kidsOf = new Map();
+  rows.forEach((r, i) => { r.idx = i; if (r.id !== null) nodes.set(r.id, r); if (!rowByObj.has(r.sel.obj)) rowByObj.set(r.sel.obj, r); });
+  rows.forEach((r) => { if (r.cause !== null && nodes.has(r.cause)) { if (!kidsOf.has(r.cause)) kidsOf.set(r.cause, []); kidsOf.get(r.cause).push(r); } });
+  // Children in the order they happened (event ids count up as the engine works; a proc takes its id when it starts).
+  kidsOf.forEach((list) => list.sort((a, b) => a.t - b.t || (a.id ?? 1e12) - (b.id ?? 1e12)));
+}
+
+/* ---------- cause links: what caused this event, and what it caused ---------- */
+function nodeLink(r) { return `<a class="nodelink" data-row="${r.idx}" href="#">${eventChip(r)} ${ic(r.name, 14)}${esc(r.name)} <span class="muted">${fmt(r.t, 2)}s</span></a>`; }
+
+function causeChain(r) {
+  const out = [];
+  for (let c = nodes.get(r.cause), guard = 0; c && guard < 40; c = nodes.get(c.cause), guard++) out.unshift(c);
+  return out;
+}
+
+function causeHtml() {
+  const r = selectedRow && selectedRow.sel.obj === selected.obj ? selectedRow : rowByObj.get(selected.obj);
+  if (!r) return "";
+  const chain = causeChain(r), kids = kidsOf.get(r.id) || [];
+  let html = chain.length
+    ? `<h2>Caused by</h2><div class="chain">${chain.map(nodeLink).join(' <span class="muted">&rarr;</span> ')} <span class="muted">&rarr;</span> <b>this</b></div>`
+    : '<h2>Caused by</h2><div class="muted small">Nothing: this starts a chain (a rotation decision, resource regeneration or a pre-combat step).</div>';
+  if (r.type === "hit") {
+    const shaping = (r.sel.obj.shaped_by || []).map((s) => nodes.get(s.id)).filter(Boolean);
+    if (shaping.length) html += `<h2>Buffs and debuffs that shaped it (${shaping.length})</h2>${shaping.slice(0, 12).map((b) => {
+      const from = nodes.get(b.cause);
+      return `<div class="cand">${nodeLink(b)}${from ? ` <span class="muted">from</span> ${nodeLink(from)}` : ""}</div>`;
+    }).join("")}<div class="muted small">Only effects with their own start in the log are listed; permanent ones are not.</div>`;
+  }
+  if (kids.length) html += `<h2>Caused (${kids.length})</h2>${kids.slice(0, 12).map((k) => `<div class="cand">${nodeLink(k)} <span class="muted">${esc(k.text)}</span></div>`).join("")}${kids.length > 12 ? `<div class="muted small">${kids.length - 12} more: see the tree below.</div>` : ""}`;
+  return html;
 }
 
 function eventChip(r) {
@@ -857,7 +912,7 @@ function showEventAt(t) { if (t < view.a || t > view.b) { const span = view.b - 
 function selectEventRow(i) {
   const r = eventList[i];
   if (!r) return;
-  selected = r.sel; showEventAt(r.t); renderDetail(); draw();
+  selected = r.sel; selectedRow = r; showEventAt(r.t); renderDetail(); draw();
 }
 
 /* ---------- timeline ---------- */
@@ -1113,7 +1168,9 @@ $("detailbody").addEventListener("click", (ev) => {
   const c = ev.target.closest("button[data-change]");
   if (c) { showChange(Number(c.dataset.change)); return; }
   const row = ev.target.closest("tr.cas[data-ei]");
-  if (row) { const r = eventRows[Number(row.dataset.ei)]; selected = r.sel; showEventAt(r.t); renderDetail(); draw(); }
+  if (row) { const r = eventRows[Number(row.dataset.ei)]; selected = r.sel; selectedRow = r; showEventAt(r.t); renderDetail(); draw(); return; }
+  const link = ev.target.closest("a.nodelink[data-row]");
+  if (link) { ev.preventDefault(); const r = eventRows[Number(link.dataset.row)]; selected = r.sel; selectedRow = r; showEventAt(r.t); renderDetail(); draw(); }
 });
 $("detailbody").addEventListener("change", (ev) => {
   if (ev.target.id === "cas-window") { cascadeWindow = Math.max(0, Number(ev.target.value) || 0); renderCascade(); }

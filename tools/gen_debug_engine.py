@@ -52,6 +52,10 @@ _LOG_METHOD = '''    def _log_eval(self, sim, event_name, sub, outcome, **detail
             "trigger_index": sub["icd_key"][2],
             "kind": "bus",
         }
+        # Cause links: what was being processed when this was evaluated, and (for a proc that fired) its own event.
+        tracer = getattr(sim, "tracer", None)
+        rec["cause"] = tracer.current_cause_id() if tracer is not None else None
+        rec["node"] = None
         rec.update(detail)
         self.proc_log.append(rec)
 
@@ -125,10 +129,31 @@ TRIGGERS_PATCHES = [
         "                        continue\n",
     ),
     (
+        "cause frame opens",
+        '            ran = sub["ability"].execute_branch(\n',
+        '            _cause_frame = sim.tracer.begin_cause(reserve=True, trigger=event_name, context=context) if getattr(sim, "tracer", None) is not None else None\n'
+        '            ran = sub["ability"].execute_branch(\n',
+    ),
+    (
+        "cause frame closes when nothing fired",
+        "            trigger_mods.clear()  # the branch may have applied, removed or restacked effects\n",
+        "            trigger_mods.clear()  # the branch may have applied, removed or restacked effects\n"
+        "            if _cause_frame is not None and not ran:\n"
+        "                sim.tracer.end_cause(_cause_frame)\n",
+    ),
+    (
+        "proc event takes the frame",
+        '                    reason="Trigger conditions satisfied",\n',
+        '                    reason="Trigger conditions satisfied",\n'
+        "                    cause_frame=_cause_frame,\n",
+    ),
+    (
         "outcome after branch",
         '            if ran and getattr(sim, "tracer", None) is not None:\n',
         '            self._log_eval(sim, event_name, sub, "fired" if ran else "branch_did_not_run",\n'
-        "                           base_chance=proc_chance, chance=effective_proc, draw=draw)\n"
+        "                           base_chance=proc_chance, chance=effective_proc, draw=draw,\n"
+        '                           node=(_cause_frame["id"] if ran and _cause_frame is not None else None),\n'
+        '                           cause=(_cause_frame["parent"] if _cause_frame is not None else None))\n'
         '            if ran and getattr(sim, "tracer", None) is not None:\n',
     ),
 ]
@@ -199,7 +224,8 @@ TRIGGERED_BRANCHES_PATCHES = [
         '                    "source": getattr(ability, "name", None) or getattr(ability, "fqn", None),\n'
         '                    "fqn": getattr(ability, "fqn", None), "effect_key": self.name,\n'
         '                    "branch_index": branch.index, "trigger_index": matched_index, "kind": "lifecycle",\n'
-        '                    "base_chance": base_proc_chance, "chance": proc_chance, "draw": None,\n'
+        '                    "base_chance": base_proc_chance, "chance": proc_chance, "draw": None, "node": None,\n'
+        '                    "cause": (sim.tracer.current_cause_id() if getattr(sim, "tracer", None) is not None else None),\n'
         "                }\n"
         "                lifecycle_log.append(record)\n"
         "\n"

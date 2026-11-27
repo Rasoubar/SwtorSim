@@ -172,7 +172,8 @@ def effect_execute_triggered_branches(
                 "source": getattr(ability, "name", None) or getattr(ability, "fqn", None),
                 "fqn": getattr(ability, "fqn", None), "effect_key": self.name,
                 "branch_index": branch.index, "trigger_index": matched_index, "kind": "lifecycle",
-                "base_chance": base_proc_chance, "chance": proc_chance, "draw": None,
+                "base_chance": base_proc_chance, "chance": proc_chance, "draw": None, "node": None,
+                "cause": (sim.tracer.current_cause_id() if getattr(sim, "tracer", None) is not None else None),
             }
             lifecycle_log.append(record)
 

@@ -23,6 +23,75 @@ class CombatTracer:
         self.summary: Dict[str, Any] = {}
         self._last_resource: Optional[float] = None
         self.time_offset: float = 0.0  # raw sim time of T0 (first damage); reported times are relative to it
+        # Cause links (see debug/causes.py): every event gets an id and the id of the event that caused it.
+        self._next_id: int = 1
+        self._frames: List[Dict[str, Any]] = []  # causes currently being processed, innermost last
+        self._aliases: Dict[int, Optional[int]] = {}  # a proc frame that fired nothing -> the cause it stood in for
+        self._last_apply: Dict[str, int] = {}  # effect name -> id of the event that last applied or restacked it
+        self._pending_decision: Optional[tuple] = None  # (event id, time) of the last rotation choice
+        self._last_cast: Optional[Dict[str, Any]] = None
+        self._last_hit: Optional[Dict[str, Any]] = None
+        self._last_t: Optional[float] = None
+        self._hit_by_context: Dict[int, tuple] = {}  # id(dispatch context) -> (context, id of the hit it belongs to)
+
+    # -------------------------------------------------------------------------
+    # Cause links
+    # -------------------------------------------------------------------------
+
+    def current_cause_id(self) -> Optional[int]:
+        """The id of the event whose consequences are being processed now, or None."""
+        for frame in reversed(self._frames):
+            if frame["id"] is not None:
+                return frame["id"]
+        return None
+
+    def note_parked_hit(self, context: Dict[str, Any]) -> None:
+        """A hit just landed and its damage-dealt dispatch is held until its branch ends: remember which hit it is."""
+        if self._last_hit is not None:
+            self._hit_by_context[id(context)] = (context, self._last_hit["id"])  # keeping context alive keeps its id unique
+
+    def begin_cause(self, inherited_id: Optional[int] = None, reserve: bool = False, trigger: Optional[str] = None,
+                    context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Opens a cause frame. ``inherited_id``: an event scheduled by that cause resolves. ``reserve``: a proc about to
+        run; its event is recorded afterwards with the reserved id. Neither: a cast, bound by ``record_cast_start``."""
+        parent = self.current_cause_id()
+        held = self._hit_by_context.get(id(context)) if context is not None else None
+        if trigger in ("on_damage_dealt", "on_damage_taken") and held is not None:
+            parent = held[1]  # a held dispatch, released when its branch ended: it belongs to that hit
+        elif trigger == "on_damage_dealt" and self._last_hit is not None and self._last_hit["t"] == self._last_t:
+            parent = self._last_hit["id"]  # dispatched at once: heard right after that hit landed
+        frame = {"id": inherited_id, "parent": parent, "used": inherited_id is not None}
+        if reserve:
+            frame["id"] = self._next_id
+            self._next_id += 1
+        self._frames.append(frame)
+        return frame
+
+    def end_cause(self, frame: Dict[str, Any]) -> None:
+        """Closes a frame (and any left open inside it). A reserved id nobody recorded stands for its parent."""
+        while self._frames:
+            top = self._frames.pop()
+            if top is frame:
+                break
+        if frame["id"] is not None and not frame["used"]:
+            self._aliases[frame["id"]] = frame["parent"]
+
+    def _emit(self, event: Dict[str, Any], frame: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Appends an event with its id and cause. With ``frame`` (a proc), the event takes the frame's reserved id and the
+        frame's parent as its cause."""
+        if frame is not None:
+            event["id"] = frame["id"]
+            event["cause"] = frame["parent"]
+            frame["used"] = True
+        else:
+            event["id"] = self._next_id
+            self._next_id += 1
+            event["cause"] = self.current_cause_id()
+        self.events.append(event)
+        self._last_t = event["t"]
+        if event["type"] == "damage_hit":
+            self._last_hit = event
+        return event
 
     def record_initial_state(
         self,
@@ -390,11 +459,18 @@ class CombatTracer:
             "is_channel": is_channel,
             "target": target_name,
         }
-        self.events.append(event_dict)
+        event = self._emit(event_dict)
+        frame = self._frames[-1] if self._frames else None
+        if frame is not None and frame["id"] is None:
+            frame["id"] = event["id"]  # this cast is now the cause of what it does
+            frame["used"] = True
+        if event["cause"] is None and self._pending_decision and self._pending_decision[1] == round(timestamp, 4) and self._pending_decision[2] == ability_name:
+            event["cause"] = self._pending_decision[0]  # a rotation choice made this cast
+        self._last_cast = event
 
     def record_cast_finish(self, timestamp: float, caster_name: str, ability_name: str):
         """Records the completion of an activation cast bar."""
-        self.events.append({
+        self._emit({
             "t": round(timestamp, 4),
             "type": "cast_finish",
             "caster": caster_name,
@@ -403,7 +479,7 @@ class CombatTracer:
 
     def record_channel_tick(self, timestamp: float, caster_name: str, ability_name: str, tick: int):
         """Records a channel pulse tick."""
-        self.events.append({
+        self._emit({
             "t": round(timestamp, 4),
             "type": "channel_tick",
             "caster": caster_name,
@@ -440,7 +516,16 @@ class CombatTracer:
             "damage_type": damage_type,
             "math": audit,
         }
-        self.events.append(event_dict)
+        self._emit(event_dict)
+        # Buffs and debuffs that shaped this hit (from its audit): link each to the event that last applied it.
+        shaped_by, seen = [], set()
+        for src in audit.get("sources") or []:
+            name = src.get("effect")
+            applied = self._last_apply.get(name)
+            if applied is not None and name not in seen:
+                seen.add(name)
+                shaped_by.append({"id": applied, "effect": name})
+        event_dict["shaped_by"] = shaped_by
         self.hit_math_records.append(event_dict)
 
         # Update target HP time-series
@@ -454,7 +539,7 @@ class CombatTracer:
 
     def record_miss(self, timestamp: float, ability_name: str, hand: str = "main", attack_type: Any = "", target_name: str = ""):
         """Records a hit that missed (the accuracy roll failed); see ``src/swtorsim/miss_log.py``."""
-        self.events.append({
+        self._emit({
             "t": round(timestamp, 4),
             "type": "miss",
             "ability": ability_name,
@@ -473,7 +558,7 @@ class CombatTracer:
         is_passive: bool = False,
     ):
         """Records buff/debuff application and begins a timeline window."""
-        self.events.append({
+        event = self._emit({
             "t": round(timestamp, 4),
             "type": "buff_apply",
             "entity": entity_name,
@@ -482,6 +567,7 @@ class CombatTracer:
             "duration": round(duration, 3),
             "is_passive": is_passive,
         })
+        self._last_apply[effect_name] = event["id"]
 
         key = (entity_name, effect_name)
         window = {
@@ -491,6 +577,8 @@ class CombatTracer:
             "end": None,
             "max_stacks": stacks,
             "is_passive": is_passive,
+            "id": event["id"],
+            "cause": event["cause"],
         }
         self._open_buffs[key] = window
         self.active_buff_windows.append(window)
@@ -504,7 +592,7 @@ class CombatTracer:
         duration: float = 0.0,
     ):
         """Records buff refresh."""
-        self.events.append({
+        self._emit({
             "t": round(timestamp, 4),
             "type": "buff_refresh",
             "entity": entity_name,
@@ -525,7 +613,7 @@ class CombatTracer:
         new_stacks: int,
     ):
         """Records buff stack modification."""
-        self.events.append({
+        self._emit({
             "t": round(timestamp, 4),
             "type": "buff_stack",
             "entity": entity_name,
@@ -539,7 +627,7 @@ class CombatTracer:
 
     def record_buff_expired(self, timestamp: float, entity_name: str, effect_name: str):
         """Records buff expiration and closes the timeline window."""
-        self.events.append({
+        event = self._emit({
             "t": round(timestamp, 4),
             "type": "buff_expire",
             "entity": entity_name,
@@ -548,6 +636,8 @@ class CombatTracer:
         key = (entity_name, effect_name)
         if key in self._open_buffs:
             self._open_buffs[key]["end"] = round(timestamp, 4)
+            self._open_buffs[key]["end_id"] = event["id"]  # what ended it (a proc that consumed it, or the clock running out)
+            self._open_buffs[key]["end_cause"] = event["cause"]
             del self._open_buffs[key]
 
     def record_resource_change(
@@ -564,7 +654,7 @@ class CombatTracer:
         c_round = round(current, 1)
         d_round = round(delta, 1)
 
-        self.events.append({
+        self._emit({
             "t": t_round,
             "type": "resource",
             "entity": entity_name,
@@ -604,7 +694,7 @@ class CombatTracer:
             "is_stall": is_stall,
         }
         self.rotation_decisions.append(rec)
-        self.events.append({
+        event = self._emit({
             "t": round(timestamp, 4),
             "type": "rotation_eval",
             "decision_id": decision_id,
@@ -613,6 +703,13 @@ class CombatTracer:
             "is_stall": is_stall,
             "candidates_count": len(candidates),
         })
+        rec["node"] = event["id"]
+        if chosen_ability:
+            self._pending_decision = (event["id"], round(timestamp, 4), chosen_ability)
+            # A priority block records its choice after the cast it started; an optional step before it.
+            cast = self._last_cast
+            if cast is not None and cast["t"] == round(timestamp, 4) and cast["cause"] is None and cast["ability"] == chosen_ability:
+                cast["cause"] = event["id"]
 
     def record_proc_dispatch(
         self,
@@ -622,8 +719,10 @@ class CombatTracer:
         effect_name: str,
         passed: bool,
         reason: str,
+        cause_frame: Optional[Dict[str, Any]] = None,
     ):
-        """Records reactive trigger dispatch attempts and lockout states."""
+        """Records reactive trigger dispatch attempts and lockout states. ``cause_frame`` (passed by the generated
+        trigger manager) is the frame the proc's branch ran under: the proc event takes its reserved id."""
         rec = {
             "t": round(timestamp, 4),
             "trigger": trigger_name,
@@ -634,17 +733,19 @@ class CombatTracer:
         }
         self.proc_records.append(rec)
         if passed:
-            self.events.append({
+            self._emit({
                 "t": round(timestamp, 4),
                 "type": "proc_fire",
                 "trigger": trigger_name,
                 "source": source_name,
                 "effect": effect_name,
-            })
+            }, frame=cause_frame)
+        if cause_frame is not None:
+            self.end_cause(cause_frame)  # what the proc did is already recorded under its reserved id
 
     def record_stall(self, timestamp: float, duration: float, step_info: str):
         """Records an idle deadlock / stall window."""
-        self.events.append({
+        self._emit({
             "t": round(timestamp, 4),
             "type": "stall",
             "duration": round(duration, 3),
@@ -653,7 +754,7 @@ class CombatTracer:
 
     def record_tactical_swap(self, timestamp: float, entity_name: str, from_fqn: str, to_fqn: str, new_name: str = ""):
         """Records an out-of-combat tactical swap performed by the pre-combat sequence."""
-        self.events.append({
+        self._emit({
             "t": round(timestamp, 4),
             "type": "tactical_swap",
             "caster": entity_name,
@@ -732,12 +833,27 @@ class CombatTracer:
             out.append(r)
         return out
 
+    def _resolved_events(self) -> List[Dict[str, Any]]:
+        """The events with causes that point at an unrecorded proc frame moved to what that frame stood in for."""
+        if not self._aliases:
+            return self.events
+        out = []
+        for ev in self.events:
+            cause = ev.get("cause")
+            if cause in self._aliases:
+                ev = dict(ev)
+                while cause in self._aliases:
+                    cause = self._aliases[cause]
+                ev["cause"] = cause
+            out.append(ev)
+        return out
+
     def to_dict(self) -> Dict[str, Any]:
         """Serializes the complete trace; all times are relative to T0 (first damage)."""
         return {
             "initial_state": self.initial_state,
             "summary": self.summary,
-            "events": self._shifted(self.events),
+            "events": self._shifted(self._resolved_events()),
             "rotation_decisions": self._shifted(self.rotation_decisions),
             "hit_math_records": self._shifted(self.hit_math_records),
             "proc_records": self._shifted(self.proc_records),

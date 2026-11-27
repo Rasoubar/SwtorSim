@@ -177,6 +177,10 @@ class TriggerManager:
             "trigger_index": sub["icd_key"][2],
             "kind": "bus",
         }
+        # Cause links: what was being processed when this was evaluated, and (for a proc that fired) its own event.
+        tracer = getattr(sim, "tracer", None)
+        rec["cause"] = tracer.current_cause_id() if tracer is not None else None
+        rec["node"] = None
         rec.update(detail)
         self.proc_log.append(rec)
 
@@ -367,6 +371,7 @@ class TriggerManager:
                 branch_ctx["stack_multiplier"] = 1  # a passive owner has no stacks to scale by
             if effective_interval > 0.0:
                 sub["next_allowed_time"] = sim.current_time + effective_interval
+            _cause_frame = sim.tracer.begin_cause(reserve=True, trigger=event_name, context=context) if getattr(sim, "tracer", None) is not None else None
             ran = sub["ability"].execute_branch(
                 sim,
                 sub["branch"],
@@ -375,10 +380,14 @@ class TriggerManager:
                 context=branch_ctx,
             )
             trigger_mods.clear()  # the branch may have applied, removed or restacked effects
+            if _cause_frame is not None and not ran:
+                sim.tracer.end_cause(_cause_frame)
             if ran:
                 ran_by_owner.setdefault(sub["owner_id"], set()).add(getattr(sub["branch"], "index", None))
             self._log_eval(sim, event_name, sub, "fired" if ran else "branch_did_not_run",
-                           base_chance=proc_chance, chance=effective_proc, draw=draw)
+                           base_chance=proc_chance, chance=effective_proc, draw=draw,
+                           node=(_cause_frame["id"] if ran and _cause_frame is not None else None),
+                           cause=(_cause_frame["parent"] if _cause_frame is not None else None))
             if ran and getattr(sim, "tracer", None) is not None:
                 sim.tracer.record_proc_dispatch(
                     timestamp=sim.current_time,
@@ -387,6 +396,7 @@ class TriggerManager:
                     effect_name=str(sub.get("effect_key") or getattr(sub["ability"], "name", "")),
                     passed=True,
                     reason="Trigger conditions satisfied",
+                    cause_frame=_cause_frame,
                 )
             if not ran and effective_interval > 0.0:
                 sub["next_allowed_time"] = sim.current_time

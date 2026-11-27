@@ -4,6 +4,7 @@ The swap lasts only for the ``with`` block, so normal runs never see it:
   * ``engine.TriggerManager`` is rebound to the generated traced class (bus procs);
   * ``Branch.execute`` and ``Effect.execute_triggered_branches`` get the generated patched functions
     (lifecycle procs: on_apply, on_refresh, on_tick, on_stack_charge_*);
+  * ``Ability.cast`` and the simulation's scheduling are wrapped to keep the tracer's cause links (``causes.py``);
   * ``events.calculate_hit`` is rebound to a copy whose hit functions also record who contributed to the multiplier
     and the crit (``combat_math_traced.py``; the formulas themselves are unchanged and parity-tested).
 """
@@ -11,6 +12,8 @@ The swap lasts only for the ``with`` block, so normal runs never see it:
 from contextlib import contextmanager
 from functools import lru_cache
 from pathlib import Path
+
+from src.swtorsim.debug.causes import track_causes
 
 _GENERATED = Path(__file__).resolve().parent / "generated" / "abilities_traced.py"
 _GENERATED_COMBAT_MATH = Path(__file__).resolve().parent / "generated" / "combat_math_traced.py"
@@ -62,7 +65,8 @@ def traced_engine():
     abilities.Effect.execute_triggered_branches = effect_execute_triggered_branches
     events.calculate_hit = traced_calculate_hit
     try:
-        yield TracedTriggerManager
+        with track_causes():
+            yield TracedTriggerManager
     finally:
         engine.TriggerManager = original_manager
         abilities.Branch.execute = original_branch_execute

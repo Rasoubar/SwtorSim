@@ -192,7 +192,8 @@ def compress_proc_log(proc_log: list[dict], time_offset: float) -> dict[str, Any
 
     Each evaluation row is ``[t, raw_t, rule_id, outcome_index, base_chance, chance, draw, remaining, interval]``
     with ``t`` relative to the first damage (pre-combat negative) and ``raw_t`` on the simulation clock, unrounded (what
-    ``measure`` takes as its anchor).
+    ``measure`` takes as its anchor). The last two entries are the id of the event being processed when the rule was
+    evaluated and, for a rule that fired, the id of the proc's own event (``None`` otherwise).
     """
     summary = {tuple(row["key"]): row for row in summarize_proc_log(proc_log)}
     rule_ids: dict[tuple, int] = {}
@@ -219,6 +220,7 @@ def compress_proc_log(proc_log: list[dict], time_offset: float) -> dict[str, Any
             _round(rec["t"] - time_offset), rec["t"], rule_id, OUTCOMES.index(outcome),
             _round(rec.get("base_chance"), 3), _round(rec.get("chance"), 3), _round(rec.get("draw"), 3),
             _round(rec.get("remaining")), _round(rec.get("interval")),
+            rec.get("cause"), rec.get("node"),
         ])
     return {"outcomes": OUTCOMES, "rules": rules, "evals": evals, "time_offset": _round(time_offset)}
 
@@ -245,7 +247,7 @@ def run_trace(*, config: str | None = None, setup: dict | None = None, environme
         icons = icon_map(build_sim.inputs.loadout_blueprints)
         fight_environment = getattr(build_sim.config, "environment", None) or environment
 
-    keep = ("damage_hit", "cast_start", "stall", "tactical_swap", "miss")
+    keep = ("damage_hit", "cast_start", "stall", "tactical_swap", "miss", "proc_fire", "rotation_eval")
     initial = trace["initial_state"]
     # Exact simulation-clock time of each event (the trace's own times are relative to the first damage); the
     # state / damage-check replays take their anchors on the simulation clock.
