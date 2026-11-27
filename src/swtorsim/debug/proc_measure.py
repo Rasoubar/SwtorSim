@@ -334,22 +334,35 @@ def sweep_proc(
     result.seconds = time.perf_counter() - started
     return result
 
-def _run_inside_traced_engine(sim) -> None:
+def _run_inside_traced_engine(sim, blueprints=None) -> None:
     """Makes this simulation's own run calls execute with the traced engine installed.
 
     The traced engine is swapped in process-wide only for the duration of a ``with`` block, and the events of a
     fight resolve long after the simulation is built, so the run methods of this one simulation re-enter it.
+    A simulation with a tracer also records its missed hits (``miss_log``) while it runs.
     """
+    from contextlib import ExitStack
+
     from src.swtorsim.debug.traced_run import traced_engine
+    from src.swtorsim.miss_log import log_misses
 
     run_until, run_timed = sim.run_until, sim.run_timed
 
+    def entered():
+        stack = ExitStack()
+        stack.enter_context(traced_engine())
+        tracer = getattr(sim, "tracer", None)
+        if tracer is not None:
+            stack.enter_context(log_misses(sim, blueprints, lambda r: tracer.record_miss(
+                r["time"], r["ability"], r["hand"], r["attack_type"], r["target"])))
+        return stack
+
     def traced_run_until(*args, **kwargs):
-        with traced_engine():
+        with entered():
             return run_until(*args, **kwargs)
 
     def traced_run_timed(*args, **kwargs):
-        with traced_engine():
+        with entered():
             return run_timed(*args, **kwargs)
 
     sim.run_until, sim.run_timed = traced_run_until, traced_run_timed
@@ -420,7 +433,7 @@ def make_sim_builder(config_path, environment: str = "live", seed: int | None = 
                 player.combat_distance = cfg.combat_distance
                 target.combat_distance = cfg.combat_distance
         sim.verbose = False
-        _run_inside_traced_engine(sim)
+        _run_inside_traced_engine(sim, inputs.loadout_blueprints)
         return sim
 
     build_sim.inputs = inputs  # the loaded loadout, for read-only lookups (icons, names)

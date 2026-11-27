@@ -12,6 +12,7 @@ from src.swtorsim.debug import debug_api
 
 ROOT = Path(__file__).resolve().parents[3]
 UI_PATH = ROOT / "tools" / "debugger_ui.html"
+STARTED_WITH_VERSION = debug_api.current_code_version()  # the code this process loaded; see ensure_debugger_running
 
 
 class DebuggerRequestHandler(BaseHTTPRequestHandler):
@@ -42,7 +43,7 @@ class DebuggerRequestHandler(BaseHTTPRequestHandler):
             else:
                 self._send(200, icon.read_bytes(), "image/png", cache="public, max-age=86400")
         elif path == "/api/configs":
-            self._send_json(200, debug_api.handle("configs"))
+            self._send_json(200, {**debug_api.handle("configs"), "version": STARTED_WITH_VERSION})
         else:
             self._send_json(404, {"error": "not found"})
 

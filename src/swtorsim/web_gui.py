@@ -41,6 +41,7 @@ from src.swtorsim.config_load import (
     load_rotation_from_json,
     load_training_dummy_armor_debuffs,
 )
+from src.swtorsim.miss_log import log_misses
 from src.swtorsim.metrics import (
     ATTACK_TYPE_NAMES,
     DAMAGE_TYPE_NAMES,
@@ -841,6 +842,7 @@ def _run_single_test_detailed(
     stdout_buf = io.StringIO()
     combat_events: list[dict[str, Any]] = []
     ability_extra: dict[str, dict[str, Any]] = {}
+    miss_counts: dict[str, int] = {}
 
     with redirect_stdout(stdout_buf):
         sim, player, target = prepare_simulation(
@@ -1001,7 +1003,26 @@ def _run_single_test_detailed(
             orig_finalize_stalls(current_time)
         sim.tracker.finalize_stalls = _wrapped_finalize_stalls
 
-        sim.run_timed(duration=config.duration, target=target)
+        def _log_miss(rec: dict[str, Any]) -> None:
+            res_val = round(float(getattr(player.resource, "current_value", 0.0)), 1)
+            hp_pct = round(float(target.hp_ratio) * 100.0, 1)
+            hand_note = " (off hand)" if rec["hand"] == "off" else ""
+            miss_counts[rec["ability"]] = miss_counts.get(rec["ability"], 0) + 1
+            combat_events.append({
+                "time": round(float(rec["time"]), 4),
+                "category": "miss",
+                "ability": rec["ability"],
+                "damage": 0.0,
+                "is_crit": False,
+                "damage_type": "",
+                "target_hp": round(float(target.hp), 0),
+                "target_hp_pct": hp_pct,
+                "resource": res_val,
+                "text": f"{rec['ability']} missed{hand_note}",
+            })
+
+        with log_misses(sim, sim_inputs["loadout_blueprints"], _log_miss):
+            sim.run_timed(duration=config.duration, target=target)
         sim.tracker.finalize_effects(sim.current_time)
         combat_events.sort(key=lambda ev: ev["time"])
         time_origin = sim.time_origin()
@@ -1124,6 +1145,13 @@ def _run_single_test_detailed(
     total_hits = sum(int(d.get("hit_count", 0)) for d in sim.tracker.breakdown.values())
     total_crits = sum(int(d.get("crit_count", 0)) for d in sim.tracker.breakdown.values())
     overall_crit_pct = (total_crits / total_hits * 100.0) if total_hits > 0 else 0.0
+    total_misses = sum(miss_counts.values())
+    attempts = total_hits + total_misses
+    misses = {
+        "total": total_misses,
+        "pct": round(total_misses / attempts * 100.0, 2) if attempts > 0 else 0.0,
+        "by_ability": [{"ability": name, "misses": n} for name, n in sorted(miss_counts.items(), key=lambda kv: -kv[1])],
+    }
 
     return {
         "mode": "TEST",
@@ -1141,6 +1169,7 @@ def _run_single_test_detailed(
         "total_hits": total_hits,
         "total_crits": total_crits,
         "overall_crit_pct": round(overall_crit_pct, 1),
+        "misses": misses,
         "target_remaining_hp": round(max(0.0, float(target.hp)), 0),
         "killed_target": bool(target.hp <= 0),
         "computed_player_stats": computed_stats,
@@ -1802,13 +1831,30 @@ _DEBUGGER_PROC: Any = None
 _DEBUGGER_PORT: int | None = None
 
 
-def _debugger_answers(host: str, port: int) -> bool:
-    """True if the Debugger server answers on host:port."""
+def _debugger_answers(host: str, port: int, version: str | None = None) -> bool:
+    """True if the Debugger server answers on host:port (and, when ``version`` is given, runs that version of the code).
+
+    A debugger started before the code changed keeps running the old code (Python loads it once), so a process that
+    reports another version, or none, is not the one to hand a setup to.
+    """
     try:
         with urllib.request.urlopen(f"http://{host}:{port}/api/configs", timeout=1.0) as resp:
-            return b'"configs"' in resp.read(65536)
+            body = resp.read(1_000_000)
     except Exception:
         return False
+    if b'"configs"' not in body:
+        return False
+    if version is None:
+        return True
+    try:
+        return json.loads(body).get("version") == version
+    except ValueError:
+        return False
+
+
+def _debugger_code_version() -> str:
+    from src.swtorsim.debug.debug_api import current_code_version
+    return current_code_version()
 
 
 def stop_debugger() -> None:
@@ -1834,11 +1880,13 @@ def ensure_debugger_running(host: str = "127.0.0.1", default_port: int = 8770) -
 
     global _DEBUGGER_PROC, _DEBUGGER_PORT
     with _DEBUGGER_LOCK:
-        if _DEBUGGER_PORT is not None and _DEBUGGER_PROC is not None and _DEBUGGER_PROC.poll() is None \
-                and _debugger_answers(host, _DEBUGGER_PORT):
-            return f"http://{host}:{_DEBUGGER_PORT}/"
-        # A debugger started by hand (tools/debugger.py) on the default port is reused.
-        if _debugger_answers(host, default_port):
+        version = _debugger_code_version()
+        if _DEBUGGER_PORT is not None and _DEBUGGER_PROC is not None and _DEBUGGER_PROC.poll() is None:
+            if _debugger_answers(host, _DEBUGGER_PORT, version):
+                return f"http://{host}:{_DEBUGGER_PORT}/"
+            stop_debugger()  # the code changed since it started (or it is stuck): start a fresh one below
+        # A debugger started by hand (tools/debugger.py) on the default port is reused, if it runs the current code.
+        if _debugger_answers(host, default_port, version):
             return f"http://{host}:{default_port}/"
 
         port = None

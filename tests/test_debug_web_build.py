@@ -70,6 +70,12 @@ class PageHandshakeTests(unittest.TestCase):
         for field in ("d.mastery", "d.crit_rating", "d.alacrity_rating", "d.accuracy_rating", "g.tactical", "g.legendaries", "g.relics"):
             self.assertIn(field, DEBUGGER_HTML)
 
+    def test_both_pages_show_missed_hits(self):
+        self.assertIn("data-logfilter=\"miss\"", SIMULATOR_HTML)
+        self.assertIn('ev.category === "miss"', SIMULATOR_HTML)
+        self.assertIn('id="ev-miss"', DEBUGGER_HTML)
+        self.assertIn('e.type === "miss"', DEBUGGER_HTML)
+
     def test_the_simulator_has_the_button(self):
         self.assertIn('id="openDebuggerBtn"', SIMULATOR_HTML)
 

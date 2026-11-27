@@ -108,6 +108,47 @@ class LaunchFromTheSimulatorServerTests(unittest.TestCase):
         web_gui.stop_debugger()
         self.assertFalse(web_gui._debugger_answers("127.0.0.1", port))
 
+    def test_a_debugger_running_older_code_is_not_reused(self):
+        """A debugger left running from before a code change keeps the old code; the simulator must start a fresh one."""
+        import threading
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+        from src.swtorsim import web_gui
+
+        class StaleDebugger(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                body = json.dumps({"configs": ["Hatred"], "version": "an-older-version"}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+        stale = ThreadingHTTPServer(("127.0.0.1", 0), StaleDebugger)
+        threading.Thread(target=stale.serve_forever, daemon=True).start()
+        stale_port = stale.server_address[1]
+        try:
+            current = web_gui._debugger_code_version()
+            self.assertTrue(web_gui._debugger_answers("127.0.0.1", stale_port))  # it answers...
+            self.assertFalse(web_gui._debugger_answers("127.0.0.1", stale_port, current))  # ...but not as the current code
+            url = web_gui.ensure_debugger_running(default_port=stale_port)
+            self.assertNotEqual(url, f"http://127.0.0.1:{stale_port}/")
+            self.assertTrue(web_gui._debugger_answers("127.0.0.1", int(url.rstrip("/").rsplit(":", 1)[1]), current))
+        finally:
+            stale.shutdown()
+            stale.server_close()
+
+    def test_a_started_debugger_reports_the_version_it_started_with(self):
+        import urllib.request
+
+        from src.swtorsim import web_gui
+
+        url = web_gui.ensure_debugger_running(default_port=8790)
+        with urllib.request.urlopen(url + "api/configs", timeout=5) as res:
+            self.assertEqual(json.loads(res.read())["version"], web_gui._debugger_code_version())
+
     def test_the_route_returns_the_address_or_the_reason_it_failed(self):
         import threading
         import urllib.error

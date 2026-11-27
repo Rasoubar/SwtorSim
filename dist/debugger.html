@@ -8,7 +8,7 @@
 :root {
   --bg: #f4f5f8; --panel: #ffffff; --ink: #1a1f2b; --muted: #637083; --line: #dde1e9; --accent: #2f6fed;
   --stripe: #f8f9fb; --hit: #5b6b86; --crit: #d9a406; --cast: #7b8798;
-  --fired: #1f8f55; --failed: #8591a3; --icd: #dc7f12; --cond: #c2410c; --noroll: #8e44ad; --skip: #4f78b4;
+  --fired: #1f8f55; --failed: #8591a3; --icd: #dc7f12; --cond: #c2410c; --noroll: #8e44ad; --skip: #4f78b4; --miss: #d6204a;
   --good: #1f8f55; --bad: #c2410c;
   /* names the browser build's injected badge and core selector use */
   --border: var(--line); --accent-bg: var(--stripe); --green: var(--fired); --green-bg: var(--stripe);
@@ -18,7 +18,7 @@
   :root:not([data-theme="light"]) {
     --bg: #14171d; --panel: #1c2028; --ink: #e6e9ef; --muted: #98a3b5; --line: #2d333f; --accent: #6b9bff;
     --stripe: #20252e; --hit: #8fa0bd; --crit: #f0c040; --cast: #8c97a8;
-    --fired: #3ecf86; --failed: #8a95a8; --icd: #f0a040; --cond: #ff7b4a; --noroll: #c084fc; --skip: #7ea6e0;
+    --fired: #3ecf86; --failed: #8a95a8; --icd: #f0a040; --cond: #ff7b4a; --noroll: #c084fc; --skip: #7ea6e0; --miss: #ff6b8a;
     --good: #3ecf86; --bad: #ff7b4a;
   }
 }
@@ -84,7 +84,7 @@ body[data-backend="native"] .web-only { display: none; }
 .pill { display: inline-block; padding: 0 7px; border-radius: 9px; background: var(--stripe); border: 1px solid var(--line); font-size: 12px; }
 @media (max-width: 960px) { main { grid-template-columns: 1fr; } #detail { position: static; max-height: none; } }
 </style>
-  <script src="pyodide_client.js?v=1795806971"></script>
+  <script src="pyodide_client.js?v=1795809466"></script>
 </head>
 <body>
 <header>
@@ -120,6 +120,7 @@ body[data-backend="native"] .web-only { display: none; }
         <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-decision" checked> Decisions</label>
         <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-cast" checked> Casts</label>
         <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-hit" checked> Hits</label>
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-miss" checked> Misses</label>
         <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-fired" checked> Procs fired</label>
         <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-missed"> Procs not fired</label>
         <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-buff" checked> Buffs</label>
@@ -213,7 +214,7 @@ function iconImage(name) {
   return entry.ok ? entry.img : null;
 }
 
-let trace = null, hits = [], casts = [], rules = [], evalsByRule = [], buffs = [], buffNames = [], decisions = [], offset = 0, eventRows = [], eventList = [], eventStart = 0, cascadeWindow = 0, cascadeMissed = false;
+let trace = null, hits = [], misses = [], casts = [], rules = [], evalsByRule = [], buffs = [], buffNames = [], decisions = [], offset = 0, eventRows = [], eventList = [], eventStart = 0, cascadeWindow = 0, cascadeMissed = false;
 const changeCache = new Map();
 let shownRules = new Set(), shownBuffs = [], selected = null, lanes = [], view = { a: 0, b: 1 }, full = { a: 0, b: 1 };
 
@@ -305,6 +306,7 @@ function prepare() {
   const outcomes = trace.proc.outcomes;
   hits = trace.events.filter((e) => e.type === "damage_hit").sort((x, y) => x.t - y.t);
   casts = trace.events.filter((e) => e.type === "cast_start").sort((x, y) => x.t - y.t);
+  misses = trace.events.filter((e) => e.type === "miss").sort((x, y) => x.t - y.t);
   rules = trace.proc.rules;
   evalsByRule = rules.map(() => []);
   for (const r of trace.proc.evals) {
@@ -347,7 +349,7 @@ function ruleStats(id) {
 function renderSummary() {
   const s = trace.summary, c = trace.character || {};
   const items = [[Math.round(s.dps).toLocaleString(), "DPS"], [s.duration + "s", "Duration"], [s.total_hits, "Hits"], [s.crit_pct + "%", "Crit rate"],
-    [s.casts_count, "Casts"], [c.class_name || "", [c.spec, c.environment].filter(Boolean).join(" ")]];
+    [`${s.misses || 0} (${(s.miss_pct || 0).toFixed(1)}%)`, "Missed hits"], [s.casts_count, "Casts"], [c.class_name || "", [c.spec, c.environment].filter(Boolean).join(" ")]];
   $("summary").innerHTML = items.map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
 }
 
@@ -418,7 +420,7 @@ function renderDetail() {
 function selectedTimes() {
   if (!selected || !selected.obj) return null;
   const o = selected.obj;
-  if (selected.kind === "hit" || selected.kind === "cast" || selected.kind === "eval") return { t: o.t, raw: o.raw };
+  if (selected.kind === "hit" || selected.kind === "cast" || selected.kind === "eval" || selected.kind === "miss") return { t: o.t, raw: o.raw };
   if (selected.kind === "decision") return { t: o.t, raw: o.t + offset };
   if (selected.kind === "buff") return { t: o.start, raw: o.start + offset };
   return null;
@@ -429,6 +431,14 @@ function renderDetailCore() {
   if (!selected) { el.innerHTML = "Click a hit, a cast, a proc marker, or a proc row."; el.className = "muted"; return; }
   el.className = "";
   if (selected.kind === "hit") return detailHit(el, selected.obj);
+  if (selected.kind === "miss") {
+    const m = selected.obj, acc = (trace.derived || {}).accuracy_pct;
+    el.innerHTML = `${ic(m.ability, 24)}<b>${esc(m.ability)}</b> missed<div class="kv"><span>Time</span><span>${fmt(m.t, 3)}s</span><span>Hand</span><span>${m.hand === "off" ? "off hand" : "main hand"}</span>
+      <span>Target</span><span>${esc(m.target || "-")}</span><span>Accuracy stat</span><span>${acc === undefined ? "-" : fmt(acc, 2) + "%"} at the start of the fight</span></div>
+      <div class="muted" style="font-size:12px">The hit failed its accuracy roll, so no damage was dealt and no hit-based procs were evaluated for it.</div>
+      <button class="sbtn" data-state="${m.raw}">Show state just before this</button>`;
+    return;
+  }
   if (selected.kind === "cast") {
     const c = selected.obj, d = decisions.find((x) => x.chosen === c.ability && Math.abs(x.t - c.t) < 0.02);
     el.innerHTML = `${ic(c.ability, 24)}<b>${esc(c.ability)}</b> ${c.is_channel ? "(channel)" : ""}<div class="kv"><span>Time</span><span>${fmt(c.t, 3)}s</span><span>Duration</span><span>${fmt(c.duration, 2)}s</span><span>Target</span><span>${esc(c.target || "-")}</span></div>
@@ -787,6 +797,7 @@ function buildEventRows() {
   decisions.forEach((d) => rows.push({ t: d.t, type: "decision", name: d.chosen ?? (d.is_stall ? "stall" : "-"), text: d.step_name, sel: { kind: "decision", obj: d } }));
   casts.forEach((c) => rows.push({ t: c.t, type: "cast", name: c.ability, text: c.is_channel ? `channel ${fmt(c.duration, 1)}s` : "", sel: { kind: "cast", obj: c } }));
   hits.forEach((h) => rows.push({ t: h.t, type: "hit", name: h.ability, text: h.damage.toLocaleString() + (h.is_crit ? " crit" : ""), crit: h.is_crit, sel: { kind: "hit", obj: h } }));
+  misses.forEach((m) => rows.push({ t: m.t, type: "miss", name: m.ability, text: m.hand === "off" ? "missed (off hand)" : "missed", sel: { kind: "miss", obj: m } }));
   evalsByRule.forEach((list) => list.forEach((e) => rows.push({
     t: e.t, type: e.outcome === "fired" ? "fired" : "missed", name: rules[e.rule].source, outcome: e.outcome,
     text: OUTCOME_LABEL[e.outcome] + (e.chance !== null ? ` (${fmt(e.chance, 1)}%)` : ""), sel: { kind: "eval", obj: e }
@@ -801,8 +812,8 @@ function buildEventRows() {
 
 function eventChip(r) {
   const color = r.type === "decision" ? "--accent" : r.type === "cast" ? "--cast" : r.type === "hit" ? (r.crit ? "--crit" : "--hit")
-    : r.type === "buff" ? "--skip" : OUTCOME_VAR[r.outcome];
-  const label = { decision: "Decision", cast: "Cast", hit: "Hit", fired: "Proc", missed: "No proc", buff: "Buff" }[r.type];
+    : r.type === "buff" ? "--skip" : r.type === "miss" ? "--miss" : OUTCOME_VAR[r.outcome];
+  const label = { decision: "Decision", cast: "Cast", hit: "Hit", miss: "Miss", fired: "Proc", missed: "No proc", buff: "Buff" }[r.type];
   return `<span class="chip" style="background:var(${color});${r.crit ? "color:#222" : ""}">${label}</span>`;
 }
 
@@ -918,6 +929,12 @@ function drawDamage(ctx, l, w) {
     ctx.fillRect(x - 1, l.y + l.h - 3 - bh, 2.5, bh);
     if (selected && selected.obj === hit) { ctx.globalAlpha = 1; ctx.strokeStyle = css("--ink"); ctx.strokeRect(x - 3, l.y + l.h - 5 - bh, 6, bh + 4); }
   }
+  // A missed hit has no damage: a red tick hangs from the top of the lane.
+  for (const miss of visible(misses, "t")) {
+    const x = xOf(miss.t, w);
+    ctx.globalAlpha = 1; ctx.fillStyle = css("--miss"); ctx.fillRect(x - 1, l.y + 1, 2.5, 9);
+    if (selected && selected.obj === miss) { ctx.strokeStyle = css("--ink"); ctx.strokeRect(x - 3, l.y, 6, 12); }
+  }
   ctx.globalAlpha = 1;
 }
 
@@ -982,6 +999,11 @@ function pick(ev) {
   const lane = lanes.find((l) => y >= l.y && y < l.y + l.h);
   if (!lane || x < GUTTER) return null;
   const t = tOf(x, w), tolerance = 6 / (w - GUTTER - 8) * (view.b - view.a);
+  if (lane.type === "damage") {
+    const m = nearest(misses, t, "t"), h = nearest(hits, t, "t");
+    // The red ticks sit in the top rows of the lane, so a click there picks a miss.
+    if (m.item && m.dist <= tolerance && (y - lane.y < 12 || m.dist < h.dist)) return { kind: "miss", obj: m.item, label: `${m.item.ability}: missed` };
+  }
   if (lane.type === "damage") { const n = nearest(hits, t, "t"); return n.item && n.dist <= tolerance ? { kind: "hit", obj: n.item, label: `${n.item.ability}: ${n.item.damage.toLocaleString()}${n.item.is_crit ? " (crit)" : ""}` } : null; }
   if (lane.type === "rotation") { const n = nearest(decisions, t, "t"); return n.item && n.dist <= tolerance ? { kind: "decision", obj: n.item, label: `${n.item.step_name}: ${n.item.chosen ?? (n.item.is_stall ? "stall" : "-")}` } : null; }
   if (lane.type === "casts") { const n = nearest(casts, t, "t"); return n.item && n.dist <= tolerance ? { kind: "cast", obj: n.item, label: n.item.ability } : null; }
@@ -1012,7 +1034,7 @@ function setView(a, b) {
 function legendItem(color, text) { return `<span><i style="background:var(${color})"></i>${text}</span>`; }
 function buildLegend() {
   $("legend").innerHTML = [["--fired", "Fired (row 1)"], ["--failed", "Roll failed (row 2)"], ["--icd", "Blocked by ICD (row 3)"], ["--cond", "Conditions not met"],
-    ["--noroll", "Roll passed, conditions failed"], ["--skip", "Skipped"], ["--hit", "Hit"], ["--crit", "Crit"]].map(([c, t]) => legendItem(c, t)).join("");
+    ["--noroll", "Roll passed, conditions failed"], ["--skip", "Skipped"], ["--hit", "Hit"], ["--crit", "Crit"], ["--miss", "Miss"]].map(([c, t]) => legendItem(c, t)).join("");
 }
 
 const canvas = $("tl");
@@ -1057,7 +1079,7 @@ $("proctable").addEventListener("click", (ev) => {
   const tr = ev.target.closest("tr[data-rule]");
   if (tr) { selected = { kind: "rule", rule: Number(tr.dataset.rule) }; renderDetail(); renderProcTable(); }
 });
-["ev-decision", "ev-cast", "ev-hit", "ev-fired", "ev-missed", "ev-buff", "evvisible"].forEach((id) => { $(id).onchange = () => renderEventLog(); });
+["ev-decision", "ev-cast", "ev-hit", "ev-miss", "ev-fired", "ev-missed", "ev-buff", "evvisible"].forEach((id) => { $(id).onchange = () => renderEventLog(); });
 $("evfilter").oninput = () => renderEventLog();
 $("evprev").onclick = () => { eventStart = Math.max(0, eventStart - EVENT_PAGE); renderEventLog(true); $("evtable").scrollTop = 0; };
 $("evnext").onclick = () => { eventStart += EVENT_PAGE; renderEventLog(true); $("evtable").scrollTop = 0; };

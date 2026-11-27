@@ -28,6 +28,25 @@ from src.swtorsim.debug.proc_measure import (
 )
 
 ROOT = Path(__file__).resolve().parents[3]
+
+
+def current_code_version() -> str:
+    """Fingerprint of the code a debugger process runs (every ``src/swtorsim`` module and the page: path, size, mtime).
+
+    A debugger process reports the value it had when it started; a process that was started before the code changed
+    reports an older one, which tells the simulator not to reuse it.
+    """
+    import hashlib
+
+    digest = hashlib.sha1()
+    files = sorted((ROOT / "src" / "swtorsim").rglob("*.py")) + [ROOT / "tools" / "debugger_ui.html"]
+    for path in files:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        digest.update(f"{path.relative_to(ROOT).as_posix()}|{stat.st_size}|{stat.st_mtime_ns}\n".encode())
+    return digest.hexdigest()[:16]
 RUN_CONFIG_DIR = ROOT / "data" / "run_config"
 
 # Stable order: the trace refers to outcomes by index (smaller payload).
@@ -226,7 +245,7 @@ def run_trace(*, config: str | None = None, setup: dict | None = None, environme
         icons = icon_map(build_sim.inputs.loadout_blueprints)
         fight_environment = getattr(build_sim.config, "environment", None) or environment
 
-    keep = ("damage_hit", "cast_start", "stall", "tactical_swap")
+    keep = ("damage_hit", "cast_start", "stall", "tactical_swap", "miss")
     initial = trace["initial_state"]
     # Exact simulation-clock time of each event (the trace's own times are relative to the first damage); the
     # state / damage-check replays take their anchors on the simulation clock.

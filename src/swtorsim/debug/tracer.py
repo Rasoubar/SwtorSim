@@ -452,6 +452,17 @@ class CombatTracer:
             "pct": pct,
         })
 
+    def record_miss(self, timestamp: float, ability_name: str, hand: str = "main", attack_type: Any = "", target_name: str = ""):
+        """Records a hit that missed (the accuracy roll failed); see ``src/swtorsim/miss_log.py``."""
+        self.events.append({
+            "t": round(timestamp, 4),
+            "type": "miss",
+            "ability": ability_name,
+            "hand": hand,
+            "attack_type": attack_type,
+            "target": target_name,
+        })
+
     def record_buff_applied(
         self,
         timestamp: float,
@@ -677,6 +688,7 @@ class CombatTracer:
         total_hits = len(self.hit_math_records)
         crit_pct = round((crits / total_hits * 100.0), 1) if total_hits > 0 else 0.0
 
+        misses = sum(1 for e in self.events if e.get("type") == "miss")
         casts_count = sum(1 for e in self.events if e.get("type") == "cast_start")
         apm = round((casts_count / duration) * 60.0, 1)
 
@@ -689,6 +701,8 @@ class CombatTracer:
             "total_hits": total_hits,
             "crits": crits,
             "crit_pct": crit_pct,
+            "misses": misses,
+            "miss_pct": round(misses / (misses + total_hits) * 100.0, 2) if (misses + total_hits) > 0 else 0.0,
             "casts_count": casts_count,
             "apm": apm,
             "total_stalled_time": round(total_stalled, 3),

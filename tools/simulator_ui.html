@@ -1572,6 +1572,7 @@
             <span class="chip" data-logfilter="cast" onclick="setLogFilter('cast')">Casts Only</span>
             <span class="chip" data-logfilter="damage" onclick="setLogFilter('damage')">Damage Hits</span>
             <span class="chip" data-logfilter="crit" onclick="setLogFilter('crit')">Critical Hits</span>
+            <span class="chip" data-logfilter="miss" onclick="setLogFilter('miss')">Misses</span>
             <span class="chip" data-logfilter="execute" onclick="setLogFilter('execute')">Execute (&lt;30% HP)</span>
           </div>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -2816,7 +2817,8 @@
 
     document.getElementById("kpiCritValue").textContent = `${res.overall_crit_pct.toFixed(1)}%`;
     document.getElementById("kpiHitsSub").textContent =
-      (isBatch ? "Avg Hits: " : "Total Hits: ") + res.total_hits.toLocaleString();
+      (isBatch ? "Avg Hits: " : "Total Hits: ") + res.total_hits.toLocaleString() +
+      (res.misses ? ` | Misses: ${res.misses.total.toLocaleString()} (${res.misses.pct.toFixed(1)}%)` : "");
 
     document.getElementById("wallTimeLabel").textContent = `Completed in ${res.elapsed_wall_ms} ms`;
 
@@ -3395,6 +3397,7 @@
     return ACTIVE_RESULT.combat_log.filter(ev => {
       if (LOG_FILTER === "cast" && ev.category !== "cast") return false;
       if (LOG_FILTER === "damage" && ev.category !== "damage") return false;
+      if (LOG_FILTER === "miss" && ev.category !== "miss") return false;
       if (LOG_FILTER === "crit" && !ev.is_crit) return false;
       if (LOG_FILTER === "execute" && ev.target_hp_pct > 30.0) return false;
       if (q) {
@@ -3442,6 +3445,8 @@
         catBadge = `<span class="tag" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);font-weight:700;padding:1px 5px;border-radius:3px;">STALL</span>`;
       } else if (ev.category === "cast") {
         catBadge = `<span class="cast-tag">CAST</span>`;
+      } else if (ev.category === "miss") {
+        catBadge = `<span class="tag" style="background:var(--amber-bg);color:var(--amber);border:1px solid var(--amber);font-weight:700;padding:1px 5px;border-radius:3px;">MISS</span>`;
       } else {
         catBadge = ev.is_crit ? `<span class="crit-tag">CRIT HIT</span>` : `<span>HIT</span>`;
       }
