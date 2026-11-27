@@ -16,6 +16,7 @@ from pathlib import Path
 
 SWTORSIM_ROOT = Path(__file__).resolve().parents[1]
 DIST_DIR = SWTORSIM_ROOT / "dist"
+DEFAULT_DIST_DIR = DIST_DIR  # build_web_release() can build somewhere else (its own DIST_DIR); this is the default
 WEB_TOOLS_DIR = SWTORSIM_ROOT / "tools" / "web"
 SIM_UI_PATH = SWTORSIM_ROOT / "tools" / "simulator_ui.html"
 ROT_UI_PATH = SWTORSIM_ROOT / "tools" / "rotation_builder_ui.html"
@@ -26,6 +27,7 @@ SHARE_IMAGE_JS_PATH = SWTORSIM_ROOT / "tools" / "share_image.js"
 TUTORIAL_JS_PATH = SWTORSIM_ROOT / "tools" / "tutorial_showcase.js"
 CREDITS_JS_PATH = SWTORSIM_ROOT / "tools" / "credits_modal.js"
 CREDITS_MD_PATH = SWTORSIM_ROOT / "CREDITS.md"
+DEBUGGER_UI_PATH = SWTORSIM_ROOT / "tools" / "debugger_ui.html"
 
 # Import bundle builder
 sys.path.insert(0, str(SWTORSIM_ROOT))
@@ -41,9 +43,36 @@ def inject_pyodide_client(html_content: str, version: int | None = None) -> str:
     return html_content + f'\n<script src="pyodide_client.js{v_str}"></script>'
 
 
-def build_web_release() -> None:
+def check_debug_engine_is_current() -> bool:
+    """False when the generated debugger copies of the engine are stale (they ship in the asset bundle)."""
+    sys.path.insert(0, str(SWTORSIM_ROOT / "tools"))
+    try:
+        import gen_debug_engine
+
+        return gen_debug_engine.is_up_to_date()
+    except Exception as exc:  # an engine change that moved a patch anchor surfaces here
+        print(f"[FAIL] The debugger's generated engine copy cannot be checked: {exc}")
+        return False
+
+
+def write_debugger_page(dist_dir: Path, version: int | None = None) -> bool:
+    """Writes the debugger page as ``debugger.html`` with the Pyodide client injected; False if the source is missing."""
+    if not DEBUGGER_UI_PATH.is_file():
+        print(f"[FAIL] debugger_ui.html not found at {DEBUGGER_UI_PATH}")
+        return False
+    html = DEBUGGER_UI_PATH.read_text(encoding="utf-8")
+    (dist_dir / "debugger.html").write_text(inject_pyodide_client(html, version=version), encoding="utf-8")
+    return True
+
+
+def build_web_release(dist_dir: Path | None = None) -> None:
+    """Builds the static web app into ``dist_dir`` (default: dist/)."""
+    DIST_DIR = Path(dist_dir) if dist_dir else DEFAULT_DIST_DIR  # shadows the module default for this build
     build_version = int(time.time())
     print(f"[INFO] Starting SwtorSim Web Release Build (v{build_version})...")
+    if not check_debug_engine_is_current():
+        print("[FAIL] The generated debug engine is stale: run tools/gen_debug_engine.py (with pyclean), then build again.")
+        raise SystemExit(1)
     DIST_DIR.mkdir(parents=True, exist_ok=True)
 
     # 1. Build runtime assets archive
@@ -149,6 +178,10 @@ def build_web_release() -> None:
         print("[OK] Copied dist/CREDITS.md (single source of truth for credits)")
     else:
         print(f"[FAIL] CREDITS.md not found at {CREDITS_MD_PATH}")
+
+    # 10. The debugger page (traces, hit math, proc and damage checks); engine files ship in the asset bundle
+    if write_debugger_page(DIST_DIR, build_version):
+        print("[OK] Generated dist/debugger.html (Debugger)")
 
     print("\n" + "=" * 65)
     print("  [OK] WEB RELEASE BUILD COMPLETE!")

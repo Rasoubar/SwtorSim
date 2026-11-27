@@ -1,0 +1,185 @@
+{
+    "pre_combat": [
+        {
+            "ability": "channel_hatred"
+        },
+        {
+            "swap_tactical": "abl.itm.tactical.sow.war_kni.mar_sen.utl_regen_01"
+        },
+        {
+            "ability": "force_camouflage"
+        },
+        {
+            "swap_tactical": "abl.itm.tactical.sow.war_kni.mar_sen.ani_watch.dmg_sust_01"
+        },
+        {
+            "wait": 8
+        }
+    ],
+    "sequence": [
+        {
+            "type": "optional",
+            "ability_id": "deadly_saber",
+            "rules": {}
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 3",
+            "pool": [
+                {
+                    "ability_id": "rupture",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 4",
+            "pool": [
+                {
+                    "ability_id": "annihilate",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "loop_anchor"
+        },
+        {
+            "type": "optional",
+            "ability_id": "berserk",
+            "rules": {}
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 5",
+            "pool": [
+                {
+                    "ability_id": "force_rend",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 1",
+            "pool": [
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 1 (Copy)",
+            "pool": [
+                {
+                    "ability_id": "battering_assault",
+                    "rules": {
+                        "caster_energy_below": 10
+                    }
+                },
+                {
+                    "ability_id": "dual_saber_throw",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "ravage",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 6",
+            "pool": [
+                {
+                    "ability_id": "vicious_throw",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 7",
+            "pool": [
+                {
+                    "ability_id": "vicious_throw",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 8",
+            "pool": [
+                {
+                    "ability_id": "annihilate",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "optional",
+            "ability_id": "deadly_saber",
+            "rules": {}
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 9",
+            "pool": [
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "ravage",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "priority_block",
+            "name": "Window 10",
+            "pool": [
+                {
+                    "ability_id": "vicious_slash",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "rupture",
+                    "rules": {}
+                },
+                {
+                    "ability_id": "ravage",
+                    "rules": {}
+                }
+            ]
+        },
+        {
+            "type": "optional",
+            "ability_id": "frenzy",
+            "rules": {
+                "caster_buff_stacks": [
+                    "Fury",
+                    30,
+                    "lt"
+                ]
+            },
+            "lead_time": 0
+        }
+    ]
+}

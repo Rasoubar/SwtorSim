@@ -1,0 +1,132 @@
+{
+    "weave": [
+        {
+            "ability_id": "polarity_shift",
+            "rules": {}
+        }
+    ],
+    "sequence": [
+        {
+            "type": "optional",
+            "ability_id": "lightning_bolt",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "polarity_shift"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "affliction"
+        },
+        {
+            "type": "loop_anchor"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "lightning_flash"
+        },
+        {
+            "type": "optional",
+            "ability_id": "recklessness",
+            "rules": {}
+        },
+        {
+            "type": "optional",
+            "ability_id": "thundering_blast",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "halted_offensive"
+        },
+        {
+            "type": "optional",
+            "ability_id": "crushing_darkness",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "lightning_torrent"
+        },
+        {
+            "type": "optional",
+            "ability_id": "volt_rush",
+            "rules": {}
+        },
+        {
+            "type": "optional",
+            "ability_id": "halted_offensive",
+            "rules": {}
+        },
+        {
+            "type": "optional",
+            "ability_id": "shock",
+            "rules": {}
+        },
+        {
+            "type": "optional",
+            "ability_id": "recklessness",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "thundering_blast"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "halted_offensive"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "lightning_flash"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "shock"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "volt_rush"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "crushing_darkness"
+        },
+        {
+            "type": "optional",
+            "ability_id": "recklessness",
+            "rules": {}
+        },
+        {
+            "type": "optional",
+            "ability_id": "halted_offensive",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "thundering_blast"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "lightning_torrent"
+        },
+        {
+            "type": "optional",
+            "ability_id": "shock",
+            "rules": {}
+        },
+        {
+            "type": "fixed",
+            "ability_id": "halted_offensive"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "volt_rush"
+        },
+        {
+            "type": "fixed",
+            "ability_id": "halted_offensive"
+        }
+    ]
+}

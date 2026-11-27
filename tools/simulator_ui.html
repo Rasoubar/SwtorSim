@@ -1123,6 +1123,7 @@
     <button class="btn btn-sm" id="saveRunConfigBtn" title="Save current configuration to workspace or export JSON">Save Config</button>
     <button class="btn btn-sm" id="exportRunConfigBtn" type="button" title="Export current configuration to JSON file" onclick="exportRunConfigDirectly()">Export Config</button>
     <button class="btn btn-sm" id="reloadCatalogBtn" title="Reload files from workspace">Refresh</button>
+    <button class="btn btn-sm" id="openDebuggerBtn" type="button" title="Open this setup in the Debugger: a traced fight with a timeline, proc and damage details">Debug</button>
     <button class="btn btn-purple btn-sm" id="openRotationBuilderBtn" title="Launch or switch to the Web Rotation Builder">Rotation Builder</button>
     <button class="btn btn-sm" id="tutorialBtn" type="button" style="border-color:var(--accent);color:var(--accent);background:var(--accent-bg);" title="Replay the Interactive Guided Tour">? Tutorial</button>
     <button class="btn btn-sm" id="themeToggleBtn" type="button" onclick="toggleTheme()" title="Toggle Dark / Light Theme">🌙 Dark</button>
@@ -2910,6 +2911,61 @@
     w.focus();
     castTimelineChannel.postMessage(castTimelinePayload());
   }
+
+  // -------------------------------------------------------------------------
+  // Debugger ("Debug"): opens debugger.html (browser build) or the local debugger server with the setup that is
+  // on screen. The pages talk over postMessage: the debugger announces it is ready and this page answers with
+  // the setup. Only the window opened from here is answered, and only at the origin it was opened at.
+  // -------------------------------------------------------------------------
+  let debuggerWindow = null;
+  let debuggerOrigin = "";
+
+  function debuggerSetupMessage() {
+    const { clsName, specName } = selectedClassAndSpec();
+    return { type: "swtorsim-debugger-setup", setup: buildPayloadFromForm(), label: `${clsName} ${specName}`.trim() };
+  }
+
+  window.addEventListener("message", (ev) => {
+    if (!debuggerWindow || ev.source !== debuggerWindow) return;
+    if ((ev.data || {}).type === "swtorsim-debugger-ready") debuggerWindow.postMessage(debuggerSetupMessage(), debuggerOrigin);
+  });
+
+  async function openDebugger() {
+    const inBrowser = window.__swtorsimBackend === "wasm";
+    let url = "debugger.html";
+    let w = null;
+    if (inBrowser) {
+      // In the browser build both pages share an origin, so the setup is also left in local storage: that works when the
+      // browser reuses the tab or blocks pop-ups (no opener to message).
+      try { localStorage.setItem("swtorsim_debug_setup", JSON.stringify({ ...debuggerSetupMessage(), at: Date.now() })); } catch (e) { /* storage unavailable */ }
+      url += "?setup=1";
+      w = window.open(url, "swtorsim_debugger");
+    } else {
+      // With the local server the debugger is its own process that this server starts on demand (it can take a few
+      // seconds). The window is opened first, while the click still counts, and pointed at the debugger once it is up.
+      w = window.open("about:blank", "swtorsim_debugger");
+      try {
+        const res = await fetch("/api/launch_debugger", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await res.json();
+        if (!res.ok || !data.url) throw new Error(data.error || "no address returned");
+        url = data.url;
+      } catch (e) {
+        if (w) w.close();
+        alert("Could not start the Debugger: " + e.message + "\n\nYou can start it by hand:\n  .\\tools\\pyclean.exe tools\\debugger.py");
+        return;
+      }
+      if (w) w.location.href = url;
+    }
+    if (!w) {
+      alert("The browser blocked the Debugger window. Allow pop-ups for this page.");
+      return;
+    }
+    debuggerWindow = w;
+    debuggerOrigin = new URL(url, window.location.href).origin;
+    w.focus();
+    // A debugger that was already open does not announce itself again, so send the setup right away as well.
+    try { w.postMessage(debuggerSetupMessage(), debuggerOrigin); } catch (e) { /* it announces itself once loaded */ }
+  }  document.getElementById("openDebuggerBtn")?.addEventListener("click", openDebugger);
 
   // -------------------------------------------------------------------------
   // Share Image: the PNG cards are drawn by tools/share_image.js (ShareImage, served as

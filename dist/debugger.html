@@ -1,0 +1,1082 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwtorSim Debugger</title>
+<style>
+:root {
+  --bg: #f4f5f8; --panel: #ffffff; --ink: #1a1f2b; --muted: #637083; --line: #dde1e9; --accent: #2f6fed;
+  --stripe: #f8f9fb; --hit: #5b6b86; --crit: #d9a406; --cast: #7b8798;
+  --fired: #1f8f55; --failed: #8591a3; --icd: #dc7f12; --cond: #c2410c; --noroll: #8e44ad; --skip: #4f78b4;
+  --good: #1f8f55; --bad: #c2410c;
+  /* names the browser build's injected badge and core selector use */
+  --border: var(--line); --accent-bg: var(--stripe); --green: var(--fired); --green-bg: var(--stripe);
+  --amber: var(--icd); --amber-bg: var(--stripe); --bg-input: var(--panel); --text-main: var(--ink);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14171d; --panel: #1c2028; --ink: #e6e9ef; --muted: #98a3b5; --line: #2d333f; --accent: #6b9bff;
+    --stripe: #20252e; --hit: #8fa0bd; --crit: #f0c040; --cast: #8c97a8;
+    --fired: #3ecf86; --failed: #8a95a8; --icd: #f0a040; --cond: #ff7b4a; --noroll: #c084fc; --skip: #7ea6e0;
+    --good: #3ecf86; --bad: #ff7b4a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; }
+header { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; padding: 12px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header h1 { font-size: 16px; margin: 0 8px 0 0; align-self: center; }
+label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+input, select, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+input[type=number] { width: 90px; }
+button { cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+button:disabled { opacity: .55; cursor: wait; }
+#status { align-self: center; color: var(--muted); font-size: 13px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; padding: 14px 16px; align-items: start; }
+.col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.card h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+#summary { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+#summary div b { display: block; font-size: 18px; }
+#summary div span { font-size: 12px; color: var(--muted); }
+#tlwrap { position: relative; }
+canvas { width: 100%; display: block; border-radius: 6px; background: var(--panel); touch-action: none; }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 8px; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+#tip { position: fixed; pointer-events: none; background: var(--ink); color: var(--bg); padding: 4px 8px; border-radius: 6px; font-size: 12px; display: none; max-width: 320px; z-index: 5; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+th:nth-child(2), td:nth-child(2), th:first-child, td:first-child { text-align: left; }
+th { color: var(--muted); font-weight: 600; position: sticky; top: 0; background: var(--panel); }
+tr.sel td { background: var(--stripe); }
+tbody tr { cursor: pointer; }
+#proctable { max-height: 340px; overflow: auto; }
+#detail { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 13px; margin: 6px 0; }
+.kv span:nth-child(odd) { color: var(--muted); }
+.why { padding: 8px 10px; border-radius: 6px; background: var(--stripe); border-left: 4px solid var(--muted); margin: 8px 0; }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; color: #fff; }
+.muted { color: var(--muted); }
+.good { color: var(--good); } .bad { color: var(--bad); }
+.bar { position: relative; height: 18px; background: var(--stripe); border: 1px solid var(--line); border-radius: 4px; margin: 8px 0 4px; }
+.bar .range { position: absolute; top: 3px; bottom: 3px; background: var(--accent); opacity: .5; border-radius: 3px; }
+.bar .exp { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); }
+.form { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin-top: 8px; }
+.form input { width: 74px; }
+details { margin-top: 6px; } summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.err { color: var(--bad); }
+body[data-backend="wasm"] .native-only { display: none; }
+body[data-backend="native"] .web-only { display: none; }
+#swtor-core-selector-container label { color: var(--ink) !important; }
+.scroll { max-height: 320px; overflow: auto; }
+#evtable td, #dectable td, #cascade td { text-align: left; }
+#cascade td:first-child { text-align: right; }
+#dectable td:last-child { text-align: right; }
+.cand { margin: 3px 0; }
+.srow { display: flex; justify-content: space-between; gap: 10px; }
+.small { font-size: 12px; }
+.src { padding-left: 4px; border-left: 2px solid var(--line); }
+.sbtn { margin-top: 6px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.ic { width: 18px; height: 18px; vertical-align: -4px; margin-right: 5px; border-radius: 3px; }
+.pill { display: inline-block; padding: 0 7px; border-radius: 9px; background: var(--stripe); border: 1px solid var(--line); font-size: 12px; }
+@media (max-width: 960px) { main { grid-template-columns: 1fr; } #detail { position: static; max-height: none; } }
+</style>
+  <script src="pyodide_client.js?v=1795804033"></script>
+</head>
+<body>
+<header>
+  <h1>SwtorSim Debugger</h1>
+  <label>Run config <select id="config"></select></label>
+  <label>Data <select id="env"><option value="live">Live</option><option value="pts">PTS</option></select></label>
+  <label>Seed <input id="seed" type="number" placeholder="config"></label>
+  <label>Duration (s) <input id="duration" type="number" placeholder="config"></label>
+  <button id="run" class="primary">Run trace</button>
+  <button id="cancelBusy" class="web-only" style="display:none" title="Stop the running replays">Cancel</button>
+  <span id="status">Pick a config and run a trace.</span>
+</header>
+<main>
+  <div class="col">
+    <div class="card"><h2>Fight</h2><div id="summary"><span class="muted">No trace yet.</span></div></div>
+    <div class="card">
+      <h2>Timeline</h2>
+      <div class="tools">
+        <button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">&minus;</button>
+        <button id="fit">Fit</button>
+        <label style="flex-direction:row;align-items:center;gap:6px">Buff lane
+          <select id="addbuff"><option value="">add...</option></select></label>
+        <span id="buffchips"></span>
+        <span class="muted" style="margin-left:auto">Wheel zooms, drag pans, click selects. Rotation lane: one colour per step, red = stall.</span>
+      </div>
+      <div id="tlwrap"><canvas id="tl" height="300"></canvas></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="card">
+      <h2>Events</h2>
+      <div class="tools">
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-decision" checked> Decisions</label>
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-cast" checked> Casts</label>
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-hit" checked> Hits</label>
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-fired" checked> Procs fired</label>
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-missed"> Procs not fired</label>
+        <label style="flex-direction:row;align-items:center;gap:4px"><input type="checkbox" id="ev-buff" checked> Buffs</label>
+      </div>
+      <div class="tools">
+        <input id="evfilter" placeholder="Filter by name or text" aria-label="Filter events">
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="evvisible"> only the timeline's visible range</label>
+        <button id="evprev">Earlier</button><button id="evnext">Later</button>
+        <span class="muted" id="evcount"></span>
+      </div>
+      <div class="muted" style="font-size:12px;margin-bottom:6px">One row per event, in order. Click a row to select it; with the list focused, the up and down arrows step through the events.</div>
+      <div class="scroll" id="evtable" tabindex="0" style="max-height:420px"></div>
+    </div>
+    <div class="card">
+      <h2>Procs</h2>
+      <div class="tools">
+        <input id="procfilter" placeholder="Filter by name" aria-label="Filter procs">
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="onlychance" checked> only procs with a chance</label>
+      </div>
+      <div id="proctable"></div>
+    </div>
+    <div class="card">
+      <h2>Rotation decisions</h2>
+      <div class="tools">
+        <input id="decfilter" placeholder="Filter by step or ability" aria-label="Filter decisions">
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="decstalls"> stalls only</label>
+        <span class="muted" id="deccount"></span>
+      </div>
+      <div class="scroll" id="dectable"></div>
+    </div>
+    <div class="card">
+      <h2>Damage by ability</h2>
+      <div class="muted" style="font-size:12px;margin-bottom:6px">Click a row to select that ability's first hit, then run a damage check on it. Stat crit chance for reference: <span id="statcrit">-</span>.</div>
+      <div class="scroll" id="abltable"></div>
+    </div>
+    <div class="card">
+      <h2>State at a moment</h2>
+      <div class="tools">
+        <label style="flex-direction:row;align-items:center;gap:6px">Time (s, fight clock)<input id="st-time" type="number" step="0.1" style="width:100px"></label>
+        <button id="st-go" class="primary">Show state</button>
+        <span class="muted">Replays to just before that moment and reads cooldowns, charges, effects, ICDs and stats.</span>
+      </div>
+      <div id="stateview" class="muted">Pick a time, or use "Show state just before this" on a selected item.</div>
+    </div>
+  </div>
+  <div class="col"><div class="card" id="detail"><h2>Details</h2><div id="detailbody" class="muted">Click a hit, a cast, a proc marker, or a proc row.</div></div></div>
+</main>
+<div id="tip"></div>
+<script>
+"use strict";
+const OUTCOME_LABEL = {
+  fired: "Fired", roll_failed: "Roll failed", blocked_icd: "Blocked by ICD", blocked_condition: "Conditions not met",
+  branch_did_not_run: "Roll passed, conditions failed", skipped_else_gate: "Skipped (else gate)",
+  skipped_same_activation: "Skipped (same activation)"
+};
+const OUTCOME_VAR = {
+  fired: "--fired", roll_failed: "--failed", blocked_icd: "--icd", blocked_condition: "--cond",
+  branch_did_not_run: "--noroll", skipped_else_gate: "--skip", skipped_same_activation: "--skip"
+};
+const OUTCOME_ROW = { fired: 0, roll_failed: 1, blocked_icd: 2 };
+const ROLLED = new Set(["fired", "roll_failed", "branch_did_not_run"]);
+const GUTTER = 150, AXIS = 24, ROW = 9;
+
+const $ = (id) => document.getElementById(id);
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const fmt = (n, d = 2) => (n === null || n === undefined) ? "-" : Number(n).toFixed(d);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+/* ---------- icons ---------- */
+function iconFile(name) {
+  if (!trace || !trace.icons || !name) return null;
+  const m = trace.icons, base = String(name).replace(/_\d+$/, "");
+  const inner = /\(([^)]+)\)\s*$/.exec(base), bare = base.replace(/\s*\([^)]*\)\s*$/, "");
+  return m[name] || m[base] || (inner && m[inner[1]]) || m[bare] || null;
+}
+const iconUrl = (name) => { const f = iconFile(name); return f ? "icons/" + encodeURIComponent(f) : null; };
+function ic(name, size = 18) {
+  const u = iconUrl(name);
+  return u ? `<img class="ic" src="${u}" width="${size}" height="${size}" alt="" loading="lazy" onerror="this.remove()">` : "";
+}
+const iconCache = new Map(); let redrawQueued = false;
+function iconImage(name) {
+  const u = iconUrl(name);
+  if (!u) return null;
+  let entry = iconCache.get(u);
+  if (!entry) {
+    const img = new Image(); entry = { img, ok: false };
+    img.onload = () => { entry.ok = true; if (!redrawQueued) { redrawQueued = true; requestAnimationFrame(() => { redrawQueued = false; draw(); }); } };
+    img.src = u; iconCache.set(u, entry);
+  }
+  return entry.ok ? entry.img : null;
+}
+
+let trace = null, hits = [], casts = [], rules = [], evalsByRule = [], buffs = [], buffNames = [], decisions = [], offset = 0, eventRows = [], eventList = [], eventStart = 0, cascadeWindow = 0, cascadeMissed = false;
+const changeCache = new Map();
+let shownRules = new Set(), shownBuffs = [], selected = null, lanes = [], view = { a: 0, b: 1 }, full = { a: 0, b: 1 };
+
+// "wasm": the engine runs in this browser (workers); "native": a local Python server answers.
+const BACKEND = window.__swtorsimBackend === "wasm" ? "wasm" : "native";
+document.body.dataset.backend = BACKEND;
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+// The fight being debugged: a saved run config by name, or the Combat Simulator's own setup (its request payload).
+const SETUP_OPTION = "__setup__";
+let currentSource = { config: null }, setupObject = null, lastSetupJson = "";
+const sourceFields = () => (currentSource.setup ? { setup: currentSource.setup } : { config: currentSource.config });
+
+// Progress of the replays that run on several workers in the browser build ("Replaying 120/500").
+let progressTarget = null;
+window.addEventListener("swtor-debug-progress", (ev) => {
+  const el = progressTarget && $(progressTarget), d = ev.detail || {};
+  if (el) el.innerHTML = `<span class="muted">${esc(d.label)} ${d.done}/${d.total}...</span>`;
+});
+function busyStart(targetId) { progressTarget = targetId; $("cancelBusy").style.display = ""; }
+function busyEnd() { progressTarget = null; $("cancelBusy").style.display = "none"; }
+$("cancelBusy").onclick = () => { fetch("/api/simulate_cancel", { method: "POST" }).catch(() => {}); };
+
+/* ---------- loading ---------- */
+async function init() {
+  buildLegend();
+  try {
+    const { configs } = await api("/api/configs");
+    const options = configs.map((c) => `<option>${esc(c)}</option>`).join("");
+    $("config").insertAdjacentHTML("beforeend", options);
+  } catch (e) { $("status").textContent = "Could not load configs: " + e.message; }
+  // Opened from the Combat Simulator in the browser build (same origin): the setup it left in local storage.
+  if (new URLSearchParams(location.search).get("setup") === "1") {
+    try {
+      const saved = JSON.parse(localStorage.getItem("swtorsim_debug_setup") || "null");
+      if (saved && saved.setup && Date.now() - saved.at < 10 * 60 * 1000) receiveSetup(saved.setup, saved.label);
+    } catch (e) { /* no usable setup: the page starts normally */ }
+  }
+  // Opened as a window from the Combat Simulator ("Debug"): tell it we are ready, it answers with its setup.
+  if (window.opener && window.opener !== window) {
+    try { window.opener.postMessage({ type: "swtorsim-debugger-ready" }, "*"); } catch (e) { /* the opener went away */ }
+  }
+}
+
+// Only the window that opened this one may hand it a setup.
+window.addEventListener("message", (ev) => {
+  if (!window.opener || ev.source !== window.opener) return;
+  const d = ev.data || {};
+  if (d.type === "swtorsim-debugger-setup" && d.setup && typeof d.setup === "object") receiveSetup(d.setup, d.label);
+});
+
+function receiveSetup(setup, label) {
+  const json = JSON.stringify(setup);
+  if (json === lastSetupJson && trace) return; // the same setup sent twice (on opening and on "ready")
+  lastSetupJson = json; setupObject = setup;
+  let option = $("config").querySelector(`option[value="${SETUP_OPTION}"]`);
+  if (!option) { option = document.createElement("option"); option.value = SETUP_OPTION; $("config").prepend(option); }
+  option.textContent = `Simulator setup: ${label || "current"}`;
+  $("config").value = SETUP_OPTION;
+  $("env").value = setup.environment === "pts" ? "pts" : "live"; $("env").disabled = true;
+  $("seed").placeholder = setup.seed != null ? String(setup.seed) : "setup";
+  $("duration").placeholder = setup.duration != null ? String(setup.duration) : "setup";
+  runTrace();
+}
+$("config").onchange = () => { $("env").disabled = $("config").value === SETUP_OPTION; };
+
+async function runTrace() {
+  const fromSetup = $("config").value === SETUP_OPTION && setupObject;
+  const body = fromSetup ? { setup: setupObject, environment: setupObject.environment || "live" } : { config: $("config").value, environment: $("env").value };
+  if ($("seed").value !== "") body.seed = Number($("seed").value);
+  if ($("duration").value !== "") body.duration = Number($("duration").value);
+  $("run").disabled = true; $("status").textContent = "Running traced fight...";
+  try {
+    const t0 = performance.now();
+    trace = await api("/api/trace", body);
+    currentSource = fromSetup ? { setup: setupObject } : { config: body.config };
+    prepare();
+    $("status").textContent = `Traced ${trace.config.name} (seed ${trace.config.seed}) in ${((performance.now() - t0) / 1000).toFixed(1)}s.`;
+  } catch (e) { $("status").innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  $("run").disabled = false;
+}
+function prepare() {
+  const outcomes = trace.proc.outcomes;
+  hits = trace.events.filter((e) => e.type === "damage_hit").sort((x, y) => x.t - y.t);
+  casts = trace.events.filter((e) => e.type === "cast_start").sort((x, y) => x.t - y.t);
+  rules = trace.proc.rules;
+  evalsByRule = rules.map(() => []);
+  for (const r of trace.proc.evals) {
+    evalsByRule[r[2]].push({ t: r[0], raw: r[1], rule: r[2], outcome: outcomes[r[3]], base: r[4], chance: r[5], draw: r[6], remaining: r[7], interval: r[8] });
+  }
+  evalsByRule.forEach((a) => a.sort((x, y) => x.t - y.t));
+  rules.forEach((r) => { r.stats = ruleStats(r.id); });
+  changeCache.clear(); // cached diffs belong to the previous fight
+  buffs = trace.buff_windows;
+  const dur = {};
+  buffs.forEach((w) => { if (!w.is_passive) dur[w.name] = (dur[w.name] || 0) + Math.max(0, (w.end ?? w.start) - w.start); });
+  buffNames = Object.keys(dur).sort((a, b) => dur[b] - dur[a]);
+  shownBuffs = buffNames.slice(0, 2);
+  shownRules = new Set(rules.filter((r) => r.mean_chance !== null && r.mean_chance < 100).sort((a, b) => evalsByRule[b.id].length - evalsByRule[a.id].length).slice(0, 3).map((r) => r.id));
+  const s = trace.summary;
+  full = { a: Math.min(0, s.t_start) - 0.5, b: s.duration + 0.5 };
+  view = { ...full };
+  selected = null;
+  decisions = trace.rotation || [];
+  offset = trace.proc.time_offset || 0;
+  buildEventRows(); eventStart = 0;
+  renderSummary(); renderBuffControls(); renderProcTable(); renderDecisions(); renderAbilityTable(); renderEventLog(); renderDetail(); layout(); draw();
+  $("stateview").className = "muted"; $("stateview").textContent = "Pick a time, or use \"Show state just before this\" on a selected item.";
+}
+
+function ruleStats(id) {
+  const st = { n: 0, fired: 0, failed: 0, icd: 0, cond: 0, rolled: 0, passes: 0, expected: 0 };
+  for (const e of evalsByRule[id]) {
+    st.n++;
+    if (e.outcome === "fired") st.fired++;
+    if (e.outcome === "roll_failed") st.failed++;
+    if (e.outcome === "blocked_icd") st.icd++;
+    if (e.outcome === "blocked_condition" || e.outcome === "branch_did_not_run") st.cond++;
+    if (ROLLED.has(e.outcome) && e.chance !== null) { st.rolled++; st.expected += e.chance / 100; if (e.outcome !== "roll_failed") st.passes++; }
+  }
+  return st;
+}
+
+/* ---------- panels ---------- */
+function renderSummary() {
+  const s = trace.summary, c = trace.character || {};
+  const items = [[Math.round(s.dps).toLocaleString(), "DPS"], [s.duration + "s", "Duration"], [s.total_hits, "Hits"], [s.crit_pct + "%", "Crit rate"],
+    [s.casts_count, "Casts"], [c.class_name || "", [c.spec, c.environment].filter(Boolean).join(" ")]];
+  $("summary").innerHTML = items.map(([v, l]) => `<div><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join("");
+}
+
+function renderBuffControls() {
+  $("addbuff").innerHTML = '<option value="">add...</option>' + buffNames.filter((n) => !shownBuffs.includes(n)).map((n) => `<option>${esc(n)}</option>`).join("");
+  $("buffchips").innerHTML = shownBuffs.map((n, i) => `<button data-i="${i}" title="Remove lane">${ic(n, 14)}${esc(n)} &times;</button>`).join(" ");
+}
+
+function renderProcTable() {
+  const q = $("procfilter").value.trim().toLowerCase(), onlyChance = $("onlychance").checked;
+  const list = rules.filter((r) => (!q || String(r.source).toLowerCase().includes(q)) && (!onlyChance || (r.mean_chance !== null && r.mean_chance < 100)))
+    .sort((a, b) => b.stats.n - a.stats.n);
+  const rows = list.map((r) => {
+    const s = r.stats, obs = s.rolled ? (100 * s.passes / s.rolled) : null, exp = s.rolled ? (100 * s.expected / s.rolled) : null;
+    return `<tr data-rule="${r.id}" class="${selected && selected.kind === "rule" && selected.rule === r.id ? "sel" : ""}">
+      <td><input type="checkbox" data-lane="${r.id}" ${shownRules.has(r.id) ? "checked" : ""} aria-label="Show lane"></td>
+      <td>${ic(r.source)}${esc(r.source)}</td><td>${esc(r.kind)} / ${esc(r.event)}</td><td>${s.n}</td><td>${s.fired}</td><td>${s.failed}</td><td>${s.icd}</td><td>${s.cond}</td>
+      <td>${fmt(exp, 1)}${exp === null ? "" : "%"}</td><td>${fmt(obs, 1)}${obs === null ? "" : "%"}</td></tr>`;
+  }).join("");
+  $("proctable").innerHTML = `<table><thead><tr><th>Lane</th><th>Proc</th><th>Kind / event</th><th>Evals</th><th>Fired</th><th>Roll failed</th><th>ICD</th><th>Conditions</th><th>Expected</th><th>Observed</th></tr></thead><tbody>${rows || '<tr><td colspan="10" class="muted">No procs match.</td></tr>'}</tbody></table>`;
+}
+
+function chip(outcome) { return `<span class="chip" style="background:var(${OUTCOME_VAR[outcome]})">${esc(OUTCOME_LABEL[outcome] || outcome)}</span>`; }
+
+function whyText(e) {
+  const chance = e.chance !== null ? `${fmt(e.chance, 1)}%` + (e.base !== null && Math.abs(e.base - e.chance) > 1e-9 ? ` (base ${fmt(e.base, 1)}%, ${e.chance - e.base >= 0 ? "+" : ""}${fmt(e.chance - e.base, 1)} from stat 228)` : "") : null;
+  switch (e.outcome) {
+    case "fired": return chance ? `Procced. Rolled ${fmt(e.draw, 1)}, needed ${fmt(e.chance, 1)} or lower (chance ${chance}).` : "Procced. This rule has no chance roll: it fires whenever its conditions pass.";
+    case "roll_failed": return `Did not proc. Rolled ${fmt(e.draw, 1)}, needed ${fmt(e.chance, 1)} or lower (chance ${chance}).`;
+    case "blocked_icd": return `Blocked by the internal cooldown: ${fmt(e.remaining)}s left of ${fmt(e.interval)}s. No roll was made.`;
+    case "blocked_condition": return "The branch conditions were not met, so no roll was made.";
+    case "branch_did_not_run": return `The roll passed (rolled ${fmt(e.draw, 1)}, chance ${chance}) but the branch conditions then failed, so nothing happened.`;
+    case "skipped_else_gate": return "Skipped: another branch of the same effect already ran (else gate). No roll was made.";
+    case "skipped_same_activation": return "Skipped: this effect was (re)applied by the same ability activation, so it only hears the next one.";
+  }
+  return "";
+}
+
+function renderDetail() {
+  syncEventLog();
+  renderDetailCore();
+  if (selectedTimes()) { $("detailbody").insertAdjacentHTML("beforeend", '<div id="cascade"></div>'); renderCascade(); }
+}
+
+function selectedTimes() {
+  if (!selected || !selected.obj) return null;
+  const o = selected.obj;
+  if (selected.kind === "hit" || selected.kind === "cast" || selected.kind === "eval") return { t: o.t, raw: o.raw };
+  if (selected.kind === "decision") return { t: o.t, raw: o.t + offset };
+  if (selected.kind === "buff") return { t: o.start, raw: o.start + offset };
+  return null;
+}
+
+function renderDetailCore() {
+  const el = $("detailbody");
+  if (!selected) { el.innerHTML = "Click a hit, a cast, a proc marker, or a proc row."; el.className = "muted"; return; }
+  el.className = "";
+  if (selected.kind === "hit") return detailHit(el, selected.obj);
+  if (selected.kind === "cast") {
+    const c = selected.obj, d = decisions.find((x) => x.chosen === c.ability && Math.abs(x.t - c.t) < 0.02);
+    el.innerHTML = `${ic(c.ability, 24)}<b>${esc(c.ability)}</b> ${c.is_channel ? "(channel)" : ""}<div class="kv"><span>Time</span><span>${fmt(c.t, 3)}s</span><span>Duration</span><span>${fmt(c.duration, 2)}s</span><span>Target</span><span>${esc(c.target || "-")}</span></div>
+      <h2>Why this ability was cast</h2>${d ? decisionHtml(d) : '<span class="muted">No rotation decision recorded at this moment (a pre-combat step or a triggered cast).</span>'}
+      <button class="sbtn" data-state="${c.raw}">Show state just before this</button>`;
+    return;
+  }
+  if (selected.kind === "decision") { const d = selected.obj; el.innerHTML = `<b>Rotation decision</b>${decisionHtml(d)}<button class="sbtn" data-state="${d.t + offset}">Show state just before this</button>`; return; }
+  if (selected.kind === "eval") return detailEval(el, selected.obj);
+  if (selected.kind === "rule") return detailRule(el, rules[selected.rule]);
+  if (selected.kind === "buff") { const w = selected.obj; el.innerHTML = `${ic(w.name, 24)}<b>${esc(w.name)}</b><div class="kv"><span>Entity</span><span>${esc(w.entity)}</span><span>From</span><span>${fmt(w.start, 2)}s</span><span>To</span><span>${fmt(w.end, 2)}s</span><span>Max stacks</span><span>${w.max_stacks}</span></div>`; }
+}
+
+function mathRows(obj, depth = 0) {
+  return Object.entries(obj).map(([k, v]) => {
+    if (v && typeof v === "object") return `<span style="padding-left:${depth * 12}px">${esc(k)}</span><span></span>${mathRows(v, depth + 1)}`;
+    return `<span style="padding-left:${depth * 12}px">${esc(k)}</span><span>${typeof v === "number" ? +v.toFixed(4) : esc(v)}</span>`;
+  }).join("");
+}
+
+// Plain-language stat name: "STAT_cbt_damage_done_modifier_percentage" -> "damage done".
+function statName(raw) { return String(raw).replace(/^(STAT_|stat_)(cbt_|eff_)?/i, "").replace(/_(modifier_)?(percentage|fixed)$/i, "").replace(/_/g, " "); }
+
+function sourceRows(list) {
+  if (!list.length) return '<div class="muted" style="font-size:12px">No effects contribute.</div>';
+  return [...list].sort((a, b) => b.value - a.value).map((s) => `<div class="cand src"><div class="srow"><span>${ic(s.effect, 16)}<b>${esc(s.effect ?? "?")}</b></span>
+    <span>${s.value >= 0 ? "+" : ""}${(100 * s.value).toFixed(2)}%</span></div>
+    <div class="muted small" title="${esc(s.label || s.stat)}">${esc(statName(s.label || s.stat))} &middot; ${s.where}${s.stacks > 1 ? ` &middot; ${s.stacks} stacks` : ""}</div></div>`).join("");
+}
+
+// Damage range of this hit: lowest and highest base roll after armor and the multiplier, and the same with a crit.
+function rangeHtml(h) {
+  const r = (h.math || {}).range;
+  if (!r) return "";
+  const n = (v) => Math.floor(v).toLocaleString(), cm = r.crit_multiplier;
+  const kind = h.is_crit ? { lo: r.min * cm, hi: r.max * cm } : { lo: r.min, hi: r.max };
+  const spread = kind.hi - kind.lo, pos = spread > 0 ? Math.max(0, Math.min(1, (h.damage - kind.lo) / spread)) : null;
+  const row = (label, lo, hi, here) => `<span>${label}${here ? " <b>(this hit)</b>" : ""}</span><span>${n(lo)} &ndash; ${n(hi)}</span>`;
+  return `<h2>Damage range</h2>
+    <div class="kv">${row("Base roll, before armor", r.base_min, r.base_max, false)}${row("Without a crit", r.min, r.max, !h.is_crit)}${cm === null ? "<span>With a crit</span><span>cannot crit</span>" : row("With a crit", r.min * cm, r.max * cm, h.is_crit)}</div>
+    ${pos === null ? '<div class="muted" style="font-size:12px">This ability deals a fixed amount: no spread.</div>'
+      : `<div class="bar" aria-label="Position of this hit in its damage range"><div class="exp" style="left:${(100 * pos).toFixed(1)}%"></div></div>
+         <div class="muted" style="font-size:12px">This hit rolled ${(100 * pos).toFixed(0)}% of the way from the lowest to the highest ${h.is_crit ? "crit" : "non-crit"} value.</div>`}`;
+}
+
+function hitMathHtml(h) {
+  const m = h.math || {};
+  if (!m.sources) return `<div class="kv">${mathRows(m)}</div>`; // a trace without source recording
+  const pct = (v) => (100 * v).toFixed(2) + "%", by = (kind) => m.sources.filter((s) => s.kind === kind);
+  const buckets = Object.entries(m.buckets || {}), c = m.crit;
+  const flow = `<div class="kv"><span>Base damage</span><span>${Math.round(m.base_damage).toLocaleString()}</span>
+    <span>After armor</span><span>${Math.round(m.post_mit_damage).toLocaleString()}</span>
+    <span>&times; multiplier</span><span>${m.total_multiplier.toFixed(4)}</span>
+    <span>= before crit</span><span>${Math.round(m.post_mod_damage).toLocaleString()}</span>
+    <span>Result</span><span><b>${h.damage.toLocaleString()}</b>${h.is_crit ? " (crit)" : ""}</span></div>`;
+  const bucketHtml = buckets.map(([key, value]) => {
+    const own = by("bucket").filter((s) => s.bucket === key);
+    return `<div style="margin-top:6px"><b>${esc(key.replace("_", " "))}</b> <span class="muted">&times;${value.toFixed(4)} = 1 + ${pct(value - 1)}</span>${sourceRows(own)}</div>`;
+  }).join("");
+  const multiplier = `<h2>Multiplier &times;${m.total_multiplier.toFixed(4)}</h2>
+    <div class="muted" style="font-size:12px">Effects in the same bucket add; the buckets then multiply.${buckets.length ? ` Here: ${buckets.map(([, v]) => "&times;" + v.toFixed(4)).join(" ")}.` : ""}</div>${bucketHtml || '<div class="muted" style="font-size:12px">No damage bonuses apply.</div>'}`;
+  let crit = "";
+  if (c) {
+    const bonusChance = by("crit_chance"), bonusMod = by("crit_modifier"), total = c.stat_modifier + c.bonus_modifier;
+    crit = `<h2>Crit chance ${pct(c.chance)}</h2>
+      <div class="kv"><span>Character stat</span><span>${pct(c.stat_chance)}</span><span>From effects</span><span>${pct(c.bonus_chance)}</span>
+      <span>Roll</span><span>${(100 * c.roll).toFixed(2)} ${c.crit ? "&lt;" : "&ge;"} ${pct(c.chance)} &rarr; ${c.crit ? "<b>crit</b>" : "no crit"}</span></div>${sourceRows(bonusChance)}
+      <h2>Crit modifier ${pct(total)}</h2>
+      <div class="kv"><span>Character stat</span><span>${pct(c.stat_modifier)}</span><span>From effects</span><span>${pct(c.bonus_modifier)}</span>
+      <span>Crit damage</span><span>${c.multiplier === null ? "not used (no crit)" : "&times;" + c.multiplier.toFixed(4)}</span></div>${sourceRows(bonusMod)}
+      <div class="muted" style="font-size:12px">A crit multiplies damage by 1 + modifier, and the modifier is multiplied by the crit chance when that is above 100%.</div>`;
+  }
+  const extras = [["armor_pen", "Armor penetration", m.bonus_armor_pen], ["weapon_modifier", "Weapon damage modifier", m.base_weapon_damage_modifier],
+    ["dual_wield", "Off-hand modifier", m.dual_wield_damage_modifier]].filter(([, , v]) => v).map(([kind, title, v]) => `<h2>${title} ${pct(v)}</h2>${sourceRows(by(kind))}`).join("");
+  return flow + rangeHtml(h) + multiplier + crit + extras;
+}
+
+function detailHit(el, h) {
+  const near = [];
+  rules.forEach((r) => { for (const e of evalsByRule[r.id]) if (Math.abs(e.t - h.t) < 0.0005) near.push(e); });
+  const procs = near.length ? near.map((e) => `<div>${chip(e.outcome)} ${ic(rules[e.rule].source, 16)}${esc(rules[e.rule].source)}</div>`).join("") : '<span class="muted">No proc was evaluated at this instant.</span>';
+  el.innerHTML = `${ic(h.ability, 24)}<b>${esc(h.ability)}</b> ${h.is_crit ? '<span class="chip" style="background:var(--crit);color:#222">Crit</span>' : ""}
+    <div class="kv"><span>Time</span><span>${fmt(h.t, 3)}s</span><span>Damage</span><span>${h.damage.toLocaleString()}</span><span>Type</span><span>${esc(h.attack_type)} / ${esc(h.damage_type)}</span></div>
+    <h2>Why this number</h2>${hitMathHtml(h)}
+    <h2>Procs evaluated at this hit</h2>${procs}
+    <button class="sbtn" data-state="${h.raw}">Show state just before this</button>
+    <h2>Damage check</h2>
+    <div class="muted" style="font-size:12px">Replays this hit with fresh random rolls and shows the crit rate and the damage range, next to what the character's stats say. A lead of a second or more also replays the cast before it.</div>
+    <div class="form"><label>Lead (s)<input id="d-lead" type="number" step="0.1" min="0" value="0"></label>
+      <label>Trials<input id="d-trials" type="number" min="10" max="3000" value="300"></label>
+      <label class="native-only">Workers<input id="d-workers" type="number" min="1" max="16" value="${Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1))}"></label>
+      <button id="d-go" class="primary">Check damage</button></div><div id="d-result"></div>`;
+  $("d-go").onclick = async () => {
+    const go = $("d-go"); go.disabled = true; $("d-result").innerHTML = '<span class="muted">Replaying...</span>'; busyStart("d-result");
+    try {
+      showDamage(await api("/api/damage", {
+        ...sourceFields(), environment: trace.config.environment, seed: trace.config.seed, ability: h.ability, anchor: h.raw,
+        window: Number($("d-lead").value) || 0, trials: Number($("d-trials").value) || 300, workers: Number($("d-workers").value) || 1,
+        duration: trace.config.duration
+      }));
+    } catch (err) { $("d-result").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+    go.disabled = false; busyEnd();
+  };
+}
+
+function detailEval(el, e) {
+  const r = rules[e.rule], hasChance = e.chance !== null;
+  const same = evalsByRule[e.rule], i = same.indexOf(e);
+  const prevFire = [...same.slice(0, i)].reverse().find((x) => x.outcome === "fired");
+  el.innerHTML = `${chip(e.outcome)} ${ic(r.source, 24)}<b>${esc(r.source)}</b>
+    <div class="why" style="border-color:var(${OUTCOME_VAR[e.outcome]})">${esc(whyText(e))}</div>
+    <div class="kv"><span>Time</span><span>${fmt(e.t, 3)}s</span><span>Kind</span><span>${esc(r.kind)} / ${esc(r.event)}</span>
+      <span>Last fired</span><span>${prevFire ? fmt(e.t - prevFire.t, 2) + "s earlier" : "never before"}</span>
+      <span>Evaluations</span><span>${same.length} total, ${r.stats.fired} fired</span></div>
+    <button class="sbtn" data-state="${e.raw}">Show state just before this</button>
+    ${hasChance ? measureForm(e) : '<div class="muted">No chance on this evaluation, so there is nothing to measure.</div>'}`;
+  bindMeasure(e);
+}
+
+function detailRule(el, r) {
+  const first = evalsByRule[r.id].find((e) => ROLLED.has(e.outcome) && e.chance !== null);
+  const counts = Object.entries(r.outcomes).map(([k, v]) => `<span>${esc(OUTCOME_LABEL[k] || k)}</span><span>${v}</span>`).join("");
+  el.innerHTML = `${ic(r.source, 24)}<b>${esc(r.source)}</b><div class="kv"><span>Kind</span><span>${esc(r.kind)} / ${esc(r.event)}</span><span>Mean chance</span><span>${r.mean_chance === null ? "none" : fmt(r.mean_chance, 1) + "%"}</span>${counts}</div>
+    ${first ? measureForm(first) : '<div class="muted">This rule never rolled a chance in this fight.</div>'}`;
+  if (first) bindMeasure(first);
+}
+
+function measureForm(e) {
+  const workers = Math.max(1, Math.min(6, (navigator.hardwareConcurrency || 4) - 1));
+  return `<h2>Measure this proc</h2>
+    <div class="muted" style="font-size:12px">Replays the fight to this moment many times with fresh random rolls and compares the observed rate with the chance used. A lead of 0 re-rolls only the dice; a lead of a second or two also runs the action that causes the proc (crits, once-per-hit rules).</div>
+    <div class="form"><label>Lead (s)<input id="m-lead" type="number" step="0.1" min="0" value="0"></label>
+      <label>Trials<input id="m-trials" type="number" min="10" max="5000" value="500"></label>
+      <label class="native-only">Workers<input id="m-workers" type="number" min="1" max="16" value="${workers}"></label>
+      <button id="m-go" class="primary">Measure</button></div><div id="m-result"></div>
+    <h2>Exact check</h2>
+    <div class="muted" style="font-size:12px">Forces this one roll to every value from 1 to 100 (the rest of the fight replays unchanged) and counts how many pass. With a 30% chance exactly 30 should. No sampling error, but it covers only this single roll.</div>
+    <div class="form"><button id="s-go">Run exact check</button></div><div id="s-result"></div>`;
+}
+
+function bindMeasure(e) {
+  const sweepGo = $("s-go");
+  if (sweepGo) sweepGo.onclick = async () => {
+    sweepGo.disabled = true; $("s-result").innerHTML = '<span class="muted">Replaying with forced rolls...</span>'; busyStart("s-result");
+    try {
+      const r = await api("/api/sweep", {
+        ...sourceFields(), environment: trace.config.environment, seed: trace.config.seed, key: rules[e.rule].key, anchor: e.raw,
+        workers: Number(($("m-workers") || {}).value) || 1, duration: trace.config.duration, source: rules[e.rule].source
+      });
+      showSweep(r);
+    } catch (err) { $("s-result").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+    sweepGo.disabled = false; busyEnd();
+  };
+  const go = $("m-go");
+  if (!go) return;
+  go.onclick = async () => {
+    go.disabled = true; $("m-result").innerHTML = '<span class="muted">Measuring...</span>'; busyStart("m-result");
+    try {
+      const r = await api("/api/measure", {
+        ...sourceFields(), environment: trace.config.environment, seed: trace.config.seed, key: rules[e.rule].key, anchor: e.raw,
+        window: Number($("m-lead").value) || 0, trials: Number($("m-trials").value) || 500, workers: Number($("m-workers").value) || 1,
+        duration: trace.config.duration, source: rules[e.rule].source
+      });
+      showMeasure(r);
+    } catch (err) { $("m-result").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+    go.disabled = false; busyEnd();
+  };
+}
+
+function showSweep(r) {
+  if (r.chance === null) { $("s-result").innerHTML = '<div class="why">No chance roll at this moment: the rule fires whenever its conditions pass, so there is nothing to sweep.</div>'; return; }
+  const ok = r.verdict === "exact";
+  $("s-result").innerHTML = `<div class="why" style="border-color:var(${ok ? "--fired" : "--cond"})"><b class="${ok ? "good" : "bad"}">${ok ? "Exact" : "MISMATCH"}</b>:
+    ${r.passed} of ${r.tested} forced draws passed; the chance used was ${r.chance.toFixed(4)}%, which allows ${r.expected}.</div>
+    <div class="kv"><span>Draw equal to the chance</span><span>${r.boundary_at_chance_passes ? "passes" : "FAILS"}</span><span>Draw just above it</span><span>${r.boundary_above_chance_fails ? "fails" : "PASSES"}</span><span>Time</span><span>${r.seconds.toFixed(1)}s</span></div>
+    ${r.problems.length ? `<div class="err">${r.problems.map(esc).join("<br>")}</div>` : ""}`;
+}
+
+function showMeasure(r) {
+  if (!r.rolls) { $("m-result").innerHTML = '<div class="why">No evaluation reached the roll in that window.</div>'; return; }
+  const ok = r.verdict === "consistent", top = Math.max(0.05, Math.min(1, Math.max(r.interval[1], r.expected) * 1.15));
+  const pos = (v) => `${(100 * v / top).toFixed(2)}%`;
+  $("m-result").innerHTML = `<div class="why" style="border-color:var(${ok ? "--fired" : "--cond"})"><b class="${ok ? "good" : "bad"}">${ok ? "Consistent" : "MISMATCH"}</b>:
+    observed ${(100 * r.observed).toFixed(2)}% vs expected ${(100 * r.expected).toFixed(2)}%.</div>
+    <div class="bar" aria-label="Observed interval and expected chance"><div class="range" style="left:${pos(r.interval[0])};width:calc(${pos(r.interval[1])} - ${pos(r.interval[0])})"></div><div class="exp" style="left:${pos(r.expected)}"></div></div>
+    <div class="muted" style="font-size:12px">Bar: 99% interval (blue) and expected chance (line), 0 to ${(100 * top).toFixed(0)}%.</div>
+    <div class="kv"><span>Rolls</span><span>${r.rolls} in ${r.trials} trials (${r.rolls_per_trial.toFixed(2)} per trial)</span><span>Fires per trial</span><span>${r.fires_per_trial.toFixed(3)}</span>
+    <span>99% interval</span><span>${(100 * r.interval[0]).toFixed(2)}% to ${(100 * r.interval[1]).toFixed(2)}%</span><span>Stopped</span><span>${esc(r.stopped_because)}, ${r.seconds.toFixed(1)}s</span></div>`;
+}
+
+/* ---------- rotation decisions ---------- */
+function decisionHtml(d) {
+  const rows = d.candidates.map((c) => {
+    const kind = c.accepted ? ["--fired", "Chosen"] : c.rules_passed ? ["--icd", "Blocked"] : ["--failed", "Rule failed"];
+    return `<div class="cand"><span class="chip" style="background:var(${kind[0]})">${kind[1]}</span> ${ic(c.ability, 16)}${esc(c.ability)} <span class="muted">${esc(c.reason)}</span></div>`;
+  }).join("");
+  return `<div class="kv"><span>Step</span><span>${esc(d.step_name)} (${esc(d.step_type)})</span><span>Time</span><span>${fmt(d.t, 3)}s</span>
+    <span>Chose</span><span>${ic(d.chosen, 16)}${esc(d.chosen ?? (d.is_stall ? "nothing (stall)" : "-"))}</span></div>${rows || '<span class="muted">No candidates were considered.</span>'}`;
+}
+
+function renderDecisions() {
+  const q = $("decfilter").value.trim().toLowerCase(), stallsOnly = $("decstalls").checked;
+  const list = decisions.filter((d) => (!stallsOnly || d.is_stall) &&
+    (!q || (d.step_name + " " + (d.chosen || "") + " " + d.candidates.map((c) => c.ability).join(" ")).toLowerCase().includes(q)));
+  const shown = list.slice(0, 400);
+  $("deccount").textContent = `${list.length} decisions${list.length > shown.length ? ", first 400 shown" : ""}`;
+  $("dectable").innerHTML = `<table><thead><tr><th>Time</th><th>Step</th><th>Chose</th><th>Rejected</th></tr></thead><tbody>${shown.map((d) => {
+    const rejected = d.candidates.filter((c) => !c.accepted).length;
+    return `<tr data-dec="${d.id}"><td>${fmt(d.t, 2)}s</td><td>${esc(d.step_name)}</td><td>${ic(d.chosen)}${esc(d.chosen ?? (d.is_stall ? "stall" : "-"))}</td><td>${rejected}</td></tr>`;
+  }).join("") || '<tr><td colspan="4" class="muted">No decisions match.</td></tr>'}</tbody></table>`;
+}
+
+/* ---------- damage by ability ---------- */
+function renderAbilityTable() {
+  const by = new Map();
+  for (const h of hits) {
+    const a = by.get(h.ability) || { name: h.ability, n: 0, crits: 0, normal: 0, nNormal: 0, crit: 0, total: 0 };
+    a.n++; a.total += h.damage;
+    if (h.is_crit) { a.crits++; a.crit += h.damage; } else { a.normal += h.damage; a.nNormal++; }
+    by.set(h.ability, a);
+  }
+  const all = [...by.values()].sort((x, y) => y.total - x.total), sum = all.reduce((s, a) => s + a.total, 0) || 1;
+  const d = trace.derived || {};
+  $("statcrit").textContent = d.base_crit_chance !== undefined ? `${fmt(d.base_crit_chance, 1)}% (at the start of the fight)` : "-";
+  $("abltable").innerHTML = `<table><thead><tr><th>Ability</th><th>Hits</th><th>Crit %</th><th>Avg normal</th><th>Avg crit</th><th>Total</th><th>Share</th></tr></thead><tbody>${all.map((a) =>
+    `<tr data-abl="${esc(a.name)}"><td>${ic(a.name)}${esc(a.name)}</td><td>${a.n}</td><td>${fmt(100 * a.crits / a.n, 1)}%</td><td>${a.nNormal ? Math.round(a.normal / a.nNormal).toLocaleString() : "-"}</td><td>${a.crits ? Math.round(a.crit / a.crits).toLocaleString() : "-"}</td><td>${a.total.toLocaleString()}</td><td>${fmt(100 * a.total / sum, 1)}%</td></tr>`).join("")}</tbody></table>`;
+}
+
+function showDamage(r) {
+  if (!r.hits) { $("d-result").innerHTML = '<div class="why">No hits of this ability in that window.</div>'; return; }
+  const ok = r.verdict === "consistent", top = Math.max(0.05, Math.min(1, Math.max(r.interval[1], r.expected_crit ?? 0) * 1.15));
+  const pos = (v) => `${(100 * v / top).toFixed(2)}%`;
+  const range = (s) => s ? `${Math.round(s.min).toLocaleString()} / ${Math.round(s.mean).toLocaleString()} / ${Math.round(s.max).toLocaleString()} (${s.n})` : "none";
+  $("d-result").innerHTML = `<div class="why" style="border-color:var(${ok ? "--fired" : "--icd"})"><b class="${ok ? "good" : "bad"}">${ok ? "Consistent" : esc(r.verdict)}</b>:
+    crit rate ${(100 * r.crit_rate).toFixed(1)}% over ${r.hits} hits (99% interval ${(100 * r.interval[0]).toFixed(1)}-${(100 * r.interval[1]).toFixed(1)}%)${r.expected_crit === null ? "" : `, stats say ${(100 * r.expected_crit).toFixed(1)}%`}.
+    ${ok || r.expected_crit === null ? "" : "A gap points at inputs (stats, buffs, bonuses) before the math."}</div>
+    ${r.expected_crit === null ? "" : `<div class="bar" aria-label="Observed crit interval and stat crit chance"><div class="range" style="left:${pos(r.interval[0])};width:calc(${pos(r.interval[1])} - ${pos(r.interval[0])})"></div><div class="exp" style="left:${pos(r.expected_crit)}"></div></div>
+    <div class="muted" style="font-size:12px">Bar: 99% interval (blue) and the stats' crit chance plus this hit's bonus (line), 0 to ${(100 * top).toFixed(0)}%.</div>`}
+    <div class="kv"><span>Normal hit (min / mean / max)</span><span>${range(r.normal)}</span><span>Crit hit (min / mean / max)</span><span>${range(r.crit_damage)}</span>
+    <span>Crit / normal mean</span><span>${r.crit_ratio === null ? "-" : r.crit_ratio.toFixed(3)} (crit modifier stat: ${r.expected_ratio === null ? "-" : r.expected_ratio.toFixed(3)})</span>
+    <span>Stat crit chance</span><span>${r.reference.crit_chance === undefined ? "-" : (100 * r.reference.crit_chance).toFixed(1) + "%"}${r.bonus_crit ? ` + ${(100 * r.bonus_crit).toFixed(1)}% on this hit` : ""}</span><span>Trials</span><span>${r.trials}, ${r.seconds.toFixed(1)}s</span></div>
+    <div class="muted" style="font-size:12px">The ratio is only a reference: the engine applies the crit multiplier inside its damage buckets with the hit's own bonuses, so it need not equal the stat.</div>`;
+}
+
+/* ---------- state at a moment ---------- */
+async function showState(raw) {
+  const box = $("stateview"); box.className = ""; box.innerHTML = '<span class="muted">Replaying to that moment...</span>';
+  $("st-time").value = (raw - offset).toFixed(3);
+  box.scrollIntoView({ block: "nearest" });
+  try {
+    const s = await api("/api/state", { ...sourceFields(), environment: trace.config.environment, seed: trace.config.seed, at: raw, duration: trace.config.duration });
+    renderState(s);
+  } catch (e) { box.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+function renderState(s) {
+  const notReady = s.abilities.filter((a) => !a.ready);
+  const rel = (v) => (v === null ? "-" : v.toFixed(2) + "s");
+  const abl = (list) => `<table><thead><tr><th>Ability</th><th>Ready in</th><th>Charges</th><th>Recharge in</th><th>Cooldown</th></tr></thead><tbody>${list.map((a) =>
+    `<tr><td>${ic(a.name, 16)}${esc(a.name)}</td><td>${a.ready ? "ready" : (a.max_charges && a.charges === 0 ? rel(a.recharge_in) : rel(a.ready_in))}</td><td>${a.max_charges ? `${a.charges}/${a.max_charges}` : "-"}</td><td>${rel(a.recharge_in)}</td><td>${a.cooldown ? a.cooldown + "s" : "-"}</td></tr>`).join("")}</tbody></table>`;
+  const eff = s.effects.filter((e) => !e.passive || $("st-passive")?.checked);
+  const effTable = (list) => `<table><thead><tr><th>Who</th><th>Effect</th><th>Stacks</th><th>Remaining</th></tr></thead><tbody>${list.map((e) =>
+    `<tr><td>${esc(e.entity)}</td><td>${ic(e.name, 16)}${esc(e.name)}</td><td>${e.stacks}${e.max_stacks > 1 ? "/" + e.max_stacks : ""}</td><td>${e.permanent ? "permanent" : rel(e.remaining)}</td></tr>`).join("") || '<tr><td colspan="4" class="muted">None.</td></tr>'}</tbody></table>`;
+  const res = s.resource;
+  $("stateview").innerHTML = `<div class="summary-line"><span class="pill">t = ${fmt(s.at - offset, 3)}s</span> <span class="pill">GCD ${s.gcd_remaining > 0 ? s.gcd_remaining.toFixed(2) + "s left" : "ready"}</span>
+    <span class="pill">${esc(res.type.replace("Pool", ""))} ${fmt(res.current, 1)}/${fmt(res.max, 0)}</span>
+    ${s.casting ? `<span class="pill">casting ${esc(s.casting)}</span>` : ""}${s.channeling ? `<span class="pill">channeling ${esc(s.channeling)}</span>` : ""}
+    <span class="pill">target ${Number(s.target.hp).toLocaleString()} / ${Number(s.target.max_hp).toLocaleString()} HP</span></div>
+    <div class="grid2" style="margin-top:10px">
+      <div><h2>Not ready (${notReady.length} of ${s.abilities.length})</h2><div class="scroll">${abl(notReady)}</div>
+        <details><summary>All abilities</summary><div class="scroll">${abl(s.abilities)}</div></details></div>
+      <div><h2>Effects <label style="display:inline;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" id="st-passive" ${$("st-passive")?.checked ? "checked" : ""}> include passives</label></h2><div class="scroll">${effTable(eff)}</div></div>
+    </div>
+    <h2 style="margin-top:10px">Internal cooldowns running (${s.icds.length})</h2>
+    ${s.icds.length ? `<table><thead><tr><th>Proc</th><th>Event</th><th>Remaining</th></tr></thead><tbody>${s.icds.map((i) => `<tr><td>${ic(i.source, 16)}${esc(i.source)}</td><td>${esc(i.event)}</td><td>${rel(i.remaining)}</td></tr>`).join("")}</tbody></table>` : '<span class="muted">None running.</span>'}
+    <details><summary>Character stats (${Object.keys(s.stats).length})</summary><div class="kv">${Object.entries(s.stats).map(([k, v]) => `<span>${esc(k)}</span><span>${v}</span>`).join("")}</div></details>`;
+  const box = $("st-passive");
+  if (box) box.onchange = () => renderState(s);
+}
+
+/* ---------- cascade: everything at this moment, and what changed ---------- */
+function eventsBetween(t0, t1) {
+  let lo = 0, hi = eventRows.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (eventRows[m].t < t0) lo = m + 1; else hi = m; }
+  const out = [];
+  for (let i = lo; i < eventRows.length && eventRows[i].t <= t1; i++) out.push({ row: eventRows[i], index: i });
+  return out;
+}
+
+const CASCADE_INDENT = { decision: 0, cast: 1, hit: 2, buff: 2, fired: 3, missed: 3 };
+
+function renderCascade() {
+  const box = $("cascade"), tm = selectedTimes();
+  if (!box || !tm) return;
+  const W = cascadeWindow, all = eventsBetween(tm.t - 0.00015, tm.t + W + 0.00015);
+  const n = { decision: 0, cast: 0, hit: 0, crit: 0, damage: 0, fired: 0, applied: 0, ended: 0 };
+  for (const { row } of all) {
+    if (row.type === "hit") { n.hit++; n.damage += row.sel.obj.damage; if (row.crit) n.crit++; }
+    else if (row.type === "buff") { row.text === "applied" ? n.applied++ : n.ended++; }
+    else if (n[row.type] !== undefined) n[row.type]++;
+  }
+  const shown = all.filter((x) => cascadeMissed || x.row.type !== "missed");
+  const rows = shown.slice(0, 80).map(({ row, index }) => `<tr class="cas ${selected && selected.obj === row.sel.obj ? "sel" : ""}" data-ei="${index}"><td>${fmt(row.t - tm.t, 3)}s</td><td>${eventChip(row)}</td>
+    <td style="padding-left:${8 + 12 * CASCADE_INDENT[row.type]}px">${ic(row.name, 16)}${esc(row.name)}</td><td>${esc(row.text)}</td></tr>`).join("");
+  const key = `${trace.config.name}|${tm.raw}|${W}`;
+  box.innerHTML = `<h2>At this moment</h2>
+    <div class="tools"><label style="flex-direction:row;align-items:center;gap:6px">Include the next <input id="cas-window" type="number" step="0.1" min="0" value="${W}" style="width:70px"> s</label>
+      <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="cas-missed" ${cascadeMissed ? "checked" : ""}> procs that did not fire</label></div>
+    <div class="muted" style="font-size:12px">Everything recorded at this instant${W > 0 ? ` and the next ${W}s` : ""}, grouped by kind. Events at the same time happened together; that is not proof that one caused another.</div>
+    <div style="margin:6px 0">${[`${n.cast} cast`, `${n.hit} hits (${n.damage.toLocaleString()} damage${n.crit ? `, ${n.crit} crit` : ""})`, `${n.fired} procs fired`, `${n.applied} buffs applied`, `${n.ended} ended`].map((s) => `<span class="pill">${s}</span>`).join(" ")}</div>
+    <div class="scroll" style="max-height:260px"><table><tbody>${rows || '<tr><td colspan="4" class="muted">Nothing else at this moment.</td></tr>'}</tbody></table></div>
+    ${shown.length > 80 ? `<div class="muted" style="font-size:12px">First 80 of ${shown.length}.</div>` : ""}
+    <h2>What changed</h2>
+    <div class="muted" style="font-size:12px">The state just before this moment against the state after ${W > 0 ? `the next ${W}s` : "it"}: resource, GCD, cooldowns, effects, ICDs and stats. Runs a replay.</div>
+    <button class="sbtn" data-change="${tm.raw}">Show what changed</button><div id="chg"></div>`;
+  if (changeCache.has(key)) renderChange(changeCache.get(key));
+}
+
+function abilityState(a) { return `${a.charges !== null ? a.charges + " charges, " : ""}${a.ready ? "ready" : (a.ready_in ?? 0).toFixed(1) + "s left"}`; }
+
+function renderChange(res) {
+  const d = res.diff, num = (v, k = 1) => (v === null || v === undefined ? "-" : Number(v).toFixed(k)), lines = [];
+  if (d.resource.delta) lines.push(`<b>${esc(d.resource.type.replace("Pool", ""))}</b> ${num(d.resource.before)} &rarr; ${num(d.resource.after)} (${d.resource.delta > 0 ? "+" : ""}${num(d.resource.delta)})`);
+  if (d.gcd.before !== d.gcd.after) lines.push(`<b>GCD</b> ${num(d.gcd.before, 2)}s &rarr; ${num(d.gcd.after, 2)}s left`);
+  if (d.target_hp.delta) lines.push(`<b>Target</b> ${Math.abs(d.target_hp.delta).toLocaleString()} damage taken`);
+  if (d.casting.before !== d.casting.after) lines.push(`<b>Casting</b> ${esc(d.casting.before ?? "nothing")} &rarr; ${esc(d.casting.after ?? "nothing")}`);
+  if (d.channeling.before !== d.channeling.after) lines.push(`<b>Channeling</b> ${esc(d.channeling.before ?? "nothing")} &rarr; ${esc(d.channeling.after ?? "nothing")}`);
+  const section = (title, items) => items.length ? `<h2>${title} (${items.length})</h2>${items.map((s) => `<div class="cand">${s}</div>`).join("")}` : "";
+  const e = d.effects;
+  const html = lines.map((s) => `<div class="cand">${s}</div>`).join("")
+    + section("Cooldowns and charges", d.abilities.map((a) => `${ic(a.name, 16)}${esc(a.name)}: ${abilityState(a.before)} &rarr; ${abilityState(a.after)}`))
+    + section("Effects gained", e.added.map((x) => `<span class="chip" style="background:var(--fired)">+</span> ${ic(x.name, 16)}${esc(x.name)} <span class="muted">${esc(x.entity)}, ${x.stacks} stack${x.stacks > 1 ? "s" : ""}${x.permanent ? "" : ", " + num(x.remaining) + "s"}</span>`))
+    + section("Effects lost", e.removed.map((x) => `<span class="chip" style="background:var(--failed)">&minus;</span> ${ic(x.name, 16)}${esc(x.name)} <span class="muted">${esc(x.entity)}</span>`))
+    + section("Effects changed", e.changed.map((x) => `<span class="chip" style="background:var(--icd)">~</span> ${ic(x.name, 16)}${esc(x.name)} <span class="muted">${esc(x.entity)}: ${x.stacks_before !== x.stacks_after ? `stacks ${x.stacks_before} &rarr; ${x.stacks_after}` : ""}${x.refreshed ? `${x.stacks_before !== x.stacks_after ? ", " : ""}refreshed to ${num(x.remaining_after)}s` : ""}</span>`))
+    + section("Internal cooldowns started", d.icds.map((i) => `${ic(i.source, 16)}${esc(i.source)} <span class="muted">${esc(i.event)}, ${num(i.remaining, 2)}s${i.restarted ? " (restarted)" : ""}</span>`))
+    + (d.stats.length ? `<details><summary>Character stats changed (${d.stats.length})</summary><div class="kv">${d.stats.map((s) => `<span>${esc(s.stat)}</span><span>${s.before} &rarr; ${s.after}</span>`).join("")}</div></details>` : "");
+  $("chg").innerHTML = `<div class="muted" style="font-size:12px;margin-top:6px">From ${num(res.at - offset, 3)}s to ${num(res.at - offset + res.window, 3)}s</div>${html || '<div class="why">Nothing changed.</div>'}`;
+}
+
+async function showChange(raw) {
+  const key = `${trace.config.name}|${raw}|${cascadeWindow}`, box = $("chg");
+  if (!box) return;
+  if (changeCache.has(key)) { renderChange(changeCache.get(key)); return; }
+  box.innerHTML = '<span class="muted">Replaying...</span>';
+  try {
+    const res = await api("/api/change", { ...sourceFields(), environment: trace.config.environment, seed: trace.config.seed, at: raw, window: cascadeWindow, duration: trace.config.duration });
+    changeCache.set(key, res);
+    if ($("chg")) renderChange(res);
+  } catch (err) { if ($("chg")) $("chg").innerHTML = `<span class="err">${esc(err.message)}</span>`; }
+}
+
+/* ---------- event log ---------- */
+const EVENT_PAGE = 300;
+function buildEventRows() {
+  const rows = [];
+  decisions.forEach((d) => rows.push({ t: d.t, type: "decision", name: d.chosen ?? (d.is_stall ? "stall" : "-"), text: d.step_name, sel: { kind: "decision", obj: d } }));
+  casts.forEach((c) => rows.push({ t: c.t, type: "cast", name: c.ability, text: c.is_channel ? `channel ${fmt(c.duration, 1)}s` : "", sel: { kind: "cast", obj: c } }));
+  hits.forEach((h) => rows.push({ t: h.t, type: "hit", name: h.ability, text: h.damage.toLocaleString() + (h.is_crit ? " crit" : ""), crit: h.is_crit, sel: { kind: "hit", obj: h } }));
+  evalsByRule.forEach((list) => list.forEach((e) => rows.push({
+    t: e.t, type: e.outcome === "fired" ? "fired" : "missed", name: rules[e.rule].source, outcome: e.outcome,
+    text: OUTCOME_LABEL[e.outcome] + (e.chance !== null ? ` (${fmt(e.chance, 1)}%)` : ""), sel: { kind: "eval", obj: e }
+  })));
+  buffs.filter((w) => !w.is_passive).forEach((w) => {
+    rows.push({ t: w.start, type: "buff", name: w.name, text: "applied", sel: { kind: "buff", obj: w } });
+    if (w.end !== null && w.end !== undefined) rows.push({ t: w.end, type: "buff", name: w.name, text: "ended", sel: { kind: "buff", obj: w } });
+  });
+  rows.sort((a, b) => a.t - b.t); // stable: at the same instant a decision comes before its cast, hits and procs
+  eventRows = rows;
+}
+
+function eventChip(r) {
+  const color = r.type === "decision" ? "--accent" : r.type === "cast" ? "--cast" : r.type === "hit" ? (r.crit ? "--crit" : "--hit")
+    : r.type === "buff" ? "--skip" : OUTCOME_VAR[r.outcome];
+  const label = { decision: "Decision", cast: "Cast", hit: "Hit", fired: "Proc", missed: "No proc", buff: "Buff" }[r.type];
+  return `<span class="chip" style="background:var(${color});${r.crit ? "color:#222" : ""}">${label}</span>`;
+}
+
+function filteredEvents() {
+  const on = (id) => $(id).checked, q = $("evfilter").value.trim().toLowerCase(), ranged = on("evvisible");
+  return eventRows.filter((r) => on("ev-" + r.type) && (!q || (r.name + " " + r.text).toLowerCase().includes(q)) && (!ranged || (r.t >= view.a && r.t <= view.b)));
+}
+
+function renderEventLog(keepStart) {
+  if (!trace) return;
+  eventList = filteredEvents();
+  if (!keepStart) eventStart = 0;
+  eventStart = Math.max(0, Math.min(eventStart, Math.max(0, eventList.length - 1)));
+  const shown = eventList.slice(eventStart, eventStart + EVENT_PAGE);
+  $("evcount").textContent = eventList.length ? `${eventStart + 1}-${eventStart + shown.length} of ${eventList.length}` : "no events";
+  $("evprev").disabled = eventStart === 0; $("evnext").disabled = eventStart + EVENT_PAGE >= eventList.length;
+  $("evtable").innerHTML = `<table><tbody>${shown.map((r, i) => {
+    const sel = selected && selected.obj === r.sel.obj;
+    return `<tr data-ev="${eventStart + i}" class="${sel ? "sel" : ""}"><td>${fmt(r.t, 3)}s</td><td>${eventChip(r)}</td><td>${ic(r.name, 16)}${esc(r.name)}</td><td>${esc(r.text)}</td></tr>`;
+  }).join("") || '<tr><td colspan="4" class="muted">No events match.</td></tr>'}</tbody></table>`;
+}
+
+let eventLogQueued = false;
+function queueEventLog() { if (!eventLogQueued) { eventLogQueued = true; requestAnimationFrame(() => { eventLogQueued = false; renderEventLog(); }); } }
+
+// Keep the log on the selected item: page to it if it is off the current page, highlight it and scroll it to the middle.
+function syncEventLog() {
+  if (!trace || !eventRows.length) return;
+  if (selected && selected.obj) {
+    if (!eventList.length) eventList = filteredEvents();
+    const idx = eventList.findIndex((r) => r.sel.obj === selected.obj);
+    if (idx >= 0 && (idx < eventStart || idx >= eventStart + EVENT_PAGE)) eventStart = Math.max(0, idx - Math.floor(EVENT_PAGE / 3));
+  }
+  renderEventLog(true);
+  const row = $("evtable").querySelector("tr.sel");
+  if (row) { const box = $("evtable"); box.scrollTop = row.offsetTop - box.clientHeight / 2; }
+}
+
+function showEventAt(t) { if (t < view.a || t > view.b) { const span = view.b - view.a; view = { a: t - span / 2, b: t + span / 2 }; } }
+
+function selectEventRow(i) {
+  const r = eventList[i];
+  if (!r) return;
+  selected = r.sel; showEventAt(r.t); renderDetail(); draw();
+}
+
+/* ---------- timeline ---------- */
+function buildLanes() {
+  lanes = [{ type: "damage", label: "Damage", h: 84 }, { type: "casts", label: "Casts", h: 22 }, { type: "rotation", label: "Rotation", h: 40 }];
+  [...shownRules].forEach((id) => lanes.push({ type: "proc", rule: id, label: rules[id].source, h: ROW * 4 + 10 }));
+  shownBuffs.forEach((n) => lanes.push({ type: "buff", name: n, label: n, h: 18 }));
+  let y = AXIS; lanes.forEach((l) => { l.y = y; y += l.h; });
+  return y;
+}
+
+function layout() {
+  if (!trace) return;
+  const canvas = $("tl"), total = buildLanes(), dpr = window.devicePixelRatio || 1, w = canvas.parentElement.clientWidth;
+  canvas.style.height = total + 4 + "px"; canvas.width = Math.round(w * dpr); canvas.height = Math.round((total + 4) * dpr);
+  canvas._dpr = dpr; canvas._w = w; canvas._h = total + 4;
+}
+
+const xOf = (t, w) => GUTTER + (t - view.a) / (view.b - view.a) * (w - GUTTER - 8);
+const tOf = (x, w) => view.a + (x - GUTTER) / (w - GUTTER - 8) * (view.b - view.a);
+
+function draw() {
+  if (!trace) return;
+  if ($("evvisible").checked) queueEventLog();
+  const canvas = $("tl"), ctx = canvas.getContext("2d"), w = canvas._w, h = canvas._h;
+  ctx.setTransform(canvas._dpr, 0, 0, canvas._dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  ctx.font = "12px system-ui, sans-serif"; ctx.textBaseline = "middle";
+  const ink = css("--ink"), muted = css("--muted"), line = css("--line"), stripe = css("--stripe");
+  // axis
+  const span = view.b - view.a, steps = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300], target = span / ((w - GUTTER) / 90);
+  const step = steps.find((s) => s >= target) || 600;
+  ctx.fillStyle = muted; ctx.strokeStyle = line;
+  for (let t = Math.ceil(view.a / step) * step; t <= view.b; t += step) {
+    const x = xOf(t, w); ctx.beginPath(); ctx.moveTo(x, AXIS - 4); ctx.lineTo(x, h); ctx.stroke(); ctx.fillText(+t.toFixed(2) + "s", x + 3, 11);
+  }
+  lanes.forEach((l, i) => {
+    if (i % 2 === 0) { ctx.fillStyle = stripe; ctx.fillRect(0, l.y, w, l.h); }
+    drawLabel(ctx, l, ink);
+    if (l.type === "damage") drawDamage(ctx, l, w);
+    else if (l.type === "casts") drawCasts(ctx, l, w);
+    else if (l.type === "rotation") drawRotation(ctx, l, w);
+    else if (l.type === "proc") drawProc(ctx, l, w);
+    else drawBuff(ctx, l, w);
+  });
+  ctx.fillStyle = css("--panel"); ctx.fillRect(0, AXIS, GUTTER - 4, h - AXIS);
+  lanes.forEach((l) => drawLabel(ctx, l, ink));
+  ctx.strokeStyle = line; ctx.beginPath(); ctx.moveTo(GUTTER - 4, AXIS); ctx.lineTo(GUTTER - 4, h); ctx.stroke();
+}
+
+function drawLabel(ctx, l, ink) {
+  const img = (l.type === "proc" || l.type === "buff") ? iconImage(l.label) : null, y = l.y + Math.min(l.h / 2, 12);
+  ctx.fillStyle = ink;
+  if (img) { ctx.drawImage(img, 6, y - 8, 16, 16); ctx.fillText(l.label, 26, y, GUTTER - 34); } else ctx.fillText(l.label, 8, y, GUTTER - 14);
+}
+
+function visible(arr, key) {
+  let lo = 0, hi = arr.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m][key] < view.a) lo = m + 1; else hi = m; }
+  const out = [];
+  for (let i = lo; i < arr.length && arr[i][key] <= view.b; i++) out.push(arr[i]);
+  return out;
+}
+
+function drawDamage(ctx, l, w) {
+  const maxD = Math.max(1, ...hits.map((h) => h.damage));
+  for (const hit of visible(hits, "t")) {
+    const bh = Math.max(2, (l.h - 6) * Math.sqrt(hit.damage / maxD)), x = xOf(hit.t, w);
+    ctx.fillStyle = hit.is_crit ? css("--crit") : css("--hit"); ctx.globalAlpha = 0.85;
+    ctx.fillRect(x - 1, l.y + l.h - 3 - bh, 2.5, bh);
+    if (selected && selected.obj === hit) { ctx.globalAlpha = 1; ctx.strokeStyle = css("--ink"); ctx.strokeRect(x - 3, l.y + l.h - 5 - bh, 6, bh + 4); }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawCasts(ctx, l, w) {
+  const list = visible(casts, "t");
+  list.forEach((c, i) => {
+    const x = xOf(c.t, w), gap = (list[i + 1] ? xOf(list[i + 1].t, w) : w) - x;
+    const img = gap >= 20 && iconFile(c.ability) ? iconImage(c.ability) : null;
+    if (img) ctx.drawImage(img, x - 8, l.y + 3, 16, 16);
+    else { ctx.fillStyle = css("--cast"); ctx.fillRect(x - 0.5, l.y + 4, c.is_channel ? Math.max(2, c.duration / (view.b - view.a) * (w - GUTTER - 8)) : 1.5, l.h - 8); }
+    if (selected && selected.obj === c) { ctx.strokeStyle = css("--ink"); ctx.strokeRect(x - 9, l.y + 2, 18, l.h - 4); }
+  });
+}
+// One colour per rotation step (stable across zooms); stalls are drawn taller in the warning colour.
+function stepHue(name) { let h = 0; for (const ch of String(name)) h = (h * 31 + ch.charCodeAt(0)) % 280; return 40 + h; } // hues 40-320: red is kept for stalls
+function drawRotation(ctx, l, w) {
+  const list = visible(decisions, "t"), dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  ctx.font = "11px system-ui, sans-serif";
+  list.forEach((d, i) => {
+    const x = xOf(d.t, w), gap = (list[i + 1] ? xOf(list[i + 1].t, w) : w) - x;
+    ctx.fillStyle = d.is_stall ? css("--cond") : `hsl(${stepHue(d.step_name)} ${dark ? 60 : 55}% ${dark ? 62 : 42}%)`;
+    ctx.fillRect(x - 1, l.y + (d.is_stall ? 3 : 5), 3, d.is_stall ? l.h - 6 : l.h - 10);
+    const hasIcon = !!d.chosen && gap > 30 && !!iconFile(d.chosen), img = hasIcon ? iconImage(d.chosen) : null;
+    if (img) ctx.drawImage(img, x + 5, l.y + (l.h - 22) / 2, 22, 22);
+    const textX = x + (hasIcon ? 31 : 5);
+    if (d.chosen && gap - (textX - x) > 60) { ctx.fillStyle = css("--ink"); ctx.fillText(d.chosen, textX, l.y + l.h / 2, Math.min(gap - (textX - x) - 6, 150)); }
+    if (selected && selected.obj === d) { ctx.strokeStyle = css("--ink"); ctx.strokeRect(x - 3, l.y + 2, 7, l.h - 4); }
+  });
+  ctx.font = "12px system-ui, sans-serif";
+}
+
+function drawProc(
+ctx, l, w) {
+  for (const e of visible(evalsByRule[l.rule], "t")) {
+    const row = OUTCOME_ROW[e.outcome] ?? 3, x = xOf(e.t, w), y = l.y + 5 + row * ROW;
+    ctx.fillStyle = css(OUTCOME_VAR[e.outcome]); ctx.fillRect(x - 1, y, 2.5, ROW - 2);
+    if (selected && selected.obj === e) { ctx.strokeStyle = css("--ink"); ctx.strokeRect(x - 3, y - 2, 6, ROW + 2); }
+  }
+}
+
+function drawBuff(ctx, l, w) {
+  for (const win of buffs) {
+    if (win.name !== l.name || (win.end ?? win.start) < view.a || win.start > view.b) continue;
+    const x0 = Math.max(GUTTER, xOf(win.start, w)), x1 = Math.min(w - 8, xOf(win.end ?? win.start, w));
+    ctx.fillStyle = css("--accent"); ctx.globalAlpha = 0.55; ctx.fillRect(x0, l.y + 4, Math.max(1.5, x1 - x0), l.h - 8); ctx.globalAlpha = 1;
+    const bi = (x1 - x0) >= 20 ? iconImage(l.name) : null;
+    if (bi) ctx.drawImage(bi, x0 + 2, l.y + 2, 14, 14);
+    if (selected && selected.obj === win) { ctx.strokeStyle = css("--ink"); ctx.strokeRect(x0, l.y + 3, Math.max(1.5, x1 - x0), l.h - 6); }
+  }
+}
+
+function nearest(arr, t, key) {
+  let lo = 0, hi = arr.length;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m][key] < t) lo = m + 1; else hi = m; }
+  let best = null, bd = Infinity;
+  for (const i of [lo - 1, lo]) if (arr[i] && Math.abs(arr[i][key] - t) < bd) { bd = Math.abs(arr[i][key] - t); best = arr[i]; }
+  return { item: best, dist: bd };
+}
+
+function pick(ev) {
+  const rect = $("tl").getBoundingClientRect(), x = ev.clientX - rect.left, y = ev.clientY - rect.top, w = rect.width;
+  const lane = lanes.find((l) => y >= l.y && y < l.y + l.h);
+  if (!lane || x < GUTTER) return null;
+  const t = tOf(x, w), tolerance = 6 / (w - GUTTER - 8) * (view.b - view.a);
+  if (lane.type === "damage") { const n = nearest(hits, t, "t"); return n.item && n.dist <= tolerance ? { kind: "hit", obj: n.item, label: `${n.item.ability}: ${n.item.damage.toLocaleString()}${n.item.is_crit ? " (crit)" : ""}` } : null; }
+  if (lane.type === "rotation") { const n = nearest(decisions, t, "t"); return n.item && n.dist <= tolerance ? { kind: "decision", obj: n.item, label: `${n.item.step_name}: ${n.item.chosen ?? (n.item.is_stall ? "stall" : "-")}` } : null; }
+  if (lane.type === "casts") { const n = nearest(casts, t, "t"); return n.item && n.dist <= tolerance ? { kind: "cast", obj: n.item, label: n.item.ability } : null; }
+  if (lane.type === "proc") {
+    const n = nearest(evalsByRule[lane.rule], t, "t");
+    if (n.item && n.dist <= tolerance) return { kind: "eval", obj: n.item, label: `${rules[lane.rule].source}: ${OUTCOME_LABEL[n.item.outcome]}` };
+    return { kind: "gap", rule: lane.rule, t, nearest: n.item, label: `${rules[lane.rule].source}: nothing evaluated here` };
+  }
+  const win = buffs.find((b) => b.name === lane.name && b.start <= t && (b.end ?? b.start) >= t);
+  return win ? { kind: "buff", obj: win, label: `${win.name} (${fmt(win.start, 1)}s to ${fmt(win.end, 1)}s)` } : null;
+}
+
+function showGap(g) {
+  const r = rules[g.rule], n = g.nearest;
+  $("detailbody").className = "";
+  $("detailbody").innerHTML = `<b>${esc(r.source)}</b> at ${fmt(g.t, 2)}s
+    <div class="why">Nothing evaluated this proc here. Either no matching event happened (the trigger did not occur), or the event was filtered out before the proc stage (tags, spec, target).</div>
+    ${n ? `<div class="kv"><span>Nearest evaluation</span><span>${fmt(n.t, 3)}s (${fmt(Math.abs(n.t - g.t), 2)}s away)</span></div>${chip(n.outcome)} <span class="muted">${esc(whyText(n))}</span>` : ""}`;
+}
+
+/* ---------- events ---------- */
+function setView(a, b) {
+  const min = 0.05, span = Math.max(min, b - a);
+  view.a = a; view.b = a + span;
+  draw();
+}
+
+function legendItem(color, text) { return `<span><i style="background:var(${color})"></i>${text}</span>`; }
+function buildLegend() {
+  $("legend").innerHTML = [["--fired", "Fired (row 1)"], ["--failed", "Roll failed (row 2)"], ["--icd", "Blocked by ICD (row 3)"], ["--cond", "Conditions not met"],
+    ["--noroll", "Roll passed, conditions failed"], ["--skip", "Skipped"], ["--hit", "Hit"], ["--crit", "Crit"]].map(([c, t]) => legendItem(c, t)).join("");
+}
+
+const canvas = $("tl");
+canvas.addEventListener("wheel", (ev) => {
+  if (!trace) return; ev.preventDefault();
+  const rect = canvas.getBoundingClientRect(), t = tOf(ev.clientX - rect.left, rect.width), k = ev.deltaY < 0 ? 0.8 : 1.25;
+  setView(t - (t - view.a) * k, t + (view.b - t) * k);
+}, { passive: false });
+let drag = null, moved = false;
+canvas.addEventListener("pointerdown", (ev) => { if (!trace) return; drag = { x: ev.clientX, a: view.a, b: view.b }; moved = false; canvas.setPointerCapture(ev.pointerId); });
+canvas.addEventListener("pointermove", (ev) => {
+  if (!trace) return;
+  if (drag) {
+    const w = canvas.getBoundingClientRect().width, dt = (ev.clientX - drag.x) / (w - GUTTER - 8) * (drag.b - drag.a);
+    if (Math.abs(ev.clientX - drag.x) > 3) moved = true;
+    setView(drag.a - dt, drag.b - dt); $("tip").style.display = "none"; return;
+  }
+  const p = pick(ev), tip = $("tip");
+  if (p && p.label) { tip.textContent = p.label; tip.style.display = "block"; tip.style.left = ev.clientX + 12 + "px"; tip.style.top = ev.clientY + 12 + "px"; } else tip.style.display = "none";
+});
+canvas.addEventListener("pointerup", (ev) => {
+  const wasDrag = moved; drag = null;
+  if (!trace || wasDrag) return;
+  const p = pick(ev);
+  if (!p) return;
+  if (p.kind === "gap") { selected = null; showGap(p); draw(); return; }
+  selected = p; renderDetail(); renderProcTable(); draw();
+});
+canvas.addEventListener("pointerleave", () => { $("tip").style.display = "none"; });
+canvas.addEventListener("dblclick", () => { view = { ...full }; draw(); });
+$("zin").onclick = () => { const m = (view.a + view.b) / 2, h = (view.b - view.a) * 0.4; setView(m - h, m + h); };
+$("zout").onclick = () => { const m = (view.a + view.b) / 2, h = (view.b - view.a) * 0.625; setView(m - h, m + h); };
+$("fit").onclick = () => { view = { ...full }; draw(); };
+$("run").onclick = runTrace;
+$("procfilter").oninput = renderProcTable;
+$("onlychance").onchange = renderProcTable;
+$("addbuff").onchange = (ev) => { if (ev.target.value) { shownBuffs.push(ev.target.value); renderBuffControls(); layout(); draw(); } };
+$("buffchips").onclick = (ev) => { const b = ev.target.closest("button"); if (b) { shownBuffs.splice(Number(b.dataset.i), 1); renderBuffControls(); layout(); draw(); } };
+$("proctable").addEventListener("click", (ev) => {
+  const box = ev.target.closest("input[data-lane]");
+  if (box) { const id = Number(box.dataset.lane); box.checked ? shownRules.add(id) : shownRules.delete(id); layout(); draw(); return; }
+  const tr = ev.target.closest("tr[data-rule]");
+  if (tr) { selected = { kind: "rule", rule: Number(tr.dataset.rule) }; renderDetail(); renderProcTable(); }
+});
+["ev-decision", "ev-cast", "ev-hit", "ev-fired", "ev-missed", "ev-buff", "evvisible"].forEach((id) => { $(id).onchange = () => renderEventLog(); });
+$("evfilter").oninput = () => renderEventLog();
+$("evprev").onclick = () => { eventStart = Math.max(0, eventStart - EVENT_PAGE); renderEventLog(true); $("evtable").scrollTop = 0; };
+$("evnext").onclick = () => { eventStart += EVENT_PAGE; renderEventLog(true); $("evtable").scrollTop = 0; };
+$("evtable").addEventListener("click", (ev) => { const tr = ev.target.closest("tr[data-ev]"); if (tr) selectEventRow(Number(tr.dataset.ev)); });
+$("evtable").addEventListener("keydown", (ev) => {
+  if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;
+  ev.preventDefault();
+  const cur = selected ? eventList.findIndex((r) => r.sel.obj === selected.obj) : -1;
+  selectEventRow(Math.max(0, Math.min(eventList.length - 1, cur + (ev.key === "ArrowDown" ? 1 : -1))));
+});
+$("decfilter").oninput = renderDecisions;
+$("decstalls").onchange = renderDecisions;
+$("dectable").addEventListener("click", (ev) => {
+  const tr = ev.target.closest("tr[data-dec]");
+  if (!tr) return;
+  const d = decisions.find((x) => x.id === Number(tr.dataset.dec));
+  selected = { kind: "decision", obj: d }; renderDetail();
+  const span = view.b - view.a, mid = d.t; view = { a: mid - span / 2, b: mid + span / 2 }; draw();
+});
+$("abltable").addEventListener("click", (ev) => {
+  const tr = ev.target.closest("tr[data-abl]");
+  if (!tr) return;
+  const h = hits.find((x) => x.ability === tr.dataset.abl);
+  if (!h) return;
+  selected = { kind: "hit", obj: h }; renderDetail();
+  const span = view.b - view.a; view = { a: h.t - span / 2, b: h.t + span / 2 }; draw();
+});
+$("detailbody").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button[data-state]");
+  if (b) { showState(Number(b.dataset.state)); return; }
+  const c = ev.target.closest("button[data-change]");
+  if (c) { showChange(Number(c.dataset.change)); return; }
+  const row = ev.target.closest("tr.cas[data-ei]");
+  if (row) { const r = eventRows[Number(row.dataset.ei)]; selected = r.sel; showEventAt(r.t); renderDetail(); draw(); }
+});
+$("detailbody").addEventListener("change", (ev) => {
+  if (ev.target.id === "cas-window") { cascadeWindow = Math.max(0, Number(ev.target.value) || 0); renderCascade(); }
+  if (ev.target.id === "cas-missed") { cascadeMissed = ev.target.checked; renderCascade(); }
+});
+$("st-go").onclick = () => { if (trace && $("st-time").value !== "") showState(Number($("st-time").value) + offset); };
+window.addEventListener("resize", () => { layout(); draw(); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+init();
+</script>
+</body>
+</html>

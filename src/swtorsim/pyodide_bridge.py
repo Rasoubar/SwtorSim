@@ -187,6 +187,11 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
         elif action == "GET_PROGRESS":
             result = get_simulation_progress()
 
+        elif action.startswith("DEBUG_"):
+            # Web debugger (src/swtorsim/debug); imported only when used so the other pages start as before.
+            from src.swtorsim.debug.debug_bridge import dispatch as debug_dispatch
+            result = debug_dispatch(action, data)
+
         else:
             return json.dumps({"error": f"Unknown action: {action}"}, ensure_ascii=False)
 

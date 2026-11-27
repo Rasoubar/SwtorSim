@@ -36,6 +36,11 @@
     isNativeServer = true;
   }
 
+  // Pages can ask which engine answers their /api calls ("native" server or "wasm" in the browser).
+  window.__swtorsimBackend = isNativeServer ? "native" : "wasm";
+  // The debugger starts only one worker at first; the others start when a measurement needs them.
+  const isDebuggerPage = window.location.pathname.includes("debugger");
+
   const isBuilderPage = window.location.pathname.includes("rotation_builder") || (typeof document !== "undefined" && document.title && document.title.includes("Rotation Builder"));
 
   // Determine concurrency:
@@ -49,7 +54,9 @@
   } catch (_e) {}
 
   const defaultCores = savedCores && savedCores >= 1 && savedCores <= hardwareCores ? savedCores : hardwareCores;
-  const targetPoolSize = isBuilderPage ? 1 : Math.max(1, defaultCores);
+  // The debugger replays one fight many times but starts workers only when asked: default to a modest pool.
+  const hasSavedCores = Boolean(savedCores && savedCores >= 1 && savedCores <= hardwareCores);
+  const targetPoolSize = isBuilderPage ? 1 : (isDebuggerPage && !hasSavedCores ? Math.min(6, hardwareCores) : Math.max(1, defaultCores));
 
   let resolveReady, rejectReady;
   const readyPromise = new Promise((resolve, reject) => {
@@ -420,13 +427,13 @@
       rejectWorkerReady(err);
     };
 
-    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1795746501" });
+    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1795804033" });
     return wState;
   }
 
   let secondaryWorkersStarted = false;
   function initSecondaryWorkers() {
-    if (isBuilderPage || state.targetPoolSize <= 1) return;
+    if (isBuilderPage || isDebuggerPage || state.targetPoolSize <= 1) return;
     if (secondaryWorkersStarted) return;
     secondaryWorkersStarted = true;
     for (let i = 1; i < state.targetPoolSize; i++) {
@@ -634,6 +641,140 @@
     return finalReport;
   }
 
+  // --- Debugger (debugger.html): single-run actions go to one worker, measuring is split across the pool ---
+
+  const DEBUG_SINGLE_ROUTES = {
+    "/api/configs": "DEBUG_CONFIGS",
+    "/api/trace": "DEBUG_TRACE",
+    "/api/state": "DEBUG_STATE",
+    "/api/change": "DEBUG_CHANGE"
+  };
+
+  function debugProgress(label, done, total) {
+    window.dispatchEvent(new CustomEvent("swtor-debug-progress", { detail: { label, done, total } }));
+  }
+
+  // The workers a measurement runs on; starts the missing ones and waits for them (reporting how many are ready).
+  async function activeDebugWorkers() {
+    await state.readyPromise;
+    while (state.workers.length < state.targetPoolSize) {
+      state.workers.push(createWorkerInstance(state.workers.length));
+    }
+    const pool = state.workers.slice(0, state.targetPoolSize);
+    const readyCount = () => pool.filter(w => w.isReady).length;
+    if (readyCount() < pool.length) {
+      debugProgress("Starting workers", readyCount(), pool.length);
+      await Promise.all(pool.map(w => w.readyPromise.then(() => debugProgress("Starting workers", readyCount(), pool.length))));
+    }
+    return pool.filter(w => w.isReady);
+  }
+
+  // Splits ``count`` consecutive items starting at ``first`` over ``parts`` workers (empty parts dropped).
+  function splitRange(first, count, parts) {
+    const base = Math.floor(count / parts), extra = count % parts, out = [];
+    let at = first;
+    for (let i = 0; i < parts; i++) {
+      const n = base + (i < extra ? 1 : 0);
+      if (n > 0) out.push({ first: at, count: n });
+      at += n;
+    }
+    return out;
+  }
+
+  // The fields that name the fight (a saved config or the simulator's setup), passed on to every slice.
+  function debugFight(p) {
+    return { config: p.config, setup: p.setup, environment: p.environment, seed: p.seed, duration: p.duration, dummy_hp: p.dummy_hp };
+  }
+
+  function checked(result) {
+    if (result && result.error) throw new Error(result.error);
+    return result;
+  }
+
+  async function debugMeasure(p) {
+    const workers = await activeDebugWorkers();
+    const cap = Math.max(1, Math.min(5000, parseInt(p.trials, 10) || 500));
+    const window_ = Math.max(0, Number(p.window) || 0), started = performance.now(), trials = [];
+    const batch = Math.max(16, workers.length * 4);
+    for (;;) {
+      const count = Math.min(batch, cap - trials.length);
+      if (count > 0) {
+        const parts = splitRange(trials.length, count, workers.length);
+        const slices = await Promise.all(parts.map((part, i) => callSpecificWorker(workers[i], "DEBUG_TRIALS", {
+          ...debugFight(p), key: p.key, anchor: p.anchor, window: window_, first: part.first, count: part.count
+        })));
+        for (const slice of slices) trials.push(...checked(slice));
+      }
+      // The stop rule is applied in trial order by one worker, so the result equals the serial run.
+      const agg = checked(await callSpecificWorker(workers[0], "DEBUG_MEASURE_AGG", {
+        key: p.key, anchor: p.anchor, window: window_, trials, max_trials: cap, source: p.source || "",
+        seconds: (performance.now() - started) / 1000
+      }));
+      debugProgress("Replaying", trials.length, cap);
+      if (agg.done) return agg.result;
+      if (count <= 0) throw new Error("The measurement needs more trials than the cap allows.");
+    }
+  }
+
+  async function debugSweep(p) {
+    const workers = await activeDebugWorkers(), started = performance.now();
+    const fight = debugFight(p), step = Number(p.step) || 1;
+    const plan = checked(await callSpecificWorker(workers[0], "DEBUG_SWEEP_PLAN", { ...fight, key: p.key, anchor: p.anchor, step }));
+    debugProgress("Replaying", 1, plan.values.length + 1);
+    const parts = splitRange(0, plan.values.length, workers.length);
+    const slices = await Promise.all(parts.map((part, i) => callSpecificWorker(workers[i], "DEBUG_FORCED", {
+      ...fight, key: p.key, anchor: p.anchor, values: plan.values.slice(part.first, part.first + part.count)
+    })));
+    const results = [];
+    for (const slice of slices) results.push(...checked(slice));
+    debugProgress("Replaying", plan.values.length + 1, plan.values.length + 1);
+    return checked(await callSpecificWorker(workers[0], "DEBUG_SWEEP_AGG", {
+      key: p.key, anchor: p.anchor, probe: plan.probe, values: plan.values, results, step, source: p.source || "",
+      seconds: (performance.now() - started) / 1000
+    }));
+  }
+
+  async function debugDamage(p) {
+    const workers = await activeDebugWorkers(), started = performance.now();
+    const total = Math.max(1, Math.min(3000, parseInt(p.trials, 10) || 300)), window_ = Math.max(0, Number(p.window) || 0);
+    const parts = splitRange(0, total, workers.length);
+    const slices = await Promise.all(parts.map((part, i) => callSpecificWorker(workers[i], "DEBUG_DAMAGE_TRIALS", {
+      ...debugFight(p), ability: p.ability, anchor: p.anchor, window: window_, first: part.first, count: part.count,
+      want_reference: i === 0
+    })));
+    const hits = [];
+    let reference = null;
+    for (const slice of slices) {
+      checked(slice);
+      hits.push(...slice.hits);
+      if (slice.reference) reference = slice.reference;
+    }
+    debugProgress("Replaying", total, total);
+    return checked(await callSpecificWorker(workers[0], "DEBUG_DAMAGE_AGG", {
+      ability: p.ability, anchor: p.anchor, window: window_, trials: hits, reference,
+      seconds: (performance.now() - started) / 1000
+    }));
+  }
+
+  // Runs one debugger route; null when the path is not a debugger route.
+  async function handleDebugRoute(pathname, options) {
+    const single = DEBUG_SINGLE_ROUTES[pathname];
+    const pooled = { "/api/measure": debugMeasure, "/api/sweep": debugSweep, "/api/damage": debugDamage }[pathname];
+    if (!single && !pooled) return null;
+    const payload = options && options.body ? JSON.parse(options.body) : {};
+    state.cancelRequested = false;
+    try {
+      const result = single ? await callPrimaryWorker(single, payload) : await pooled(payload);
+      const isError = result && result.error !== undefined;
+      return new Response(JSON.stringify(result), { status: isError ? 400 : 200, headers: { "Content-Type": "application/json" } });
+    } catch (err) {
+      if (state.cancelRequested) {
+        return new Response(JSON.stringify({ cancelled: true, error: "Cancelled" }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: String(err && err.message || err) }), { status: 400, headers: { "Content-Type": "application/json" } });
+    }
+  }
+
   // --- Fetch Interceptor ---
   const originalFetch = window.fetch;
 
@@ -804,6 +945,9 @@
           headers: { "Content-Type": "application/json" }
         });
       }
+
+      const debugResponse = await handleDebugRoute(pathname, options);
+      if (debugResponse) return debugResponse;
 
       if (pathname === "/api/simulate_cancel") {
         cancelActiveSimulation();

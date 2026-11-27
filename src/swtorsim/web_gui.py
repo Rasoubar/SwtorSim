@@ -1797,6 +1797,81 @@ def ensure_rotation_builder_running(host: str = "127.0.0.1", default_port: int =
         raise RuntimeError("Could not start Rotation Builder server on ports 8765-8784.")
 
 
+_DEBUGGER_LOCK = threading.Lock()
+_DEBUGGER_PROC: Any = None
+_DEBUGGER_PORT: int | None = None
+
+
+def _debugger_answers(host: str, port: int) -> bool:
+    """True if the Debugger server answers on host:port."""
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/api/configs", timeout=1.0) as resp:
+            return b'"configs"' in resp.read(65536)
+    except Exception:
+        return False
+
+
+def stop_debugger() -> None:
+    """Stops the Debugger process this server started (also runs when this server exits)."""
+    global _DEBUGGER_PROC, _DEBUGGER_PORT
+    proc, _DEBUGGER_PROC, _DEBUGGER_PORT = _DEBUGGER_PROC, None, None
+    if proc is not None and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except Exception:
+            proc.kill()
+
+
+def ensure_debugger_running(host: str = "127.0.0.1", default_port: int = 8770) -> str:
+    """Ensures the Debugger server is running and returns its URL.
+
+    Unlike the Rotation Builder it runs as its own process: tracing swaps debug versions of the engine in for the whole
+    process while a fight is built, which must not reach the simulations this server runs.
+    """
+    import atexit
+    import subprocess
+
+    global _DEBUGGER_PROC, _DEBUGGER_PORT
+    with _DEBUGGER_LOCK:
+        if _DEBUGGER_PORT is not None and _DEBUGGER_PROC is not None and _DEBUGGER_PROC.poll() is None \
+                and _debugger_answers(host, _DEBUGGER_PORT):
+            return f"http://{host}:{_DEBUGGER_PORT}/"
+        # A debugger started by hand (tools/debugger.py) on the default port is reused.
+        if _debugger_answers(host, default_port):
+            return f"http://{host}:{default_port}/"
+
+        port = None
+        for candidate in range(default_port, default_port + 20):
+            # Windows' SO_REUSEADDR lets bind() succeed on an occupied port, so probe first.
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.settimeout(0.25)
+                if probe.connect_ex((host, candidate)) != 0:
+                    port = candidate
+                    break
+        if port is None:
+            raise RuntimeError(f"No free port for the Debugger in {default_port}-{default_port + 19}.")
+
+        script = SWTORSIM_ROOT / "tools" / "debugger.py"
+        proc = subprocess.Popen(
+            [sys.executable, str(script), "--no-browser", "--host", host, "--port", str(port)],
+            cwd=str(SWTORSIM_ROOT), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        deadline = time.time() + 30.0
+        while time.time() < deadline:
+            if proc.poll() is not None:
+                raise RuntimeError("The Debugger process exited right after starting; run tools/debugger.py to see why.")
+            if _debugger_answers(host, port):
+                _DEBUGGER_PROC, _DEBUGGER_PORT = proc, port
+                atexit.register(stop_debugger)
+                print(f"[OK] Started Debugger server at http://{host}:{port}/")
+                return f"http://{host}:{port}/"
+            time.sleep(0.3)
+        proc.terminate()
+        raise RuntimeError("The Debugger did not start within 30 seconds.")
+
+
 class SimulatorRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         pass
@@ -2124,6 +2199,13 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                         self._send_json({"error": str(e)}, status=500)
                         return
                 self._send_json({"error": f"File not found: {rel_path}"}, status=404)
+                return
+
+            if route == "/api/launch_debugger":
+                try:
+                    self._send_json({"ok": True, "url": ensure_debugger_running()})
+                except Exception as exc:
+                    self._send_json({"error": str(exc)}, status=500)
                 return
 
             if route == "/api/launch_rotation_builder":
