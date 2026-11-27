@@ -2,6 +2,7 @@
 
 import random
 
+from src.swtorsim.effects import damage_stack_multiplier
 
 _LIFECYCLE_TRIGGERS = frozenset({
     "on_apply",
@@ -310,13 +311,13 @@ class TriggerManager:
             owner_effects = getattr(owner, "effects", None)
             owner_effect = owner_effects.get(sub["effect_key"]) if owner_effects is not None and sub["effect_key"] else None
             if owner_effect is not None and not getattr(owner_effect, "is_expired", False):
-                owner_stacks = getattr(owner_effect, "stacks", 1)
                 branch_ctx["active_effect"] = owner_effect
                 branch_ctx["effect"] = getattr(owner_effect, "effect_blueprint", None)
-                branch_ctx["current_stacks"] = owner_stacks
-                branch_ctx["stack_multiplier"] = owner_stacks if getattr(owner_effect, "scales_with_stacks", False) else 1
+                branch_ctx["current_stacks"] = getattr(owner_effect, "stacks", 1)
+                branch_ctx["stack_multiplier"] = damage_stack_multiplier(owner_effect)
             else:
                 branch_ctx.pop("effect", None)
+                branch_ctx["stack_multiplier"] = 1  # a passive owner has no stacks to scale by
             if effective_interval > 0.0:
                 sub["next_allowed_time"] = sim.current_time + effective_interval
             ran = sub["ability"].execute_branch(

@@ -551,6 +551,20 @@ def _find_ability(entity, spec):
     return None
 
 
+def owner_effect_stacks(context) -> int | None:
+    """Live stacks of the effect that owns the branch (``owner_entity.effects[owner_effect_key]``),
+    or None when the context names no owner effect. Exact key only: a raw dict lookup, so an effect
+    that just dropped to 0 stacks (flagged expired, not yet cleaned up) still answers."""
+    if not context:
+        return None
+    effects = getattr(context.get("owner_entity"), "effects", None)
+    key = context.get("owner_effect_key")
+    if effects is None or not key:
+        return None
+    eff = dict.get(effects, key)
+    return None if eff is None else getattr(eff, "stacks", None)
+
+
 def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "Dummy", sim=None, context=None) -> bool:
     """Evaluates an individual atomic condition record from an extracted condition list."""
     cond_type = item.get("type")
@@ -698,19 +712,23 @@ def evaluate_single_extracted_condition(item: dict, caster: "Player", target: "D
 
     elif cond_type == "if_stack_charge":
         expected_count = int(item.get("count", 1))
-        actual_stacks = 1
-        if context:
-            if "stack_multiplier" in context:
-                actual_stacks = int(context["stack_multiplier"])
-            elif "current_stacks" in context:
-                actual_stacks = int(context["current_stacks"])
-            elif "stacks" in context:
-                actual_stacks = int(context["stacks"])
-            elif "charges" in context:
-                actual_stacks = int(context["charges"])
-            elif "active_effect" in context and hasattr(context["active_effect"], "stacks"):
-                actual_stacks = int(getattr(context["active_effect"], "stacks", 1))
-        res = (actual_stacks == expected_count)
+        # The stack charge of the effect this branch belongs to. The context's stack_multiplier is 1 for an
+        # effect whose stacks do not scale damage (trigger manager, DoT tick), so it is only the fallback.
+        actual_stacks = owner_effect_stacks(context)
+        if actual_stacks is None:
+            actual_stacks = 1
+            if context:
+                if "stack_multiplier" in context:
+                    actual_stacks = int(context["stack_multiplier"])
+                elif "current_stacks" in context:
+                    actual_stacks = int(context["current_stacks"])
+                elif "stacks" in context:
+                    actual_stacks = int(context["stacks"])
+                elif "charges" in context:
+                    actual_stacks = int(context["charges"])
+                elif "active_effect" in context and hasattr(context["active_effect"], "stacks"):
+                    actual_stacks = int(getattr(context["active_effect"], "stacks", 1))
+        res = (int(actual_stacks) == expected_count)
 
     elif cond_type == "is_target_caster":
         effective_target = target if target is not None else ((context or {}).get("target"))

@@ -6,9 +6,10 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 from pathlib import Path
 from src.swtorsim.combat_math import accuracy_roll
+from src.swtorsim.effects import damage_stack_multiplier
 from src.swtorsim.entities import Dummy, Player
 from src.swtorsim.events import ChargeRestoreEvent, DamageHit, HitGroup, ResourceGainEvent
-from src.swtorsim.requirements import validate_all
+from src.swtorsim.requirements import owner_effect_stacks, validate_all
 from src.swtorsim.engine import sim_log
 from src.swtorsim.metrics import has_proper_effect_name
 from src.swtorsim.triggers import _LIFECYCLE_TRIGGERS, _collect_trigger_mods, effective_proc_chance
@@ -261,7 +262,11 @@ class Effect:
                         ints = t.get("ints") or {}
                         req_count = ints.get("count") if "count" in ints else t.get("count")
                         if req_count is not None and int(req_count) > 0:
-                            current_stacks = branch_context.get("current_stacks")
+                            # The owner effect's live stacks: on the modify_stack_charge path the context's
+                            # current_stacks is copied from the calling branch.
+                            current_stacks = owner_effect_stacks(branch_context)
+                            if current_stacks is None:
+                                current_stacks = branch_context.get("current_stacks")
                             if current_stacks is not None and int(current_stacks) < int(req_count):
                                 continue
                     if trigger_name == "on_channeling_ended":
@@ -381,7 +386,7 @@ class Effect:
             stack_increased = was_refreshed and (cur_stacks > old_stacks)
 
             branch_ctx = dict(context) if context else {}
-            branch_ctx["stack_multiplier"] = cur_stacks
+            branch_ctx["stack_multiplier"] = damage_stack_multiplier(effect_instance)
             branch_ctx["current_stacks"] = cur_stacks
             branch_ctx["active_effect"] = effect_instance
             branch_ctx["owner_effect_key"] = effect_key
@@ -1074,7 +1079,7 @@ def remove_effect_firing_pre_remove(sim, entity, effect_key, fallback_caster=Non
             getattr(eff, "caster_ref", None) or fallback_caster,
             entity,
             context={
-                "stack_multiplier": stacks,
+                "stack_multiplier": damage_stack_multiplier(eff),
                 "current_stacks": stacks,
                 "active_effect": eff,
                 "owner_effect_key": effect_key,
@@ -1215,7 +1220,7 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
         if blueprint and hasattr(blueprint, "execute_triggered_branches"):
             ctx = {
                 **(context or {}),
-                "stack_multiplier": cur_stacks,
+                "stack_multiplier": damage_stack_multiplier(eff),
                 "owner_effect_key": owner_key,
                 "owner_entity": owner_entity,
             }
@@ -1246,7 +1251,7 @@ def handle_modify_stack_charge(sim, caster, target, action, context=None):
         if blueprint and hasattr(blueprint, "execute_triggered_branches"):
             ctx = {
                 **(context or {}),
-                "stack_multiplier": cur_stacks,
+                "stack_multiplier": damage_stack_multiplier(eff),
                 "current_stacks": cur_stacks,
                 "owner_effect_key": owner_key,
                 "owner_entity": owner_entity,
@@ -2161,7 +2166,7 @@ def cleanup_channel_effects(channel, sim):
             if bp and hasattr(bp, "execute_triggered_branches") and not getattr(eff_inst, "pre_remove_fired", False):
                 eff_inst.pre_remove_fired = True
                 expire_ctx = {
-                    "stack_multiplier": getattr(eff_inst, "stacks", 1),
+                    "stack_multiplier": damage_stack_multiplier(eff_inst),
                     "current_stacks": getattr(eff_inst, "stacks", 1),
                     "active_effect": eff_inst,
                     "owner_effect_key": effect_key,

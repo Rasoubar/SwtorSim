@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
 from src.swtorsim.combat_math import calculate_hit
+from src.swtorsim.effects import damage_stack_multiplier
 from src.swtorsim.engine import sim_log
 
 
@@ -651,7 +652,7 @@ class EffectExpire(Event):
         ):
             self.instance_ref.pre_remove_fired = True  # once per instance (see remove_effect_firing_pre_remove)
             expire_ctx = {
-                "stack_multiplier": getattr(self.instance_ref, "stacks", 1),
+                "stack_multiplier": damage_stack_multiplier(self.instance_ref),
                 "current_stacks": getattr(self.instance_ref, "stacks", 1),
                 "active_effect": self.instance_ref,
                 "owner_entity": self.entity,
@@ -701,15 +702,10 @@ class DotTick(Event):
             total_ticks = getattr(self.instance_ref, "total_ticks", 0)
             current_tick = (total_ticks - self.instance_ref.ticks_remaining + 1) if total_ticks > 0 else 1
             eff_tags = set(getattr(self.instance_ref, "tags", frozenset()))
-            stack_mult = (
-                self.instance_ref.stacks
-                if getattr(self.instance_ref, "scales_with_stacks", False)
-                else 1
-            )
             context = {
                 "is_periodic": True,
                 "effect_tags": frozenset(eff_tags),
-                "stack_multiplier": stack_mult,
+                "stack_multiplier": damage_stack_multiplier(self.instance_ref),
                 "owner_effect_key": dot_name,
                 "owner_entity": self.target,
             }
@@ -750,7 +746,7 @@ class DotTick(Event):
                 ):
                     self.instance_ref.pre_remove_fired = True  # once per instance
                     expire_ctx = {
-                        "stack_multiplier": getattr(self.instance_ref, "stacks", 1),
+                        "stack_multiplier": damage_stack_multiplier(self.instance_ref),
                         "current_stacks": getattr(self.instance_ref, "stacks", 1),
                         "active_effect": self.instance_ref,
                         "owner_entity": self.target,

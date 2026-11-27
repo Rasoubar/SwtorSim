@@ -85,6 +85,13 @@ def reconcile_charge_caps(entity, removed_mods=()) -> None:
             eff.stacks = max_stacks
 
 
+def damage_stack_multiplier(eff) -> int:
+    """Damage multiplier from an effect's stacks: its stack count only when its stacks scale damage
+    (scales_with_stack_charge), else 1."""
+    stacks = getattr(eff, "stacks", 1)
+    return stacks if getattr(eff, "scales_with_stacks", False) else 1
+
+
 def _resolve_branch_modifiers(
     raw_branches: List[Any],
     caster: Any = None,
