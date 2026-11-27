@@ -2941,11 +2941,11 @@
       // browser reuses the tab or blocks pop-ups (no opener to message).
       try { localStorage.setItem("swtorsim_debug_setup", JSON.stringify({ ...debuggerSetupMessage(), at: Date.now() })); } catch (e) { /* storage unavailable */ }
       url += "?setup=1";
-      w = window.open(url, "swtorsim_debugger");
+      w = window.open(url, "_blank"); // a new tab every press, so earlier debugger tabs stay for comparing
     } else {
       // With the local server the debugger is its own process that this server starts on demand (it can take a few
       // seconds). The window is opened first, while the click still counts, and pointed at the debugger once it is up.
-      w = window.open("about:blank", "swtorsim_debugger");
+      w = window.open("about:blank", "_blank");
       try {
         const res = await fetch("/api/launch_debugger", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
         const data = await res.json();

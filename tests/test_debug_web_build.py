@@ -70,6 +70,11 @@ class PageHandshakeTests(unittest.TestCase):
         for field in ("d.mastery", "d.crit_rating", "d.alacrity_rating", "d.accuracy_rating", "g.tactical", "g.legendaries", "g.relics"):
             self.assertIn(field, DEBUGGER_HTML)
 
+    def test_every_press_of_debug_opens_a_new_tab(self):
+        self.assertIn('window.open(url, "_blank")', SIMULATOR_HTML)
+        self.assertIn('window.open("about:blank", "_blank")', SIMULATOR_HTML)
+        self.assertNotIn("swtorsim_debugger\"", SIMULATOR_HTML)  # no shared window name that would reuse a tab
+
     def test_both_pages_show_missed_hits(self):
         self.assertIn("data-logfilter=\"miss\"", SIMULATOR_HTML)
         self.assertIn('ev.category === "miss"', SIMULATOR_HTML)
