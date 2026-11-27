@@ -43,5 +43,5 @@
   "enable_projectile_flight_time": true,
   "in_flashpoint_operation": true,
   "combat_distance": 30,
-  "gcd_stall": 0.3
+  "gcd_stall": 0.0
 }

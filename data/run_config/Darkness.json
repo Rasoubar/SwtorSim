@@ -45,6 +45,6 @@
   "enable_projectile_flight_time": false,
   "in_flashpoint_operation": true,
   "combat_distance": 30,
-  "gcd_stall": 0.3,
+  "gcd_stall": 0.0,
   "incoming_attack_interval": 1.5
 }
