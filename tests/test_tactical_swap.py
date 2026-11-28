@@ -127,7 +127,7 @@ class TacticalSwapTests(unittest.TestCase):
 
     def test_force_camouflage_hidden_power_swap_persists_across_damage(self):
         """Force Camouflage cast with Hidden Power creates a 10s buff that survives tactical swap and damage dealt."""
-        from data.rotation_builder import load_json_file
+        from src.swtorsim.config_load import load_json_file
         import json
 
         rot_file = ROOT / "data" / "rotations" / "custom" / "marauder" / "annihilation" / "Annihilation_Rotation.json"
@@ -138,7 +138,7 @@ class TacticalSwapTests(unittest.TestCase):
         spec_data = load_json_file(str(ROOT / "data" / "extractor" / "live" / "disciplines" / "marauder" / "annihilation.json"))
         choices = {str(lvl): 1 for lvl in spec_data.get("skill_tree", {})}
 
-        from data.rotation_builder import run_dry_run_preview
+        from src.swtorsim.rotation_builder import run_dry_run_preview
         payload = {
             "env": "live",
             "spec_path": "data/extractor/live/disciplines/marauder/annihilation.json",
@@ -184,8 +184,8 @@ class ByTagReplacementCleanupTests(unittest.TestCase):
 
     def _prepare(self):
         import json
-        from data.rotation_builder import load_json_file, loadout_fqns
-        from src.swtorsim.config_load import load_character_stats_from_json, load_complete_loadout
+        from src.swtorsim.config_load import load_character_stats_from_json, load_complete_loadout, load_json_file
+        from src.swtorsim.rotation_builder import loadout_fqns
 
         with open(ANNI_ROT, encoding="utf-8") as f:
             rot = json.load(f)

@@ -12,7 +12,7 @@ if str(SWTORSIM_ROOT / "src") not in sys.path:
 if str(SWTORSIM_ROOT) not in sys.path:
     sys.path.insert(0, str(SWTORSIM_ROOT))
 
-from data.rotation_builder import (
+from src.swtorsim.rotation_builder import (
     discover_loadout_catalog,
     RotationBuilderRequestHandler,
 )

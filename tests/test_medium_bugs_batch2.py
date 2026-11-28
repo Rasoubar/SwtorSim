@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from data import rotation_builder as rb
+from src.swtorsim import rotation_builder as rb
 from src.swtorsim import pyodide_bridge
 from src.swtorsim.engine import Simulation
 from src.swtorsim.entities import Dummy, Player

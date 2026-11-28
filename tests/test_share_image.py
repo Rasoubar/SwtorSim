@@ -187,7 +187,7 @@ class ShareImageScriptRouteTests(unittest.TestCase):
         self._check(SimulatorRequestHandler)
 
     def test_builder_serves_share_image_js(self):
-        from data.rotation_builder import RotationBuilderRequestHandler
+        from src.swtorsim.rotation_builder import RotationBuilderRequestHandler
 
         self._check(RotationBuilderRequestHandler)
 

@@ -102,7 +102,7 @@ Because all disciplines, abilities, talents, tacticals, and legendary implants a
 3. **Write a run config** (`data/run_config/<spec>.json`):
    - Inline `choices` (`"23"` through `"73"`, each `1`, `2`, or `3`), plus `main_hand` (`{"min", "max"}`) and `off_hand` (`null`, or a range when the spec dual-wields).
 4. **Build a Rotation (`data/rotations/<spec>_rotation.json`)**:
-   - Launch `.\.venv\Scripts\python.exe data/rotation_builder.py --ui`, select the new discipline and choices, and construct the opener and priority list.
+   - Launch `.\.venv\Scripts\python.exe src/swtorsim/rotation_builder.py`, select the new discipline and choices, and construct the opener and priority list.
 5. **Validate Against a Live Combat Log**:
    - Run a single `TEST` simulation (`run_sim.py --config ...`) and compare hit sizes, tick counts, and buff uptimes against a live StarParse log. (The log tools `tools/parse_combat_log.py` and `tools/validate_modifiers_vs_log.py` are currently missing from the repo.)
 

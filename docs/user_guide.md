@@ -167,12 +167,12 @@ At runtime, `resolve_skill_tree_fqns()` resolves these selections against the di
 
 ## 3. Rotation Format & Visual Rotation Builder
 
-### 3.1 Using the Rotation Builder (`data/rotation_builder.py`)
+### 3.1 Using the Rotation Builder (`src/swtorsim/rotation_builder.py`)
 
 You can create and edit rotations visually in your browser:
 
 ```powershell
-.\.venv\Scripts\python.exe data/rotation_builder.py --ui
+.\.venv\Scripts\python.exe src/swtorsim/rotation_builder.py
 ```
 
 The Rotation Builder automatically inspects your selected Discipline, Skill Tree Choices, Tactical, Legendaries, and Relics to discover:

@@ -48,7 +48,7 @@ Not in scope:
 - Today the loadout FQN list is assembled in four places, none of which include adrenals:
   1. `src/swtorsim/config_load.py :: selected_fqns_from_config` (around line 146) for the CLI.
   2. `src/swtorsim/web_gui.py :: _resolve_simulation_inputs_from_payload` (around lines 595-603) for the web simulator and WASM.
-  3. `data/rotation_builder.py :: loadout_fqns` (around line 93) for the Rotation Builder catalog and dry-run.
+  3. `src/swtorsim/rotation_builder.py :: loadout_fqns` for the Rotation Builder catalog and dry-run.
   4. `src/diminishing_returns/config.py` (its own run configs; leave it alone unless the user asks).
 - Validation lives in `src/swtorsim/run_config.py :: validate_run_config` (around line 281). Relics are validated by `_validate_relics` against the relic catalog. There is no adrenal catalog path helper yet.
 
@@ -156,7 +156,7 @@ Document in `docs/user_guide.md` that the effect lasts 15 s, the cooldown is 180
    - `buildExportRunConfigObject`: add `adrenal_fqn: p.adrenal_fqn` (omit the key when empty to keep exported files clean: `...(p.adrenal_fqn ? {adrenal_fqn: p.adrenal_fqn} : {})`).
    - Call `refreshComputedStats()` on change? Not needed (the adrenal only matters while active).
 
-7. **Rotation Builder (`data/rotation_builder.py`):**
+7. **Rotation Builder (`src/swtorsim/rotation_builder.py`):**
    - `loadout_fqns(..., adrenal_fqn: str = "")`: append to `extra` after relics.
    - `build_castable_catalog(..., adrenal_fqn: str = "")` and `discover_loadout_catalog(..., adrenal_fqn: str = "")`: pass it through to `loadout_fqns`.
    - `RotationBuilderRequestHandler.do_POST` `/api/loadout` (around line 1278): read `payload.get("adrenal_fqn") or ""` and pass it.

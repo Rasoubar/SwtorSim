@@ -5,7 +5,7 @@ import io
 import os
 import unittest
 
-from data import rotation_builder
+from src.swtorsim import rotation_builder
 from src.swtorsim.metrics import Metrics
 from src.swtorsim.web_gui import _format_ability_breakdown_rows
 

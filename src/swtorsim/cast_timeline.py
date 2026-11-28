@@ -1,6 +1,6 @@
 """Records per-cast timeline rows (step, resource, buffs, cast/channel timing) for the Cast Timeline view.
 
-Display-only instrumentation shared by the Rotation Builder dry-run (`data/rotation_builder.py`) and the
+Display-only instrumentation shared by the Rotation Builder dry-run (`src/swtorsim/rotation_builder.py`) and the
 Combat Simulator single run (`web_gui._run_single_test_detailed`). It wraps `Ability.cast` on the player's
 abilities and only reads engine state (scaled cast time, `ActiveChannel`, `next_gcd`); it never changes
 the simulation.

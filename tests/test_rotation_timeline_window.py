@@ -6,8 +6,8 @@ import unittest
 import urllib.request
 from http.server import ThreadingHTTPServer
 
-from data import rotation_builder
-from data.rotation_builder import RotationBuilderRequestHandler
+from src.swtorsim import rotation_builder
+from src.swtorsim.rotation_builder import RotationBuilderRequestHandler
 from src.swtorsim import settings
 
 
@@ -192,7 +192,7 @@ def _dry_run(config_path, duration=30.0):
     import io
     import json
 
-    from data.rotation_builder import run_dry_run_preview
+    from src.swtorsim.rotation_builder import run_dry_run_preview
 
     root = rotation_builder.SWTORSIM_ROOT
     cfg = json.loads((root / config_path).read_text(encoding="utf-8"))
