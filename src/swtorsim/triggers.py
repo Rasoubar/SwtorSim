@@ -68,6 +68,15 @@ def effective_proc_chance(proc_chance, proc_chance_mods, ability_fqn, tags):
     return min(100.0, max(0.0, proc_chance + bonus_proc))
 
 
+def event_result(context):
+    """The event's combat result (effResult* name) for a trigger's result filter: the context's own
+    "result" when set (e.g. an avoided attack), otherwise a landed hit, effResultCrit or effResultOk."""
+    result = context.get("result")
+    if isinstance(result, str) and result:
+        return result
+    return "effResultCrit" if context.get("is_crit", False) else "effResultOk"
+
+
 class TriggerManager:
     """Manages reactive proc listeners, actor/tag/attack-type filtering, and rate-limit lockouts."""
 
@@ -201,8 +210,10 @@ class TriggerManager:
             if sub["tags"] and not (event_tags & sub["tags"]):
                 continue
 
-            # 3. Result filter (e.g. effResultCrit)
-            if "effResultCrit" in sub["eff_results"] and not context.get("is_crit", False):
+            # 3. Result filter (effParam_Results): the event's combat result must be in the trigger's list
+            # (crit-only procs; Retaliation's enabler only on Parry / Dodge / Miss). An event without an
+            # explicit "result" is a landed hit: effResultCrit when it crit, else effResultOk.
+            if sub["eff_results"] and event_result(context) not in sub["eff_results"]:
                 continue
 
             # 4. Match on integer / spec flags

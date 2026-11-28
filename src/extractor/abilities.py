@@ -23,7 +23,8 @@ DEFAULT_BASE_GCD = 1.5
 
 CRIT_RESULT_NAME = "effResultCrit"
 CRIT_RESULT_TOKENS = frozenset({CRIT_RESULT_NAME, "32"})
-OK_RESULT_TOKENS = frozenset({"effResultOk", "1"})
+OK_RESULT_NAME = "effResultOk"
+OK_RESULT_TOKENS = frozenset({OK_RESULT_NAME, "1"})
 
 ACTOR_LABELS: dict[str, str] = {
     "2": "caster",
@@ -896,12 +897,18 @@ def _int_list_items(value: Any) -> list[str]:
 
 
 def _decode_eff_results(int_list_params: dict[str, Any]) -> list[str]:
+    """The trigger's combat-result filter, in data order (e.g. Parry / Dodge / Miss on Retaliation's
+    enabler). Numeric Crit / Ok tokens are written by name; an empty list means no filter."""
     tokens = _int_list_items(int_list_params.get("effParam_Results"))
-    if any(token in CRIT_RESULT_TOKENS for token in tokens) and not any(
-        token in OK_RESULT_TOKENS for token in tokens
-    ):
-        return [CRIT_RESULT_NAME]
-    return []
+    results: list[str] = []
+    for token in tokens:
+        if token in CRIT_RESULT_TOKENS:
+            token = CRIT_RESULT_NAME
+        elif token in OK_RESULT_TOKENS:
+            token = OK_RESULT_NAME
+        if token not in results:
+            results.append(token)
+    return results
 
 
 def _raw_time_interval_seconds(value: Any) -> float | None:

@@ -1,7 +1,7 @@
 {
     "pre_combat": [
         {
-            "ability": "personal_heavy_ordinance"
+            "ability": "personal_heavy_ordnance"
         },
         {
             "ability": "flame_sweep"
@@ -28,7 +28,7 @@
             "rules": {}
         },
         {
-            "ability_id": "personal_heavy_ordinance",
+            "ability_id": "personal_heavy_ordnance",
             "rules": {
                 "target_doesnt_have_debuff": "Burning (Shoulder Cannon)"
             }
@@ -89,7 +89,7 @@
         },
         {
             "type": "optional",
-            "ability_id": "personal_heavy_ordinance",
+            "ability_id": "personal_heavy_ordnance",
             "rules": {},
             "lead_time": 0.1
         },
@@ -103,7 +103,7 @@
         },
         {
             "type": "optional",
-            "ability_id": "personal_heavy_ordinance",
+            "ability_id": "personal_heavy_ordnance",
             "rules": {},
             "lead_time": 0.1
         },
@@ -117,7 +117,7 @@
         },
         {
             "type": "optional",
-            "ability_id": "personal_heavy_ordinance",
+            "ability_id": "personal_heavy_ordnance",
             "rules": {},
             "lead_time": 0.1
         },
@@ -131,7 +131,7 @@
         },
         {
             "type": "optional",
-            "ability_id": "personal_heavy_ordinance",
+            "ability_id": "personal_heavy_ordnance",
             "rules": {},
             "lead_time": 0.1
         },
@@ -145,7 +145,7 @@
         },
         {
             "type": "optional",
-            "ability_id": "personal_heavy_ordinance",
+            "ability_id": "personal_heavy_ordnance",
             "rules": {}
         },
         {
@@ -164,7 +164,7 @@
         },
         {
             "type": "optional",
-            "ability_id": "personal_heavy_ordinance",
+            "ability_id": "personal_heavy_ordnance",
             "rules": {}
         },
         {
