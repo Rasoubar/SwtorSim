@@ -153,6 +153,16 @@
     border-color: var(--accent);
   }
 
+  /* Dropdown group headers ("Custom" / "Pre-set") in orange; their options stay in the normal text color. */
+  optgroup {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  optgroup option {
+    color: var(--text-main);
+    font-weight: 400;
+  }
+
   .btn {
     background: var(--bg-card);
     color: var(--text-main);
@@ -1090,7 +1100,7 @@
     font-size: 14px;
   }
 </style>
-  <script src="pyodide_client.js?v=1795869705"></script>
+  <script src="pyodide_client.js?v=1795874815"></script>
 </head>
 <body>
 
@@ -1705,6 +1715,12 @@
   let PINNED_BASELINE = null;
   let RUN_HISTORY = [];
 
+  // Display name for a file in a Custom / Pre-set dropdown: file name without ".json", underscores as spaces.
+  function dropdownFileName(item) {
+    const base = String(item.name || item.label || item.path || "").split("/").pop();
+    return base.replace(/\.json$/i, "").replace(/_/g, " ");
+  }
+
   function setStatus(text, kind = "ready") {
     const el = document.getElementById("statusPill");
     el.textContent = text;
@@ -1808,36 +1824,25 @@
       if (!res.ok) throw new Error(data.error || "Failed to load catalog");
       CATALOG = data;
 
-      function populateSelectWithOptions(selectElem, items, defaultPlaceholder, defaultGroupLabel) {
+      function populateSelectWithOptions(selectElem, items, defaultPlaceholder) {
         const prevVal = selectElem.value;
         selectElem.innerHTML = defaultPlaceholder ? `<option value="">${defaultPlaceholder}</option>` : "";
 
-        const customItems = (items || []).filter(it => it.is_custom || (it.path && it.path.includes("/custom/")));
-        const presetItems = (items || []).filter(it => !it.is_custom && (!it.path || !it.path.includes("/custom/")));
-
-        if (customItems.length > 0) {
-          const cGroup = document.createElement("optgroup");
-          cGroup.label = "★ My Custom Files";
-          customItems.forEach(it => {
+        const isCustom = it => !!it.is_custom || !!(it.path && it.path.includes("/custom/"));
+        // Custom (user-saved) first, then the shipped pre-sets; same group names as the rotation dropdown.
+        [["Custom", true], ["Pre-set", false]].forEach(([label, custom]) => {
+          const group = (items || []).filter(it => isCustom(it) === custom);
+          if (group.length === 0) return;
+          const optGroup = document.createElement("optgroup");
+          optGroup.label = label;
+          group.forEach(it => {
             const opt = document.createElement("option");
             opt.value = it.path;
-            opt.textContent = `★ ${it.name || it.label}`;
-            cGroup.appendChild(opt);
+            opt.textContent = dropdownFileName(it);
+            optGroup.appendChild(opt);
           });
-          selectElem.appendChild(cGroup);
-        }
-
-        if (presetItems.length > 0) {
-          const pGroup = document.createElement("optgroup");
-          pGroup.label = defaultGroupLabel || "Built-In Presets";
-          presetItems.forEach(it => {
-            const opt = document.createElement("option");
-            opt.value = it.path;
-            opt.textContent = it.label || it.name;
-            pGroup.appendChild(opt);
-          });
-          selectElem.appendChild(pGroup);
-        }
+          selectElem.appendChild(optGroup);
+        });
 
         if (prevVal && Array.from(selectElem.options).some(o => o.value === prevVal)) {
           selectElem.value = prevVal;
@@ -1847,12 +1852,12 @@
       // Preset Run Configs
       const rcSel = document.getElementById("presetConfigSelect");
       const prevRc = rcSel.value;
-      populateSelectWithOptions(rcSel, data.run_configs || [], "-- Select Run Config --", "Preset Configurations");
+      populateSelectWithOptions(rcSel, data.run_configs || [], "-- Select Run Config --");
 
       // Builds
       const bSel = document.getElementById("buildSelect");
       const prevB = bSel.value;
-      populateSelectWithOptions(bSel, data.builds || [], "", "Preset Builds");
+      populateSelectWithOptions(bSel, data.builds || [], "");
 
       // Rotations (Spec-aware)
       const rotSel = document.getElementById("rotationSelect");
@@ -2005,11 +2010,19 @@
       emptyOpt.textContent = `(No rotations found for ${specSlug || classSlug})`;
       rotSel.appendChild(emptyOpt);
     } else {
-      specRotations.forEach(it => {
-        const opt = document.createElement("option");
-        opt.value = it.path;
-        opt.textContent = it.name ? it.name.replace(/\.json$/i, "") : it.label;
-        rotSel.appendChild(opt);
+      // Custom (user-saved, data/rotations/custom/) first, then the shipped pre-sets.
+      [["Custom", true], ["Pre-set", false]].forEach(([label, custom]) => {
+        const group = specRotations.filter(it => !!it.is_custom === custom);
+        if (group.length === 0) return;
+        const optGroup = document.createElement("optgroup");
+        optGroup.label = label;
+        group.forEach(it => {
+          const opt = document.createElement("option");
+          opt.value = it.path;
+          opt.textContent = dropdownFileName(it);
+          optGroup.appendChild(opt);
+        });
+        rotSel.appendChild(optGroup);
       });
     }
 
@@ -3827,9 +3840,8 @@
 
   function canDeleteSelected(selId, path) {
     if (!path) return false;
-    const norm = path.replace(/\\/g, "/");
-    if (selId === "rotationSelect") return norm.startsWith("data/rotations/");
-    return norm.includes("/custom/");
+    // Only custom files can be deleted; pre-sets (rotations included) are protected.
+    return `/${path.replace(/\\/g, "/")}`.includes("/custom/");
   }
 
   function syncDeleteButtons() {

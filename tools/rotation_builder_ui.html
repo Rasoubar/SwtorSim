@@ -229,6 +229,16 @@
     border-color: var(--accent);
   }
 
+  /* Dropdown group headers ("Custom" / "Pre-set") in orange; their options stay in the normal text color. */
+  optgroup {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  optgroup option {
+    color: var(--text-main);
+    font-weight: 400;
+  }
+
   button {
     background: var(--bg-card);
     color: var(--text-main);
@@ -1502,7 +1512,7 @@
         <label>Rotation Filename</label>
         <div style="display:flex;gap:6px;align-items:center;">
           <input type="text" id="saveFilename" style="flex:1;" value="CustomRotation.json" placeholder="CustomRotation.json">
-          <button class="btn-success btn-sm" onclick="saveRotationToDisk()" title="Save into simulator presets" style="font-weight:600;white-space:nowrap;">Save</button>
+          <button class="btn-success btn-sm" onclick="saveRotationToDisk()" title="Save as a custom rotation (data/rotations/custom/); pre-sets are never overwritten" style="font-weight:600;white-space:nowrap;">Save</button>
           <button class="btn-sm" onclick="downloadRotationJson()" title="Download rotation .json file to PC" style="font-weight:600;white-space:nowrap;">Download</button>
           <button class="btn-sm" id="rotationImageBtn" onclick="openRotationImage()" title="Make a PNG image of this rotation to copy or download" style="font-weight:600;white-space:nowrap;">Image</button>
         </div>
@@ -1856,11 +1866,19 @@ function populateExistingRotationsSelect(preferredPath = null) {
     emptyOpt.textContent = `(No rotations found for ${specSlug || classSlug})`;
     rotSel.appendChild(emptyOpt);
   } else {
-    for (const rot of specRotations) {
-      const opt = document.createElement("option");
-      opt.value = rot.path;
-      opt.textContent = rot.name ? rot.name.replace(/\.json$/i, "") : rot.label;
-      rotSel.appendChild(opt);
+    // Custom (user-saved, data/rotations/custom/) first, then the shipped pre-sets.
+    for (const [label, custom] of [["Custom", true], ["Pre-set", false]]) {
+      const group = specRotations.filter(r => !!r.is_custom === custom);
+      if (group.length === 0) continue;
+      const optGroup = document.createElement("optgroup");
+      optGroup.label = label;
+      for (const rot of group) {
+        const opt = document.createElement("option");
+        opt.value = rot.path;
+        opt.textContent = String(rot.name || rot.label || "").split("/").pop().replace(/\.json$/i, "").replace(/_/g, " ");
+        optGroup.appendChild(opt);
+      }
+      rotSel.appendChild(optGroup);
     }
   }
 

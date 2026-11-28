@@ -93,6 +93,12 @@ class PageHandshakeTests(unittest.TestCase):
     def test_icons_are_relative_so_a_sub_path_deployment_works(self):
         self.assertIn('"icons/" + encodeURIComponent', DEBUGGER_HTML)
         self.assertNotIn('"/icons/"', DEBUGGER_HTML)
+        self.assertIn("iconUrl(name, true)", DEBUGGER_HTML)
+
+    def test_build_copies_pts_icons_and_lowercases_filenames(self):
+        src = (ROOT / "tools" / "build_web_release.py").read_text(encoding="utf-8")
+        self.assertIn('"pts" / "icons"', src)
+        self.assertIn("icon_file.name.lower()", src)
 
 
 class BuildTests(unittest.TestCase):

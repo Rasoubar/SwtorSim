@@ -71,12 +71,11 @@
       const files = JSON.parse(raw);
       const sanitized = {};
       let changed = false;
+      // Everything stored here is user-made, so it belongs under a custom folder. Rotations saved
+      // before the pre-set / custom split (data/rotations/<class>/<spec>/) move to data/rotations/custom/.
+      const movedRotations = {};
       for (const [k, content] of Object.entries(files)) {
-        if (k.startsWith("data/rotations/custom/")) {
-          changed = true;
-          const newKey = k.replace("data/rotations/custom/", "data/rotations/");
-          if (!sanitized[newKey]) sanitized[newKey] = content;
-        } else if (!k.includes("/custom/")) {
+        if (!k.includes("/custom/")) {
           let newKey = k;
           if (k.startsWith("data/Choices/") || k.startsWith("data/choices/")) {
             newKey = k.replace(/^data\/[Cc]hoices\//, "data/Choices/custom/");
@@ -84,6 +83,9 @@
             newKey = k.replace("data/builds/", "data/builds/custom/");
           } else if (k.startsWith("data/run_config/")) {
             newKey = k.replace("data/run_config/", "data/run_config/custom/");
+          } else if (k.startsWith("data/rotations/")) {
+            newKey = k.replace("data/rotations/", "data/rotations/custom/");
+            if (!files[newKey]) movedRotations[k] = newKey;
           }
           if (newKey !== k) changed = true;
           if (newKey === k || !files[newKey]) {
@@ -91,6 +93,20 @@
           }
         } else {
           sanitized[k] = content;
+        }
+      }
+      // Saved run configs that pointed at a moved rotation follow it.
+      if (Object.keys(movedRotations).length > 0) {
+        for (const [k, content] of Object.entries(sanitized)) {
+          if (!k.startsWith("data/run_config/")) continue;
+          try {
+            const rc = JSON.parse(content);
+            const target = rc && typeof rc.rotation_path === "string" ? movedRotations[rc.rotation_path.replace(/\\/g, "/")] : null;
+            if (target) {
+              rc.rotation_path = target;
+              sanitized[k] = JSON.stringify(rc, null, 2);
+            }
+          } catch (_e) {}
         }
       }
       if (changed) {
@@ -917,7 +933,8 @@
         }
         const contentStr = formatted.content;
 
-        const customPath = `data/rotations/${classFolder}/${specFolder}/${filename}`;
+        // Saves go to the custom folder (same as the native server), never over a pre-set.
+        const customPath = `data/rotations/custom/${classFolder}/${specFolder}/${filename}`;
 
         state.customFiles[customPath] = contentStr;
         saveCustomFilesToStorage(state.customFiles);
@@ -1005,7 +1022,7 @@
         const classFolder = String(payload.class_folder || "").trim().toLowerCase();
         const specFolder = String(payload.spec_folder || "").trim().toLowerCase();
 
-        let relFolder = "data/rotations";
+        let relFolder = "data/rotations/custom";
         if (category === "choices") relFolder = "data/Choices/custom";
         else if (category === "builds") relFolder = "data/builds/custom";
         else if (category === "run_config") relFolder = "data/run_config/custom";
@@ -1037,6 +1054,13 @@
       if (pathname === "/api/custom_file/delete") {
         const payload = JSON.parse(options.body || "{}");
         const vPath = String(payload.path || "").trim();
+        // Pre-set files are never deleted (removing one from the workers would hide it until reload).
+        if (!`/${vPath}`.includes("/custom/")) {
+          return new Response(JSON.stringify({ error: "Only files under a custom folder can be deleted." }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
 
         // Only the exact path: other custom files may share this basename.
         delete state.customFiles[vPath];

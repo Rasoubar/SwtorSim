@@ -26,6 +26,7 @@ from src.swtorsim.run_config import (
     RELICS_PATH,
     ROTATIONS_DIR,
     TACTICAL_PREFIX,
+    custom_rotation_rel_dir,
     discipline_names,
     filter_gear_for_class,
     get_disciplines_dir,
@@ -33,6 +34,7 @@ from src.swtorsim.run_config import (
     get_relics_path,
     normalize_pre_combat,
     relic_menu_label,
+    rotation_catalog_location,
     resolve_env_extractor_path,
     resolve_skill_tree_fqns,
 )
@@ -996,9 +998,7 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
             if not path.is_file():
                 continue
             rel = path.relative_to(base)
-            parts = rel.parts
-            cls = parts[0].lower() if len(parts) >= 2 else ""
-            sp = parts[1].lower() if len(parts) >= 3 else ""
+            cls, sp, is_custom = rotation_catalog_location(rel.parts)
             clean_label = rel.with_suffix("").as_posix()
             try:
                 rel_path = path.resolve().relative_to(SWTORSIM_ROOT).as_posix()
@@ -1010,7 +1010,7 @@ def get_workspace_catalog(env: str = "live") -> dict[str, Any]:
                 "path": rel_path,
                 "class": cls,
                 "spec": sp,
-                "is_custom": False,
+                "is_custom": is_custom,
             })
         return items
 
@@ -1442,7 +1442,8 @@ class RotationBuilderRequestHandler(BaseHTTPRequestHandler):
                     filename += ".json"
                 # Sanitize filename
                 filename = Path(filename).name
-                rotation_dir = SWTORSIM_ROOT / "data" / "rotations" / class_folder / spec_folder
+                # Saves always go to the custom folder, so a pre-set rotation is never overwritten.
+                rotation_dir = SWTORSIM_ROOT / custom_rotation_rel_dir(class_folder, spec_folder)
                 rotation_dir.mkdir(parents=True, exist_ok=True)
                 full_path = rotation_dir / filename
 

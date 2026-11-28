@@ -198,10 +198,13 @@ function iconFile(name) {
   const inner = /\(([^)]+)\)\s*$/.exec(base), bare = base.replace(/\s*\([^)]*\)\s*$/, "");
   return m[name] || m[base] || (inner && m[inner[1]]) || m[bare] || null;
 }
-const iconUrl = (name) => { const f = iconFile(name); return f ? "icons/" + encodeURIComponent(f) : null; };
+const iconUrl = (name, lower = false) => { const f = iconFile(name); return f ? "icons/" + encodeURIComponent(lower ? f.toLowerCase() : f) : null; };
 function ic(name, size = 18) {
   const u = iconUrl(name);
-  return u ? `<img class="ic" src="${u}" width="${size}" height="${size}" alt="" loading="lazy" onerror="this.remove()">` : "";
+  if (!u) return "";
+  const l = iconUrl(name, true);
+  const onerr = u !== l ? `if(!this.dataset.r){this.dataset.r='1';this.src='${l}';}else{this.remove();}` : `this.remove()`;
+  return `<img class="ic" src="${u}" width="${size}" height="${size}" alt="" loading="lazy" onerror="${onerr}">`;
 }
 const iconCache = new Map(); let redrawQueued = false;
 function iconImage(name) {
@@ -210,7 +213,9 @@ function iconImage(name) {
   let entry = iconCache.get(u);
   if (!entry) {
     const img = new Image(); entry = { img, ok: false };
+    const l = iconUrl(name, true);
     img.onload = () => { entry.ok = true; if (!redrawQueued) { redrawQueued = true; requestAnimationFrame(() => { redrawQueued = false; draw(); }); } };
+    img.onerror = () => { if (l && l !== u && !img.dataset.r) { img.dataset.r = "1"; img.src = l; } };
     img.src = u; iconCache.set(u, entry);
   }
   return entry.ok ? entry.img : null;

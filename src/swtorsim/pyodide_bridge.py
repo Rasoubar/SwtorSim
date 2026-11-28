@@ -17,6 +17,7 @@ if str(SWTORSIM_ROOT) not in sys.path:
     sys.path.insert(0, str(SWTORSIM_ROOT))
 
 from src.swtorsim.config_load import load_json_file
+from src.swtorsim.run_config import custom_rotation_rel_dir
 from src.swtorsim.web_gui import (
     aggregate_batch_slices,
     execute_simulation_from_payload,
@@ -159,7 +160,8 @@ def dispatch(action: str, payload_json: str = "{}") -> str:
             if not filename.endswith(".json"):
                 filename += ".json"
             filename = Path(filename).name
-            target_dir = SWTORSIM_ROOT / "data" / "rotations" / class_folder / spec_folder
+            # Same as the native server: saves go to the custom folder, never over a pre-set.
+            target_dir = SWTORSIM_ROOT / custom_rotation_rel_dir(class_folder, spec_folder)
             target_dir.mkdir(parents=True, exist_ok=True)
             full_path = target_dir / filename
             file_data = build_rotation_file_data(

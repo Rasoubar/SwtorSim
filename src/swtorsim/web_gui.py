@@ -59,6 +59,7 @@ from src.swtorsim.run_config import (
     TRAINING_DUMMY_ARMOR_DEBUFF_LABEL,
     RunConfig,
     apply_weapon_ranges,
+    custom_rotation_rel_dir,
     discipline_names,
     filter_gear_for_class,
     get_disciplines_dir,
@@ -68,6 +69,7 @@ from src.swtorsim.run_config import (
     relic_menu_label,
     resolve_env_extractor_path,
     resolve_skill_tree_fqns,
+    rotation_catalog_location,
     validate_run_config,
 )
 from src.swtorsim.settings import (
@@ -257,9 +259,7 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
             if not path.is_file():
                 continue
             rel = path.relative_to(base)
-            parts = rel.parts
-            cls = parts[0].lower() if len(parts) >= 2 else ""
-            sp = parts[1].lower() if len(parts) >= 3 else ""
+            cls, sp, is_custom = rotation_catalog_location(rel.parts)
             items.append(
                 {
                     "label": rel.with_suffix("").as_posix(),
@@ -267,7 +267,7 @@ def get_simulator_catalog(env: str = "live") -> dict[str, Any]:
                     "path": _to_workspace_rel(path),
                     "class": cls,
                     "spec": sp,
-                    "is_custom": False,
+                    "is_custom": is_custom,
                 }
             )
         return items
@@ -2209,9 +2209,7 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 spec_folder = str(payload.get("spec_folder") or "").strip().lower()
 
                 if category == "rotations":
-                    folder = SWTORSIM_ROOT / "data" / "rotations"
-                    if class_folder and spec_folder:
-                        folder = folder / class_folder / spec_folder
+                    folder = SWTORSIM_ROOT / custom_rotation_rel_dir(class_folder, spec_folder)
                 elif category == "choices":
                     folder = SWTORSIM_ROOT / "data" / "Choices" / "custom"
                     if class_folder and spec_folder:
@@ -2247,14 +2245,9 @@ class SimulatorRequestHandler(BaseHTTPRequestHandler):
                 except ValueError:
                     self._send_json({"error": "Invalid file path."}, status=400)
                     return
-                rotations_root = (SWTORSIM_ROOT / "data" / "rotations").resolve()
-                try:
-                    target_file.resolve().relative_to(rotations_root)
-                    in_rotations = True
-                except ValueError:
-                    in_rotations = False
-                if not in_rotations and "/custom/" not in f"/{rel_to_root}":
-                    self._send_json({"error": "Only rotation files, or files under a custom folder, can be deleted."}, status=400)
+                # Pre-set files (rotations included) are never deleted; only files under a custom folder.
+                if "/custom/" not in f"/{rel_to_root}":
+                    self._send_json({"error": "Only files under a custom folder can be deleted."}, status=400)
                     return
                 if target_file.is_file():
                     try:

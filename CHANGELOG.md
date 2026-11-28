@@ -4,6 +4,16 @@
 
 ## Completed Fixes
 
+### 125. Custom / Pre-set dropdowns look the same everywhere (`tools/simulator_ui.html`, `tools/rotation_builder_ui.html`)
+- The simulator's run config, build, and rotation dropdowns and the Rotation Builder's rotation dropdown all use two groups, **Custom** then **Pre-set**. Before, run configs and builds said "★ My Custom Files" / "Preset Configurations" / "Preset Builds", and custom items had a star and ".json".
+- Items show the file name without ".json", with underscores as spaces (`Annihilation_Parse_float.json` -> "Annihilation Parse float"). The simulator uses one helper, `dropdownFileName`.
+- The group headers are orange (`--accent`), bold. The items keep the normal text color.
+- Checked on local test servers: all four dropdowns show the new groups and names, and loading `Annihilation_Parse_float` still selects its custom rotation. No console errors. The tests that read these UI files fail only on known issues already listed in 122 (Carnage config is PTS, Marksmanship config, sniper casts, rule form export line, and share_image's setup on the same config). No combat-math change. `dist/` not rebuilt.
+
+### 124. Annihilation_Parse configs kept out of the web release (`data/run_config/custom/`, `data/rotations/custom/marauder/annihilation/`)
+- `Annihilation_Parse_fixed` and `Annihilation_Parse_float` (run configs and rotations) moved into the `custom/` folders. `tools/bundle_pyodide_assets.py` already skips any `custom` folder, so they no longer go into `swtorsim_assets.zip`. The local simulator and Rotation Builder still list them, now as custom files. Each run config's `rotation_path` points at the new rotation location.
+- Checked with a scratch bundle: no `Annihilation_Parse` entries. `dist/` not rebuilt; the current `dist/swtorsim_assets.zip` still contains them until the next release build.
+
 ### 123. Rotation Builder right panel drops the Visual Map tab (`tools/rotation_builder_ui.html`)
 - The right panel under Save, Verify & Simulate no longer has a Visual Map tab. The header **Open Visual Map** button still opens the map. The empty-list button stays. The last tutorial step no longer points at the tab bar.
 
@@ -3834,3 +3844,16 @@ Added a "Beta" pill next to the app name and a dismissible bug-report banner (li
 - **Why:** each burst buff (Polarity Shift / Mental Alacrity 20%, Berserk / Zen 30%, Stim Boost / Pugnacity 10%, Focal Point 1% per stack...) gives the same value to all three speed stats; only 274 had been checked against logs (Berserk: 1.1 s GCD, ~8.7 s Ferocity). Not measured in game yet. Example, 7.23% Alacrity + Polarity Shift, 1.5 s cast: 1.119 s -> 1.179 s (GCD 1.2 s either way); 3 s cast: 2.238 s -> 2.358 s.
 - **DPS (`tools/dps_baseline.py --compare`, same seeds):** all 9 runnable PTS configs unchanged (none use a 256 / 257 buff). Live copies (PTS 85 build, comparison only): Arsenal +1.02%, Carnage 0, Marksmanship -7.30%. Scratch PTS runs: Telekinetics (tester's config) +2.26%, Lightning -0.00%. Over 20 seeds (old formula patched back in memory): Marksmanship -2.55%, Telekinetics -1.77%; Arsenal's live copy swings between ~12k and ~25k per seed with either formula (unstable rotation), so its averages say nothing about this change.
 - **Tests:** new `tests/test_cast_channel_alacrity_bonus.py` (9). Full suite: 714 tests, 7 failures, 18 errors, 3 skipped, the same failing tests as before the change.
+
+## 2026-11-28 — Rotations split into pre-set and custom; saves never overwrite a pre-set
+- **Change:** Rotation Builder Save and the simulator's rotation import now always write to `data/rotations/custom/<class>/<spec>/` (new `run_config.CUSTOM_ROTATIONS_DIR` / `custom_rotation_rel_dir`). Before, they wrote into the shipped folder `data/rotations/<class>/<spec>/`, so saving under a shipped name replaced it. Same in the native server (`rotation_builder.py` `/api/rotation/save`, `web_gui.py` `/api/custom_file/import`), the bridge (`pyodide_bridge.py` `SAVE_ROTATION`) and the browser build (`tools/web/pyodide_client.js`).
+- **Catalog:** both rotation scans (`rotation_builder.get_workspace_catalog`, `web_gui.get_simulator_catalog`) use the new `run_config.rotation_catalog_location`: files under `custom/` get `is_custom: true` and their class / spec from the folders after `custom/`. The Rotation Builder's open list and the simulator's rotation list show a "Custom" group first and then "Pre-set".
+- **Delete:** only files under a `custom/` folder can be deleted, rotations included (before, any rotation file could be deleted; in the browser build that hid a shipped rotation until reload). `web_gui.py` `/api/custom_file/delete`, `pyodide_client.js` delete route, `simulator_ui.html` `canDeleteSelected`.
+- **Browser storage migration:** rotations saved before this change (stored as `data/rotations/<class>/<spec>/...`) move to `data/rotations/custom/...` on load, and saved run configs whose `rotation_path` pointed at one follow it. This reverses the old migration that moved `custom/` rotations out.
+- **Moved:** the user rotations `Annihilation_Parse_fixed.json` / `Annihilation_Parse_float.json` are now in `data/rotations/custom/marauder/annihilation/`, and their run configs in `data/run_config/custom/` point there (both load).
+- **Tests:** new `tests/test_custom_rotation_split.py` (16, all pass). Full suite: 7 failures, 18 errors, 3 skipped, the same failing tests the previous entry lists (none touch these files). No DPS comparison: no simulation code changed.
+
+## 2026-11-28 - Fix Missing Website Icons (Case Sensitivity & PTS Icons)
+- Updated `tools/build_web_release.py` to clean `dist/icons/` before copying (preventing Windows NTFS from preserving mixed-case filenames), copy icons from `tools/web/icons`, `data/extractor/live/icons`, and `data/extractor/pts/icons`, and normalize all output icon filenames to lowercase for case-sensitive web hosts.
+- Updated `tools/debugger_ui.html` (`iconUrl`, `ic`, `iconImage`) to fall back to lowercase icon filenames on load error, matching the other web UI pages.
+- Added regression checks in `tests/test_debug_web_build.py` and rebuilt `dist/`.

@@ -17,6 +17,9 @@ from src.swtorsim.settings import (
 DISCIPLINES_DIR = "data/extractor/live/disciplines"
 BUILDS_DIR = "data/builds"
 ROTATIONS_DIR = "data/rotations"
+# User-saved rotations live here (data/rotations/custom/<class>/<spec>/); everything else under
+# ROTATIONS_DIR is a pre-set. Saves and imports only ever write here, so pre-sets are never overwritten.
+CUSTOM_ROTATIONS_DIR = f"{ROTATIONS_DIR}/custom"
 GEAR_PATH = "data/extractor/live/gear_abilities_talents.json"
 RELICS_PATH = "data/extractor/live/relics.json"
 TRAINING_DUMMY_ARMOR_DEBUFF_LABEL = "Training Dummy Armor Debuff"
@@ -34,6 +37,29 @@ def resolve_env_extractor_path(path_str: str, env: str | None = None) -> str:
     elif f"data/extractor/{other_env}/" in norm:
         norm = norm.replace(f"data/extractor/{other_env}/", f"data/extractor/{target_env}/", 1)
     return norm
+
+
+def custom_rotation_rel_dir(class_folder: str = "", spec_folder: str = "") -> str:
+    """Workspace-relative folder for a user-saved rotation: data/rotations/custom[/<class>/<spec>]."""
+    cls = Path(str(class_folder or "").strip().lower()).name
+    sp = Path(str(spec_folder or "").strip().lower()).name
+    if cls and sp:
+        return f"{CUSTOM_ROTATIONS_DIR}/{cls}/{sp}"
+    return CUSTOM_ROTATIONS_DIR
+
+
+def rotation_catalog_location(rel_parts: tuple[str, ...]) -> tuple[str, str, bool]:
+    """(class, spec, is_custom) of a rotation file from its path parts relative to ROTATIONS_DIR.
+
+    Pre-sets are <class>/<spec>/<file>; custom files are custom/<class>/<spec>/<file>.
+    """
+    parts = tuple(rel_parts)
+    is_custom = len(parts) >= 2 and parts[0].lower() == "custom"
+    if is_custom:
+        parts = parts[1:]
+    cls = parts[0].lower() if len(parts) >= 2 else ""
+    sp = parts[1].lower() if len(parts) >= 3 else ""
+    return cls, sp, is_custom
 
 
 def get_disciplines_dir(env: str | None = None) -> str:
