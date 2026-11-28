@@ -330,6 +330,9 @@
           ["Flight time", yesNo(s.flight_time)],
           ["GCD stall", `${Math.round(Number(s.gcd_stall || 0) * 100)}%`],
           ["Attacked every", Number(s.incoming_attack_interval) > 0 ? `${Number(s.incoming_attack_interval)}s` : "off"],
+          // TEMPORARY stand-in for a defense / shield roll (see TODO.md): shown only when used.
+          ...(Number(s.incoming_attack_interval) > 0 && (Number(s.incoming_avoid_chance) > 0 || Number(s.incoming_shield_chance) > 0)
+            ? [["Avoided / shielded", `${Number(s.incoming_avoid_chance || 0)}% / ${Number(s.incoming_shield_chance || 0)}%`]] : []),
         ] : [];
         const cs = res.computed_player_stats || {};
         const pct2 = (v) => `${Number(v || 0).toFixed(2)}%`;

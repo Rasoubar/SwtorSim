@@ -656,6 +656,13 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
     if isinstance(raw_attack_interval, bool) or not isinstance(raw_attack_interval, (int, float)):
         raw_attack_interval = 0.0
     incoming_attack_interval = max(0.0, float(raw_attack_interval or 0.0))
+    # TEMPORARY stand-in for a defense / shield roll (see TODO.md): % of incoming attacks avoided / shielded.
+    incoming_chances = {}
+    for key in ("incoming_avoid_chance", "incoming_shield_chance"):
+        raw_chance = payload.get(key, 0.0)
+        if isinstance(raw_chance, bool) or not isinstance(raw_chance, (int, float)):
+            raw_chance = 0.0
+        incoming_chances[key] = min(100.0, max(0.0, float(raw_chance or 0.0)))
 
     # Resolve choices
     choices_data = {}
@@ -689,6 +696,8 @@ def _resolve_simulation_inputs_from_payload(payload: dict[str, Any]) -> tuple[Ru
         combat_distance=combat_distance,
         gcd_stall=gcd_stall,
         incoming_attack_interval=incoming_attack_interval,
+        incoming_avoid_chance=incoming_chances["incoming_avoid_chance"],
+        incoming_shield_chance=incoming_chances["incoming_shield_chance"],
         level=level,
         seed=seed,
         environment=env,
@@ -855,6 +864,8 @@ def _run_single_test_detailed(
             config=config,
             gcd_stall=config.gcd_stall,
             incoming_attack_interval=config.incoming_attack_interval,
+            incoming_avoid_chance=config.incoming_avoid_chance,
+            incoming_shield_chance=config.incoming_shield_chance,
         )
         player.combat_distance = config.combat_distance
         target.combat_distance = config.combat_distance
@@ -1328,6 +1339,8 @@ def _batch_worker_task(args: tuple) -> dict[str, Any]:
             seed=worker_seed,
             gcd_stall=settings_dict.get("gcd_stall", 0.0),
             incoming_attack_interval=settings_dict.get("incoming_attack_interval", 0.0),
+            incoming_avoid_chance=settings_dict.get("incoming_avoid_chance", 0.0),
+            incoming_shield_chance=settings_dict.get("incoming_shield_chance", 0.0),
         )
         player.combat_distance = settings_dict["combat_distance"]
         target.combat_distance = settings_dict["combat_distance"]
@@ -1438,6 +1451,8 @@ def _run_batch_monte_carlo_detailed(
         "in_flashpoint_operation": config.in_flashpoint_operation,
         "gcd_stall": getattr(config, "gcd_stall", 0.0),
         "incoming_attack_interval": getattr(config, "incoming_attack_interval", 0.0),
+        "incoming_avoid_chance": getattr(config, "incoming_avoid_chance", 0.0),
+        "incoming_shield_chance": getattr(config, "incoming_shield_chance", 0.0),
     }
 
     sim_context = {
@@ -1456,6 +1471,8 @@ def _run_batch_monte_carlo_detailed(
         settings_dict["in_flashpoint_operation"],
         settings_dict["gcd_stall"],
         settings_dict["incoming_attack_interval"],
+        settings_dict["incoming_avoid_chance"],
+        settings_dict["incoming_shield_chance"],
     )
     selected_fqns_tuple = tuple(sim_inputs.get("selected_fqns") or ())
     cores = max(1, min(cpu_count() or 2, iterations))
@@ -1724,6 +1741,8 @@ def execute_simulation_slice(payload: dict[str, Any]) -> dict[str, Any]:
         "in_flashpoint_operation": config.in_flashpoint_operation,
         "gcd_stall": getattr(config, "gcd_stall", 0.0),
         "incoming_attack_interval": getattr(config, "incoming_attack_interval", 0.0),
+        "incoming_avoid_chance": getattr(config, "incoming_avoid_chance", 0.0),
+        "incoming_shield_chance": getattr(config, "incoming_shield_chance", 0.0),
     }
     sim_context = {
         "rotation_config": sim_inputs["rotation_config"],

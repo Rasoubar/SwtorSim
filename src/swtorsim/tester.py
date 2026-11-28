@@ -14,7 +14,7 @@ from src.swtorsim.metrics import format_type_descriptor
 class Tester:
     """Orchestrates single-fight verbose runs and multi-core Monte Carlo batch simulations."""
 
-    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False, seed: int = 42, gcd_stall: float = 0.0, incoming_attack_interval: float = 0.0):
+    def __init__(self, rotation_config, stats_config, loadout_blueprints, duration, dummy_hp, debuff_module, enable_stem_matching: bool = False, seed: int = 42, gcd_stall: float = 0.0, incoming_attack_interval: float = 0.0, incoming_avoid_chance: float = 0.0, incoming_shield_chance: float = 0.0):
         self.rotation_config = rotation_config
         self.stats_config = stats_config
         self.loadout_blueprints = loadout_blueprints
@@ -30,6 +30,9 @@ class Tester:
         self.engine_settings["gcd_stall"] = self.gcd_stall
         self.incoming_attack_interval = float(incoming_attack_interval)
         self.engine_settings["incoming_attack_interval"] = self.incoming_attack_interval
+        # TEMPORARY stand-in for a defense / shield roll (see TODO.md).
+        self.engine_settings["incoming_avoid_chance"] = float(incoming_avoid_chance)
+        self.engine_settings["incoming_shield_chance"] = float(incoming_shield_chance)
 
     def run_test(self, show_buffs: bool = True, tracer=None, config=None):
         """Orchestrates a single simulation."""
@@ -45,6 +48,8 @@ class Tester:
             config=config,
             gcd_stall=self.gcd_stall,
             incoming_attack_interval=self.incoming_attack_interval,
+            incoming_avoid_chance=self.engine_settings["incoming_avoid_chance"],
+            incoming_shield_chance=self.engine_settings["incoming_shield_chance"],
         )
         sim.run_timed(duration=self.duration, target=target)
         sim.tracker.print_metrics(sim.current_time, show_buffs=show_buffs)
@@ -101,6 +106,8 @@ class Tester:
                 rotation_config, stats_config, loadout_blueprints, dummy_hp, debuff_module, verbose=False, seed=worker_seed,
                 gcd_stall=(engine_settings or {}).get("gcd_stall", 0.0),
                 incoming_attack_interval=(engine_settings or {}).get("incoming_attack_interval", 0.0),
+                incoming_avoid_chance=(engine_settings or {}).get("incoming_avoid_chance", 0.0),
+                incoming_shield_chance=(engine_settings or {}).get("incoming_shield_chance", 0.0),
             )
             sim.run_timed(duration, target)
 

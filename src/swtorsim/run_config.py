@@ -124,6 +124,9 @@ class RunConfig:
     combat_distance: float = 30.0
     gcd_stall: float = 0.0
     incoming_attack_interval: float = 0.0
+    # TEMPORARY stand-in for a defense / shield roll (see TODO.md): % of incoming attacks avoided / shielded.
+    incoming_avoid_chance: float = 0.0
+    incoming_shield_chance: float = 0.0
     level: int = 85
     seed: int = 42
     environment: str = "live"
@@ -300,6 +303,8 @@ def load_run_config(path: str, environment: str | None = None) -> RunConfig:
         incoming_attack_interval=_require_non_negative_float(
             raw, "incoming_attack_interval", 0.0
         ),
+        incoming_avoid_chance=_require_non_negative_float(raw, "incoming_avoid_chance", 0.0),
+        incoming_shield_chance=_require_non_negative_float(raw, "incoming_shield_chance", 0.0),
         level=_optional_config_int(raw, "level", 85),
         seed=_optional_config_int(raw, "seed", 42),
         environment=active_env,
@@ -362,6 +367,10 @@ def validate_run_config(
         or config.incoming_attack_interval < 0.0
     ):
         errors.append("incoming_attack_interval must be a number greater than or equal to 0.")
+    for label in ("incoming_avoid_chance", "incoming_shield_chance"):
+        value = getattr(config, label)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0.0 <= value <= 100.0:
+            errors.append(f"{label} must be a number from 0 to 100.")
     if not isinstance(config.training_dummy_armor_debuff, bool):
         errors.append("training_dummy_armor_debuff must be true or false.")
     elif config.training_dummy_armor_debuff and not _is_file(actual_debuff):

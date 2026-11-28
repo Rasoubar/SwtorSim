@@ -428,6 +428,8 @@ def make_sim_builder(config_path, environment: str = "live", seed: int | None = 
                 inputs.rotation_config, inputs.stats_config, inputs.loadout_blueprints,
                 cfg.dummy_hp, inputs.debuff_module, seed=run_seed, tracer=tracer, config=cfg,
                 gcd_stall=gcd_stall, incoming_attack_interval=incoming,
+                incoming_avoid_chance=float(getattr(cfg, "incoming_avoid_chance", 0.0) or 0.0),
+                incoming_shield_chance=float(getattr(cfg, "incoming_shield_chance", 0.0) or 0.0),
             )
             if from_setup:  # what the simulator's own TEST run does after preparing
                 player.combat_distance = cfg.combat_distance

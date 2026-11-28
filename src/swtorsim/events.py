@@ -1,5 +1,6 @@
 """Discrete simulation event classes resolved by the priority queue."""
 
+import random
 from typing import TYPE_CHECKING #yellow warnings annoy me
 
 from src.swtorsim.combat_math import calculate_hit
@@ -98,6 +99,23 @@ class ApplyDamageLand(Event):
                 math_audit=getattr(self, "math_audit", None),
             )
 
+INCOMING_RESULT_LABELS = {"effResultParry": " (parried)", "effResultGlance": " (shielded)"}
+
+
+def incoming_attack_result(sim):
+    """TEMPORARY stand-in for a real defense / shield roll (user decision 2026-11-28, see TODO.md): the run
+    config's ``incoming_avoid_chance`` % of incoming attacks are avoided (effResultParry), then
+    ``incoming_shield_chance`` % of the landed ones are shielded (effResultGlance). None = a plain landed hit.
+    Each roll draws a random number only when its chance is above 0, so configs without them are unchanged."""
+    avoid = float(getattr(sim, "incoming_avoid_chance", 0.0) or 0.0)
+    shield = float(getattr(sim, "incoming_shield_chance", 0.0) or 0.0)
+    if avoid > 0.0 and random.random() * 100.0 < avoid:
+        return "effResultParry"
+    if shield > 0.0 and random.random() * 100.0 < shield:
+        return "effResultGlance"
+    return None
+
+
 class IncomingAttack(Event):
     """A landed area melee swing on the player. Fires damage-taken triggers and deals no health damage."""
 
@@ -123,11 +141,15 @@ class IncomingAttack(Event):
             "weapon_mode": 2,
             "final_damage": 0.0,
         }
+        outcome = incoming_attack_result(sim)
+        if outcome:
+            ctx["result"] = outcome
         if sim is not None and hasattr(sim, "triggers"):
             sim.triggers.dispatch("on_pre_damage_taken", sim, ctx)
             sim.triggers.dispatch("on_damage_taken", sim, ctx)
         if getattr(sim, "verbose", True):
-            sim_log(sim, f"Incoming attack on {getattr(self.victim, 'name', 'player')}")
+            label = INCOMING_RESULT_LABELS.get(outcome, "")
+            sim_log(sim, f"Incoming attack on {getattr(self.victim, 'name', 'player')}{label}")
         if sim is not None and self.interval > 0.0:
             sim.schedule_relative(
                 self.interval, IncomingAttack(self.attacker, self.victim, self.interval)

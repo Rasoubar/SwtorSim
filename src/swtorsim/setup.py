@@ -295,6 +295,8 @@ def prepare_simulation(
     pull_max_wait: float | None = None,
     gcd_stall: float = 0.0,
     incoming_attack_interval: float = 0.0,
+    incoming_avoid_chance: float = 0.0,
+    incoming_shield_chance: float = 0.0,
 ):
     """Prepares simulation entities from unified loadout blueprints."""
     active_abilities = {}
@@ -342,6 +344,9 @@ def prepare_simulation(
         random.seed(seed)
     sim = Simulation(verbose=verbose, seed=seed, tracer=tracer)
     sim.incoming_attack_interval = float(incoming_attack_interval)
+    # TEMPORARY stand-in for a defense / shield roll (see TODO.md; events.py :: incoming_attack_result).
+    sim.incoming_avoid_chance = float(incoming_avoid_chance)
+    sim.incoming_shield_chance = float(incoming_shield_chance)
     sim.incoming_attack_attacker = target
     sim.incoming_attack_victim = player
     player.current_target = target
