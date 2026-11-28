@@ -216,16 +216,22 @@ _CASTER_DAMAGE_DISPATCH = {
     "stat_cbt_damage_dealt_scale_channel_tech_modifier_fixed": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
 
     # Stat 449: stat_cbt_tech_damage_dealt_modifier
-    "449": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
-    "stat_cbt_tech_damage_dealt_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    # UNVERIFIED (user decision 2026-11-28): placed in BUCKET_1 like its sister stat 451 and the verified channel
+    # dealt scales (407 / 409) until an in-game test settles it. No live or PTS source uses it today.
+    "449": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
+    "stat_cbt_tech_damage_dealt_modifier": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_t),
 
     # Stat 450: stat_cbt_weapon_damage_dealt_modifier
-    "450": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
-    "stat_cbt_weapon_damage_dealt_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+    # UNVERIFIED (user decision 2026-11-28): placed in BUCKET_1 like its sister stat 451 and the verified channel
+    # dealt scales (407 / 409) until an in-game test settles it. No live or PTS source uses it today.
+    "450": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
+    "stat_cbt_weapon_damage_dealt_modifier": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_m or is_r),
 
     # Stat 451: stat_cbt_force_damage_dealt_modifier
-    "451": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
-    "stat_cbt_force_damage_dealt_modifier": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    # UNVERIFIED (user decision 2026-11-28): placed in BUCKET_1 like Shii-Cho Mastery's 409 (Test 15) until an in-game
+    # test settles it. Only source: PTS Obliterate "Shii Cho Mastery" buff. Test plan: TODO.md (Force Choke with/without buff).
+    "451": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
+    "stat_cbt_force_damage_dealt_modifier": (BUCKET_1, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: is_f),
 
     # Stat 454: stat_cbt_aoe_damage_dealt_modifier
     "454": (None, lambda target, is_m, is_r, is_f, is_t, dmg_type, tags, caster: _hit_is_aoe(tags)),
