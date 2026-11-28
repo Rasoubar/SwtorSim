@@ -96,11 +96,11 @@ $$T_{\text{scaled}} = \frac{T_{\text{base}}}{1 + \text{Alacrity}}$$
 
 Before a `"damage"` action creates a `DamageHit` event, [`accuracy_roll(caster, target, attack_type, is_offhand)`](../src/swtorsim/combat_math.py#L747-L760) determines whether the strike lands:
 
-$$\text{HitChance} = \text{Accuracy}_{\text{caster}} - \text{Defense}_{\text{target}} - \begin{cases} 0.33 & \text{if } \texttt{is\_offhand} \\ 0.00 & \text{otherwise} \end{cases}$$
+$$\text{HitChance} = \text{Accuracy}_{\text{caster}} - \text{Defense}_{\text{target}} - \begin{cases} 0.30 & \text{if } \texttt{is\_offhand} \\ 0.00 & \text{otherwise} \end{cases}$$
 
 - Operations Training Dummies have `defense_chance = 0.10` (`10%`).
 - Therefore, **`1.10` (`110%`) Accuracy** guarantees `100%` hit rate on main-hand and Force/Tech attacks (`1.10 - 0.10 = 1.00`).
-- Dual-wield off-hand weapon attacks incur a `-33%` (`0.33`) accuracy penalty (`0.77` hit chance at `110%` sheet accuracy).
+- Dual-wield off-hand weapon attacks incur a `-30%` (`0.30`) accuracy penalty (`0.70` base off-hand accuracy; `0.80` hit chance at `110%` sheet accuracy).
 
 ---
 

@@ -779,7 +779,7 @@ def accuracy_roll(
     is_tech = attack_type in (4, "tech", "Tech")
 
     if hand == "off":
-        base_acc = source.stats.get("Off Accuracy", 0.67)
+        base_acc = source.stats.get("Off Accuracy", 0.70)
     elif is_force:
         base_acc = source.stats.get("Force Accuracy", source.stats.get("Main Accuracy", 1.0))
     elif is_tech:
