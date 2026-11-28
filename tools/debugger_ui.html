@@ -33,7 +33,7 @@ button { cursor: pointer; }
 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 button:disabled { opacity: .55; cursor: wait; }
 #status { align-self: center; color: var(--muted); font-size: 13px; }
-main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; padding: 14px 16px; align-items: start; }
+main { display: grid; grid-template-columns: minmax(0, 1fr) clamp(440px, 38vw, 680px); gap: 14px; padding: 14px 16px; align-items: start; }
 .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
 .card h2 { font-size: 13px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }

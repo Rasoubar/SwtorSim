@@ -3817,3 +3817,5 @@ Added a "Beta" pill next to the app name and a dismissible bug-report banner (li
 - **Why:** result-filtered damage-taken triggers (Retaliation's enabler: Parry / Deflect / Dodge / Miss; Revenge; Glance-only shield procs such as Heat Screen, Kinetic Ward) never fired because incoming attacks always landed. To be replaced by a real defense / shield roll (TODO).
 - **Tester's Immortal (PTS, attacked every 1.5 s, seed 116216):** avoid 0% -> Retaliation 23 (24 Crushing Blows), 22,546 DPS; 20% -> 47, 25,972 DPS; 40% -> 66, 27,812 DPS; 20% avoid + 30% shield -> 47, 25,178 DPS.
 - **Tests:** `tests/test_incoming_avoid_shield.py` (7). Full suite: 709 tests, same 5 failures / 17 errors / 3 skips as before. `tools/dps_baseline.py`: all 9 configs unchanged.
+## 2026-11-28 Debugger details column wider
+- `tools/debugger_ui.html`: the right-hand details column was a fixed 360px and cramped; it is now `clamp(440px, 38vw, 680px)` (about 440px on a 1000px window, 680px on a wide one). The narrow-window single-column layout is unchanged. `dist/` rebuilt.
