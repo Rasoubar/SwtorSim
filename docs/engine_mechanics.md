@@ -230,14 +230,14 @@ Two separate questions:
 
 ### 6.5 Cast bars
 
-- **Cast time** = `(base x (1 + %mods - stat 256) + flat mods) / (1 + Alacrity stat)`, rounded to 4 decimals (stat 62 for cast-time mods). `ablIgnoreAlacrity` skips the division. The instant-reduction bonus does not apply.
+- **Cast time** = `(base x (1 + %mods) + flat mods) / (1 + Alacrity + cast-speed bonus)`, rounded to 4 decimals (stat 62 for cast-time mods, stat 256 for the cast-speed bonus). The bonus is extra Alacrity, the same way the GCD adds stat 274 **[choice]** (the user's call, 2026-11-28; no log measured yet). `ablIgnoreAlacrity` skips the division, bonus included. The instant-reduction bonus (274) does not apply.
 - During the bar the player can do nothing else.
 - **At the end of the bar** the cost is computed again (modifiers as they are now) and paid. If it cannot be paid the cast fails: no effects, no post-activate, and the next decision is scheduled. If it can, the entry effects execute, `on_ability_post_activate` fires, and the next decision is scheduled.
 - An interrupted cast (`ability_cancel`) does nothing at the end of the bar. The GCD and cooldown were already spent at cast start.
 
 ### 6.6 Channels
 
-- **Duration** = `(base x (1 + %mods - stat 257) + flat mods) / (1 + Alacrity stat)` (stat 63 for channel mods), rounded to 4 decimals.
+- **Duration** = `(base x (1 + %mods) + flat mods) / (1 + Alacrity + channel-speed bonus)` (stat 63 for channel mods, stat 257 for the channel-speed bonus), rounded to 4 decimals. The bonus is extra Alacrity, as for cast time **[choice]**.
 - **Tick count** is fixed by the base data: the base tick interval is the first effect tick interval found, else the smallest `on_tick` delay, else `min(1 s, duration / 3)`; stat 45 tick mods then apply; ticks = `round(base duration / base interval)`. The scaled interval is `scaled duration / ticks`, so faster channels keep every tick, only closer together (Penetrating Blasts keeps its 5th tick under Sniper Volley **[data]**).
 - **At channel start** the entry effects run immediately (the initial hit). If they cancel the channel, no ticks follow.
 - **Each tick** (first one 1 interval after the start) runs the `on_tick` branches of **every** effect of the ability, with the tick number (a branch with `tick_number` n only runs on tick n; 0 means every tick). These branches are run directly: the effects' own conditions and target overrides are not re-checked at tick time.

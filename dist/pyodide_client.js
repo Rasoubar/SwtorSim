@@ -427,7 +427,7 @@
       rejectWorkerReady(err);
     };
 
-    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1795865340" });
+    wState.worker.postMessage({ action: "INIT", assetsUrl: "swtorsim_assets.zip?v=1795869705" });
     return wState;
   }
 

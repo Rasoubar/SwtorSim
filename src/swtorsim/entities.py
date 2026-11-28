@@ -561,12 +561,16 @@ class Player(Entity):
         return round(scaled_gcd, 2)
 
     def calculate_cast_time(self, base_cast_time: float, ability: Any = None) -> float:
-        """Calculates ability cast time after flat/percentage modifiers (STAT_abl_time_casting, 62) and Alacrity scaling."""
+        """Calculates ability cast time after flat/percentage modifiers (STAT_abl_time_casting, 62) and Alacrity scaling.
+
+        The cast-speed bonus (stat 256) is extra Alacrity, added to the Alacrity stat the way the GCD adds stat 274.
+        """
         if base_cast_time <= 0.0:
             return 0.0
 
         flat_mod = 0.0
         pct_mod = 1.0
+        alacrity_bonus = 0.0
 
         if ability is not None:
             if isinstance(ability, str):
@@ -594,7 +598,7 @@ class Player(Entity):
                             flat_mod += mod.value
                 elif stat in ("256", "STAT_cbt_spell_casting_reduction_percentage"):
                     if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
-                        pct_mod -= val
+                        alacrity_bonus += val
 
         adjusted_base = max(0.0, (base_cast_time * pct_mod) + flat_mod)
         if adjusted_base <= 0.0:
@@ -606,15 +610,20 @@ class Player(Entity):
 
         if ignore_alacrity:
             return round(adjusted_base, 4)
-        return round(self.scale_time_modifier(adjusted_base), 4)
+        total_alacrity = self.stats.get("Alacrity", 0.0) + alacrity_bonus
+        return round(adjusted_base / (1.0 + total_alacrity), 4)
 
     def calculate_channel_duration(self, base_duration: float, ability: Any = None) -> float:
-        """Calculates channel duration after flat/percentage modifiers (STAT_abl_time_channeling, 63) and Alacrity scaling."""
+        """Calculates channel duration after flat/percentage modifiers (STAT_abl_time_channeling, 63) and Alacrity scaling.
+
+        The channel-speed bonus (stat 257) is extra Alacrity, added to the Alacrity stat the way the GCD adds stat 274.
+        """
         if base_duration <= 0.0:
             return 0.0
 
         flat_mod = 0.0
         pct_mod = 1.0
+        alacrity_bonus = 0.0
 
         if ability is not None:
             if isinstance(ability, str):
@@ -642,7 +651,7 @@ class Player(Entity):
                             flat_mod += mod.value
                 elif stat in ("257", "STAT_cbt_spell_channeling_reduction_percentage"):
                     if mod.applies_to(ability_fqn=abl_fqn, ability_tags=abl_tags):
-                        pct_mod -= val
+                        alacrity_bonus += val
 
         adjusted_base = max(0.0, (base_duration * pct_mod) + flat_mod)
         if adjusted_base <= 0.0:
@@ -654,7 +663,8 @@ class Player(Entity):
 
         if ignore_alacrity:
             return round(adjusted_base, 4)
-        return round(self.scale_time_modifier(adjusted_base), 4)
+        total_alacrity = self.stats.get("Alacrity", 0.0) + alacrity_bonus
+        return round(adjusted_base / (1.0 + total_alacrity), 4)
 
     def calculate_cooldown(self, base_cooldown: float, ability: Any = None) -> float:
         """Calculates ability cooldown after flat/percentage modifiers and scaled by current Alacrity CDR."""
