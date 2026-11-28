@@ -21,7 +21,7 @@ Unlike spreadsheet calculators or hardcoded rotation scripts, SwtorSim extracts 
 - **Dual-Mode Execution**:
   - **Native Mode**: Fast CLI and local web dashboard powered by Python `multiprocessing.Pool`.
   - **Browser-Only WebAssembly Mode**: Standalone static build (`dist/`) running parallel Pyodide Web Workers in the user's browser—deployable to GitHub Pages, Cloudflare Pages, or Netlify with zero server cost.
-- **Visual Rotation Builder**: Interactive browser-based rotation editor (`data/rotation_builder.py --ui`) with a visual Rotation Map and Cast Timeline.
+- **Visual Rotation Builder**: Interactive browser-based rotation editor (`src/swtorsim/rotation_builder.py`) with a visual Rotation Map and Cast Timeline.
 
 ---
 
@@ -83,14 +83,10 @@ Run a simulation directly from `run_config.json`:
 Launch the browser-based Rotation Builder directly:
 
 ```powershell
-.\.venv\Scripts\python.exe data/rotation_builder.py --ui
+.\.venv\Scripts\python.exe src/swtorsim/rotation_builder.py
 ```
 
-Or run the terminal-based rotation builder wizard:
-
-```powershell
-.\.venv\Scripts\python.exe data/rotation_builder.py
-```
+`--port` changes the listen port (default 8765). `--no-browser` starts the server without opening a tab.
 
 ### 4. Extract Game Data from a SWTOR Installation
 
@@ -132,7 +128,6 @@ SwtorSim/
 │   ├── builds/                  # Character stat profiles (Mastery, Power, Crit, Alacrity, Accuracy, Weapon dmg)
 │   ├── choices/                 # Discipline skill-tree tier selections
 │   ├── rotations/               # Priority & sequential ability rotation JSON files
-│   ├── rotation_builder.py      # CLI + HTTP backend for the Rotation Builder
 │   └── extractor/               # Extracted & parsed game data blueprints
 │       ├── combat_curves.json   # Level-indexed DR curves, armor constants, standard damage tables
 │       ├── disciplines/         # Class discipline definitions & skill tree layouts
@@ -164,6 +159,7 @@ SwtorSim/
 │   │   ├── metrics.py           # Damage breakdown, execute phase (<30% HP), and buff uptime tracker
 │   │   ├── tester.py            # Single-run and multiprocessing Monte Carlo runner
 │   │   ├── web_gui.py           # Local Web GUI server & UI
+│   │   ├── rotation_builder.py  # Rotation Builder HTTP backend and dry-run
 │   │   └── pyodide_bridge.py    # WebAssembly bridge for in-browser execution
 │   ├── extractor/               # Binary .tor (MYP) & GOM (.bkt / .stb) Game Data Extractor
 │   └── diminishing_returns/     # Empirical DR curve-fitting utility

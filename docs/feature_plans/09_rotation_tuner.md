@@ -49,7 +49,7 @@ Not in scope:
   - `caster_buff_stacks` (and aliases), `target_debuff_stacks` (and alias): dict with one of `stacks` / `count` / `value` / `charges`, or a list `[name, stacks, comparison]`.
   - Buff/debuff presence rules: strings or lists (no numbers; not tuned).
 - `lead_time` (seconds) may be set on steps and pool entries (`rotation.py`); `DEFAULT_OFF_GCD_LEAD_TIME = 0.1`, overridable per rotation by the top-level `default_lead_time`.
-- `data/rotation_builder.py :: normalize_rotation_steps` (around line 714) validates/normalizes step lists and returns warnings; `build_rotation_file_data` (around line 864) writes the bare-list or wrapper form.
+- `src/swtorsim/rotation_builder.py :: normalize_rotation_steps` validates/normalizes step lists and returns warnings; `build_rotation_file_data` writes the bare-list or wrapper form.
 - Plan 00 provides `rotation_inline` (run a payload with an in-memory rotation) and experiment kinds with multi-round driving.
 - Saving: `POST /api/custom_file/import` with `category: "rotations"`, `class_folder`, `spec_folder`, `filename`, `content` (native writes CRLF JSON under `data/rotations/custom/<class>/<spec>/`; WASM stores it in browser storage).
 - Max resource for clamping energy thresholds: `computed_player_stats.max_resource` (from `preview_character_stats`).
@@ -65,7 +65,7 @@ def to_working_form(rotation) -> dict:
     """{"sequence": [...], "weave": [...], "pre_combat": [...], "pull_conditions": {...}, "pull_max_wait": x} (deep copy)."""
 
 def from_working_form(work: dict):
-    """Inverse; uses data.rotation_builder.build_rotation_file_data so saved files match the Builder's format."""
+    """Inverse; uses src.swtorsim.rotation_builder.build_rotation_file_data so saved files match the Builder's format."""
 ```
 
 ### 5.2 Mutation model (`src/swtorsim/rotation_mutations.py`, new, pure)
@@ -181,7 +181,7 @@ Budget estimate (for the modal): `fights <= generations * (max_neighbors * n_scr
 ### 5.4 Save flow
 
 - Filename suggestion: `<original stem>_tuned.json`; if it exists, `_tuned_2`, ...
-- `POST /api/custom_file/import` with `category: "rotations"`, `class_folder` / `spec_folder` from the current spec (same folder logic the Rotation Builder uses: `rotation_folder_defaults(spec_path)` in `data/rotation_builder.py`), `content: tuned_rotation`.
+- `POST /api/custom_file/import` with `category: "rotations"`, `class_folder` / `spec_folder` from the current spec (same folder logic the Rotation Builder uses: `rotation_folder_defaults(spec_path)` in `src/swtorsim/rotation_builder.py`), `content: tuned_rotation`.
 - Reload the catalog and select the new rotation.
 - "Open in Rotation Builder" uses the existing launcher (`/api/launch_rotation_builder`) and passes the path if the builder supports it (check its query parameters; otherwise just open it).
 

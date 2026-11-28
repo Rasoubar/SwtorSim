@@ -219,7 +219,7 @@ A rotation file is either a bare list of steps or a dict wrapper:
 }
 ```
 
-Step types (`src/swtorsim/rotation.py :: Rotation.build_steps`): `fixed` (`ability_id`), `optional` (`ability_id`, `rules`), `priority_block` (`name`, `pool: [{ability_id, rules, lead_time?}]`), `loop_anchor`. Optional `lead_time` on steps and pool entries. Rule keys are the keys of `CONDITION_REGISTRY` in `src/swtorsim/requirements.py`: `target_hp_below_pct`, `target_hp_above_pct`, `target_has_debuff`, `target_doesnt_have_debuff`, `caster_has_buff`, `caster_does_not_have_buff`, `caster_energy_above`, `caster_energy_below`, `proc_cooldown_above`, `ability_cooldown_under`, `ability_cooldown_above`, `caster_buff_stacks`, `target_debuff_stacks`. The Rotation Builder normalizes files with `data/rotation_builder.py :: normalize_rotation_steps` and writes them with `build_rotation_file_data`.
+Step types (`src/swtorsim/rotation.py :: Rotation.build_steps`): `fixed` (`ability_id`), `optional` (`ability_id`, `rules`), `priority_block` (`name`, `pool: [{ability_id, rules, lead_time?}]`), `loop_anchor`. Optional `lead_time` on steps and pool entries. Rule keys are the keys of `CONDITION_REGISTRY` in `src/swtorsim/requirements.py`: `target_hp_below_pct`, `target_hp_above_pct`, `target_has_debuff`, `target_doesnt_have_debuff`, `caster_has_buff`, `caster_does_not_have_buff`, `caster_energy_above`, `caster_energy_below`, `proc_cooldown_above`, `ability_cooldown_under`, `ability_cooldown_above`, `caster_buff_stacks`, `target_debuff_stacks`. The Rotation Builder normalizes files with `src/swtorsim/rotation_builder.py :: normalize_rotation_steps` and writes them with `build_rotation_file_data`.
 
 ### 7.4 Ability lookup by rotation id
 

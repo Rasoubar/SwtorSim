@@ -7,8 +7,8 @@ import re
 import unittest
 from pathlib import Path
 
-from data import rotation_builder
-from data.rotation_builder import run_dry_run_preview
+from src.swtorsim import rotation_builder
+from src.swtorsim.rotation_builder import run_dry_run_preview
 from src.swtorsim import settings
 
 ROOT = Path(__file__).resolve().parents[1]

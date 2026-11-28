@@ -1,5 +1,5 @@
 // Guided rule (condition) form shared by the Rotation Builder's rule modal and the Rotation Map's
-// rule popover. Served as rule_form.js by data/rotation_builder.py and copied to dist/ by
+// rule popover. Served as rule_form.js by src/swtorsim/rotation_builder.py and copied to dist/ by
 // tools/build_web_release.py. One form at a time per page: the fields use fixed element ids.
 (function (global) {
   "use strict";

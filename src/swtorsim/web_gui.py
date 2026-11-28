@@ -1824,7 +1824,7 @@ def ensure_rotation_builder_running(host: str = "127.0.0.1", default_port: int =
             _ROTATION_BUILDER_PORT = default_port
             return f"http://{host}:{default_port}"
 
-        from data.rotation_builder import RotationBuilderRequestHandler
+        from src.swtorsim.rotation_builder import RotationBuilderRequestHandler
 
         for candidate in range(default_port, default_port + 20):
             # Windows' SO_REUSEADDR lets bind() succeed on an occupied port, so probe first.

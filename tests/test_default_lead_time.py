@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from data.rotation_builder import build_rotation_file_data, normalize_default_lead
+from src.swtorsim.rotation_builder import build_rotation_file_data, normalize_default_lead
 from src.swtorsim.entities import Dummy, Player
 from src.swtorsim.rotation import DEFAULT_OFF_GCD_LEAD_TIME, Rotation, resolve_default_lead_time
 

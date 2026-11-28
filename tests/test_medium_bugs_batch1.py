@@ -35,7 +35,7 @@ class BridgeBuildStatsParityTests(unittest.TestCase):
         self.assertIn("error", out)
 
     def test_builder_run_config_prefers_choices_override(self):
-        from data import rotation_builder as rb
+        from src.swtorsim import rotation_builder as rb
 
         res = rb.load_builder_run_config("data/run_config/Hatred.json")
         raw = res["run_config"]

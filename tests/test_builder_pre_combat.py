@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import unittest
 
-from data.rotation_builder import (
+from src.swtorsim.rotation_builder import (
     build_rotation_file_data,
     class_tactical_fqns,
     normalize_pre_combat_steps,
@@ -83,11 +83,11 @@ class BuilderPullGateTests(unittest.TestCase):
 
     def test_wait_until_step_round_trip(self):
         pre = [{"wait_until": {"caster_has_buff": "Recklessness"}, "max_wait": 10.0}]
-        from data.rotation_builder import normalize_pre_combat_steps as norm
+        from src.swtorsim.rotation_builder import normalize_pre_combat_steps as norm
         self.assertEqual(norm({"pre_combat": pre, "sequence": ROTATION}), pre)
 
     def test_pull_gate_only_wrapper(self):
-        from data.rotation_builder import normalize_pull_gate
+        from src.swtorsim.rotation_builder import normalize_pull_gate
         data = build_rotation_file_data(ROTATION, [], self.PULL, 20)
         self.assertEqual(data, {"pull_conditions": self.PULL, "pull_max_wait": 20.0, "sequence": ROTATION})
         self.assertEqual(normalize_pull_gate(data), {"pull_conditions": self.PULL, "pull_max_wait": 20.0})

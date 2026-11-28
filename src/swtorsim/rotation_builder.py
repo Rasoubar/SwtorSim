@@ -1,7 +1,6 @@
-"""Interactive CLI and browser-based rotation builder for authoring SwtorSim rotation JSON files."""
+"""Browser-based rotation builder for authoring SwtorSim rotation JSON files."""
 
 import argparse
-import copy
 import json
 import os
 import re
@@ -13,18 +12,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-SWTORSIM_ROOT = Path(__file__).resolve().parents[1]
+SWTORSIM_ROOT = Path(__file__).resolve().parents[2]
 if str(SWTORSIM_ROOT) not in sys.path:
     sys.path.insert(0, str(SWTORSIM_ROOT))
 
-from src.swtorsim.cli import (
-    index_disciplines,
-    select_discipline_path,
-    select_legendaries,
-    select_relics,
-    select_skill_tree_choices,
-    select_tactical,
-)
+from src.swtorsim.cli import index_disciplines
 from src.swtorsim.config_load import fqn_to_relative_path, load_json_file
 from src.swtorsim.run_config import (
     BUILDS_DIR,
@@ -1515,257 +1507,14 @@ def launch_web_builder(host: str = "127.0.0.1", port: int = 8765, open_browser: 
         server.server_close()
 
 
-# ---------------------------------------------------------------------------
-# Legacy Terminal CLI Builder (preserved for --cli mode and existing callers)
-# ---------------------------------------------------------------------------
-
-
-def get_input(prompt, type_func=str, default=None):
-    """Helper function to safely capture and format terminal input."""
-    default_str = f" [Default: {default}]" if default is not None else " [Required]"
-    while True:
-        user_input = input(f"{prompt}{default_str}: ").strip()
-        if not user_input:
-            if default is not None:
-                return default
-            print("[FAIL] This field is required. Please try again.")
-            continue
-        try:
-            if type_func == bool:
-                if user_input.lower() in ["y", "yes", "t", "true", "1"]:
-                    return True
-                elif user_input.lower() in ["n", "no", "f", "false", "0"]:
-                    return False
-                else:
-                    print("[FAIL] Please enter 'y' or 'n'.")
-                    continue
-
-            return type_func(user_input)
-        except ValueError:
-            print(f"[FAIL] Invalid format. Expected {type_func.__name__}. Try again.")
-
-
-def build_rules(indent="  "):
-    """Interactively builds a dictionary of conditional rules for a rotation step."""
-    rules = {}
-    print(f"\n{indent}--- Adding Rules (Conditions) ---")
-    print(f"{indent}Examples: caster_energy_below, caster_has_buff, target_hp_below_pct")
-
-    while get_input(f"{indent}Add a rule? (y/n)", bool, False):
-        key = get_input(f"{indent}Rule Key", str)
-        is_nested = get_input(f"{indent}Is the value for '{key}' a nested dictionary? (y/n)", bool, False)
-
-        if is_nested:
-            nested_dict = {}
-            print(f"{indent}  [Building Nested Dictionary for '{key}']")
-            while True:
-                sub_key = get_input(f"{indent}  Sub-key (e.g., 'name' or 'value')", str)
-                sub_val_str = get_input(f"{indent}  Value for '{sub_key}'", str)
-
-                if sub_val_str.lower() in ["true", "false"]:
-                    sub_val = sub_val_str.lower() == "true"
-                else:
-                    try:
-                        sub_val = float(sub_val_str) if "." in sub_val_str else int(sub_val_str)
-                    except ValueError:
-                        sub_val = sub_val_str
-
-                nested_dict[sub_key] = sub_val
-
-                if not get_input(f"{indent}  Add another sub-key to '{key}'? (y/n)", bool, False):
-                    break
-
-            rules[key] = nested_dict
-            print(f"{indent}[OK] Added nested rule: '{key}': {nested_dict}")
-
-        else:
-            val_str = get_input(f"{indent}Value for '{key}'", str)
-
-            if val_str.lower() in ["true", "false"]:
-                val = val_str.lower() == "true"
-            else:
-                try:
-                    val = float(val_str) if "." in val_str else int(val_str)
-                except ValueError:
-                    val = val_str
-
-            rules[key] = val
-            print(f"{indent}[OK] Added rule: '{key}': {val}")
-
-    return rules
-
-
-def pick_ability(catalog: list[CastableAbility], prompt: str = "Select ability number: ") -> str:
-    """Shows the castable list and returns the chosen ability FQN."""
-    if not catalog:
-        raise ValueError("No castable abilities to choose from.")
-
-    for idx, ability in enumerate(catalog, 1):
-        suffix = "" if ability.triggers_gcd else " (off-GCD)"
-        print(f"  [{idx}] {ability.name}{suffix}")
-
-    while True:
-        try:
-            choice_idx = int(input(prompt).strip()) - 1
-            if 0 <= choice_idx < len(catalog):
-                return catalog[choice_idx].fqn
-            print(f"  [FAIL] Invalid selection. Please enter a number between 1 and {len(catalog)}.")
-        except ValueError:
-            print(f"  [FAIL] Invalid selection. Please enter a number between 1 and {len(catalog)}.")
-
-
 def rotation_folder_defaults(spec_path: str) -> tuple[str, str]:
     """Class and spec folder names from a discipline path, not its display names."""
     path = Path(spec_path)
     return path.parent.name, path.stem
 
 
-def cli_main():
-    os.chdir(SWTORSIM_ROOT)
-    print("=========================================")
-    print("      SWTOR SIM - ROTATION BUILDER       ")
-    print("=========================================")
-
-    class_name, _spec, spec_path = select_discipline_path()
-    choices = select_skill_tree_choices(spec_path)
-    tactical_fqn = select_tactical(class_name)
-    legendary_fqns = select_legendaries(class_name)
-    relic_fqns = select_relics()
-    catalog = build_castable_catalog(
-        spec_path,
-        choices,
-        tactical_fqn=tactical_fqn,
-        legendary_fqns=legendary_fqns,
-        relic_fqns=relic_fqns,
-    )
-    if not catalog:
-        print("[WARN] No castable abilities found. Exiting without saving.")
-        return
-
-    default_class, default_spec = rotation_folder_defaults(spec_path)
-    rotation = []
-    saved_templates = {}
-
-    while True:
-        print("\nWhat kind of step do you want to add to the timeline?")
-        print("  1. Fixed Cast (No rules. Engine waits until ability is ready)")
-        print("  2. Optional Cast (Has rules. Engine skips it if rules fail)")
-        print("  3. Priority Block (A pool of abilities evaluated top-to-bottom)")
-        print("  4. Loop Anchor (Marks where the rotation restarts after an opener)")
-        print("  5. Insert Saved Template (Paste a previously saved block/cast)")
-        print("  0. Finish & Save Rotation")
-
-        choice = get_input("Select an option", int)
-
-        if choice == 0:
-            break
-
-        elif choice == 1:
-            print("\n--- Adding FIXED Step ---")
-            ability_id = pick_ability(catalog)
-            rotation.append({"type": "fixed", "ability_id": ability_id})
-            print(f"[OK] Fixed step '{ability_id}' added.")
-
-        elif choice == 2:
-            print("\n--- Adding OPTIONAL Step ---")
-            ability_id = pick_ability(catalog)
-            rules = build_rules()
-
-            lead_time = get_input("  Lead time before next GCD in seconds (e.g., 0.2, 0.0 for instant at GCD):", float, 0.0)
-            step_dict = {"type": "optional", "ability_id": ability_id, "rules": rules}
-            if lead_time > 0.0:
-                step_dict["lead_time"] = lead_time
-            rotation.append(step_dict)
-            print(f"[OK] Optional step '{ability_id}' added.")
-
-            if get_input("  Save this Optional Step as a template for reuse? (y/n)", bool, False):
-                t_name = get_input("  Enter a short template name (e.g., 'reck_opt')", str)
-                saved_templates[t_name] = step_dict
-                print(f"  [OK] Template '{t_name}' saved to clipboard.")
-
-        elif choice == 3:
-            print("\n--- Adding PRIORITY BLOCK ---")
-            block_name = get_input("Block Name (e.g., Main Priority Window)", str)
-            pool = []
-
-            while True:
-                print(f"\n  [Pool: {block_name}] Current size: {len(pool)}")
-                add_ability = get_input("  Add an ability to this priority pool? (y/n)", bool, True)
-                if not add_ability:
-                    break
-
-                ab_id = pick_ability(catalog, prompt="  Select ability number: ")
-                ab_rules = build_rules(indent="    ")
-                pool.append({"ability_id": ab_id, "rules": ab_rules})
-                print(f"  [OK] Added '{ab_id}' to pool.")
-
-            step_dict = {"type": "priority_block", "name": block_name, "pool": pool}
-            rotation.append(step_dict)
-            print(f"[OK] Priority Block '{block_name}' added.")
-
-            if get_input("  Save this Priority Block as a template for reuse? (y/n)", bool, False):
-                t_name = get_input("  Enter a short template name (e.g., 'main_filler')", str)
-                saved_templates[t_name] = step_dict
-                print(f"  [OK] Template '{t_name}' saved to clipboard.")
-
-        elif choice == 4:
-            print("\n--- Adding LOOP ANCHOR ---")
-            rotation.append({"type": "loop_anchor"})
-            print("[OK] Loop Anchor added. Everything below this will repeat indefinitely.")
-
-        elif choice == 5:
-            print("\n--- INSERT SAVED TEMPLATE ---")
-            if not saved_templates:
-                print("[WARN] Your clipboard is empty. Create an Optional or Priority step and save it first.")
-                continue
-
-            print("Available templates:")
-            for name in saved_templates.keys():
-                print(f"  - {name}")
-
-            template_name = get_input("Enter template name to insert", str)
-            if template_name in saved_templates:
-                rotation.append(copy.deepcopy(saved_templates[template_name]))
-                print(f"[OK] Successfully inserted template '{template_name}'.")
-            else:
-                print("[WARN] Template not found. Skipping.")
-
-        else:
-            print("[FAIL] Invalid choice. Select 0-5.")
-
-    if not rotation:
-        print("[WARN] Rotation sequence is empty. Exiting without saving.")
-        return
-
-    print("\n=========================================")
-    print("             SAVE & EXPORT               ")
-
-    class_name = get_input("Enter Class folder (e.g., assassin)", str, default_class)
-    spec_name = get_input("Enter Spec folder (e.g., hatred)", str, default_spec)
-
-    target_dir = os.path.join("data", "rotations", class_name, spec_name)
-    os.makedirs(target_dir, exist_ok=True)
-
-    save_path = get_input("Enter filename to save (e.g., Hybrid.json)", str, "StandardRotation.json")
-
-    if not save_path.endswith(".json"):
-        save_path += ".json"
-
-    full_path = os.path.join(target_dir, save_path)
-
-    with open(full_path, "w", encoding="utf-8") as f:
-        json.dump(rotation, f, indent=4)
-
-    print(f"\n[OK] SUCCESS! Rotation safely exported to {full_path}")
-
-
 def main():
-    parser = argparse.ArgumentParser(description="SwtorSim Rotation Builder (Web UI & CLI)")
-    parser.add_argument(
-        "--cli",
-        action="store_true",
-        help="Use the legacy interactive terminal prompt instead of the Web UI.",
-    )
+    parser = argparse.ArgumentParser(description="SwtorSim Rotation Builder web UI")
     parser.add_argument(
         "--port",
         type=int,
@@ -1778,11 +1527,7 @@ def main():
         help="Start the Web UI server without automatically opening a browser tab.",
     )
     args = parser.parse_args()
-
-    if args.cli:
-        cli_main()
-    else:
-        launch_web_builder(port=args.port, open_browser=not args.no_browser)
+    launch_web_builder(port=args.port, open_browser=not args.no_browser)
 
 
 if __name__ == "__main__":

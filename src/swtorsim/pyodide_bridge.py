@@ -28,7 +28,7 @@ from src.swtorsim.web_gui import (
     preview_character_stats,
     set_simulation_progress_callback,
 )
-from data.rotation_builder import (
+from src.swtorsim.rotation_builder import (
     _resolve_workspace_path,
     build_rotation_file_data,
     discover_loadout_catalog,

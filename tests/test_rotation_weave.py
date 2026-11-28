@@ -4,7 +4,7 @@ import os
 import unittest
 from pathlib import Path
 
-from data.rotation_builder import (
+from src.swtorsim.rotation_builder import (
     build_rotation_file_data,
     normalize_rotation_steps,
     normalize_weave_steps,
