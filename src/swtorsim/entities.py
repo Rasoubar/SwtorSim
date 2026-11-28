@@ -930,7 +930,7 @@ class Player(Entity):
             + self.permanent_bonuses.get("Critical Modifier", 0.0)
         )
         temp_stats["Main Accuracy"] = 1 + acc_base + bonuses["Accuracy"]
-        temp_stats["Off Accuracy"] = 0.70 + acc_base + bonuses["Accuracy"]
+        temp_stats["Off Accuracy"] = 0.77 + acc_base + bonuses["Accuracy"]
         temp_stats["Melee Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Melee Accuracy"]
         temp_stats["Ranged Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Ranged Accuracy"]
         temp_stats["Force Accuracy"] = temp_stats["Main Accuracy"] + bonuses["Force Accuracy"]
